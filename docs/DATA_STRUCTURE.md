@@ -2,95 +2,112 @@
 
 ## Firestore Collections Schema
 
-### 1. Users Collection
+### 1. Users Collection (Common fields)
 
 **Path:** `users/{userId}`
 
-**Purpose:** Store user profile and authentication data
+**Purpose:** Store common user profile data. Role-specific data is in subcollections to keep documents small, enable granular security rules, and isolate PII.
 
 **Document Schema:**
 ```typescript
 interface User {
-  // Common fields
   uid: string;                          // Firebase Auth UID
   email: string;
   firstName: string;
   lastName: string;
-  role: "applicant" | "lender";         // User type
-  profileComplete: boolean;              // Profile completion status
+  role: "applicant" | "lender";
+  profileComplete: boolean;
   status: "active" | "suspended" | "inactive";
   profilePhotoUrl?: string;
-  
-  // Timestamps
+
   createdAt: Timestamp;
   updatedAt: Timestamp;
   lastLoginAt?: Timestamp;
-  
-  // Additional metadata
+
   phoneVerified: boolean;
   emailVerified: boolean;
-  twoFactorEnabled: boolean;
 }
 ```
 
-**Applicant Sub-fields:**
+**Indexes Required:**
+- `users.role` (Ascending)
+- `users.status` (Ascending)
+- `users.createdAt` (Descending)
+
+---
+
+### 1a. Applicant Profile Subcollection
+
+**Path:** `users/{userId}/applicantProfile/profile` (single document)
+
+**Purpose:** Store applicant-specific personal, employment, and credit data.
+
+**PII Encryption:** Fields marked with `🔒` are encrypted at the application layer using AES-256-GCM before writing to Firestore. They are stored as opaque strings and decrypted server-side on read. See PLATFORM_PLAN.md Section 8.3 for implementation.
+
 ```typescript
-interface ApplicantProfile extends User {
+interface ApplicantProfile {
   // Personal Information
-  dateOfBirth: string;                   // YYYY-MM-DD
-  ssn?: string;                          // Last 4 digits only (encrypted)
+  dateOfBirth: string;                   // 🔒 Encrypted (YYYY-MM-DD)
+  ssn?: string;                          // 🔒 Encrypted (last 4 digits)
   phone: string;
-  
+
   // Address
   address: string;
   city: string;
   state: string;
   zipCode: string;
   country: string;
-  
+
   // Employment
   employmentStatus: "employed" | "self-employed" | "unemployed" | "retired";
   employerName?: string;
   jobTitle?: string;
   yearsAtCurrentJob?: number;
-  annualIncome: number;
-  
+  annualIncome: string;                  // 🔒 Encrypted (number as string)
+
   // Credit Information
-  creditScore?: number;
+  creditScore?: string;                  // 🔒 Encrypted (number as string)
   creditHistory: {
     accounts: number;
     inquiries: number;
     latePayments: number;
     totalDebt: number;
   };
-  
+
   // Documents
   identityVerified: boolean;
   incomeVerified: boolean;
-  
+
   // Preferences
   loanPreferences: {
-    preferredLoanTerms: number[];        // Months
-    maxDesiredRate: number;               // Percentage
+    preferredLoanTerms: number[];
+    maxDesiredRate: number;
     notificationPreferences: string[];
   };
 }
 ```
 
-**Lender Sub-fields:**
+---
+
+### 1b. Lender Profile Subcollection
+
+**Path:** `users/{userId}/lenderProfile/profile` (single document)
+
+**Purpose:** Store lender business information, verification, metrics, and preferences.
+
 ```typescript
-interface LenderProfile extends User {
+interface LenderProfile {
   // Business Information
   businessName: string;
   businessEntity: "sole_proprietor" | "llc" | "corporation" | "partnership";
-  einOrTaxId: string;                    // Partially masked
+  einOrTaxId: string;                    // 🔒 Encrypted
   businessType: "traditional_lender" | "crowdfunding" | "peer_to_peer" | "other";
   yearsInBusiness: number;
-  
+
   // Lending Capacity
   annualFundingCapacity: number;
   currentlyAvailable: number;
-  
+
   // Verification
   verification: {
     isVerified: boolean;
@@ -100,44 +117,37 @@ interface LenderProfile extends User {
     approvedBy?: string;
     approvalDate?: Timestamp;
   };
-  
+
   // Performance Metrics
   metrics: {
     activeLoans: number;
     totalFundsDispersed: number;
     totalLoansCompleted: number;
-    averageROI: number;                  // %
-    defaultRate: number;                 // %
-    earlyPayoffRate: number;             // %
-    averageLoanDuration: number;         // months
+    averageROI: number;
+    defaultRate: number;
+    earlyPayoffRate: number;
+    averageLoanDuration: number;
   };
-  
-  // Banking Details (Encrypted)
+
+  // Banking Details
   bankingInfo?: {
     bankName: string;
     accountType: "checking" | "savings" | "money_market";
-    routingNumber: string;               // Partially masked
-    accountNumber: string;               // Last 4 only
+    routingNumber: string;               // 🔒 Encrypted
+    accountNumber: string;               // 🔒 Encrypted (last 4)
     verified: boolean;
   };
-  
+
   // Preferences
   lendingPreferences: {
     minCreditScore: number;
     maxDebtToIncome: number;
     preferredLoanTypes: string[];
     geographicFocus?: string[];
-    autoApprovalThreshold?: number;     // Loan amount
+    autoApprovalThreshold?: number;
   };
 }
 ```
-
-**Indexes Required:**
-- `users.role` (Ascending)
-- `users.status` (Ascending)
-- `users.createdAt` (Descending)
-- `applicant users.creditScore` (Descending)
-- `lender users.metrics.activeLoans` (Descending)
 
 ---
 
@@ -153,7 +163,7 @@ interface LoanApplication {
   // Identifiers
   applicationId: string;                 // UUID
   applicantId: string;                   // Reference to users/{userId}
-  lenderId?: string;                     // Assigned lender (null if unassigned)
+  // Single-lender model: no lenderId field needed. The lender sees all submitted applications.
   
   // Status Tracking
   status: "draft" | "submitted" | "under_review" | "approved" | 
@@ -210,8 +220,8 @@ interface LoanApplication {
     lastAssessedAt?: Timestamp;
   };
   
-  // Approval Workflow
-  approvals: LenderApproval[];
+  // Approval (single lender decision)
+  approval?: LenderApproval;
   
   // Timeline
   timeline: {
@@ -227,10 +237,6 @@ interface LoanApplication {
   
   // Metadata
   metadata: {
-    viewedBy: Array<{
-      userId: string;
-      viewedAt: Timestamp;
-    }>;
     comments: Comment[];
     internalNotes: string;
   };
@@ -337,32 +343,39 @@ interface Loan {
 }
 ```
 
-**Sub-collection: Payments**
+### 4. Payments Collection (Top-Level)
 
-**Path:** `loans/{loanId}/payments/{paymentId}`
+**Path:** `payments/{paymentId}`
+
+**Purpose:** Payments are a top-level collection (not a subcollection under loans) to enable cross-loan queries such as "all payments for the lender" or "all overdue payments" without needing collection group queries.
 
 ```typescript
 interface Payment {
   paymentId: string;
-  loanId: string;
-  
+  loanId: string;                        // Reference to loans
+  applicantId: string;                   // Reference to users (denormalized for querying)
+  lenderId: string;                      // Reference to users (denormalized for querying)
+
   // Payment Details
   amount: number;
   principal: number;
   interest: number;
-  
+
   // Dates
   dueDate: Timestamp;
   paidDate?: Timestamp;
   processedAt?: Timestamp;
-  
+
   // Status
   status: "scheduled" | "pending" | "completed" | "failed" | "reversed";
-  
+
   // Payment Method
   method: "bank_transfer" | "card" | "ach" | "check" | "manual";
   transactionId?: string;
-  
+
+  // Idempotency
+  idempotencyKey: string;                // Client-generated UUID, prevents duplicate processing
+
   // Metadata
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -370,119 +383,16 @@ interface Payment {
 }
 ```
 
+**Indexes Required:**
+- `payments.loanId` (Ascending)
+- `payments.applicantId, payments.status` (Composite)
+- `payments.lenderId, payments.status` (Composite)
+- `payments.dueDate` (Ascending)
+- `payments.idempotencyKey` (Ascending, unique)
+
 ---
 
-### 4. Feature Flags Collection
-
-**Path:** `featureFlags/{flagId}`
-
-**Purpose:** Store feature flag configurations for deployment control
-
-**Document Schema:**
-```typescript
-interface FeatureFlag {
-  // Identity
-  flagId: string;
-  name: string;                          // kebab-case: "new_dashboard", "advanced_search"
-  description: string;
-  
-  // Basic Control
-  enabled: boolean;                      // Master switch
-  rolloutPercentage: number;             // 0-100
-  
-  // Targeting
-  targetRoles: ("applicant" | "lender")[]; // Empty = all roles
-  targetUsers: string[];                 // Empty = all users (respecting rollout%)
-  targetEnvironments: ("dev" | "staging" | "production")[];
-  
-  // Scheduling
-  startDate?: Timestamp;
-  endDate?: Timestamp;
-  
-  // Rules Engine
-  rules: FlagRule[];
-  
-  // Metadata
-  metadata: {
-    createdBy: string;
-    createdAt: Timestamp;
-    updatedAt: Timestamp;
-    updatedBy: string;
-    version: number;
-    changelog: Array<{
-      version: number;
-      change: string;
-      timestamp: Timestamp;
-      changedBy: string;
-    }>;
-  };
-}
-
-interface FlagRule {
-  ruleId: string;
-  description: string;
-  
-  // Conditions (AND logic between conditions, OR within arrays)
-  conditions: Array<{
-    field: string;                       // e.g., "user.creditScore", "loan.amount"
-    operator: "eq" | "ne" | "gt" | "gte" | "lt" | "lte" | "in" | "contains";
-    value: any;
-  }>;
-  
-  // Action
-  enabled: boolean;                      // Override for this rule
-  priority: number;                      // Higher = evaluated first
-  
-  // Metadata
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
-}
-```
-
-**Example Flags:**
-```typescript
-// Flag 1: New Dashboard Feature
-{
-  flagId: "new_dashboard_v2",
-  name: "new_dashboard_v2",
-  description: "Redesigned applicant dashboard with improved UX",
-  enabled: true,
-  rolloutPercentage: 25,
-  targetRoles: ["applicant"],
-  targetEnvironments: ["production"],
-  rules: [
-    {
-      ruleId: "high_value_users",
-      description: "Always enable for users with >$50k annual income",
-      conditions: [
-        { field: "user.applicant.annualIncome", operator: "gte", value: 50000 }
-      ],
-      enabled: true,
-      priority: 1
-    }
-  ],
-  metadata: {
-    createdBy: "admin_001",
-    createdAt: Timestamp.now(),
-    updatedAt: Timestamp.now(),
-    updatedBy: "admin_001",
-    version: 1
-  }
-}
-
-// Flag 2: Advanced Search for Lenders
-{
-  flagId: "advanced_search_lender",
-  name: "advanced_search_lender",
-  description: "Advanced filtering and search for lenders",
-  enabled: true,
-  rolloutPercentage: 50,
-  targetRoles: ["lender"],
-  targetEnvironments: ["production"],
-  rules: [],
-  metadata: { ... }
-}
-```
+> **Note:** Feature flags are managed exclusively via Vercel's `@vercel/flags` system. There is no `featureFlags` Firestore collection.
 
 ---
 
@@ -507,7 +417,7 @@ interface AuditLog {
   
   // Target Information
   targetId: string;                      // e.g., applicationId, loanId
-  targetType: "application" | "loan" | "user" | "payment" | "flag";
+  targetType: "application" | "loan" | "user" | "payment";
   
   // Changes (if applicable)
   changes?: {
@@ -564,14 +474,17 @@ interface Notification {
 
 ```
 users (Applicant)
+  ├── users/{id}/applicantProfile/profile
   ↓
 loanApplications
   ↓
 loans (after approval)
   ↓
-payments
+payments (top-level, references loanId + applicantId + lenderId)
 
-users (Lender) ← assigns to → loanApplications
+users (Lender)
+  ├── users/{id}/lenderProfile/profile
+  └── reads all submitted loanApplications (single-lender model)
 ```
 
 ### Business Rules
@@ -581,16 +494,18 @@ users (Lender) ← assigns to → loanApplications
 
 2. **Loan Creation:**
    - Only created when application status = approved
-   - Automatic creation or manual trigger (configurable)
+   - Uses Firestore transactions for atomicity (update application + create loan)
+   - Idempotency key prevents duplicates on retry
 
 3. **Payment Schedule:**
    - Generated when loan is funded
    - Fixed monthly schedule based on loan terms
+   - Each payment record has an idempotency key
 
-4. **Applicant & Lender Isolation:**
-   - Applicants can only see their own applications
-   - Lenders can only see assigned applications
-   - Admin sees everything
+4. **Single-Lender Access Model:**
+   - Applicants can only see their own applications and payments
+   - The lender sees all submitted applications and all payments
+   - Future: multi-lender support with assignment model
 
 ---
 
@@ -612,11 +527,20 @@ db.collection('loans')
   .orderBy('nextPaymentDate')
 ```
 
-### Get Feature Flags for User
+### Get All Payments for Lender
 ```
-db.collection('featureFlags')
-  .where('enabled', '==', true)
-  .where('targetRoles', 'array-contains', userRole)
+db.collection('payments')
+  .where('lenderId', '==', lenderId)
+  .where('status', '==', 'pending')
+  .orderBy('dueDate', 'asc')
+```
+
+### Get Overdue Payments (cross-loan query, no collection group needed)
+```
+db.collection('payments')
+  .where('status', '==', 'scheduled')
+  .where('dueDate', '<', now)
+  .orderBy('dueDate', 'asc')
 ```
 
 ---
@@ -625,10 +549,11 @@ db.collection('featureFlags')
 
 | Collection | Estimate | Notes |
 |-----------|----------|-------|
-| Users | 2-5 KB | Average with profile data |
+| Users (common) | 1 KB | Slim common fields |
+| Applicant Profile | 2-4 KB | Includes encrypted PII |
+| Lender Profile | 3-5 KB | Business info + metrics |
 | Applications | 10-50 KB | With documents array |
 | Loans | 5-10 KB | Core loan data |
-| Payments | 1 KB | Each payment record |
-| Feature Flags | 2-5 KB | With complex rules |
+| Payments | 1 KB | Each payment record (top-level) |
 | Audit Logs | 1-2 KB | Lightweight tracking |
 

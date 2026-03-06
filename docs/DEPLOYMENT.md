@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-The TerePay platform supports three deployment environments with corresponding Firebase projects and Vercel deployments. All environments use the same codebase with environment-specific configurations.
+The TerePay platform uses a two-environment deployment model: Development (local + Vercel Preview) and Production. Vercel Preview Deployments serve as the QA/staging layer for every pull request, eliminating the need for a dedicated staging branch.
 
 ---
 
@@ -12,8 +12,7 @@ The TerePay platform supports three deployment environments with corresponding F
 
 | Environment | Branch | Firebase Project | Vercel Env | Purpose | CI/CD |
 |-------------|--------|------------------|-----------|---------|-------|
-| **Development** | Feature branches | `terepay-dev` | Preview | Local & testing | None |
-| **Staging** | `staging` | `terepay-staging` | Staging | QA & validation | Auto-deploy |
+| **Development** | Feature branches | `terepay-dev` | Preview (auto per PR) | Local dev & QA | Auto preview |
 | **Production** | `main` | `terepay-prod` | Production | Live platform | Auto-deploy |
 
 ### 2.2 Environment Variables
@@ -31,46 +30,20 @@ NEXT_PUBLIC_FIREBASE_APP_ID=<dev-app-id>
 # Firebase Admin SDK (Server-side)
 FIREBASE_ADMIN_SDK_KEY=<path-to-dev-service-account.json>
 
+# PII Encryption Key (32-byte hex string)
+ENCRYPTION_KEY=<64-char-hex-string>
+
 # Application Settings
 NEXT_PUBLIC_ENVIRONMENT=development
 NEXT_PUBLIC_API_URL=http://localhost:3000
 NEXT_PUBLIC_ENABLE_LOGGING=true
 NEXT_PUBLIC_ENABLE_MOCK_DATA=true
 
-# Feature Flags (Dev defaults)
-NEXT_PUBLIC_FEATURE_FLAGS_OVERRIDE=true
-
 # Firebase Emulator
 FIREBASE_EMULATOR_HOST=localhost:8080
 ```
 
-**Staging (.env.staging):**
-```bash
-# Firebase Config
-NEXT_PUBLIC_FIREBASE_API_KEY=<staging-api-key>
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=terepay-staging.firebaseapp.com
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=terepay-staging
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=terepay-staging.appspot.com
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=<staging-sender-id>
-NEXT_PUBLIC_FIREBASE_APP_ID=<staging-app-id>
-
-# Firebase Admin SDK
-FIREBASE_ADMIN_SDK_KEY=<path-to-staging-service-account.json>
-
-# Application Settings
-NEXT_PUBLIC_ENVIRONMENT=staging
-NEXT_PUBLIC_API_URL=https://staging.terepay.vercel.app
-NEXT_PUBLIC_ENABLE_LOGGING=true
-NEXT_PUBLIC_ENABLE_MOCK_DATA=false
-
-# Sentry Setup
-SENTRY_AUTH_TOKEN=<staging-token>
-
-# Feature Flags
-NEXT_PUBLIC_FEATURE_FLAGS_OVERRIDE=false
-```
-
-**Production (.env.production):**
+**Production (set in Vercel Dashboard → Environment Variables):**
 ```bash
 # Firebase Config
 NEXT_PUBLIC_FIREBASE_API_KEY=<prod-api-key>
@@ -81,7 +54,10 @@ NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=<prod-sender-id>
 NEXT_PUBLIC_FIREBASE_APP_ID=<prod-app-id>
 
 # Firebase Admin SDK
-FIREBASE_ADMIN_SDK_KEY=<path-to-prod-service-account.json>
+FIREBASE_ADMIN_SDK_KEY=<prod-service-account.json content>
+
+# PII Encryption Key (different from dev!)
+ENCRYPTION_KEY=<64-char-hex-string>
 
 # Application Settings
 NEXT_PUBLIC_ENVIRONMENT=production
@@ -174,25 +150,25 @@ npm run deploy:prod
 ```bash
 # Initialize git repository
 git init
-git add remote origin git@github.com:rafcasto/terepay-platform.git
-
-# Create branches
-git checkout -b develop
-git checkout -b staging
+git remote add origin git@github.com:rafcasto/terepay-platform.git
 git checkout main
 ```
 
 ### 4.2 Branch Strategy
 
-**Main Branches:**
-- `main` - Production ready, protected, requires PR review
-- `staging` - QA environment, requires PR from develop
-- `develop` - Integration branch, default branch
+Small-team two-branch model. Vercel Preview Deployments replace a dedicated staging branch.
 
-**Feature Branches:**
-- `feature/loan-application` - Feature development
-- `bugfix/auth-issue` - Bug fixes
-- `hotfix/security-patch` - Production hotfixes
+**Branches:**
+- `main` - Production ready, protected, requires PR review
+- `feature/*` - Short-lived feature branches off `main`
+- `bugfix/*` - Bug fix branches
+- `hotfix/*` - Production hotfixes (merge directly to `main`)
+
+**Workflow:**
+1. Create `feature/my-feature` from `main`
+2. Push → Vercel auto-creates a Preview Deployment URL
+3. Open PR to `main` → code review on Preview URL
+4. Merge → auto-deploy to production
 
 ### 4.3 GitHub Secrets (Required for CI/CD)
 
@@ -200,8 +176,8 @@ Set these in GitHub Repository Settings → Secrets:
 
 ```
 FIREBASE_ADMIN_SDK_DEV=<dev-service-account.json content>
-FIREBASE_ADMIN_SDK_STAGING=<staging-service-account.json content>
 FIREBASE_ADMIN_SDK_PROD=<prod-service-account.json content>
+ENCRYPTION_KEY=<production-encryption-key>
 
 VERCEL_TOKEN=<vercel-api-token>
 VERCEL_ORG_ID=<vercel-org-id>
@@ -216,25 +192,19 @@ SENTRY_AUTH_TOKEN=<sentry-token>
 
 ### 5.1 Firebase Projects
 
-Create three Firebase projects:
+Create two Firebase projects:
 
 1. **terepay-dev** (Development)
    - Firestore database
    - Authentication (Email/Password, Google)
    - Cloud Storage for documents
-   - Cloud Functions (for scheduled tasks)
+   - Relaxed security rules for local testing
 
-2. **terepay-staging** (Staging)
-   - Same setup as production for testing
-   - Less strict security rules for testing
-   - Smaller data retention
-
-3. **terepay-prod** (Production)
+2. **terepay-prod** (Production)
    - Firestore database with backups enabled
    - Authentication with production settings
    - Cloud Storage with lifecycle policies
-   - Cloud Functions for critical operations
-   - Firestore security rules enforced
+   - Strict Firestore security rules enforced
 
 ### 5.2 Initialize Firebase Projects
 
@@ -266,7 +236,7 @@ service cloud.firestore {
 }
 ```
 
-**Production (Strict):**
+**Production (Strict — single-lender model with subcollections):**
 ```
 rules_version = '2';
 service cloud.firestore {
@@ -275,52 +245,45 @@ service cloud.firestore {
     // Users - own data only
     match /users/{userId} {
       allow read, write: if request.auth.uid == userId;
-      allow read: if isAdmin();
+      
+      // Applicant profile subcollection
+      match /applicantProfile/{doc} {
+        allow read, write: if request.auth.uid == userId;
+      }
+      
+      // Lender profile subcollection
+      match /lenderProfile/{doc} {
+        allow read, write: if request.auth.uid == userId;
+      }
     }
     
-    // Loan Applications
+    // Loan Applications - single lender reads all submitted+
     match /loanApplications/{docId} {
-      allow read, write: if isApplicantOwner(docId);
-      allow read: if isAssignedLender(docId);
-      allow read: if isAdmin();
+      allow read, write: if request.auth.uid == resource.data.applicantId;
+      allow read: if isLender();
     }
     
     // Loans
     match /loans/{docId} {
-      allow read: if isApplicantOrLender(docId);
-      allow write: if isAdmin();
+      allow read: if request.auth.uid == resource.data.applicantId || isLender();
     }
     
-    // Feature Flags
-    match /featureFlags/{docId} {
-      allow read: if true;
-      allow write: if isAdmin();
+    // Payments (top-level collection)
+    match /payments/{docId} {
+      allow read: if request.auth.uid == resource.data.applicantId || isLender();
+      allow create: if request.auth.uid == resource.data.applicantId;
     }
     
     // Audit Logs
     match /auditLogs/{docId} {
       allow read: if request.auth.uid == resource.data.userId;
-      allow read: if isAdmin();
       allow create: if request.auth != null;
     }
   }
   
-  function isAdmin() {
+  function isLender() {
     return get(/databases/$(database)/documents/users/$(request.auth.uid))
-      .data.role == 'admin';
-  }
-  
-  function isApplicantOwner(docId) {
-    return request.auth.uid == get(/databases/$(database)/documents/loanApplications/$(docId)).data.applicantId;
-  }
-  
-  function isAssignedLender(docId) {
-    return request.auth.uid == get(/databases/$(database)/documents/loanApplications/$(docId)).data.lenderId;
-  }
-  
-  function isApplicantOrLender(docId) {
-    let loan = get(/databases/$(database)/documents/loans/$(docId)).data;
-    return request.auth.uid == loan.applicantId || request.auth.uid == loan.lenderId;
+      .data.role == 'lender';
   }
 }
 ```
@@ -330,9 +293,6 @@ service cloud.firestore {
 ```bash
 # Deploy to dev
 firebase deploy --only firestore:rules --project terepay-dev
-
-# Deploy to staging
-firebase deploy --only firestore:rules --project terepay-staging
 
 # Deploy to production
 firebase deploy --only firestore:rules --project terepay-prod
@@ -413,65 +373,10 @@ npm run deploy:staging
 
 ### 7.1 Workflow Files
 
-**`.github/workflows/deploy-staging.yml`**
-```yaml
-name: Deploy to Staging
-
-on:
-  push:
-    branches: [staging]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      
-      - name: Setup Node
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-          cache: 'npm'
-      
-      - name: Install dependencies
-        run: npm ci
-      
-      - name: Run linter
-        run: npm run lint
-      
-      - name: Run tests
-        run: npm run test
-      
-      - name: Build
-        run: npm run build
-
-  deploy:
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      
-      - name: Deploy to Vercel Staging
-        uses: vercel/action@main
-        with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          alias: staging
-        env:
-          NEXT_PUBLIC_ENVIRONMENT: staging
-          FIREBASE_ADMIN_SDK_KEY: ${{ secrets.FIREBASE_ADMIN_SDK_STAGING }}
-      
-      - name: Notify Slack
-        uses: slackapi/slack-github-action@v1
-        with:
-          payload: |
-            {
-              "text": "Staging deployment successful ✅"
-            }
-```
-
 **`.github/workflows/deploy-production.yml`**
+
+Runs on every push to `main`. Vercel Preview Deployments are automatic for PRs (no separate staging workflow needed).
+
 ```yaml
 name: Deploy to Production
 
@@ -520,20 +425,13 @@ jobs:
         env:
           NEXT_PUBLIC_ENVIRONMENT: production
           FIREBASE_ADMIN_SDK_KEY: ${{ secrets.FIREBASE_ADMIN_SDK_PROD }}
+          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
       
       - name: Create Sentry Release
         uses: getsentry/action-release@v1
         with:
           environment: production
           sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
-      
-      - name: Notify Slack
-        uses: slackapi/slack-github-action@v1
-        with:
-          payload: |
-            {
-              "text": "🚀 Production deployment successful!"
-            }
 ```
 
 ---
