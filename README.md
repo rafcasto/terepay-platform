@@ -159,6 +159,7 @@ npm run dev
 | `npm run firebase:emulate:clear` | Start Firebase Emulator with a clean slate |
 | `npm run firebase:export` | Save current emulator data to `emulator-data/` |
 | `npm run seed:lender` | Seed a lender account into the running emulator |
+| `npm run seed:lender:prod` | Seed a lender account into the **production** Firebase project |
 
 ---
 
@@ -220,6 +221,31 @@ Every pull request also receives an isolated **Preview Deployment** URL automati
 |--------|------------|-----------------|
 | `feature/*` / `bugfix/*` | Vercel Preview (per PR) | terepay-dev |
 | `main` | Production | terepay-prod |
+
+### 5. Seed a lender account in production
+
+The public signup endpoint always creates `applicant` accounts. Lender accounts must be seeded manually.
+
+1. Add the following variables to your local `.env.local` (they are only read by the seed script, never sent to Vercel):
+
+```bash
+LENDER_EMAIL=lender@yourdomain.com
+LENDER_PASSWORD=SomeStr0ngPassword!
+LENDER_FIRST_NAME=Jane
+LENDER_LAST_NAME=Smith
+```
+
+2. Run the production seed script:
+
+```bash
+npm run seed:lender:prod
+```
+
+This clears the emulator host variables before execution so the Admin SDK connects directly to production Firebase using your `FIREBASE_ADMIN_PROJECT_ID`, `FIREBASE_ADMIN_CLIENT_EMAIL`, and `FIREBASE_ADMIN_PRIVATE_KEY` credentials.
+
+The script is **idempotent** — if the email already exists it will update the role and Firestore document without creating a duplicate.
+
+> **Note:** Never commit `LENDER_PASSWORD` or service account credentials to the repository.
 
 ---
 

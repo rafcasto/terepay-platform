@@ -10,7 +10,8 @@
     "firebase:emulate": "firebase emulators:start --project terepay-dev --import=./emulator-data --export-on-exit",
     "firebase:emulate:clear": "firebase emulators:start --clear-on-exit",
     "firebase:export": "firebase emulators:export ./emulator-data",
-    "seed:lender": "FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 ts-node --project tsconfig.scripts.json scripts/seed-lender.ts"
+    "seed:lender": "FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 ts-node --project tsconfig.scripts.json scripts/seed-lender.ts",
+    "seed:lender:prod": "FIREBASE_AUTH_EMULATOR_HOST= FIRESTORE_EMULATOR_HOST= ts-node --project tsconfig.scripts.json scripts/seed-lender.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
