@@ -67,28 +67,89 @@ Details:
 
 ---
 
+### [QUICK_START.md](./QUICK_START.md) ⚡ **NEW - Start here!**
+**Get up and running in 15 minutes**
+
+Quick setup guide for local development:
+- Prerequisites check
+- Environment setup
+- Firebase Emulator startup
+- Test user creation
+- Common commands and troubleshooting
+
+**Use this** for rapid onboarding and quick reference.
+
+---
+
+### [FIREBASE_LOCAL_SETUP.md](./FIREBASE_LOCAL_SETUP.md)
+**Complete Firebase local development environment guide**
+
+Comprehensive Firebase setup covering:
+- Installation and prerequisites
+- Firebase Emulator Suite configuration
+- Environment variables and credentials
+- Firestore security rules (dev & production)
+- Authentication setup and test users
+- Database initialization and collections
+- Integration with Next.js (client & server)
+- Data persistence and export/import
+- Troubleshooting and best practices
+
+**Reference this** for detailed Firebase local environment instructions.
+
+---
+
+### [PHASE_ONE_CHECKLIST.md](./PHASE_ONE_CHECKLIST.md)
+**Phase One implementation checklist and roadmap**
+
+Track progress for MVP foundation:
+- Firebase local environment setup
+- Project initialization and dependencies
+- Authentication and authorization
+- User interface structure
+- Database and security rules
+- Core API routes
+- Testing and validation
+- Success criteria and timeline
+
+**Follow this** during Phase One implementation to track deliverables.
+
+---
+
 ## 🚀 Getting Started
+
+### Quick Start (15 minutes)
+⚡ **New to the project?** Start here:
+1. **Read** [QUICK_START.md](./QUICK_START.md) - Get running in 15 minutes
+2. Follow the step-by-step instructions
+3. Test login with provided credentials
+4. Explore the codebase
+
+---
 
 ### For New Developers
 
-1. **Read** [PLATFORM_PLAN.md](./PLATFORM_PLAN.md) for architecture overview
-2. **Understand** [DATA_STRUCTURE.md](./DATA_STRUCTURE.md) for the data model
-3. **Set up** locally using [DEPLOYMENT.md](./DEPLOYMENT.md)
-4. **Start coding** with the project structure in mind
+1. **Quick Setup**: Follow [QUICK_START.md](./QUICK_START.md) (15 min)
+2. **Deep Dive**: Read [PLATFORM_PLAN.md](./PLATFORM_PLAN.md) for architecture
+3. **Database**: Understand [DATA_STRUCTURE.md](./DATA_STRUCTURE.md) before coding
+4. **Detailed Setup**: Reference [FIREBASE_LOCAL_SETUP.md](./FIREBASE_LOCAL_SETUP.md) for full Firebase guide
+5. **Phase One**: Check [PHASE_ONE_CHECKLIST.md](./PHASE_ONE_CHECKLIST.md) for implementation progress
 
 ### For DevOps/Infrastructure
 
-1. **Follow** [DEPLOYMENT.md](./DEPLOYMENT.md) for setup
-2. **Configure** Firebase projects and Vercel
-3. **Set up** GitHub Actions workflows
-4. **Monitor** via Sentry and Vercel Analytics
+1. **Local Setup**: Follow [FIREBASE_LOCAL_SETUP.md](./FIREBASE_LOCAL_SETUP.md)
+2. **Deployment**: Read [DEPLOYMENT.md](./DEPLOYMENT.md) for full deployment guide
+3. **Configure** Firebase projects and Vercel
+4. **Set up** GitHub Actions workflows
+5. **Monitor** via Sentry and Vercel Analytics
 
 ### For Feature Development
 
-1. **Review** relevant sections in [PLATFORM_PLAN.md](./PLATFORM_PLAN.md)
-2. **Design** data structures using [DATA_STRUCTURE.md](./DATA_STRUCTURE.md)
-3. **Use** [FEATURE_FLAGS.md](./FEATURE_FLAGS.md) for controlled rollout
-4. **Deploy** using [DEPLOYMENT.md](./DEPLOYMENT.md) workflows
+1. **Understand Architecture**: Read [PLATFORM_PLAN.md](./PLATFORM_PLAN.md)
+2. **Check Data Model**: Review [DATA_STRUCTURE.md](./DATA_STRUCTURE.md)
+3. **Schema Design**: Design data structures before implementation
+4. **Feature Flags**: Read [FEATURE_FLAGS.md](./FEATURE_FLAGS.md) for controlled rollout
+5. **Deploy**: Use [DEPLOYMENT.md](./DEPLOYMENT.md) workflows
 
 ---
 

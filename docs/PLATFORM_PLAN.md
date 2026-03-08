@@ -171,8 +171,8 @@ terepay-platform/
 │   │   └── utils/
 │   │       ├── validators.ts
 │   │       ├── formatters.ts
-│   │       └── logger.ts
-│   │       └── audit.ts               # Reusable audit logging utility
+│   │       ├── logger.ts
+│   │       ├── audit.ts               # Reusable audit logging utility
 │   │       └── api-error.ts           # Unified AppError class + errorResponse()
 │   │
 │   ├── hooks/
@@ -867,7 +867,6 @@ async function createPayment(paymentData: PaymentInput) {
 ```
 
 > **Why not `where()` inside a transaction?** Firestore transactions only guarantee read consistency for document references obtained via `tx.get(docRef)`. A `where()` query inside a transaction is not isolated — two concurrent requests could both see zero results and both proceed, creating duplicate payments. Using the idempotency key as the document ID eliminates this race condition.
-```
 
 ### 8.9 Unified API Error Response Contract
 

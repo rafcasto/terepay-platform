@@ -1,0 +1,87 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // -------------------------------------------------------------------------
+    // Helper Functions
+    // -------------------------------------------------------------------------
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function hasRole(role) {
+      return isAuthenticated() && request.auth.token.role == role;
+    }
+
+    function isLender() {
+      return hasRole('lender');
+    }
+
+    function isApplicant() {
+      return hasRole('applicant');
+    }
+
+    // -------------------------------------------------------------------------
+    // Users Collection
+    // Note: All writes go through the Admin SDK (bypasses these rules).
+    // These rules cover direct Firestore SDK access from clients.
+    // -------------------------------------------------------------------------
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isLender();
+      allow write: if isOwner(userId);
+
+      // Applicant profile subcollection
+      match /applicantProfile/{doc} {
+        allow read: if isOwner(userId) || isLender();
+        allow write: if isOwner(userId);
+      }
+
+      // Lender profile subcollection
+      match /lenderProfile/{doc} {
+        allow read: if isOwner(userId);
+        allow write: if isOwner(userId);
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // Loan Applications Collection
+    // Applicants: read/write their own. Lender: read all submitted+.
+    // -------------------------------------------------------------------------
+    match /loanApplications/{docId} {
+      allow read, write: if isAuthenticated() && request.auth.uid == resource.data.applicantId;
+      allow create: if isApplicant() && request.auth.uid == request.resource.data.applicantId;
+      allow read: if isLender() && resource.data.status != 'draft';
+    }
+
+    // -------------------------------------------------------------------------
+    // Loans Collection (created server-side after approval)
+    // -------------------------------------------------------------------------
+    match /loans/{docId} {
+      allow read: if isAuthenticated() &&
+        (request.auth.uid == resource.data.applicantId || isLender());
+      allow write: if false; // Admin SDK only
+    }
+
+    // -------------------------------------------------------------------------
+    // Payments Collection
+    // -------------------------------------------------------------------------
+    match /payments/{docId} {
+      allow read: if isAuthenticated() &&
+        (request.auth.uid == resource.data.applicantId || isLender());
+      allow create: if isApplicant() && request.auth.uid == request.resource.data.applicantId;
+      allow write: if false; // Status updates via Admin SDK only
+    }
+
+    // -------------------------------------------------------------------------
+    // Audit Logs Collection (write-only via Admin SDK)
+    // -------------------------------------------------------------------------
+    match /auditLogs/{docId} {
+      allow read: if false;
+      allow write: if false;
+    }
+  }
+}
