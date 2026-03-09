@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TerePay — Lending Platform",
-  description: "A secure peer lending platform",
+  title: 'TerePay — Lending Platform',
+  description: 'A secure, transparent lending platform connecting borrowers with fair short-term loans in New Zealand.',
 };
 
 export default function RootLayout({
