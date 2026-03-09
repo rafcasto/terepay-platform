@@ -40,10 +40,10 @@ export default function FeaturesSection() {
   ];
 
   return (
-    <section className="py-20 px-6 bg-[#E6F9F8]/40">
+    <section className="py-20 px-6 bg-[#FEF7E9]/40">
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-14">
-          <span className="text-xs font-semibold tracking-widest uppercase text-[#00B3A4]">
+          <span className="text-xs font-semibold tracking-widest uppercase text-[#F5A523]">
             Why TerePay
           </span>
           <h2 className="mt-2 text-3xl md:text-4xl font-extrabold text-[#0D1B2A]">Built Around You</h2>
@@ -55,9 +55,9 @@ export default function FeaturesSection() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {features.map((f) => (
             <div key={f.title} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="h-1.5 bg-[#00B3A4]" />
+              <div className="h-1.5 bg-[#F5A523]" />
               <div className="p-8">
-                <div className="w-12 h-12 rounded-xl bg-[#00B3A4]/10 flex items-center justify-center text-[#00B3A4] mb-5">
+                <div className="w-12 h-12 rounded-xl bg-[#F5A523]/10 flex items-center justify-center text-[#F5A523] mb-5">
                   {f.icon}
                 </div>
                 <h3 className="font-bold text-[#0D1B2A] text-lg mb-2">{f.title}</h3>

@@ -11,7 +11,7 @@ export default function PartnersSection() {
           {partners.map((p) => (
             <div
               key={p}
-              className="px-6 py-3 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-500 shadow-sm hover:shadow-md hover:text-[#00B3A4] hover:border-[#00B3A4]/30 transition-all"
+              className="px-6 py-3 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-500 shadow-sm hover:shadow-md hover:text-[#F5A523] hover:border-[#F5A523]/30 transition-all"
             >
               {p}
             </div>

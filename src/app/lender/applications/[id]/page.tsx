@@ -88,7 +88,7 @@ export default async function LenderApplicationDetailPage({
   return (
     <div className="p-8 max-w-3xl">
       <div className="mb-4">
-        <Link href="/lender/applications" className="text-sm text-indigo-600 hover:underline">
+        <Link href="/lender/applications" className="text-sm text-[#F5A523] hover:underline">
           ← All Applications
         </Link>
       </div>

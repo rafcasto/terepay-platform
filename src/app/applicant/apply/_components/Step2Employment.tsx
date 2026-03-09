@@ -4,7 +4,7 @@ import { useFormContext, useWatch } from 'react-hook-form';
 import type { TerepayApplicationInput } from '@/lib/validation/schemas';
 
 const inputCls =
-  'w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:outline-none transition-colors bg-white';
+  'w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#F5A523] focus:border-[#F5A523] focus:outline-none transition-colors bg-white';
 const selectCls = inputCls + ' appearance-none';
 const labelCls = 'block text-sm font-medium text-gray-700 mb-1';
 const errorCls = 'mt-1 text-xs text-red-600';
@@ -19,7 +19,7 @@ function NzdInput({ name, ...props }: { name: string } & React.InputHTMLAttribut
         type="number"
         min={0}
         step="0.01"
-        className="w-full pl-6 pr-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:outline-none transition-colors bg-white"
+        className="w-full pl-6 pr-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#F5A523] focus:border-[#F5A523] focus:outline-none transition-colors bg-white"
         {...props}
       />
     </div>
@@ -196,7 +196,7 @@ export default function Step2Employment() {
           <span className="text-sm font-semibold text-gray-800 flex-1">
             Total Fortnightly Income
           </span>
-          <span className="w-36 px-3 py-2 bg-indigo-50 text-indigo-700 font-bold text-sm rounded-lg text-right">
+          <span className="w-36 px-3 py-2 bg-[#FEF7E9] text-[#E08B00] font-bold text-sm rounded-lg text-right">
             ${total.toFixed(2)}
           </span>
         </div>

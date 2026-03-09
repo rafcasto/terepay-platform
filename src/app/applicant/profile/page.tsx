@@ -83,7 +83,7 @@ export default function ApplicantProfilePage() {
               <input
                 type="text"
                 {...register('firstName')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#F5A523] focus:outline-none"
               />
               {errors.firstName && (
                 <p className="mt-1 text-xs text-red-600">{errors.firstName.message}</p>
@@ -94,7 +94,7 @@ export default function ApplicantProfilePage() {
               <input
                 type="text"
                 {...register('lastName')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#F5A523] focus:outline-none"
               />
               {errors.lastName && (
                 <p className="mt-1 text-xs text-red-600">{errors.lastName.message}</p>
@@ -117,7 +117,7 @@ export default function ApplicantProfilePage() {
             <input
               type="tel"
               {...register('phoneNumber')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#F5A523] focus:outline-none"
               placeholder="+1 (555) 000-0000"
             />
           </div>
@@ -131,7 +131,7 @@ export default function ApplicantProfilePage() {
             <input
               type="text"
               {...register('address.street')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#F5A523] focus:outline-none"
             />
           </div>
 
@@ -141,7 +141,7 @@ export default function ApplicantProfilePage() {
               <input
                 type="text"
                 {...register('address.city')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#F5A523] focus:outline-none"
               />
             </div>
             <div>
@@ -149,7 +149,7 @@ export default function ApplicantProfilePage() {
               <input
                 type="text"
                 {...register('address.state')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#F5A523] focus:outline-none"
               />
             </div>
           </div>
@@ -160,7 +160,7 @@ export default function ApplicantProfilePage() {
               <input
                 type="text"
                 {...register('address.zipCode')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#F5A523] focus:outline-none"
               />
             </div>
             <div>
@@ -169,7 +169,7 @@ export default function ApplicantProfilePage() {
                 type="text"
                 {...register('address.country')}
                 defaultValue="US"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#F5A523] focus:outline-none"
               />
             </div>
           </div>
@@ -189,7 +189,7 @@ export default function ApplicantProfilePage() {
         <button
           type="submit"
           disabled={isSubmitting || !isDirty}
-          className="w-full py-2.5 px-4 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="w-full py-2.5 px-4 bg-[#F5A523] text-white text-sm font-medium rounded-md hover:bg-[#E08B00] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {isSubmitting ? 'Saving…' : 'Save Changes'}
         </button>

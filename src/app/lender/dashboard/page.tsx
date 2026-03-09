@@ -96,7 +96,7 @@ export default async function LenderDashboardPage() {
       <div className="bg-white rounded-xl border border-gray-200">
         <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100">
           <h2 className="font-semibold text-gray-900">Pending Review</h2>
-          <Link href="/lender/applications" className="text-sm text-indigo-600 hover:underline shrink-0 ml-4">
+          <Link href="/lender/applications" className="text-sm text-[#F5A523] hover:underline shrink-0 ml-4">
             View all →
           </Link>
         </div>
@@ -121,7 +121,7 @@ export default async function LenderDashboardPage() {
                     <Badge variant={STATUS_VARIANT[status]}>{status.replace('_', ' ')}</Badge>
                     <Link
                       href={`/lender/applications/${app.id}`}
-                      className="text-xs text-indigo-600 hover:underline"
+                      className="text-xs text-[#F5A523] hover:underline"
                     >
                       Review →
                     </Link>

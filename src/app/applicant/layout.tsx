@@ -14,7 +14,7 @@ export default function ApplicantLayout({ children }: { children: ReactNode }) {
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Mobile top header */}
       <header className="sm:hidden sticky top-0 z-20 bg-white border-b border-gray-200 px-4 h-12 flex items-center justify-between shrink-0">
-        <Link href="/applicant/dashboard" className="text-lg font-bold text-indigo-600">
+        <Link href="/applicant/dashboard" className="text-lg font-bold text-[#F5A523]">
           TerePay
         </Link>
         <form action="/api/auth/logout" method="POST">
@@ -28,7 +28,7 @@ export default function ApplicantLayout({ children }: { children: ReactNode }) {
         {/* Desktop sidebar */}
         <aside className="hidden sm:flex w-64 bg-white border-r border-gray-200 flex-col shrink-0">
           <div className="px-6 py-5 border-b border-gray-200">
-            <Link href="/applicant/dashboard" className="text-xl font-bold text-indigo-600">
+            <Link href="/applicant/dashboard" className="text-xl font-bold text-[#F5A523]">
               TerePay
             </Link>
             <p className="text-xs text-gray-500 mt-0.5">Applicant Portal</p>
@@ -38,7 +38,7 @@ export default function ApplicantLayout({ children }: { children: ReactNode }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className="flex items-center px-3 py-2 text-sm font-medium rounded-md text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors"
+                className="flex items-center px-3 py-2 text-sm font-medium rounded-md text-gray-700 hover:bg-[#FEF7E9] hover:text-[#E08B00] transition-colors"
               >
                 {item.label}
               </Link>

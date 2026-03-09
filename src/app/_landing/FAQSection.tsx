@@ -36,7 +36,7 @@ export default function FAQSection() {
     <section id="faq" className="py-20 px-6 bg-white">
       <div className="max-w-3xl mx-auto">
         <div className="text-center mb-14">
-          <span className="text-xs font-semibold tracking-widest uppercase text-[#00B3A4]">
+          <span className="text-xs font-semibold tracking-widest uppercase text-[#F5A523]">
             Questions
           </span>
           <h2 className="mt-2 text-3xl md:text-4xl font-extrabold text-[#0D1B2A]">
@@ -54,7 +54,7 @@ export default function FAQSection() {
               >
                 <span>{faq.q}</span>
                 <svg
-                  className={`w-5 h-5 text-[#00B3A4] flex-shrink-0 ml-4 transition-transform duration-200${
+                  className={`w-5 h-5 text-[#F5A523] flex-shrink-0 ml-4 transition-transform duration-200${
                     openIndex === i ? ' rotate-180' : ''
                   }`}
                   fill="none"

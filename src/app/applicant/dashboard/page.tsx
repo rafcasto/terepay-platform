@@ -55,21 +55,21 @@ export default async function ApplicantDashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6 sm:mb-8">
         <Link
           href="/applicant/apply"
-          className="bg-indigo-600 text-white rounded-xl p-4 sm:p-5 hover:bg-indigo-700 transition-colors"
+          className="bg-[#F5A523] text-white rounded-xl p-4 sm:p-5 hover:bg-[#E08B00] transition-colors"
         >
           <p className="text-xs sm:text-sm font-medium opacity-80">Ready to borrow?</p>
           <p className="text-base sm:text-lg font-semibold mt-1">Apply for a Loan →</p>
         </Link>
         <Link
           href="/applicant/applications"
-          className="bg-white border border-gray-200 rounded-xl p-4 sm:p-5 hover:border-indigo-300 transition-colors"
+          className="bg-white border border-gray-200 rounded-xl p-4 sm:p-5 hover:border-[#F5A523]/50 transition-colors"
         >
           <p className="text-xs sm:text-sm text-gray-500">Track progress</p>
           <p className="text-base sm:text-lg font-semibold text-gray-900 mt-1">My Applications</p>
         </Link>
         <Link
           href="/applicant/profile"
-          className="bg-white border border-gray-200 rounded-xl p-4 sm:p-5 hover:border-indigo-300 transition-colors"
+          className="bg-white border border-gray-200 rounded-xl p-4 sm:p-5 hover:border-[#F5A523]/50 transition-colors"
         >
           <p className="text-xs sm:text-sm text-gray-500">Keep info current</p>
           <p className="text-base sm:text-lg font-semibold text-gray-900 mt-1">Update Profile</p>
@@ -80,14 +80,14 @@ export default async function ApplicantDashboard() {
       <div className="bg-white rounded-xl border border-gray-200">
         <div className="px-4 sm:px-6 py-4 border-b border-gray-200 flex justify-between items-center">
           <h2 className="font-semibold text-gray-900">Recent Applications</h2>
-          <Link href="/applicant/applications" className="text-sm text-indigo-600 hover:text-indigo-500 shrink-0 ml-4">
+          <Link href="/applicant/applications" className="text-sm text-[#F5A523] hover:text-[#E08B00] shrink-0 ml-4">
             View all
           </Link>
         </div>
         {recentApplications.length === 0 ? (
           <div className="px-4 sm:px-6 py-10 text-center text-gray-500">
             <p>You haven&apos;t submitted any applications yet.</p>
-            <Link href="/applicant/apply" className="mt-2 inline-block text-indigo-600 hover:text-indigo-500 text-sm font-medium">
+            <Link href="/applicant/apply" className="mt-2 inline-block text-[#F5A523] hover:text-[#E08B00] text-sm font-medium">
               Start your first application →
             </Link>
           </div>

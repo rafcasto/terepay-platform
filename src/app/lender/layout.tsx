@@ -24,7 +24,7 @@ export default async function LenderLayout({ children }: { children: React.React
       {/* Mobile top header */}
       <header className="sm:hidden sticky top-0 z-20 bg-white border-b border-gray-100 px-4 h-12 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2">
-          <span className="text-lg font-bold text-indigo-600">TerePay</span>
+          <span className="text-lg font-bold text-[#F5A523]">TerePay</span>
           <span className="text-xs font-medium text-gray-400">Lender</span>
         </div>
         <form action="/api/auth/logout" method="POST">
@@ -38,7 +38,7 @@ export default async function LenderLayout({ children }: { children: React.React
         {/* Desktop sidebar */}
         <aside className="hidden sm:flex w-60 bg-white border-r border-gray-200 flex-col shrink-0">
           <div className="px-6 py-5 border-b border-gray-100">
-            <span className="text-lg font-bold text-indigo-600">TerePay</span>
+            <span className="text-lg font-bold text-[#F5A523]">TerePay</span>
             <span className="ml-2 text-xs font-medium text-gray-400">Lender</span>
           </div>
 
@@ -47,7 +47,7 @@ export default async function LenderLayout({ children }: { children: React.React
               <Link
                 key={item.href}
                 href={item.href}
-                className="block px-3 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors"
+                className="block px-3 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-[#FEF7E9] hover:text-[#E08B00] transition-colors"
               >
                 {item.label}
               </Link>

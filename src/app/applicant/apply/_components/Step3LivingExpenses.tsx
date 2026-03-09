@@ -4,7 +4,7 @@ import { useFormContext, useWatch, type UseFormRegister } from 'react-hook-form'
 import type { TerepayApplicationInput } from '@/lib/validation/schemas';
 
 const inputCls =
-  'w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:outline-none transition-colors bg-white';
+  'w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#F5A523] focus:border-[#F5A523] focus:outline-none transition-colors bg-white';
 const selectCls = inputCls + ' appearance-none';
 
 const FREQ_OPTIONS = [
@@ -36,7 +36,7 @@ function NzdRow({
           defaultValue={0}
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           {...register(fieldName as any, { valueAsNumber: true })}
-          className="w-full pl-6 pr-2 py-2 border border-gray-200 rounded-md text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-white"
+          className="w-full pl-6 pr-2 py-2 border border-gray-200 rounded-md text-sm focus:ring-2 focus:ring-[#F5A523] focus:outline-none bg-white"
         />
       </div>
     </div>
@@ -87,7 +87,7 @@ export default function Step3LivingExpenses() {
         <NzdRow label="Remittances (Overseas Family)" fieldName="livingExpenses.nonDiscretionary.remittances" register={register} />
         <div className="flex items-center gap-3 pt-3 mt-1 border-t border-gray-200">
           <span className="text-sm font-semibold text-gray-800 flex-1">Total Non-Discretionary</span>
-          <span className="w-32 shrink-0 px-3 py-2 bg-indigo-50 text-indigo-700 font-bold text-sm rounded-md text-right">
+          <span className="w-32 shrink-0 px-3 py-2 bg-[#FEF7E9] text-[#E08B00] font-bold text-sm rounded-md text-right">
             ${sumNd.toFixed(2)}
           </span>
         </div>
@@ -107,7 +107,7 @@ export default function Step3LivingExpenses() {
         <NzdRow label="Other Discretionary" fieldName="livingExpenses.discretionary.other" register={register} />
         <div className="flex items-center gap-3 pt-3 mt-1 border-t border-gray-200">
           <span className="text-sm font-semibold text-gray-800 flex-1">Total Discretionary</span>
-          <span className="w-32 shrink-0 px-3 py-2 bg-indigo-50 text-indigo-700 font-bold text-sm rounded-md text-right">
+          <span className="w-32 shrink-0 px-3 py-2 bg-[#FEF7E9] text-[#E08B00] font-bold text-sm rounded-md text-right">
             ${sumD.toFixed(2)}
           </span>
         </div>
@@ -131,7 +131,7 @@ export default function Step3LivingExpenses() {
                     {...register(`livingExpenses.subscriptionDetails.${sub}.amount`, {
                       valueAsNumber: true,
                     })}
-                    className="w-full pl-6 pr-2 py-2 border border-gray-200 rounded-md text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-white"
+                    className="w-full pl-6 pr-2 py-2 border border-gray-200 rounded-md text-sm focus:ring-2 focus:ring-[#F5A523] focus:outline-none bg-white"
                   />
                 </div>
               </div>
@@ -152,7 +152,7 @@ export default function Step3LivingExpenses() {
           ))}
           <div className="flex items-center gap-3 pt-3 border-t border-gray-200">
             <span className="text-sm font-semibold text-gray-800 flex-1">Total Subscriptions</span>
-            <span className="px-3 py-2 bg-indigo-50 text-indigo-700 font-bold text-sm rounded-md">
+            <span className="px-3 py-2 bg-[#FEF7E9] text-[#E08B00] font-bold text-sm rounded-md">
               ${sumSubs.toFixed(2)}
             </span>
           </div>
@@ -169,14 +169,14 @@ export default function Step3LivingExpenses() {
         <NzdRow label="ZIP" fieldName="livingExpenses.bnpl.zip" register={register} />
         <div className="flex items-center gap-3 pt-3 mt-1 border-t border-gray-200">
           <span className="text-sm font-semibold text-gray-800 flex-1">Total BNPL</span>
-          <span className="w-32 shrink-0 px-3 py-2 bg-indigo-50 text-indigo-700 font-bold text-sm rounded-md text-right">
+          <span className="w-32 shrink-0 px-3 py-2 bg-[#FEF7E9] text-[#E08B00] font-bold text-sm rounded-md text-right">
             ${sumBnpl.toFixed(2)}
           </span>
         </div>
       </div>
 
       {/* Grand total */}
-      <div className="flex items-center justify-between bg-indigo-600 text-white rounded-xl px-5 py-4">
+      <div className="flex items-center justify-between bg-[#F5A523] text-white rounded-xl px-5 py-4">
         <span className="font-semibold text-sm">Total Fortnightly Expenses</span>
         <span className="text-xl font-bold">
           ${(sumNd + sumD + sumBnpl).toFixed(2)}

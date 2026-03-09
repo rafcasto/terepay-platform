@@ -4,7 +4,7 @@ import { useFormContext, useWatch } from 'react-hook-form';
 import type { TerepayApplicationInput } from '@/lib/validation/schemas';
 
 const inputCls =
-  'w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:outline-none transition-colors bg-white';
+  'w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#F5A523] focus:border-[#F5A523] focus:outline-none transition-colors bg-white';
 const selectCls = inputCls + ' appearance-none';
 const labelCls = 'block text-sm font-medium text-gray-700 mb-1';
 const errorCls = 'mt-1 text-xs text-red-600';
@@ -60,9 +60,9 @@ export default function Step5LoanRequest() {
       </div>
 
       {/* Loan terms banner */}
-      <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 space-y-2">
-        <h3 className="text-xs font-bold text-indigo-700 uppercase tracking-wide">Loan Terms</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs text-indigo-900">
+      <div className="bg-[#FEF7E9] border border-[#F5A523]/30 rounded-xl p-4 space-y-2">
+        <h3 className="text-xs font-bold text-[#E08B00] uppercase tracking-wide">Loan Terms</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs text-[#1C2740]">
           <div><span className="font-semibold">Period:</span> 8 weeks (56 days)</div>
           <div><span className="font-semibold">Payments:</span> 4 × fortnightly</div>
           <div><span className="font-semibold">APR:</span> 49%</div>
@@ -130,7 +130,7 @@ export default function Step5LoanRequest() {
         <textarea
           rows={3}
           {...register('loanRequest.purposeDescription')}
-          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none resize-none"
+          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#F5A523] focus:outline-none resize-none"
           placeholder="Briefly explain the purpose of this loan…"
         />
         {e?.purposeDescription && <p className={errorCls}>{e.purposeDescription.message}</p>}
@@ -155,7 +155,7 @@ export default function Step5LoanRequest() {
           <input
             type="checkbox"
             {...register('loanRequest.isPEP')}
-            className="mt-0.5 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+            className="mt-0.5 h-4 w-4 rounded border-gray-300 text-[#F5A523] focus:ring-[#F5A523]"
           />
           <span className="text-sm text-amber-900">
             I, or an immediate family member, am a{' '}
@@ -229,7 +229,7 @@ export default function Step5LoanRequest() {
                       type="checkbox"
                       value={p}
                       {...register('loanRequest.remittance.purposes')}
-                      className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                      className="h-4 w-4 rounded border-gray-300 text-[#F5A523] focus:ring-[#F5A523]"
                     />
                     <span className="text-sm text-gray-700">{p}</span>
                   </label>

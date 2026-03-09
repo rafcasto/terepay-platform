@@ -21,7 +21,7 @@ export default function HowItWorksSection() {
     <section id="how-it-works" className="py-20 px-6 bg-white">
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-14">
-          <span className="text-xs font-semibold tracking-widest uppercase text-[#00B3A4]">
+          <span className="text-xs font-semibold tracking-widest uppercase text-[#F5A523]">
             Simple Process
           </span>
           <h2 className="mt-2 text-3xl md:text-4xl font-extrabold text-[#0D1B2A]">How It Works</h2>
@@ -39,9 +39,9 @@ export default function HowItWorksSection() {
             >
               {/* Dashed connector (desktop only) */}
               {i < steps.length - 1 && (
-                <div className="hidden md:block absolute top-14 -right-4 w-8 border-t-2 border-dashed border-[#00B3A4]/40 z-10" />
+                <div className="hidden md:block absolute top-14 -right-4 w-8 border-t-2 border-dashed border-[#F5A523]/40 z-10" />
               )}
-              <span className="text-6xl font-black text-[#00B3A4]/15 leading-none select-none">
+              <span className="text-6xl font-black text-[#F5A523]/15 leading-none select-none">
                 {step.number}
               </span>
               <h3 className="mt-3 text-lg font-bold text-[#0D1B2A]">{step.title}</h3>

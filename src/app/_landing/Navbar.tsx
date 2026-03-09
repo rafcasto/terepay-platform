@@ -20,7 +20,7 @@ export default function Navbar() {
       }`}
     >
       <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-        <Link href="/" className="text-2xl font-bold text-[#00B3A4] tracking-tight">
+        <Link href="/" className="text-2xl font-bold text-[#F5A523] tracking-tight">
           TerePay
         </Link>
 
@@ -47,7 +47,7 @@ export default function Navbar() {
           </Link>
           <Link
             href="/auth/signup"
-            className="text-sm font-semibold px-5 py-2.5 bg-[#00B3A4] text-white rounded-lg hover:bg-[#007F74] transition-colors"
+            className="text-sm font-semibold px-5 py-2.5 bg-[#F5A523] text-white rounded-lg hover:bg-[#E08B00] transition-colors"
           >
             Get Started
           </Link>
@@ -100,7 +100,7 @@ export default function Navbar() {
           </Link>
           <Link
             href="/auth/signup"
-            className="text-sm font-semibold px-5 py-2.5 bg-[#00B3A4] text-white rounded-lg text-center hover:bg-[#007F74]"
+            className="text-sm font-semibold px-5 py-2.5 bg-[#F5A523] text-white rounded-lg text-center hover:bg-[#E08B00]"
           >
             Get Started
           </Link>

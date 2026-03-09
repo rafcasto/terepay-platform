@@ -16,7 +16,7 @@ export default function FormProgress({ steps, currentStep }: FormProgressProps) 
         <span className="text-xs font-medium text-gray-500">
           Step {currentStep + 1} of {steps.length}
         </span>
-        <span className="text-sm font-semibold text-indigo-600">
+        <span className="text-sm font-semibold text-[#F5A523]">
           {steps[currentStep].title}
         </span>
         <span className="text-xs text-gray-400">
@@ -26,7 +26,7 @@ export default function FormProgress({ steps, currentStep }: FormProgressProps) 
       {/* Mobile progress bar */}
       <div className="h-1 bg-gray-100 sm:hidden">
         <div
-          className="h-1 bg-indigo-600 transition-all duration-300"
+          className="h-1 bg-[#F5A523] transition-all duration-300"
           style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
         />
       </div>
@@ -42,9 +42,9 @@ export default function FormProgress({ steps, currentStep }: FormProgressProps) 
                 <div
                   className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
                     isCompleted
-                      ? 'bg-indigo-600 text-white'
+                      ? 'bg-[#F5A523] text-white'
                       : isActive
-                      ? 'bg-indigo-600 text-white ring-2 ring-indigo-200 ring-offset-1'
+                      ? 'bg-[#F5A523] text-white ring-2 ring-[#F5A523]/30 ring-offset-1'
                       : 'bg-gray-100 text-gray-400'
                   }`}
                 >
@@ -58,7 +58,7 @@ export default function FormProgress({ steps, currentStep }: FormProgressProps) 
                 </div>
                 <span
                   className={`text-[10px] font-medium text-center leading-tight ${
-                    isActive ? 'text-indigo-600' : isCompleted ? 'text-gray-600' : 'text-gray-400'
+                    isActive ? 'text-[#F5A523]' : isCompleted ? 'text-gray-600' : 'text-gray-400'
                   }`}
                 >
                   {step.shortTitle}
@@ -67,7 +67,7 @@ export default function FormProgress({ steps, currentStep }: FormProgressProps) 
               {i < steps.length - 1 && (
                 <div
                   className={`h-0.5 w-6 mx-1 mb-4 transition-colors ${
-                    isCompleted ? 'bg-indigo-600' : 'bg-gray-200'
+                    isCompleted ? 'bg-[#F5A523]' : 'bg-gray-200'
                   }`}
                 />
               )}

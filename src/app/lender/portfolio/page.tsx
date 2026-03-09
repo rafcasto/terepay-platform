@@ -98,7 +98,7 @@ export default async function LenderPortfolioPage() {
                     <td className="px-6 py-4">
                       <Link
                         href={`/lender/applications/${l.applicationId as string}`}
-                        className="text-indigo-600 hover:underline text-xs"
+                        className="text-[#F5A523] hover:underline text-xs"
                       >
                         View →
                       </Link>

@@ -4,7 +4,7 @@ export default function HeroSection() {
   const badges = [
     {
       icon: (
-        <svg className="w-6 h-6" fill="none" stroke="#00B3A4" viewBox="0 0 24 24">
+        <svg className="w-6 h-6" fill="none" stroke="#F5A523" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
         </svg>
       ),
@@ -13,7 +13,7 @@ export default function HeroSection() {
     },
     {
       icon: (
-        <svg className="w-6 h-6" fill="none" stroke="#00B3A4" viewBox="0 0 24 24">
+        <svg className="w-6 h-6" fill="none" stroke="#F5A523" viewBox="0 0 24 24">
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -27,7 +27,7 @@ export default function HeroSection() {
     },
     {
       icon: (
-        <svg className="w-6 h-6" fill="none" stroke="#00B3A4" viewBox="0 0 24 24">
+        <svg className="w-6 h-6" fill="none" stroke="#F5A523" viewBox="0 0 24 24">
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -42,14 +42,14 @@ export default function HeroSection() {
   ];
 
   return (
-    <section className="bg-gradient-to-br from-[#E6F9F8] via-white to-white py-20 md:py-32 px-6">
+    <section className="bg-gradient-to-br from-[#FEF7E9] via-white to-white py-20 md:py-32 px-6">
       <div className="max-w-6xl mx-auto text-center">
-        <span className="inline-block mb-4 px-4 py-1.5 text-xs font-semibold tracking-widest uppercase text-[#00B3A4] bg-[#00B3A4]/10 rounded-full">
+        <span className="inline-block mb-4 px-4 py-1.5 text-xs font-semibold tracking-widest uppercase text-[#F5A523] bg-[#F5A523]/10 rounded-full">
           New Zealand&apos;s Community Lender
         </span>
         <h1 className="text-4xl md:text-6xl font-extrabold text-[#0D1B2A] leading-tight max-w-3xl mx-auto">
           Borrow Now,{' '}
-          <span className="text-[#00B3A4]">Pay Later</span>{' '}
+          <span className="text-[#F5A523]">Pay Later</span>{' '}
           with TerePay
         </h1>
         <p className="mt-6 text-lg md:text-xl text-gray-500 max-w-2xl mx-auto leading-relaxed">
@@ -60,7 +60,7 @@ export default function HeroSection() {
         <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
           <Link
             href="/auth/signup"
-            className="px-8 py-4 bg-[#00B3A4] text-white font-bold rounded-xl hover:bg-[#007F74] transition-colors shadow-lg shadow-[#00B3A4]/25 text-base"
+            className="px-8 py-4 bg-[#F5A523] text-white font-bold rounded-xl hover:bg-[#E08B00] transition-colors shadow-lg shadow-[#F5A523]/25 text-base"
           >
             Ready To Borrow?
           </Link>
@@ -76,7 +76,7 @@ export default function HeroSection() {
         <div className="mt-16 flex flex-col sm:flex-row justify-center gap-8 sm:gap-12">
           {badges.map((badge) => (
             <div key={badge.label} className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-[#00B3A4]/10 flex items-center justify-center flex-shrink-0">
+              <div className="w-12 h-12 rounded-full bg-[#F5A523]/10 flex items-center justify-center flex-shrink-0">
                 {badge.icon}
               </div>
               <div className="text-left">

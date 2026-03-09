@@ -101,7 +101,7 @@ export default async function LenderApplicationsPage() {
                     <td className="px-6 py-4 text-right">
                       <Link
                         href={`/lender/applications/${app.id}`}
-                        className="text-indigo-600 hover:underline font-medium"
+                        className="text-[#F5A523] hover:underline font-medium"
                       >
                         Review
                       </Link>

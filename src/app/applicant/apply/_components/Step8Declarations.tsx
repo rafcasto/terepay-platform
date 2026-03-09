@@ -76,14 +76,14 @@ export default function Step8Declarations() {
       </div>
 
       {/* Check all */}
-      <label className="flex items-center gap-3 cursor-pointer bg-indigo-50 border border-indigo-200 rounded-xl p-4">
+      <label className="flex items-center gap-3 cursor-pointer bg-[#FEF7E9] border border-[#F5A523]/30 rounded-xl p-4">
         <input
           type="checkbox"
           checked={allChecked}
           onChange={(ev) => handleCheckAll(ev.target.checked)}
-          className="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+          className="h-5 w-5 rounded border-gray-300 text-[#F5A523] focus:ring-[#F5A523]"
         />
-        <span className="text-sm font-semibold text-indigo-800">
+        <span className="text-sm font-semibold text-[#E08B00]">
           I confirm all declarations below
         </span>
       </label>
@@ -96,7 +96,7 @@ export default function Step8Declarations() {
             <input
               type="checkbox"
               {...register(`declarations.${decl.key}`)}
-              className="mt-0.5 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 shrink-0"
+              className="mt-0.5 h-4 w-4 rounded border-gray-300 text-[#F5A523] focus:ring-[#F5A523] shrink-0"
             />
             <span className="text-sm text-gray-700 leading-relaxed">{decl.text}</span>
           </label>
@@ -121,7 +121,7 @@ export default function Step8Declarations() {
               <input
                 type="checkbox"
                 {...register(`declarations.${decl.key}`)}
-                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 shrink-0"
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-[#F5A523] focus:ring-[#F5A523] shrink-0"
               />
               <span className="text-sm text-gray-700 leading-relaxed">{decl.text}</span>
             </label>

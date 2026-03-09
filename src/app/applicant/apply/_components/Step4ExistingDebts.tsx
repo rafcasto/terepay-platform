@@ -4,7 +4,7 @@ import { useFormContext, useWatch, type UseFormRegister } from 'react-hook-form'
 import type { TerepayApplicationInput } from '@/lib/validation/schemas';
 
 const inputCls =
-  'w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-white';
+  'w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:ring-2 focus:ring-[#F5A523] focus:outline-none bg-white';
 
 function DebtRow({
   label,
@@ -151,10 +151,10 @@ export default function Step4ExistingDebts() {
         {/* Totals row */}
         <div className="grid grid-cols-12 gap-2 pt-3 mt-1 border-t-2 border-gray-300">
           <span className="col-span-12 sm:col-span-4 text-sm font-bold text-gray-800">TOTAL</span>
-          <span className="col-span-6 sm:col-span-4 px-3 py-2 bg-indigo-50 text-indigo-700 font-bold text-sm rounded-md text-right">
+          <span className="col-span-6 sm:col-span-4 px-3 py-2 bg-[#FEF7E9] text-[#E08B00] font-bold text-sm rounded-md text-right">
             ${totalOwed.toFixed(2)}
           </span>
-          <span className="col-span-6 sm:col-span-4 px-3 py-2 bg-indigo-50 text-indigo-700 font-bold text-sm rounded-md text-right">
+          <span className="col-span-6 sm:col-span-4 px-3 py-2 bg-[#FEF7E9] text-[#E08B00] font-bold text-sm rounded-md text-right">
             ${totalForthnightly.toFixed(2)}
           </span>
         </div>
@@ -171,7 +171,7 @@ export default function Step4ExistingDebts() {
         <textarea
           rows={4}
           {...register('existingDebts.debtPurposeDescription')}
-          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none resize-none"
+          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#F5A523] focus:outline-none resize-none"
           placeholder="e.g. Car loan finishing in 18 months, credit card for emergency medical costs…"
         />
       </div>

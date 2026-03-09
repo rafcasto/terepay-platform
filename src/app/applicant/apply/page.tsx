@@ -188,7 +188,7 @@ export default function ApplyPage() {
                 type="button"
                 onClick={handleSubmit(onSubmit)}
                 disabled={isSubmitting}
-                className="flex-1 sm:flex-none sm:w-40 py-2.5 px-4 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="flex-1 sm:flex-none sm:w-40 py-2.5 px-4 bg-[#F5A523] text-white text-sm font-semibold rounded-lg hover:bg-[#E08B00] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {isSubmitting ? 'Submitting…' : 'Submit Application'}
               </button>
@@ -196,7 +196,7 @@ export default function ApplyPage() {
               <button
                 type="button"
                 onClick={handleNext}
-                className="flex-1 sm:flex-none sm:w-28 py-2.5 px-4 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition-colors"
+                className="flex-1 sm:flex-none sm:w-28 py-2.5 px-4 bg-[#F5A523] text-white text-sm font-semibold rounded-lg hover:bg-[#E08B00] transition-colors"
               >
                 Next
               </button>

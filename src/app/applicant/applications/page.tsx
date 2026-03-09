@@ -39,7 +39,7 @@ export default async function ApplicantApplicationsPage() {
         </div>
         <Link
           href="/applicant/apply"
-          className="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700 transition-colors"
+          className="bg-[#F5A523] text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-[#E08B00] transition-colors"
         >
           New Application
         </Link>
@@ -48,7 +48,7 @@ export default async function ApplicantApplicationsPage() {
       {applications.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 px-6 py-16 text-center">
           <p className="text-gray-500 mb-3">No applications yet.</p>
-          <Link href="/applicant/apply" className="text-indigo-600 font-medium hover:text-indigo-500">
+          <Link href="/applicant/apply" className="text-[#F5A523] font-medium hover:text-[#E08B00]">
             Apply for your first loan →
           </Link>
         </div>
@@ -84,7 +84,7 @@ export default async function ApplicantApplicationsPage() {
                     <td className="px-6 py-4 text-right">
                       <Link
                         href={`/applicant/applications/${app.id}`}
-                        className="text-indigo-600 hover:text-indigo-500 font-medium"
+                        className="text-[#F5A523] hover:text-[#E08B00] font-medium"
                       >
                         View
                       </Link>

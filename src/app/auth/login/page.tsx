@@ -43,7 +43,7 @@ function LoginFormInner() {
           type="email"
           autoComplete="email"
           {...register('email')}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#F5A523] focus:border-[#F5A523] text-sm"
           placeholder="you@example.com"
         />
         {errors.email && (
@@ -60,7 +60,7 @@ function LoginFormInner() {
           type="password"
           autoComplete="current-password"
           {...register('password')}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#F5A523] focus:border-[#F5A523] text-sm"
           placeholder="••••••••"
         />
         {errors.password && (
@@ -77,14 +77,14 @@ function LoginFormInner() {
       <button
         type="submit"
         disabled={isSubmitting}
-        className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#F5A523] hover:bg-[#E08B00] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#F5A523] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
       >
         {isSubmitting ? 'Signing in…' : 'Sign in'}
       </button>
 
       <p className="text-center text-sm text-gray-600">
         Don&apos;t have an account?{' '}
-        <Link href="/auth/signup" className="text-indigo-600 hover:text-indigo-500 font-medium">
+        <Link href="/auth/signup" className="text-[#F5A523] hover:text-[#E08B00] font-medium">
           Sign up
         </Link>
       </p>
@@ -97,7 +97,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-indigo-600">TerePay</h1>
+          <h1 className="text-3xl font-bold text-[#F5A523]">TerePay</h1>
           <p className="mt-2 text-gray-600">Sign in to your account</p>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">

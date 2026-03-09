@@ -16,7 +16,7 @@ export default function Footer() {
       <div className="max-w-6xl mx-auto py-16 grid grid-cols-1 md:grid-cols-3 gap-12">
         {/* Brand column */}
         <div>
-          <Link href="/" className="text-2xl font-bold text-[#00B3A4] tracking-tight">
+          <Link href="/" className="text-2xl font-bold text-[#F5A523] tracking-tight">
             TerePay
           </Link>
           <p className="mt-4 text-sm text-gray-400 leading-relaxed max-w-xs">
@@ -63,7 +63,7 @@ export default function Footer() {
                   href={link.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-gray-400 hover:text-[#00B3A4] transition-colors"
+                  className="text-sm text-gray-400 hover:text-[#F5A523] transition-colors"
                 >
                   {link.label}
                 </a>
@@ -75,7 +75,7 @@ export default function Footer() {
               href="https://drive.google.com/file/d/1weraj0jfc1yPtet0bQV-fu332cpVTJG9/view?usp=share_link"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-[#00B3A4] hover:underline"
+              className="text-sm text-[#F5A523] hover:underline"
             >
               Contract and Agreement →
             </a>
@@ -88,7 +88,7 @@ export default function Footer() {
           <address className="not-italic flex flex-col gap-5">
             <div className="flex gap-3">
               <svg
-                className="w-4 h-4 text-[#00B3A4] mt-0.5 flex-shrink-0"
+                className="w-4 h-4 text-[#F5A523] mt-0.5 flex-shrink-0"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -114,7 +114,7 @@ export default function Footer() {
             </div>
             <div className="flex gap-3 items-center">
               <svg
-                className="w-4 h-4 text-[#00B3A4] flex-shrink-0"
+                className="w-4 h-4 text-[#F5A523] flex-shrink-0"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -128,14 +128,14 @@ export default function Footer() {
               </svg>
               <a
                 href="mailto:info@terepay.com"
-                className="text-sm text-gray-400 hover:text-[#00B3A4] transition-colors"
+                className="text-sm text-gray-400 hover:text-[#F5A523] transition-colors"
               >
                 info@terepay.com
               </a>
             </div>
             <div className="flex gap-3 items-center">
               <svg
-                className="w-4 h-4 text-[#00B3A4] flex-shrink-0"
+                className="w-4 h-4 text-[#F5A523] flex-shrink-0"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -149,7 +149,7 @@ export default function Footer() {
               </svg>
               <a
                 href="tel:+6498867158"
-                className="text-sm text-gray-400 hover:text-[#00B3A4] transition-colors"
+                className="text-sm text-gray-400 hover:text-[#F5A523] transition-colors"
               >
                 +64 9 886 7158
               </a>

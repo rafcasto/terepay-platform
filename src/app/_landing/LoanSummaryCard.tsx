@@ -12,7 +12,7 @@ export default function LoanSummaryCard() {
     <section className="py-20 px-6 bg-white">
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-14">
-          <span className="text-xs font-semibold tracking-widest uppercase text-[#00B3A4]">
+          <span className="text-xs font-semibold tracking-widest uppercase text-[#F5A523]">
             Loan Details
           </span>
           <h2 className="mt-2 text-3xl md:text-4xl font-extrabold text-[#0D1B2A]">
@@ -27,7 +27,7 @@ export default function LoanSummaryCard() {
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-8">
             {/* Amount */}
             <div className="flex-shrink-0">
-              <p className="text-[#00B3A4] text-sm font-semibold uppercase tracking-widest mb-1">
+              <p className="text-[#F5A523] text-sm font-semibold uppercase tracking-widest mb-1">
                 Example Loan
               </p>
               <p className="text-6xl font-black leading-none">$1,000</p>
@@ -64,7 +64,7 @@ export default function LoanSummaryCard() {
           <div className="mt-8 text-center">
             <Link
               href="/auth/signup"
-              className="inline-block px-8 py-4 bg-[#00B3A4] text-white font-bold rounded-xl hover:bg-[#007F74] transition-colors shadow-lg shadow-[#00B3A4]/20"
+              className="inline-block px-8 py-4 bg-[#F5A523] text-white font-bold rounded-xl hover:bg-[#E08B00] transition-colors shadow-lg shadow-[#F5A523]/20"
             >
               Ready to Apply?
             </Link>

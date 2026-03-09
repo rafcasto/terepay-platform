@@ -87,7 +87,7 @@ export default async function ApplicationDetailPage({
   return (
     <div className="p-8 max-w-3xl">
       <div className="flex items-center gap-3 mb-6">
-        <Link href="/applicant/applications" className="text-sm text-indigo-600 hover:underline">
+        <Link href="/applicant/applications" className="text-sm text-[#F5A523] hover:underline">
           ← All Applications
         </Link>
       </div>
