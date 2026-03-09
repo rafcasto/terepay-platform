@@ -36,10 +36,12 @@ export default function SignupPage() {
       // Auto-login after successful signup
       await login(data.email, data.password);
 
-      // Send email verification using Firebase client SDK
+      // Send email verification using Firebase client SDK.
+      // continueUrl brings the user back to the verify-email page after clicking the link.
       const firebaseUser = clientAuth.currentUser;
       if (firebaseUser && !firebaseUser.emailVerified) {
-        await sendEmailVerification(firebaseUser).catch(() => {/* non-critical: email send failure shouldn't block signup */});
+        const continueUrl = `${window.location.origin}/applicant/verify-email`;
+        await sendEmailVerification(firebaseUser, { url: continueUrl, handleCodeInApp: false }).catch(() => {/* non-critical */});
       }
 
       router.push('/applicant/verify-email');

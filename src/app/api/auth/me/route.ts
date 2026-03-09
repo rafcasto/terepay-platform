@@ -17,13 +17,31 @@ export async function GET(request: NextRequest) {
 
   try {
     const decoded = await verifySessionOrIdToken(sessionCookie);
-    const userDoc = await adminDb.collection('users').doc(decoded.uid).get();
+
+    // Fetch Firestore document and live Firebase Auth record in parallel.
+    // The session cookie is an immutable snapshot — it does NOT update when the
+    // user verifies their email.  adminAuth.getUser() always returns live state.
+    const [userDoc, liveAuthUser] = await Promise.all([
+      adminDb.collection('users').doc(decoded.uid).get(),
+      adminAuth.getUser(decoded.uid),
+    ]);
 
     if (!userDoc.exists) {
       return NextResponse.json({ user: null });
     }
 
     const data = userDoc.data()!;
+    const liveEmailVerified = liveAuthUser.emailVerified;
+
+    // Sync Firestore if Firebase Auth now says verified but Firestore still has false.
+    if (liveEmailVerified && !data.emailVerified) {
+      await adminDb
+        .collection('users')
+        .doc(decoded.uid)
+        .update({ emailVerified: true })
+        .catch(() => {/* non-critical */});
+    }
+
     return NextResponse.json({
       user: {
         uid: decoded.uid,
@@ -32,7 +50,7 @@ export async function GET(request: NextRequest) {
         lastName: data.lastName,
         role: data.role,
         profileComplete: data.profileComplete,
-        emailVerified: decoded.email_verified ?? false,
+        emailVerified: liveEmailVerified,
       },
     });
   } catch {

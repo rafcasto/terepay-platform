@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebase/admin';
+import { adminDb, adminAuth } from '@/lib/firebase/admin';
 
 export const dynamic = 'force-dynamic';
 import { withAuth } from '@/lib/auth/middleware';
@@ -64,7 +64,10 @@ export async function POST(request: NextRequest) {
     const auth = await withAuth(request, ['applicant']);
     uid = auth.uid;
 
-    if (!auth.emailVerified) {
+    // Check live Firebase Auth state — the session cookie is issued at login and
+    // its email_verified claim never updates after the user verifies their email.
+    const liveUser = await adminAuth.getUser(uid);
+    if (!liveUser.emailVerified) {
       return errorResponse(
         new AppError('FORBIDDEN', 403, 'Please verify your email address before submitting a loan application.'),
       );
