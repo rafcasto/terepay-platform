@@ -98,4 +98,169 @@ export type CreateApplicationInput = z.infer<typeof createApplicationSchema>;
 export type UpdateApplicationInput = z.infer<typeof updateApplicationSchema>;
 export type ApproveApplicationInput = z.infer<typeof approveApplicationSchema>;
 export type RejectApplicationInput = z.infer<typeof rejectApplicationSchema>;
+
+// ---------------------------------------------------------------------------
+// TerePay 8-section loan application schema (NZD, 8-week term)
+// ---------------------------------------------------------------------------
+
+const currencyField = z.number({ message: 'Enter a valid amount' }).min(0).default(0);
+
+export const terepayApplicationSchema = z.object({
+  // ── Section 1: Personal Information ────────────────────────────────────
+  personalInfo: z.object({
+    firstName: z.string().min(1, 'First name is required'),
+    lastName: z.string().min(1, 'Last name is required'),
+    dateOfBirth: z.string().min(1, 'Date of birth is required'),
+    email: z.string().email('Invalid email address'),
+    phone: z.string().min(1, 'Mobile phone is required'),
+    address: z.string().min(1, 'Address is required'),
+    city: z.string().min(1, 'City is required'),
+    postCode: z.string().min(1, 'Post code is required'),
+    timeAtAddress: z.string().min(1, 'Required'),
+    housingStatus: z.enum(['rent', 'own', 'flatmates', 'other'], { message: 'Select a housing status' }),
+    visaStatus: z.enum(['work_visa', 'resident_visa', 'student_visa', 'citizen', 'other'], { message: 'Select a visa status' }),
+    visaExpiryDate: z.string().optional(),
+    householdType: z.enum(['single', 'single_children', 'couple', 'couple_children'], { message: 'Select a household type' }),
+    numberOfChildren: z.number({ message: 'Enter a number' }).min(0).int().default(0),
+    numberOfDependents: z.number({ message: 'Enter a number' }).min(0).int().default(0),
+  }),
+
+  // ── Section 2: Employment & Income ─────────────────────────────────────
+  employment: z.object({
+    employerName: z.string().min(1, 'Employer name is required'),
+    employerAddress: z.string().min(1, 'Employer address is required'),
+    occupation: z.string().min(1, 'Occupation is required'),
+    hoursPerWeek: z.number({ message: 'Enter hours per week' }).min(1).max(168),
+    employmentStatus: z.enum(['permanent', 'fixed_term', 'casual', 'part_time'], { message: 'Select an employment status' }),
+    timeAtEmployer: z.string().min(1, 'Required'),
+    previousEmployer: z.string().optional(),
+    income: z.object({
+      salaryBeforeTax: currencyField,
+      salaryAfterTax: currencyField,
+      winz: currencyField,
+      otherIncome: currencyField,
+      otherIncomeDescription: z.string().optional(),
+    }),
+  }),
+
+  // ── Section 3: Living Expenses ──────────────────────────────────────────
+  livingExpenses: z.object({
+    nonDiscretionary: z.object({
+      food: currencyField,
+      utilities: currencyField,
+      personalExpenses: currencyField,
+      transport: currencyField,
+      medical: currencyField,
+      childcare: currencyField,
+      accommodation: currencyField,
+      healthInsurance: currencyField,
+      carInsurance: currencyField,
+      rates: currencyField,
+      education: currencyField,
+      childSupport: currencyField,
+      remittances: currencyField,
+    }),
+    discretionary: z.object({
+      restaurants: currencyField,
+      entertainment: currencyField,
+      travel: currencyField,
+      subscriptions: currencyField,
+      homeImprovement: currencyField,
+      cashWithdrawals: currencyField,
+      other: currencyField,
+    }),
+    subscriptionDetails: z.object({
+      gym: z.object({ amount: currencyField, frequency: z.string().default('N/A') }),
+      netflix: z.object({ amount: currencyField, frequency: z.string().default('N/A') }),
+      spotify: z.object({ amount: currencyField, frequency: z.string().default('N/A') }),
+      sports: z.object({ amount: currencyField, frequency: z.string().default('N/A') }),
+      others: z.object({ amount: currencyField, frequency: z.string().default('N/A') }),
+    }),
+    bnpl: z.object({
+      afterpay: currencyField,
+      klarna: currencyField,
+      zip: currencyField,
+    }),
+  }),
+
+  // ── Section 4: Existing Debts & Financial Commitments ──────────────────
+  existingDebts: z.object({
+    mortgage: z.object({ totalOwed: currencyField, fortnightlyPayment: currencyField }),
+    personalLoans: z.object({ totalOwed: currencyField, fortnightlyPayment: currencyField }),
+    carLoans: z.object({ totalOwed: currencyField, fortnightlyPayment: currencyField }),
+    creditCard: z.object({ totalOwed: currencyField, fortnightlyPayment: currencyField }),
+    bankOverdrafts: z.object({ totalOwed: currencyField, fortnightlyPayment: currencyField }),
+    otherLoans: z.array(
+      z.object({
+        description: z.string().optional(),
+        totalOwed: currencyField,
+        fortnightlyPayment: currencyField,
+      }),
+    ).default([
+      { totalOwed: 0, fortnightlyPayment: 0 },
+      { totalOwed: 0, fortnightlyPayment: 0 },
+      { totalOwed: 0, fortnightlyPayment: 0 },
+    ]),
+    debtPurposeDescription: z.string().optional(),
+  }),
+
+  // ── Section 5: Loan Request ─────────────────────────────────────────────
+  loanRequest: z.object({
+    requestedAmount: z
+      .number({ message: 'Enter an amount' })
+      .min(100, 'Minimum loan amount is $100')
+      .max(50000, 'Maximum loan amount is $50,000'),
+    purpose: z.string().min(1, 'Please select a purpose'),
+    purposeDescription: z.string().min(10, 'Please provide at least 10 characters').max(1000),
+    primaryIncomeSource: z.string().min(1, 'Required'),
+    isPEP: z.boolean().default(false),
+    pepDetails: z.string().optional(),
+    remittance: z.object({
+      frequency: z.enum(['weekly', 'fortnightly', 'monthly', 'occasionally', 'never']),
+      averageAmount: currencyField,
+      purposes: z.array(z.string()).default([]),
+    }),
+  }),
+
+  // ── Section 6: Bank Account & Repayment ────────────────────────────────
+  bankDetails: z.object({
+    bankName: z.string().min(1, 'Bank name is required'),
+    accountHolderName: z.string().min(1, 'Account holder name is required'),
+    accountNumber: z.string().min(1, 'Account number is required'),
+    paymentMethod: z.enum(['direct_debit', 'bank_transfer'], { message: 'Select a payment method' }),
+  }),
+
+  // ── Section 7: References (optional) ───────────────────────────────────
+  references: z.object({
+    reference1: z
+      .object({
+        name: z.string().optional(),
+        email: z.union([z.string().email('Invalid email'), z.literal('')]).optional(),
+        phone: z.string().optional(),
+      })
+      .optional(),
+    reference2: z
+      .object({
+        name: z.string().optional(),
+        email: z.union([z.string().email('Invalid email'), z.literal('')]).optional(),
+        phone: z.string().optional(),
+      })
+      .optional(),
+  }),
+
+  // ── Section 8: Declarations & Consent ──────────────────────────────────
+  declarations: z.object({
+    infoAccurate: z.boolean().refine((v) => v === true, { message: 'Required' }),
+    understandsVerification: z.boolean().refine((v) => v === true, { message: 'Required' }),
+    authorisesContacts: z.boolean().refine((v) => v === true, { message: 'Required' }),
+    understandsTerms: z.boolean().refine((v) => v === true, { message: 'Required' }),
+    canAffordRepayments: z.boolean().refine((v) => v === true, { message: 'Required' }),
+    receivedDisclosure: z.boolean().refine((v) => v === true, { message: 'Required' }),
+    understandsConsequences: z.boolean().refine((v) => v === true, { message: 'Required' }),
+    privacyPolicy: z.boolean().refine((v) => v === true, { message: 'Required' }),
+    creditReporting: z.boolean().refine((v) => v === true, { message: 'Required' }),
+  }),
+});
+
+export type TerepayApplicationInput = z.infer<typeof terepayApplicationSchema>;
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;

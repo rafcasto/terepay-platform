@@ -3,7 +3,7 @@ import { adminDb } from '@/lib/firebase/admin';
 
 export const dynamic = 'force-dynamic';
 import { withAuth } from '@/lib/auth/middleware';
-import { createApplicationSchema } from '@/lib/validation/schemas';
+import { createApplicationSchema, terepayApplicationSchema } from '@/lib/validation/schemas';
 import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { auditLog, getClientIp } from '@/lib/utils/audit';
 import { defaultLimiter, checkRateLimit } from '@/lib/rate-limit/limiter';
@@ -65,43 +65,108 @@ export async function POST(request: NextRequest) {
     uid = auth.uid;
 
     const body = await request.json();
-    const parsed = createApplicationSchema.parse(body);
 
-    const applicationId = randomUUID();
-    const now = FieldValue.serverTimestamp();
+    // Accept both TerePay 8-section form and legacy simple form
+    let parsed;
+    let applicationData: Record<string, unknown>;
 
-    const debtToIncomeRatio =
-      parsed.financialInformation.monthlyIncome > 0
-        ? parsed.financialInformation.currentDebts / parsed.financialInformation.monthlyIncome
-        : 0;
+    const isTerePayForm = 'personalInfo' in body && 'loanRequest' in body;
 
-    const applicationData = {
-      applicationId,
-      applicantId: uid,
-      status: 'draft',
-      loanDetails: {
-        ...parsed.loanDetails,
-        currency: 'USD',
-      },
-      financialInformation: {
-        ...parsed.financialInformation,
-        debtToIncomeRatio,
-        assets: parsed.financialInformation.assets ?? {},
-      },
-      documents: [],
-      underwriting: {
-        notes: '',
-        underwriterIds: [],
-      },
-      timeline: {
-        createdAt: now,
-        updatedAt: now,
-      },
-      metadata: {
-        comments: [],
-        internalNotes: '',
-      },
-    };
+    if (isTerePayForm) {
+      parsed = terepayApplicationSchema.parse(body);
+
+      const fortnightlyIncome =
+        parsed.employment.income.salaryAfterTax +
+        parsed.employment.income.winz +
+        parsed.employment.income.otherIncome;
+
+      const sumObj = (obj: Record<string, number>) =>
+        Object.values(obj).reduce((a, b) => (typeof b === 'number' ? a + b : a), 0);
+
+      const fortnightlyExpenses =
+        sumObj(parsed.livingExpenses.nonDiscretionary as unknown as Record<string, number>) +
+        sumObj(parsed.livingExpenses.discretionary as unknown as Record<string, number>);
+
+      const totalDebts =
+        parsed.existingDebts.mortgage.totalOwed +
+        parsed.existingDebts.personalLoans.totalOwed +
+        parsed.existingDebts.carLoans.totalOwed +
+        parsed.existingDebts.creditCard.totalOwed +
+        parsed.existingDebts.bankOverdrafts.totalOwed +
+        parsed.existingDebts.otherLoans.reduce((a, l) => a + l.totalOwed, 0);
+
+      const monthlyIncome = fortnightlyIncome * 2;
+      const debtToIncomeRatio = monthlyIncome > 0 ? totalDebts / monthlyIncome : 0;
+
+      const applicationId = randomUUID();
+      const now = FieldValue.serverTimestamp();
+
+      applicationData = {
+        applicationId,
+        applicantId: uid,
+        status: 'draft',
+        loanDetails: {
+          requestedAmount: parsed.loanRequest.requestedAmount,
+          currency: 'NZD',
+          loanPurpose: 'personal',
+          purposeDescription: parsed.loanRequest.purposeDescription,
+          requestedTerm: 2, // 2 payment periods = 4 fortnightly payments
+        },
+        financialInformation: {
+          monthlyIncome,
+          incomeSource: parsed.loanRequest.primaryIncomeSource,
+          employmentType: parsed.employment.employmentStatus,
+          monthlyExpenses: fortnightlyExpenses * 2,
+          currentDebts: totalDebts,
+          existingLoans: parsed.existingDebts.otherLoans.filter((l) => l.totalOwed > 0).length,
+          debtToIncomeRatio,
+          savingsBalance: 0,
+          assets: {},
+        },
+        personalInfo: parsed.personalInfo,
+        employment: parsed.employment,
+        livingExpenses: parsed.livingExpenses,
+        existingDebts: parsed.existingDebts,
+        bankDetails: parsed.bankDetails,
+        references: parsed.references,
+        declarations: {
+          ...parsed.declarations,
+          submittedAt: new Date().toISOString(),
+        },
+        documents: [],
+        underwriting: { notes: '', underwriterIds: [] },
+        timeline: { createdAt: now, updatedAt: now },
+        metadata: { comments: [], internalNotes: '' },
+      };
+    } else {
+      // Legacy simple form path
+      const legacyParsed = createApplicationSchema.parse(body);
+      const applicationId = randomUUID();
+      const now = FieldValue.serverTimestamp();
+      const debtToIncomeRatio =
+        legacyParsed.financialInformation.monthlyIncome > 0
+          ? legacyParsed.financialInformation.currentDebts /
+            legacyParsed.financialInformation.monthlyIncome
+          : 0;
+
+      applicationData = {
+        applicationId,
+        applicantId: uid,
+        status: 'draft',
+        loanDetails: { ...legacyParsed.loanDetails, currency: 'USD' },
+        financialInformation: {
+          ...legacyParsed.financialInformation,
+          debtToIncomeRatio,
+          assets: legacyParsed.financialInformation.assets ?? {},
+        },
+        documents: [],
+        underwriting: { notes: '', underwriterIds: [] },
+        timeline: { createdAt: now, updatedAt: now },
+        metadata: { comments: [], internalNotes: '' },
+      };
+    }
+
+    const applicationId = (applicationData as { applicationId: string }).applicationId;
 
     await adminDb.collection('loanApplications').doc(applicationId).set(applicationData);
 

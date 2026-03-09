@@ -1,31 +1,134 @@
 'use client';
 
-import { useForm } from 'react-hook-form';
+import { useState } from 'react';
+import { useForm, FormProvider } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/navigation';
-import { createApplicationSchema, type CreateApplicationInput } from '@/lib/validation/schemas';
-import { useState } from 'react';
+import { terepayApplicationSchema, type TerepayApplicationInput } from '@/lib/validation/schemas';
 
-const LOAN_PURPOSES = [
-  { value: 'personal', label: 'Personal' },
-  { value: 'business', label: 'Business' },
-  { value: 'auto', label: 'Auto' },
-  { value: 'home_improvement', label: 'Home Improvement' },
-  { value: 'consolidation', label: 'Debt Consolidation' },
-  { value: 'other', label: 'Other' },
+import FormProgress from './_components/FormProgress';
+import Step1PersonalInfo from './_components/Step1PersonalInfo';
+import Step2Employment from './_components/Step2Employment';
+import Step3LivingExpenses from './_components/Step3LivingExpenses';
+import Step4ExistingDebts from './_components/Step4ExistingDebts';
+import Step5LoanRequest from './_components/Step5LoanRequest';
+import Step6BankDetails from './_components/Step6BankDetails';
+import Step7References from './_components/Step7References';
+import Step8Declarations from './_components/Step8Declarations';
+
+const STEPS = [
+  { title: 'Personal Information', shortTitle: 'Personal', fields: ['personalInfo'] },
+  { title: 'Employment & Income', shortTitle: 'Employment', fields: ['employment'] },
+  { title: 'Living Expenses', shortTitle: 'Expenses', fields: ['livingExpenses'] },
+  { title: 'Existing Debts', shortTitle: 'Debts', fields: ['existingDebts'] },
+  { title: 'Loan Request', shortTitle: 'Loan', fields: ['loanRequest'] },
+  { title: 'Bank Account', shortTitle: 'Bank', fields: ['bankDetails'] },
+  { title: 'References', shortTitle: 'References', fields: ['references'] },
+  { title: 'Declarations & Consent', shortTitle: 'Consent', fields: ['declarations'] },
 ] as const;
+
+const STEP_COMPONENTS = [
+  Step1PersonalInfo,
+  Step2Employment,
+  Step3LivingExpenses,
+  Step4ExistingDebts,
+  Step5LoanRequest,
+  Step6BankDetails,
+  Step7References,
+  Step8Declarations,
+];
 
 export default function ApplyPage() {
   const router = useRouter();
+  const [currentStep, setCurrentStep] = useState(0);
   const [serverError, setServerError] = useState<string | null>(null);
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-  } = useForm<CreateApplicationInput>({ resolver: zodResolver(createApplicationSchema) });
+  const methods = useForm<TerepayApplicationInput>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: zodResolver(terepayApplicationSchema) as any,
+    mode: 'onTouched',
+    defaultValues: {
+      personalInfo: {
+        numberOfChildren: 0,
+        numberOfDependents: 0,
+      },
+      employment: {
+        income: {
+          salaryBeforeTax: 0,
+          salaryAfterTax: 0,
+          winz: 0,
+          otherIncome: 0,
+        },
+      },
+      livingExpenses: {
+        nonDiscretionary: {
+          food: 0, utilities: 0, personalExpenses: 0, transport: 0,
+          medical: 0, childcare: 0, accommodation: 0, healthInsurance: 0,
+          carInsurance: 0, rates: 0, education: 0, childSupport: 0, remittances: 0,
+        },
+        discretionary: {
+          restaurants: 0, entertainment: 0, travel: 0, subscriptions: 0,
+          homeImprovement: 0, cashWithdrawals: 0, other: 0,
+        },
+        subscriptionDetails: {
+          gym: { amount: 0, frequency: 'N/A' },
+          netflix: { amount: 0, frequency: 'N/A' },
+          spotify: { amount: 0, frequency: 'N/A' },
+          sports: { amount: 0, frequency: 'N/A' },
+          others: { amount: 0, frequency: 'N/A' },
+        },
+        bnpl: { afterpay: 0, klarna: 0, zip: 0 },
+      },
+      existingDebts: {
+        mortgage: { totalOwed: 0, fortnightlyPayment: 0 },
+        personalLoans: { totalOwed: 0, fortnightlyPayment: 0 },
+        carLoans: { totalOwed: 0, fortnightlyPayment: 0 },
+        creditCard: { totalOwed: 0, fortnightlyPayment: 0 },
+        bankOverdrafts: { totalOwed: 0, fortnightlyPayment: 0 },
+        otherLoans: [
+          { description: '', totalOwed: 0, fortnightlyPayment: 0 },
+          { description: '', totalOwed: 0, fortnightlyPayment: 0 },
+          { description: '', totalOwed: 0, fortnightlyPayment: 0 },
+        ],
+      },
+      loanRequest: {
+        isPEP: false,
+        remittance: { frequency: 'never', averageAmount: 0, purposes: [] },
+      },
+      declarations: {
+        infoAccurate: false,
+        understandsVerification: false,
+        authorisesContacts: false,
+        understandsTerms: false,
+        canAffordRepayments: false,
+        receivedDisclosure: false,
+        understandsConsequences: false,
+        privacyPolicy: false,
+        creditReporting: false,
+      },
+    },
+  });
 
-  const onSubmit = async (data: CreateApplicationInput) => {
+  const { handleSubmit, trigger, formState: { isSubmitting } } = methods;
+
+  const isLastStep = currentStep === STEPS.length - 1;
+
+  const handleNext = async () => {
+    const fields = STEPS[currentStep].fields;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const valid = await trigger(fields as any);
+    if (valid) {
+      setCurrentStep((s) => s + 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const handleBack = () => {
+    setCurrentStep((s) => Math.max(0, s - 1));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const onSubmit = async (data: TerepayApplicationInput) => {
     setServerError(null);
     try {
       const res = await fetch('/api/applications', {
@@ -36,198 +139,71 @@ export default function ApplyPage() {
 
       const body = await res.json();
       if (!res.ok) {
-        throw new Error(body.error?.message ?? 'Failed to create application');
+        throw new Error(body.error?.message ?? 'Failed to submit application');
       }
 
       router.push('/applicant/applications');
     } catch (err) {
-      setServerError(err instanceof Error ? err.message : 'Something went wrong');
+      setServerError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
+  const StepComponent = STEP_COMPONENTS[currentStep];
+
   return (
-    <div className="p-8 max-w-2xl">
-      <h1 className="text-2xl font-bold text-gray-900 mb-2">Apply for a Loan</h1>
-      <p className="text-gray-500 mb-8">Fill out the form below to start your loan application.</p>
+    <div className="min-h-screen bg-gray-50">
+      <FormProgress steps={STEPS as unknown as { title: string; shortTitle: string }[]} currentStep={currentStep} />
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-8" noValidate>
-        {/* Loan Details */}
-        <section className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
-          <h2 className="font-semibold text-gray-900">Loan Details</h2>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Requested Amount (USD)
-            </label>
-            <input
-              type="number"
-              min={100}
-              max={50000}
-              {...register('loanDetails.requestedAmount', { valueAsNumber: true })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              placeholder="e.g. 2500"
-            />
-            {errors.loanDetails?.requestedAmount && (
-              <p className="mt-1 text-xs text-red-600">{errors.loanDetails.requestedAmount.message}</p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Loan Purpose</label>
-            <select
-              {...register('loanDetails.loanPurpose')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white"
-            >
-              <option value="">Select a purpose…</option>
-              {LOAN_PURPOSES.map((p) => (
-                <option key={p.value} value={p.value}>{p.label}</option>
-              ))}
-            </select>
-            {errors.loanDetails?.loanPurpose && (
-              <p className="mt-1 text-xs text-red-600">{errors.loanDetails.loanPurpose.message}</p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Purpose Description
-            </label>
-            <textarea
-              rows={3}
-              {...register('loanDetails.purposeDescription')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none resize-none"
-              placeholder="Briefly describe how you will use this loan…"
-            />
-            {errors.loanDetails?.purposeDescription && (
-              <p className="mt-1 text-xs text-red-600">{errors.loanDetails.purposeDescription.message}</p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Requested Term (months)
-            </label>
-            <input
-              type="number"
-              min={3}
-              max={60}
-              {...register('loanDetails.requestedTerm', { valueAsNumber: true })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              placeholder="e.g. 12"
-            />
-          </div>
-        </section>
-
-        {/* Financial Information */}
-        <section className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
-          <h2 className="font-semibold text-gray-900">Financial Information</h2>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Monthly Income ($)
-              </label>
-              <input
-                type="number"
-                min={0}
-                {...register('financialInformation.monthlyIncome', { valueAsNumber: true })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              />
-              {errors.financialInformation?.monthlyIncome && (
-                <p className="mt-1 text-xs text-red-600">{errors.financialInformation.monthlyIncome.message}</p>
-              )}
+      <FormProvider {...methods}>
+        <div className="max-w-2xl mx-auto px-4 py-8 pb-32">
+          {serverError && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
+              <p className="text-sm text-red-700">{serverError}</p>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Monthly Expenses ($)
-              </label>
-              <input
-                type="number"
-                min={0}
-                {...register('financialInformation.monthlyExpenses', { valueAsNumber: true })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              />
-            </div>
-          </div>
+          )}
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Income Source</label>
-              <input
-                type="text"
-                {...register('financialInformation.incomeSource')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                placeholder="e.g. Employment"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Employment Type</label>
-              <input
-                type="text"
-                {...register('financialInformation.employmentType')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                placeholder="e.g. Full-time"
-              />
-            </div>
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 sm:p-8">
+            <StepComponent />
           </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Current Debts ($)
-              </label>
-              <input
-                type="number"
-                min={0}
-                defaultValue={0}
-                {...register('financialInformation.currentDebts', { valueAsNumber: true })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Existing Loans (#)
-              </label>
-              <input
-                type="number"
-                min={0}
-                defaultValue={0}
-                {...register('financialInformation.existingLoans', { valueAsNumber: true })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Savings Balance ($)
-            </label>
-            <input
-              type="number"
-              min={0}
-              defaultValue={0}
-              {...register('financialInformation.savingsBalance', { valueAsNumber: true })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-            />
-          </div>
-        </section>
-
-        {serverError && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-md">
-            <p className="text-sm text-red-600">{serverError}</p>
-          </div>
-        )}
-
-        <div className="flex gap-3">
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="flex-1 py-2.5 px-4 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {isSubmitting ? 'Saving…' : 'Save as Draft'}
-          </button>
         </div>
-      </form>
+
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-30">
+          <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleBack}
+              disabled={currentStep === 0}
+              className="flex-1 sm:flex-none sm:w-28 py-2.5 px-4 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Back
+            </button>
+
+            <div className="flex-1 hidden sm:block text-center text-xs text-gray-400">
+              {currentStep + 1} / {STEPS.length}
+            </div>
+
+            {isLastStep ? (
+              <button
+                type="button"
+                onClick={handleSubmit(onSubmit)}
+                disabled={isSubmitting}
+                className="flex-1 sm:flex-none sm:w-40 py-2.5 px-4 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {isSubmitting ? 'Submitting…' : 'Submit Application'}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleNext}
+                className="flex-1 sm:flex-none sm:w-28 py-2.5 px-4 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition-colors"
+              >
+                Next
+              </button>
+            )}
+          </div>
+        </div>
+      </FormProvider>
     </div>
   );
 }
