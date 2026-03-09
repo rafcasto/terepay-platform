@@ -1,22 +1,41 @@
 import type { Timestamp } from 'firebase-admin/firestore';
 
+// ---------------------------------------------------------------------------
+// LMS Application Statuses (CCCFA-aligned workflow)
+// ---------------------------------------------------------------------------
 export type ApplicationStatus =
   | 'draft'
+  | 'pending_review'
+  | 'under_assessment'
+  | 'waiting_for_docs'
+  | 'credit_check'
+  | 'approved'
+  | 'disbursed'
+  | 'active'
+  | 'closed_repaid'
+  | 'declined'
+  | 'withdrawn'
+  | 'expired';
+
+// Legacy statuses retained for backward-compat during migration
+export type LegacyApplicationStatus =
   | 'submitted'
   | 'under_review'
-  | 'approved'
   | 'rejected'
   | 'funded'
   | 'completed';
 
+export type AnyApplicationStatus = ApplicationStatus | LegacyApplicationStatus;
+
 export type DocumentType =
-  | 'pay_stub'
+  | 'passport'
+  | 'drivers_licence'
+  | 'visa'
+  | 'payslip'
   | 'bank_statement'
-  | 'tax_return'
-  | 'id_verification'
-  | 'proof_of_address'
-  | 'employment_letter'
   | 'other';
+
+export type DocumentStatus = 'pending' | 'accepted' | 'rejected';
 
 export interface ApplicationDocument {
   documentId: string;
@@ -25,49 +44,166 @@ export interface ApplicationDocument {
   fileUrl: string;
   fileSize: number;
   uploadedAt: Timestamp;
-  uploadedBy: string;
-  status: 'pending' | 'verified' | 'rejected';
+  uploadedBy: string; // uid
+  status: DocumentStatus;
   rejectionReason?: string;
+  reviewedAt?: Timestamp;
+  reviewedBy?: string; // lender uid
 }
 
-export interface LenderApproval {
-  approverId: string;
-  approvedAt: Timestamp;
-  status: 'approved' | 'rejected';
-  approvedAmount: number;
-  approvedRate: number;
-  approvedTerm: number;
-  monthlyPayment: number;
-  comments: string;
-  conditions?: string[];
-}
-
-export interface Comment {
-  commentId: string;
-  userId: string;
+export interface InternalNote {
+  noteId: string;
+  lenderId: string;
+  lenderName: string;
   text: string;
   createdAt: Timestamp;
-  isInternal: boolean;
 }
 
+export interface LenderDecision {
+  decidedBy: string; // lender uid
+  decidedAt: Timestamp;
+  action: 'approved' | 'declined';
+  rationale: string; // mandatory
+  declineReasons?: string[];
+  approvedAmount?: number;
+  disbursementDetails?: {
+    amount: number;
+    date: string;
+    reference: string;
+  };
+}
+
+export interface RepaymentSchedule {
+  installments: Array<{
+    installmentNumber: number;
+    dueDate: string;
+    amount: number;
+    status: 'scheduled' | 'paid' | 'overdue';
+  }>;
+  totalRepayment: number;
+}
+
+// ---------------------------------------------------------------------------
+// Affordability Assessment (CCCFA-aligned)
+// ---------------------------------------------------------------------------
+export interface AffordabilityIncomeRow {
+  category: string;
+  statedAmount: number;       // pre-filled from applicant form
+  centrixAmount: number;      // lender enters from Centrix
+  verifiedAmount: number;     // lender enters from payslips
+  adjustment: number;         // lender enters
+  adjustmentReason?: string;
+  finalAmount: number;        // auto: lower of centrix vs verified
+}
+
+export interface AffordabilityExpenseRow {
+  category: string;
+  statedAmount: number;       // pre-filled from applicant form
+  centrixAmount: number;      // lender enters from bank analysis
+  benchmarkAmount: number;    // auto from catalog × multiplier
+  adjustment: number;         // lender enters with reason
+  adjustmentReason?: string;
+  finalAmount: number;        // auto: max of centrix, benchmark, adjustment
+  benchmarkOverrideAcknowledged?: boolean;
+}
+
+export interface AffordabilityAssessment {
+  assessmentId: string;
+  applicationId: string;
+  version: number;
+  lenderId: string;
+  lenderName: string;
+  assessedAt: Timestamp;
+  status: 'in_progress' | 'complete';
+  isSuperseded: boolean;
+
+  // Checklist
+  checklist: {
+    centrixReportNumber: string;
+    firstTransactionDate: string;
+    daysOfTransactionData: number;       // auto-calculated
+    paylipsReceived: boolean;
+    employmentVerified: boolean;
+    employmentVerificationMethod: string;
+    visaConfirmed: boolean;
+  };
+
+  // Data
+  incomeRows: AffordabilityIncomeRow[];
+  expenseRows: AffordabilityExpenseRow[];
+  householdMultiplier: number;
+  catalogVersionId: string;  // snapshot at time of assessment
+
+  // Calculations (all auto)
+  totalVerifiedIncome: number;
+  totalExpenses: number;
+  netDisposableIncome: number;
+  loanFortnightlyPayment: number;
+  finalAvailableSurplus: number;
+
+  // Decision logic
+  hardDeclineTriggers: string[];    // list any triggered
+  redFlagsRaised: string[];
+  redFlagsAcknowledged: Record<string, string>; // flag → lender acknowledgement
+  surplusRating: 'affordable' | 'marginal' | 'high_risk' | 'not_affordable';
+  recommendation: 'proceed' | 'decline';
+}
+
+// ---------------------------------------------------------------------------
+// Benchmark Catalog
+// ---------------------------------------------------------------------------
+export interface BenchmarkEntry {
+  benchmarkId: string;
+  categoryName: string;
+  householdType: string;
+  fortnightlyAmount: number;
+  rangeLow: number;
+  rangeHigh: number;
+  source: string;
+  effectiveFrom: string;
+  effectiveTo?: string;
+  createdBy: string;
+  lastUpdated: Timestamp;
+  isActive: boolean;
+  previousVersionId?: string;
+}
+
+export interface HouseholdMultiplier {
+  multiplierId: string;
+  householdType: string;
+  multiplier: number;
+  effectiveFrom: string;
+  effectiveTo?: string;
+  createdBy: string;
+  updatedAt: Timestamp;
+}
+
+// ---------------------------------------------------------------------------
+// Main LoanApplication type
+// ---------------------------------------------------------------------------
 export interface LoanApplication {
   applicationId: string;
+  referenceNumber: string;           // e.g. TP-2026-00001
   applicantId: string;
+  assignedLenderId?: string;
   status: ApplicationStatus;
-  substatus?: string;
   submittedAt?: Timestamp;
+
+  // Loan product details (TerePay fixed-product)
   loanDetails: {
     requestedAmount: number;
     currency: string;
-    loanPurpose: 'personal' | 'business' | 'auto' | 'home_improvement' | 'consolidation' | 'other';
+    loanPurpose: string;
     purposeDescription: string;
-    requestedTerm?: number;
-    approvedTerm?: number;
-    approvedLoanAmount?: number;
-    requestedRate?: number;
-    approvedRate?: number;
-    monthlyPayment?: number;
+    // Filled on approval
+    approvedAmount?: number;
+    establishmentFee?: number;
+    fortnightlyPayment?: number;
+    totalRepayment?: number;
+    disbursementDate?: string;
   };
+
+  // Legacy financial summary (computed from 8-section form)
   financialInformation: {
     monthlyIncome: number;
     incomeSource: string;
@@ -77,43 +213,60 @@ export interface LoanApplication {
     existingLoans: number;
     debtToIncomeRatio: number;
     savingsBalance: number;
-    assets: {
-      homeValue?: number;
-      vehicleValue?: number;
-      investmentValue?: number;
-    };
   };
+
   documents: ApplicationDocument[];
-  underwriting: {
-    riskScore?: number;
-    recommendation?: 'approve' | 'decline' | 'manual_review';
-    notes: string;
-    underwriterIds: string[];
-    lastAssessedAt?: Timestamp;
+  documentRequest?: {
+    requestedAt: Timestamp;
+    requestedBy: string;
+    requiredDocuments: string[];
+    message?: string;
   };
-  approval?: LenderApproval;
+
+  internalNotes: InternalNote[];
+  decision?: LenderDecision;
+  repaymentSchedule?: RepaymentSchedule;
+
+  // Affordability assessment IDs (most recent first)
+  affordabilityAssessmentIds: string[];
+  affordabilityStatus: 'not_started' | 'in_progress' | 'complete';
+
+  // Credit check
+  creditCheck?: {
+    reportNumber: string;
+    reportDate: string;
+    requestedBy: string;
+    requestedAt: Timestamp;
+    result: 'pass' | 'fail' | 'pending';
+    summary?: string;
+  };
+
   timeline: {
     createdAt: Timestamp;
     updatedAt: Timestamp;
     submittedAt?: Timestamp;
-    reviewStartedAt?: Timestamp;
+    claimedAt?: Timestamp;
+    assessmentStartedAt?: Timestamp;
     approvedAt?: Timestamp;
-    fundedAt?: Timestamp;
-    completedAt?: Timestamp;
-    rejectedAt?: Timestamp;
+    disbursedAt?: Timestamp;
+    closedAt?: Timestamp;
+    declinedAt?: Timestamp;
   };
-  metadata: {
-    comments: Comment[];
-    internalNotes: string;
-  };
-  // TerePay-specific sections (present when created via the 8-step wizard)
+
+  // TerePay 8-section form data
   personalInfo?: TerePayPersonalInfo;
   employment?: TerePayEmployment;
   livingExpenses?: TerePayLivingExpenses;
   existingDebts?: TerePayExistingDebts;
+  loanRequest?: TerePayLoanRequest;
   bankDetails?: TerePayBankDetails;
   references?: TerePayReferences;
   declarations?: TerePayDeclarations;
+}
+
+// Legacy type alias for backward compat
+export interface LegacyLoanApplication extends Omit<LoanApplication, 'status'> {
+  status: AnyApplicationStatus;
 }
 
 // ---------------------------------------------------------------------------
@@ -184,6 +337,20 @@ export interface TerePayExistingDebts {
   bankOverdrafts: { totalOwed: number; fortnightlyPayment: number };
   otherLoans: Array<{ description?: string; totalOwed: number; fortnightlyPayment: number }>;
   debtPurposeDescription?: string;
+}
+
+export interface TerePayLoanRequest {
+  requestedAmount: number;
+  purpose: string;
+  purposeDescription: string;
+  primaryIncomeSource: string;
+  isPEP: boolean;
+  pepDetails?: string;
+  remittance: {
+    frequency: 'weekly' | 'fortnightly' | 'monthly' | 'occasionally' | 'never';
+    averageAmount: number;
+    purposes: string[];
+  };
 }
 
 export interface TerePayBankDetails {

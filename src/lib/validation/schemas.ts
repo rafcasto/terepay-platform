@@ -264,3 +264,90 @@ export const terepayApplicationSchema = z.object({
 
 export type TerepayApplicationInput = z.infer<typeof terepayApplicationSchema>;
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+
+// ---------------------------------------------------------------------------
+// LMS-specific schemas
+// ---------------------------------------------------------------------------
+
+export const claimApplicationSchema = z.object({
+  // No body needed — lender identity comes from session
+});
+
+export const addNoteSchema = z.object({
+  text: z.string().min(1, 'Note cannot be empty').max(2000),
+});
+
+export const requestDocumentsSchema = z.object({
+  requiredDocuments: z.array(z.string().min(1)).min(1, 'Specify at least one document'),
+  message: z.string().max(500).optional(),
+});
+
+export const reviewDocumentSchema = z.object({
+  action: z.enum(['accept', 'reject']),
+  rejectionReason: z.string().max(500).optional(),
+});
+
+export const affordabilityChecklistSchema = z.object({
+  centrixReportNumber: z.string().min(1, 'Centrix report number is required'),
+  firstTransactionDate: z.string().min(1, 'First transaction date is required'),
+  paylipsReceived: z.boolean(),
+  employmentVerified: z.boolean(),
+  employmentVerificationMethod: z.string().min(1, 'Specify verification method'),
+  visaConfirmed: z.boolean(),
+});
+
+const incomeRowSchema = z.object({
+  category: z.string(),
+  statedAmount: z.number().min(0),
+  centrixAmount: z.number().min(0),
+  verifiedAmount: z.number().min(0),
+  adjustment: z.number(),
+  adjustmentReason: z.string().optional(),
+});
+
+const expenseRowSchema = z.object({
+  category: z.string(),
+  statedAmount: z.number().min(0),
+  centrixAmount: z.number().min(0),
+  benchmarkAmount: z.number().min(0),
+  adjustment: z.number(),
+  adjustmentReason: z.string().optional(),
+  benchmarkOverrideAcknowledged: z.boolean().optional(),
+});
+
+export const affordabilityAssessmentSchema = z.object({
+  checklist: affordabilityChecklistSchema,
+  incomeRows: z.array(incomeRowSchema).check(z.minLength(1)),
+  expenseRows: z.array(expenseRowSchema).check(z.minLength(1)),
+  householdMultiplier: z.number().min(1),
+  catalogVersionId: z.string(),
+  redFlagsAcknowledged: z.record(z.string(), z.string()),
+  recommendation: z.enum(['proceed', 'decline']),
+});
+
+export const lenderDecisionSchema = z.object({
+  action: z.enum(['approve', 'decline']),
+  rationale: z.string().min(10, 'Rationale must be at least 10 characters'),
+  declineReasons: z.array(z.string()).optional(),
+  approvedAmount: z.number().min(200).max(2000).optional(),
+});
+
+export const benchmarkEntrySchema = z.object({
+  categoryName: z.string().min(1, 'Category name is required'),
+  householdType: z.string().min(1, 'Household type is required'),
+  fortnightlyAmount: z.number().min(0),
+  rangeLow: z.number().min(0),
+  rangeHigh: z.number().min(0),
+  source: z.string().min(1, 'Source is required'),
+  effectiveFrom: z.string().min(1, 'Effective from date is required'),
+  effectiveTo: z.string().optional(),
+  changeReason: z.string().optional(),
+});
+
+export type ClaimApplicationInput = z.infer<typeof claimApplicationSchema>;
+export type AddNoteInput = z.infer<typeof addNoteSchema>;
+export type RequestDocumentsInput = z.infer<typeof requestDocumentsSchema>;
+export type ReviewDocumentInput = z.infer<typeof reviewDocumentSchema>;
+export type AffordabilityAssessmentInput = z.infer<typeof affordabilityAssessmentSchema>;
+export type LenderDecisionInput = z.infer<typeof lenderDecisionSchema>;
+export type BenchmarkEntryInput = z.infer<typeof benchmarkEntrySchema>;

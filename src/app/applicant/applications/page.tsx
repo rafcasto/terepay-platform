@@ -1,17 +1,49 @@
 import { cookies } from 'next/headers';
-import { adminDb, verifySessionOrIdToken } from '@/lib/firebase/admin';
+import { getAdminDb, verifySessionOrIdToken } from '@/lib/firebase/admin';
 import Link from 'next/link';
 import Badge from '@/components/shared/Badge';
-import type { ApplicationStatus } from '@/types/application';
 
-const STATUS_VARIANT: Record<ApplicationStatus, 'default' | 'success' | 'warning' | 'error' | 'info'> = {
+export const dynamic = 'force-dynamic';
+
+const STATUS_VARIANT: Record<string, 'default' | 'success' | 'warning' | 'error' | 'info'> = {
   draft: 'default',
+  pending_review: 'info',
+  under_assessment: 'warning',
+  waiting_for_docs: 'warning',
+  credit_check: 'info',
+  approved: 'success',
+  disbursed: 'success',
+  active: 'success',
+  closed_repaid: 'default',
+  declined: 'error',
+  withdrawn: 'default',
+  expired: 'default',
+  // legacy
   submitted: 'info',
   under_review: 'warning',
-  approved: 'success',
   rejected: 'error',
   funded: 'success',
   completed: 'success',
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  draft: 'Draft',
+  pending_review: 'Pending Review',
+  under_assessment: 'Under Assessment',
+  waiting_for_docs: 'Documents Requested',
+  credit_check: 'Credit Check',
+  approved: 'Approved',
+  disbursed: 'Disbursed',
+  active: 'Active',
+  closed_repaid: 'Repaid',
+  declined: 'Declined',
+  withdrawn: 'Withdrawn',
+  expired: 'Expired',
+  submitted: 'Submitted',
+  under_review: 'Under Review',
+  rejected: 'Declined',
+  funded: 'Funded',
+  completed: 'Completed',
 };
 
 export default async function ApplicantApplicationsPage() {
@@ -22,7 +54,8 @@ export default async function ApplicantApplicationsPage() {
   const decoded = await verifySessionOrIdToken(session).catch(() => null);
   if (!decoded) return null;
 
-  const snapshot = await adminDb
+  const db = getAdminDb();
+  const snapshot = await db
     .collection('loanApplications')
     .where('applicantId', '==', decoded.uid)
     .orderBy('timeline.createdAt', 'desc')
@@ -67,18 +100,18 @@ export default async function ApplicantApplicationsPage() {
               {applications.map((app) => {
                 const a = app as Record<string, unknown>;
                 const loanDetails = a.loanDetails as Record<string, unknown>;
-                const status = a.status as ApplicationStatus;
+                const status = a.status as string;
                 return (
                   <tr key={app.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 font-medium text-gray-900">
                       ${(loanDetails?.requestedAmount as number)?.toLocaleString() ?? '—'}
                     </td>
                     <td className="px-6 py-4 text-gray-600 capitalize">
-                      {(loanDetails?.loanPurpose as string)?.replace('_', ' ') ?? '—'}
+                      {(loanDetails?.loanPurpose as string)?.replace(/_/g, ' ') ?? '—'}
                     </td>
                     <td className="px-6 py-4">
                       <Badge variant={STATUS_VARIANT[status] ?? 'default'}>
-                        {status?.replace('_', ' ')}
+                        {STATUS_LABELS[status] ?? status?.replace(/_/g, ' ')}
                       </Badge>
                     </td>
                     <td className="px-6 py-4 text-right">

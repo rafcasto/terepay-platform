@@ -1,13 +1,13 @@
 import { cookies } from 'next/headers';
-import { adminDb, verifySessionOrIdToken } from '@/lib/firebase/admin';
+import { getAdminDb, verifySessionOrIdToken } from '@/lib/firebase/admin';
 import Link from 'next/link';
 import Badge from '@/components/shared/Badge';
-import type { ApplicationStatus } from '@/types/application';
 
 async function getDashboardData(uid: string) {
+  const db = getAdminDb();
   const [userSnap, appsSnap] = await Promise.all([
-    adminDb.collection('users').doc(uid).get(),
-    adminDb
+    db.collection('users').doc(uid).get(),
+    db
       .collection('loanApplications')
       .where('applicantId', '==', uid)
       .orderBy('timeline.createdAt', 'desc')
@@ -21,14 +21,45 @@ async function getDashboardData(uid: string) {
   };
 }
 
-const STATUS_VARIANT: Record<ApplicationStatus, 'default' | 'success' | 'warning' | 'error' | 'info'> = {
+const STATUS_VARIANT: Record<string, 'default' | 'success' | 'warning' | 'error' | 'info'> = {
   draft: 'default',
+  pending_review: 'info',
+  under_assessment: 'warning',
+  waiting_for_docs: 'warning',
+  credit_check: 'info',
+  approved: 'success',
+  disbursed: 'success',
+  active: 'success',
+  closed_repaid: 'default',
+  declined: 'error',
+  withdrawn: 'default',
+  expired: 'default',
+  // legacy
   submitted: 'info',
   under_review: 'warning',
-  approved: 'success',
   rejected: 'error',
   funded: 'success',
   completed: 'success',
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  draft: 'Draft',
+  pending_review: 'Pending Review',
+  under_assessment: 'Under Assessment',
+  waiting_for_docs: 'Documents Requested',
+  credit_check: 'Credit Check',
+  approved: 'Approved',
+  disbursed: 'Disbursed',
+  active: 'Active',
+  closed_repaid: 'Repaid',
+  declined: 'Declined',
+  withdrawn: 'Withdrawn',
+  expired: 'Expired',
+  submitted: 'Submitted',
+  under_review: 'Under Review',
+  rejected: 'Declined',
+  funded: 'Funded',
+  completed: 'Completed',
 };
 
 export default async function ApplicantDashboard() {
@@ -96,7 +127,7 @@ export default async function ApplicantDashboard() {
             {recentApplications.map((app) => {
               const a = app as Record<string, unknown>;
               const loanDetails = a.loanDetails as Record<string, unknown>;
-              const status = a.status as ApplicationStatus;
+              const status = a.status as string;
               return (
                 <li key={app.id} className="px-4 sm:px-6 py-4 flex items-center justify-between gap-3">
                   <div className="min-w-0">
@@ -104,11 +135,11 @@ export default async function ApplicantDashboard() {
                       ${(loanDetails?.requestedAmount as number)?.toLocaleString() ?? '—'} loan
                     </p>
                     <p className="text-xs text-gray-500 capitalize truncate">
-                      {(loanDetails?.loanPurpose as string)?.replace('_', ' ') ?? '—'}
+                      {(loanDetails?.loanPurpose as string)?.replace(/_/g, ' ') ?? '—'}
                     </p>
                   </div>
                   <Badge variant={STATUS_VARIANT[status] ?? 'default'}>
-                    {status?.replace('_', ' ')}
+                    {STATUS_LABELS[status] ?? status?.replace(/_/g, ' ')}
                   </Badge>
                 </li>
               );

@@ -9,9 +9,22 @@ import { FieldValue } from 'firebase-admin/firestore';
 
 type RouteParams = { params: Promise<{ id: string }> };
 
+/** Generate a TP-YYYY-NNNNN reference number. */
+async function generateReference(): Promise<string> {
+  const year = new Date().getFullYear();
+  const counterRef = adminDb.collection('counters').doc(`applications_${year}`);
+  const result = await adminDb.runTransaction(async (tx) => {
+    const doc = await tx.get(counterRef);
+    const next = (doc.data()?.count ?? 0) + 1;
+    tx.set(counterRef, { count: next }, { merge: true });
+    return next;
+  });
+  return `TP-${year}-${String(result).padStart(5, '0')}`;
+}
+
 /**
  * POST /api/applications/[id]/submit
- * Applicant transitions their draft application to 'submitted'.
+ * Applicant transitions their draft application to 'pending_review'.
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   const ip = getClientIp(request);
@@ -32,12 +45,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       throw new AppError('BAD_REQUEST', 400, 'Only draft applications can be submitted');
     }
 
+    const referenceNumber = data.referenceNumber || await generateReference();
     const now = FieldValue.serverTimestamp();
+
     await docRef.update({
-      status: 'submitted',
+      status: 'pending_review',
+      referenceNumber,
       submittedAt: now,
       'timeline.submittedAt': now,
       'timeline.updatedAt': now,
+      affordabilityStatus: 'not_started',
+      internalNotes: [],
+      documents: data.documents ?? [],
+      affordabilityAssessmentIds: [],
     });
 
     await auditLog({
@@ -47,9 +67,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       targetType: 'application',
       outcome: 'success',
       ipAddress: ip,
+      changes: { referenceNumber },
     });
 
-    return NextResponse.json({ status: 'submitted' });
+    return NextResponse.json({ status: 'pending_review', referenceNumber });
   } catch (err) {
     if (err instanceof AppError) return errorResponse(err);
     return internalError();
