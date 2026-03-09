@@ -64,6 +64,12 @@ export async function POST(request: NextRequest) {
     const auth = await withAuth(request, ['applicant']);
     uid = auth.uid;
 
+    if (!auth.emailVerified) {
+      return errorResponse(
+        new AppError('FORBIDDEN', 403, 'Please verify your email address before submitting a loan application.'),
+      );
+    }
+
     const body = await request.json();
 
     // Accept both TerePay 8-section form and legacy simple form

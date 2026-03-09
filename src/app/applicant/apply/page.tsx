@@ -4,7 +4,9 @@ import { useState } from 'react';
 import { useForm, FormProvider } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { terepayApplicationSchema, type TerepayApplicationInput } from '@/lib/validation/schemas';
+import { useAuth } from '@/hooks/useAuth';
 
 import FormProgress from './_components/FormProgress';
 import Step1PersonalInfo from './_components/Step1PersonalInfo';
@@ -40,6 +42,7 @@ const STEP_COMPONENTS = [
 
 export default function ApplyPage() {
   const router = useRouter();
+  const { user, loading } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -150,6 +153,31 @@ export default function ApplyPage() {
   };
 
   const StepComponent = STEP_COMPONENTS[currentStep];
+
+  // Block unverified users before rendering the form
+  if (!loading && user && !user.emailVerified) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="max-w-md w-full bg-white rounded-xl border border-amber-200 shadow-sm p-8 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-amber-50">
+            <svg className="h-7 w-7 text-[#F5A523]" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
+            </svg>
+          </div>
+          <h2 className="text-lg font-bold text-gray-900 mb-2">Email verification required</h2>
+          <p className="text-sm text-gray-500 mb-6">
+            You must verify your email address before you can submit a loan application.
+          </p>
+          <Link
+            href="/applicant/verify-email"
+            className="inline-block w-full py-2.5 px-4 bg-[#F5A523] text-white text-sm font-medium rounded-lg hover:bg-[#E08B00] transition-colors"
+          >
+            Verify my email
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

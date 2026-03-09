@@ -6,6 +6,7 @@ export type AuthResult = {
   uid: string;
   email: string;
   role: 'applicant' | 'lender';
+  emailVerified: boolean;
 };
 
 /**
@@ -37,5 +38,5 @@ export async function withAuth(
     throw new AppError('FORBIDDEN', 403, 'You do not have permission to access this resource');
   }
 
-  return { uid: decoded.uid, email: decoded.email ?? '', role };
+  return { uid: decoded.uid, email: decoded.email ?? '', role, emailVerified: decoded.email_verified ?? false };
 }

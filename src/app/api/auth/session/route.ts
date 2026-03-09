@@ -29,11 +29,14 @@ export async function POST(request: NextRequest) {
       ? idToken
       : await adminAuth.createSessionCookie(idToken, { expiresIn: SESSION_EXPIRY_MS });
 
-    // Update last login timestamp
+    // Update last login timestamp; also sync emailVerified if the token confirms it
+    const updatePayload: Record<string, unknown> = { lastLoginAt: FieldValue.serverTimestamp() };
+    if (decoded.email_verified) updatePayload.emailVerified = true;
+
     await adminDb
       .collection('users')
       .doc(uid)
-      .update({ lastLoginAt: FieldValue.serverTimestamp() })
+      .update(updatePayload)
       .catch(() => {/* non-critical */});
 
     const response = NextResponse.json({ status: 'ok' });

@@ -75,6 +75,23 @@ export default async function ApplicantDashboard() {
 
   return (
     <div className="px-4 py-6 sm:px-8 sm:py-8">
+      {/* Email verification banner */}
+      {!decoded.email_verified && (
+        <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3.5">
+          <svg className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
+          </svg>
+          <div className="flex-1 text-sm">
+            <p className="font-medium text-amber-800">Please verify your email address</p>
+            <p className="text-amber-700 mt-0.5">
+              You won&apos;t be able to submit a loan application until you verify your email.{' '}
+              <a href="/applicant/verify-email" className="font-semibold underline underline-offset-2 hover:text-amber-900">
+                Verify now →
+              </a>
+            </p>
+          </div>
+        </div>
+      )}
       <div className="mb-6 sm:mb-8">
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
           Welcome back, {user?.firstName ?? 'there'}!

@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
         lastName: data.lastName,
         role: data.role,
         profileComplete: data.profileComplete,
+        emailVerified: decoded.email_verified ?? false,
       },
     });
   } catch {

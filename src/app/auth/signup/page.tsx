@@ -4,8 +4,10 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { sendEmailVerification } from 'firebase/auth';
 import { signupSchema, type SignupInput } from '@/lib/validation/schemas';
 import { useAuth } from '@/hooks/useAuth';
+import { clientAuth } from '@/lib/firebase/client';
 
 export default function SignupPage() {
   const { login } = useAuth();
@@ -33,7 +35,14 @@ export default function SignupPage() {
 
       // Auto-login after successful signup
       await login(data.email, data.password);
-      router.push('/applicant/dashboard');
+
+      // Send email verification using Firebase client SDK
+      const firebaseUser = clientAuth.currentUser;
+      if (firebaseUser && !firebaseUser.emailVerified) {
+        await sendEmailVerification(firebaseUser).catch(() => {/* non-critical: email send failure shouldn't block signup */});
+      }
+
+      router.push('/applicant/verify-email');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Registration failed. Please try again.';
       setError('root', { message: msg });
