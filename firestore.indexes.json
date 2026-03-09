@@ -13,7 +13,24 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "timeline.submittedAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "loanApplications",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "timeline.submittedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "loanApplications",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "assignedLenderId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "timeline.submittedAt", "order": "ASCENDING" }
       ]
     },
     {

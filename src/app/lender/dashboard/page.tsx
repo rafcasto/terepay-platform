@@ -15,11 +15,14 @@ function daysSince(ts: { _seconds: number } | null): number {
 async function getDashboardData(lenderUid: string) {
   const db = getAdminDb();
 
-  // All active applications (exclude draft/withdrawn/expired)
+  // All active applications (explicit in query avoids not-in index requirements)
+  const ACTIVE_STATUSES = [
+    'pending_review', 'under_assessment', 'waiting_for_docs', 'credit_check',
+    'approved', 'declined', 'disbursed', 'active', 'closed_repaid',
+  ];
   const snap = await db
     .collection('loanApplications')
-    .where('status', 'not-in', ['draft', 'withdrawn', 'expired'])
-    .orderBy('status')
+    .where('status', 'in', ACTIVE_STATUSES)
     .orderBy('timeline.submittedAt', 'desc')
     .limit(200)
     .get();
