@@ -1,21 +1,98 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useFormContext } from 'react-hook-form';
 import type { TerepayApplicationInput } from '@/lib/validation/schemas';
+import AddressAutocomplete from './AddressAutocomplete';
 
 const inputCls =
   'w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#F5A523] focus:border-[#F5A523] focus:outline-none transition-colors bg-white';
+const inputPrefilledCls =
+  'w-full px-3 py-2.5 border border-blue-200 rounded-lg text-sm focus:ring-2 focus:ring-[#F5A523] focus:border-[#F5A523] focus:outline-none transition-colors bg-blue-50';
 const selectCls = inputCls + ' appearance-none';
+const selectPrefilledCls = inputPrefilledCls + ' appearance-none';
 const labelCls = 'block text-sm font-medium text-gray-700 mb-1';
 const errorCls = 'mt-1 text-xs text-red-600';
+
+type PrefilledFields = Set<string>;
 
 export default function Step1PersonalInfo() {
   const {
     register,
-    formState: { errors },
+    setValue,
+    watch,
+    formState: { errors, touchedFields },
   } = useFormContext<TerepayApplicationInput>();
 
   const e = errors.personalInfo;
+
+  const [prefilled, setPrefilled] = useState<PrefilledFields>(new Set());
+  const [displayAddress, setDisplayAddress] = useState('');
+
+  // Fetch profile on mount and pre-populate empty fields
+  useEffect(() => {
+    fetch('/api/users/profile')
+      .then((r) => r.json())
+      .then(({ data }) => {
+        if (!data) return;
+
+        const newPrefilled = new Set<string>();
+
+        function fill(field: string, value: unknown) {
+          if (value == null || value === '') return;
+          setValue(`personalInfo.${field}` as Parameters<typeof setValue>[0], value as never, {
+            shouldDirty: false,
+            shouldValidate: false,
+          });
+          newPrefilled.add(field);
+        }
+
+        fill('firstName', data.firstName);
+        fill('lastName', data.lastName);
+        fill('email', data.email);
+        fill('phone', data.phone ?? data.phoneNumber);
+        fill('dateOfBirth', data.dateOfBirth);
+        fill('address', data.address);
+        fill('suburb', data.suburb);
+        fill('city', data.city);
+        fill('postCode', data.postCode);
+        fill('housingStatus', data.housingStatus);
+        fill('timeAtAddress', data.timeAtAddress);
+        fill('visaStatus', data.visaStatus);
+        fill('visaExpiryDate', data.visaExpiryDate);
+        fill('householdType', data.householdType);
+        if (data.numberOfChildren != null) fill('numberOfChildren', data.numberOfChildren);
+        if (data.numberOfDependents != null) fill('numberOfDependents', data.numberOfDependents);
+
+        // Build display string for address autocomplete search box
+        if (data.address) {
+          const parts = [data.address, data.suburb, data.city, data.postCode].filter(Boolean);
+          setDisplayAddress(parts.join(', '));
+        }
+
+        setPrefilled(newPrefilled);
+      })
+      .catch(() => {/* silent — form stays empty */});
+  }, [setValue]);
+
+  // Remove prefill indicator when user touches a field
+  const touched = touchedFields.personalInfo ?? {};
+  const cls = (field: string) =>
+    prefilled.has(field) && !touched[field as keyof typeof touched]
+      ? field.includes('Status') || field.includes('Type') || field.includes('household')
+        ? selectPrefilledCls
+        : inputPrefilledCls
+      : field.includes('Status') || field.includes('Type') || field.includes('household')
+      ? selectCls
+      : inputCls;
+
+  // Watch address to detect when the user edits it and remove the prefill indicator
+  const currentAddress = watch('personalInfo.address');
+  useEffect(() => {
+    if (currentAddress && prefilled.has('address')) {
+      // indicator cleared automatically via `touched` check
+    }
+  }, [currentAddress, prefilled]);
 
   return (
     <div className="space-y-6">
@@ -30,14 +107,14 @@ export default function Step1PersonalInfo() {
           <label className={labelCls}>
             First Name <span className="text-red-500">*</span>
           </label>
-          <input {...register('personalInfo.firstName')} className={inputCls} placeholder="Jane" />
+          <input {...register('personalInfo.firstName')} className={cls('firstName')} placeholder="Jane" />
           {e?.firstName && <p className={errorCls}>{e.firstName.message}</p>}
         </div>
         <div>
           <label className={labelCls}>
             Last Name <span className="text-red-500">*</span>
           </label>
-          <input {...register('personalInfo.lastName')} className={inputCls} placeholder="Smith" />
+          <input {...register('personalInfo.lastName')} className={cls('lastName')} placeholder="Smith" />
           {e?.lastName && <p className={errorCls}>{e.lastName.message}</p>}
         </div>
       </div>
@@ -51,7 +128,7 @@ export default function Step1PersonalInfo() {
           <input
             type="date"
             {...register('personalInfo.dateOfBirth')}
-            className={inputCls}
+            className={cls('dateOfBirth')}
             max={new Date(Date.now() - 18 * 365.25 * 86400000).toISOString().split('T')[0]}
           />
           {e?.dateOfBirth && <p className={errorCls}>{e.dateOfBirth.message}</p>}
@@ -63,7 +140,7 @@ export default function Step1PersonalInfo() {
           <input
             type="tel"
             {...register('personalInfo.phone')}
-            className={inputCls}
+            className={cls('phone')}
             placeholder="+64 21 000 0000"
           />
           {e?.phone && <p className={errorCls}>{e.phone.message}</p>}
@@ -78,42 +155,14 @@ export default function Step1PersonalInfo() {
         <input
           type="email"
           {...register('personalInfo.email')}
-          className={inputCls}
+          className={cls('email')}
           placeholder="jane@example.com"
         />
         {e?.email && <p className={errorCls}>{e.email.message}</p>}
       </div>
 
-      {/* Address */}
-      <div>
-        <label className={labelCls}>
-          Residential Address <span className="text-red-500">*</span>
-        </label>
-        <input
-          {...register('personalInfo.address')}
-          className={inputCls}
-          placeholder="123 Main Street"
-        />
-        {e?.address && <p className={errorCls}>{e.address.message}</p>}
-      </div>
-
-      {/* City + Postcode */}
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className={labelCls}>
-            City / Town <span className="text-red-500">*</span>
-          </label>
-          <input {...register('personalInfo.city')} className={inputCls} placeholder="Auckland" />
-          {e?.city && <p className={errorCls}>{e.city.message}</p>}
-        </div>
-        <div>
-          <label className={labelCls}>
-            Post Code <span className="text-red-500">*</span>
-          </label>
-          <input {...register('personalInfo.postCode')} className={inputCls} placeholder="1010" />
-          {e?.postCode && <p className={errorCls}>{e.postCode.message}</p>}
-        </div>
-      </div>
+      {/* Address autocomplete */}
+      <AddressAutocomplete initialDisplayAddress={displayAddress} />
 
       {/* Time at address + Housing status */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -123,7 +172,7 @@ export default function Step1PersonalInfo() {
           </label>
           <input
             {...register('personalInfo.timeAtAddress')}
-            className={inputCls}
+            className={cls('timeAtAddress')}
             placeholder="e.g. 2 years"
           />
           {e?.timeAtAddress && <p className={errorCls}>{e.timeAtAddress.message}</p>}
@@ -132,7 +181,7 @@ export default function Step1PersonalInfo() {
           <label className={labelCls}>
             Housing Status <span className="text-red-500">*</span>
           </label>
-          <select {...register('personalInfo.housingStatus')} className={selectCls}>
+          <select {...register('personalInfo.housingStatus')} className={cls('housingStatus')}>
             <option value="">Select…</option>
             <option value="rent">Rent</option>
             <option value="own">Own</option>
@@ -149,7 +198,7 @@ export default function Step1PersonalInfo() {
           <label className={labelCls}>
             Visa Status <span className="text-red-500">*</span>
           </label>
-          <select {...register('personalInfo.visaStatus')} className={selectCls}>
+          <select {...register('personalInfo.visaStatus')} className={cls('visaStatus')}>
             <option value="">Select…</option>
             <option value="citizen">NZ Citizen / PR</option>
             <option value="resident_visa">Resident Visa</option>
@@ -161,7 +210,7 @@ export default function Step1PersonalInfo() {
         </div>
         <div>
           <label className={labelCls}>Visa Expiry Date</label>
-          <input type="date" {...register('personalInfo.visaExpiryDate')} className={inputCls} />
+          <input type="date" {...register('personalInfo.visaExpiryDate')} className={cls('visaExpiryDate')} />
         </div>
       </div>
 
@@ -170,7 +219,7 @@ export default function Step1PersonalInfo() {
         <label className={labelCls}>
           Household Type <span className="text-red-500">*</span>
         </label>
-        <select {...register('personalInfo.householdType')} className={selectCls}>
+        <select {...register('personalInfo.householdType')} className={cls('householdType')}>
           <option value="">Select…</option>
           <option value="single">Single</option>
           <option value="single_children">Single + Children</option>
@@ -188,7 +237,7 @@ export default function Step1PersonalInfo() {
             type="number"
             min={0}
             {...register('personalInfo.numberOfChildren', { valueAsNumber: true })}
-            className={inputCls}
+            className={cls('numberOfChildren')}
             defaultValue={0}
           />
         </div>
@@ -198,7 +247,7 @@ export default function Step1PersonalInfo() {
             type="number"
             min={0}
             {...register('personalInfo.numberOfDependents', { valueAsNumber: true })}
-            className={inputCls}
+            className={cls('numberOfDependents')}
             defaultValue={0}
           />
         </div>

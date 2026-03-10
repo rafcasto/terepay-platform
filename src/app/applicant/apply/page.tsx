@@ -145,6 +145,31 @@ export default function ApplyPage() {
         throw new Error(body.error?.message ?? 'Failed to submit application');
       }
 
+      // Save Step 1 personal info back to the applicant profile (fire-and-forget)
+      const pi = data.personalInfo;
+      fetch('/api/users/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firstName: pi.firstName,
+          lastName: pi.lastName,
+          phone: pi.phone,
+          dateOfBirth: pi.dateOfBirth,
+          address: pi.address,
+          suburb: pi.suburb,
+          city: pi.city,
+          postCode: pi.postCode,
+          country: 'New Zealand',
+          housingStatus: pi.housingStatus,
+          timeAtAddress: pi.timeAtAddress,
+          visaStatus: pi.visaStatus,
+          visaExpiryDate: pi.visaExpiryDate,
+          householdType: pi.householdType,
+          numberOfChildren: pi.numberOfChildren,
+          numberOfDependents: pi.numberOfDependents,
+        }),
+      }).catch(() => {/* non-critical — application already submitted */});
+
       router.push('/applicant/applications');
     } catch (err) {
       setServerError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');

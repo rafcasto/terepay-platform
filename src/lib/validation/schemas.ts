@@ -91,6 +91,42 @@ export const updateProfileSchema = z.object({
   }).optional(),
 });
 
+/**
+ * Unified schema for PATCH /api/users/profile.
+ * Handles both the profile-settings page (legacy fields) and the
+ * loan-application Step 1 profile save (flat address fields).
+ */
+export const patchProfileSchema = z.object({
+  // User document fields
+  firstName: z.string().min(1).max(50).optional(),
+  lastName: z.string().min(1).max(50).optional(),
+  profilePhotoUrl: z.string().url().optional(),
+  // Applicant profile fields — flat address from loan form
+  phone: z.string().max(30).optional(),
+  phoneNumber: z.string().max(30).optional(), // kept for profile settings page
+  dateOfBirth: z.string().optional(),
+  address: z.union([z.string().max(200), z.object({
+    street: z.string().max(200).optional(),
+    city: z.string().max(100).optional(),
+    state: z.string().max(100).optional(),
+    zipCode: z.string().max(20).optional(),
+    country: z.string().max(100).optional(),
+  })]).optional(),
+  suburb: z.string().max(100).optional(),
+  city: z.string().max(100).optional(),
+  postCode: z.string().max(20).optional(),
+  country: z.string().max(100).optional(),
+  housingStatus: z.string().max(50).optional(),
+  timeAtAddress: z.string().max(50).optional(),
+  visaStatus: z.string().max(50).optional(),
+  visaExpiryDate: z.string().optional(),
+  householdType: z.string().max(50).optional(),
+  numberOfChildren: z.number().int().min(0).optional(),
+  numberOfDependents: z.number().int().min(0).optional(),
+});
+
+export type PatchProfileInput = z.infer<typeof patchProfileSchema>;
+
 export type LoginInput = z.infer<typeof loginSchema>;
 export type SignupInput = z.infer<typeof signupSchema>;
 export type SessionInput = z.infer<typeof sessionSchema>;
@@ -114,6 +150,7 @@ export const terepayApplicationSchema = z.object({
     email: z.string().email('Invalid email address'),
     phone: z.string().min(1, 'Mobile phone is required'),
     address: z.string().min(1, 'Address is required'),
+    suburb: z.string().optional(),
     city: z.string().min(1, 'City is required'),
     postCode: z.string().min(1, 'Post code is required'),
     timeAtAddress: z.string().min(1, 'Required'),
