@@ -20,7 +20,21 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { email, password, firstName, lastName } = signupSchema.parse(body);
+    const { email, password, firstName, lastName, phone, verificationToken } = signupSchema.parse(body);
+
+    // Verify the email OTP token produced by POST /api/auth/verify-otp
+    if (verificationToken) {
+      const tokenDoc = await adminDb.collection('verifiedTokens').doc(verificationToken).get();
+      if (
+        !tokenDoc.exists ||
+        tokenDoc.data()?.email !== email.toLowerCase().trim() ||
+        tokenDoc.data()?.expiresAt < Date.now()
+      ) {
+        throw new AppError('INVALID_VERIFICATION', 400, 'Email verification failed or expired. Please restart the signup process.');
+      }
+      // Consume the token — single-use
+      await tokenDoc.ref.delete();
+    }
 
     // Create the Firebase Auth user
     let userRecord;
@@ -43,6 +57,7 @@ export async function POST(request: NextRequest) {
       email,
       firstName,
       lastName,
+      phone: phone ?? null,
       role: 'applicant',
       profileComplete: false,
       status: 'active',
