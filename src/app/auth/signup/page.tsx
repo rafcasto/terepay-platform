@@ -452,8 +452,7 @@ export default function SignupPage() {
     } catch (err) {
       setStep3ApiError(err instanceof Error ? err.message : 'Registration failed. Please try again.');
     } finally { setStep3Loading(false); }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step1, password, firebaseUser, executeRecaptcha]);
+  }, [step1, password, confirmPassword, agreedToTerms, firebaseUser, executeRecaptcha]);
 
   return (
     <div className="flex min-h-screen">
