@@ -7,6 +7,7 @@ import {
   sendSignInLinkToEmail,
   isSignInWithEmailLink,
   signInWithEmailLink,
+  signInWithEmailAndPassword,
   EmailAuthProvider,
   linkWithCredential,
   type User as FirebaseUser,
@@ -305,7 +306,15 @@ export default function SignupPage() {
         setFirebaseUser(result.user);
         setStep(3);
       })
-      .catch((err: Error) => {
+      .catch((err: { code?: string; message?: string }) => {
+        // auth/email-already-in-use can surface when the link was already used
+        // on another device but the account was never fully completed. Try
+        // signing in with email/password in case the password was linked in a
+        // prior partial attempt — if that works, resume at step 3.
+        if (err.code === 'auth/email-already-in-use' || err.code === 'auth/invalid-action-code') {
+          setStep2Error('This link has already been used or has expired. Please go back and request a new one.');
+          return;
+        }
         setStep2Error(err.message ?? 'Link verification failed. Please request a new one.');
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -402,7 +411,12 @@ export default function SignupPage() {
     try {
       // Link a password credential to the email-link account
       const credential = EmailAuthProvider.credential(step1.email, password);
-      await linkWithCredential(firebaseUser, credential);
+      try {
+        await linkWithCredential(firebaseUser, credential);
+      } catch (linkErr: unknown) {
+        // A previous attempt already linked the password — safe to continue.
+        if ((linkErr as { code?: string }).code !== 'auth/provider-already-linked') throw linkErr;
+      }
 
       // Get a fresh ID token (proves this user's identity to the server)
       const idToken = await firebaseUser.getIdToken(true);

@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server';
-import { adminAuth } from '@/lib/firebase/admin';
+import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { sendOtpSchema } from '@/lib/validation/schemas';
 import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { checkRateLimit, authSignupLimiter } from '@/lib/rate-limit/limiter';
@@ -36,21 +36,28 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Check if email is already registered — return 409 so the UI can show
-    // an inline error on the email field before sending the Firebase link.
+    // Check if email is already registered with a *completed* profile.
+    // A Firebase Auth user may exist without a Firestore profile when a
+    // previous signup was interrupted after signInWithEmailLink() but before
+    // step 3 finished. In that case we allow resending the link so the user
+    // can recover and complete the flow.
     try {
-      await adminAuth.getUserByEmail(email);
-      return errorResponse(
-        new AppError('CONFLICT', 409, 'An account with this email already exists. Please sign in instead.'),
-      );
+      const existingUser = await adminAuth.getUserByEmail(email);
+      const profileSnap = await adminDb.collection('users').doc(existingUser.uid).get();
+      if (profileSnap.exists) {
+        // Fully registered account — tell the UI to sign in instead.
+        return errorResponse(
+          new AppError('CONFLICT', 409, 'An account with this email already exists. Please sign in instead.'),
+        );
+      }
+      // Firebase user exists but no Firestore profile → incomplete signup.
+      // Fall through and resend the email link so they can finish registering.
     } catch (authCheckErr: unknown) {
       const errCode =
         (authCheckErr as { code?: string }).code ??
         (authCheckErr as { errorInfo?: { code?: string } }).errorInfo?.code ??
         '';
       if (errCode !== 'auth/user-not-found') {
-        // Unexpected error — log and allow the request to continue.
-        // Firebase enforces uniqueness during signInWithEmailLink on the client.
         console.warn('[check-email] Could not verify email availability:', (authCheckErr as Error).message ?? errCode);
       }
       // auth/user-not-found → email is available
