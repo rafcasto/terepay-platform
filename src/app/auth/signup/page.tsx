@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { sendEmailVerification } from 'firebase/auth';
 import { clientAuth } from '@/lib/firebase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -286,6 +287,7 @@ function OtpInputs({ value, onChange }: { value: string[]; onChange: (v: string[
 export default function SignupPage() {
   const { login } = useAuth();
   const router = useRouter();
+  const { executeRecaptcha } = useGoogleReCaptcha();
 
   const [step, setStep] = useState(1);
 
@@ -334,10 +336,11 @@ export default function SignupPage() {
     setStep1ApiError('');
     setStep1Loading(true);
     try {
+      const recaptchaToken = executeRecaptcha ? await executeRecaptcha('send_otp') : undefined;
       const res = await fetch('/api/auth/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: step1.email }),
+        body: JSON.stringify({ email: step1.email, ...(recaptchaToken ? { recaptchaToken } : {}) }),
       });
       const data = await res.json();
       if (!res.ok) { setStep1ApiError(data.error?.message ?? 'Failed to send code.'); return; }
@@ -347,7 +350,7 @@ export default function SignupPage() {
     } catch { setStep1ApiError('Network error. Please try again.'); }
     finally { setStep1Loading(false); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step1]);
+  }, [step1, executeRecaptcha]);
 
   // Step 2 verify
   const handleVerify = useCallback(async () => {
@@ -401,18 +404,20 @@ export default function SignupPage() {
     setStep3ApiError('');
     setStep3Loading(true);
     try {
+      const recaptchaToken = executeRecaptcha ? await executeRecaptcha('signup') : undefined;
       const phone = `${step1.dialCode} ${step1.phone}`.trim();
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firstName: step1.firstName, lastName: step1.lastName, email: step1.email, phone, password, verificationToken }),
+        body: JSON.stringify({ firstName: step1.firstName, lastName: step1.lastName, email: step1.email, phone, password, verificationToken, ...(recaptchaToken ? { recaptchaToken } : {}) }),
       });
       if (!res.ok) {
         const body = await res.json();
         setStep3ApiError(body.error?.message ?? 'Registration failed. Please try again.');
         return;
       }
-      await login(step1.email, password);
+      const loginToken = executeRecaptcha ? await executeRecaptcha('login') : undefined;
+      await login(step1.email, password, loginToken);
       const firebaseUser = clientAuth.currentUser;
       if (firebaseUser && !firebaseUser.emailVerified) {
         const continueUrl = `${window.location.origin}/applicant/verify-email`;
@@ -423,7 +428,7 @@ export default function SignupPage() {
       setStep3ApiError(err instanceof Error ? err.message : 'Registration failed. Please try again.');
     } finally { setStep3Loading(false); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step1, password, verificationToken]);
+  }, [step1, password, verificationToken, executeRecaptcha]);
 
   return (
     <div className="flex min-h-screen">

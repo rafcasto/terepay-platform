@@ -48,7 +48,7 @@ export function useAuth() {
     return unsubscribe;
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string, recaptchaToken?: string) => {
     setState((s) => ({ ...s, loading: true, error: null }));
     try {
       const cred = await signInWithEmailAndPassword(clientAuth, email, password);
@@ -57,7 +57,7 @@ export function useAuth() {
       const res = await fetch('/api/auth/session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken }),
+        body: JSON.stringify({ idToken, ...(recaptchaToken ? { recaptchaToken } : {}) }),
       });
 
       if (!res.ok) {

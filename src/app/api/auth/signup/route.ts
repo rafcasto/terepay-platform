@@ -8,6 +8,7 @@ import { auditLog, getClientIp } from '@/lib/utils/audit';
 import { authSignupLimiter, checkRateLimit } from '@/lib/rate-limit/limiter';
 import { FieldValue } from 'firebase-admin/firestore';
 import { ZodError } from 'zod';
+import { verifyRecaptcha } from '@/lib/recaptcha/verify';
 
 export async function POST(request: NextRequest) {
   const ip = getClientIp(request);
@@ -20,7 +21,14 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { email, password, firstName, lastName, phone, verificationToken } = signupSchema.parse(body);
+    const { email, password, firstName, lastName, phone, verificationToken, recaptchaToken } = signupSchema.parse(body);
+
+    if (recaptchaToken) {
+      const captchaOk = await verifyRecaptcha(recaptchaToken, 'signup');
+      if (!captchaOk) {
+        return errorResponse(new AppError('RECAPTCHA_FAILED', 400, 'reCAPTCHA verification failed. Please try again.'));
+      }
+    }
 
     // Verify the email OTP token produced by POST /api/auth/verify-otp
     if (verificationToken) {

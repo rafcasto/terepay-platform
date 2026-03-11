@@ -9,6 +9,7 @@ import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { auditLog, getClientIp } from '@/lib/utils/audit';
 import { ZodError } from 'zod';
 import { FieldValue } from 'firebase-admin/firestore';
+import { verifyRecaptcha } from '@/lib/recaptcha/verify';
 
 // 5 days — matches Firebase's maximum session cookie duration
 const SESSION_EXPIRY_MS = 60 * 60 * 24 * 5 * 1000;
@@ -17,7 +18,14 @@ export async function POST(request: NextRequest) {
   let uid = 'unknown';
   try {
     const body = await request.json();
-    const { idToken } = sessionSchema.parse(body);
+    const { idToken, recaptchaToken } = sessionSchema.parse(body);
+
+    if (recaptchaToken) {
+      const captchaOk = await verifyRecaptcha(recaptchaToken, 'login');
+      if (!captchaOk) {
+        return errorResponse(new AppError('RECAPTCHA_FAILED', 400, 'reCAPTCHA verification failed. Please try again.'));
+      }
+    }
 
     // Verify the ID token before creating a session cookie
     const decoded = await adminAuth.verifyIdToken(idToken);

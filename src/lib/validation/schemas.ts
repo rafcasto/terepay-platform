@@ -23,10 +23,12 @@ export const signupSchema = z.object({
   // role is hardcoded to 'applicant' server-side; not accepted from client
   phone: z.string().min(7, 'Phone number is required').max(30).optional(),
   verificationToken: z.string().uuid('Invalid verification token').optional(),
+  recaptchaToken: z.string().min(1).optional(),
 });
 
 export const sendOtpSchema = z.object({
   email: z.string().email('Invalid email address'),
+  recaptchaToken: z.string().min(1).optional(),
 });
 
 export const verifyOtpSchema = z.object({
@@ -36,6 +38,7 @@ export const verifyOtpSchema = z.object({
 
 export const sessionSchema = z.object({
   idToken: z.string().min(1, 'ID token is required'),
+  recaptchaToken: z.string().min(1).optional(),
 });
 
 // ---------------------------------------------------------------------------

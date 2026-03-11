@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import { loginSchema, type LoginInput } from '@/lib/validation/schemas';
 import { Suspense } from 'react';
+import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 // ---------------------------------------------------------------------------
 // Left brand panel (shared design with signup)
@@ -154,6 +155,7 @@ function LoginFormInner() {
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get('redirect');
   const [showPassword, setShowPassword] = useState(false);
+  const { executeRecaptcha } = useGoogleReCaptcha();
 
   const {
     register,
@@ -162,16 +164,17 @@ function LoginFormInner() {
     setError,
   } = useForm<LoginInput>({ resolver: zodResolver(loginSchema) });
 
-  const onSubmit = async (data: LoginInput) => {
+  const onSubmit = useCallback(async (data: LoginInput) => {
     try {
-      const user = await login(data.email, data.password);
+      const recaptchaToken = executeRecaptcha ? await executeRecaptcha('login') : undefined;
+      const user = await login(data.email, data.password, recaptchaToken);
       const dest = redirectTo ?? (user?.role === 'lender' ? '/lender/dashboard' : '/applicant/dashboard');
       router.push(dest);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Invalid email or password';
       setError('root', { message: msg });
     }
-  };
+  }, [executeRecaptcha, login, redirectTo, router, setError]);
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>

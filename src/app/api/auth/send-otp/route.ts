@@ -7,6 +7,7 @@ import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { checkRateLimit, authSignupLimiter } from '@/lib/rate-limit/limiter';
 import { getClientIp } from '@/lib/utils/audit';
 import { ZodError } from 'zod';
+import { verifyRecaptcha } from '@/lib/recaptcha/verify';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,7 +27,14 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { email } = sendOtpSchema.parse(body);
+    const { email, recaptchaToken } = sendOtpSchema.parse(body);
+
+    if (recaptchaToken) {
+      const captchaOk = await verifyRecaptcha(recaptchaToken, 'send_otp');
+      if (!captchaOk) {
+        return errorResponse(new AppError('RECAPTCHA_FAILED', 400, 'reCAPTCHA verification failed. Please try again.'));
+      }
+    }
 
     const docId = emailHash(email);
     const docRef = adminDb.collection('pendingOtps').doc(docId);
