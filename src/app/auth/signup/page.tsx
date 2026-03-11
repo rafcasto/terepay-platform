@@ -1,9 +1,16 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { sendEmailVerification } from 'firebase/auth';
+import {
+  sendSignInLinkToEmail,
+  isSignInWithEmailLink,
+  signInWithEmailLink,
+  EmailAuthProvider,
+  linkWithCredential,
+  type User as FirebaseUser,
+} from 'firebase/auth';
 import { clientAuth } from '@/lib/firebase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
@@ -229,58 +236,6 @@ function PasswordStrengthBadges({ password }: { password: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// OTP inputs
-// ---------------------------------------------------------------------------
-
-function OtpInputs({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
-  const refs = useRef<(HTMLInputElement | null)[]>([]);
-
-  const handleChange = (i: number, raw: string) => {
-    const digit = raw.replace(/\D/g, '').slice(-1);
-    const next = [...value];
-    next[i] = digit;
-    onChange(next);
-    if (digit && i < 5) refs.current[i + 1]?.focus();
-  };
-
-  const handleKeyDown = (i: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace' && !value[i] && i > 0) refs.current[i - 1]?.focus();
-  };
-
-  const handlePaste = (e: React.ClipboardEvent) => {
-    const digits = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6).split('');
-    if (!digits.length) return;
-    e.preventDefault();
-    const next = [...value];
-    digits.forEach((d, i) => { next[i] = d; });
-    onChange(next);
-    refs.current[Math.min(digits.length, 5)]?.focus();
-  };
-
-  return (
-    <div className="flex gap-3 justify-center" onPaste={handlePaste}>
-      {value.map((digit, i) => (
-        <input
-          key={i}
-          ref={(el) => { refs.current[i] = el; }}
-          type="text"
-          inputMode="numeric"
-          pattern="[0-9]*"
-          maxLength={1}
-          value={digit}
-          onChange={(e) => handleChange(i, e.target.value)}
-          onKeyDown={(e) => handleKeyDown(i, e)}
-          aria-label={`Digit ${i + 1} of 6`}
-          className={`w-12 h-14 text-center text-xl font-bold rounded-xl border-2 bg-gray-50 text-gray-900 outline-none transition-all ${
-            digit ? 'border-[#F5A523] bg-[#FEF7E9]' : 'border-gray-200 focus:border-[#F5A523] focus:bg-white'
-          }`}
-        />
-      ))}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Main signup page
 // ---------------------------------------------------------------------------
 
@@ -298,12 +253,12 @@ export default function SignupPage() {
   const [step1ApiError, setStep1ApiError] = useState('');
 
   // Step 2
-  const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
-  const [otpError, setOtpError] = useState('');
-  const [otpLoading, setOtpLoading] = useState(false);
+  const [step2Error, setStep2Error] = useState('');
+  const [step2Sending, setStep2Sending] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
-  const [verificationToken, setVerificationToken] = useState('');
-  const [devCode, setDevCode] = useState('');
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [emailMissing, setEmailMissing] = useState(false);
+  const [emailMissingInput, setEmailMissingInput] = useState('');
 
   // Step 3
   const [password, setPassword] = useState('');
@@ -319,6 +274,42 @@ export default function SignupPage() {
     const t = setTimeout(() => setResendCooldown((c) => c - 1), 1000);
     return () => clearTimeout(t);
   }, [resendCooldown]);
+
+  // Detect return from Firebase email link and auto-complete sign-in
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!isSignInWithEmailLink(clientAuth, window.location.href)) return;
+
+    const storedEmail = window.localStorage.getItem('terepay_signup_email') ?? '';
+    const storedStep1Raw = window.localStorage.getItem('terepay_signup_step1');
+
+    if (!storedEmail) {
+      // User opened the link on a different device — ask for email
+      setEmailMissing(true);
+      setStep(2);
+      return;
+    }
+
+    if (storedStep1Raw) {
+      try { setStep1(JSON.parse(storedStep1Raw)); } catch { /* ignore */ }
+    }
+
+    setStep(2);
+    setStep2Error('');
+
+    signInWithEmailLink(clientAuth, storedEmail, window.location.href)
+      .then((result) => {
+        window.history.replaceState({}, document.title, window.location.pathname);
+        window.localStorage.removeItem('terepay_signup_email');
+        window.localStorage.removeItem('terepay_signup_step1');
+        setFirebaseUser(result.user);
+        setStep(3);
+      })
+      .catch((err: Error) => {
+        setStep2Error(err.message ?? 'Link verification failed. Please request a new one.');
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Step 1 submit
   const validateStep1 = () => {
@@ -343,8 +334,27 @@ export default function SignupPage() {
         body: JSON.stringify({ email: step1.email, ...(recaptchaToken ? { recaptchaToken } : {}) }),
       });
       const data = await res.json();
-      if (!res.ok) { setStep1ApiError(data.error?.message ?? 'Failed to send code.'); return; }
-      if (data.code) setDevCode(data.code);
+      if (!res.ok) {
+        if (res.status === 409) {
+          // Email already registered — show inline on the email field
+          setStep1Errors((prev) => ({ ...prev, email: data.error?.message ?? 'An account with this email already exists.' }));
+        } else {
+          setStep1ApiError(data.error?.message ?? 'Failed to send code.');
+        }
+        return;
+      }
+      // Send Firebase email link — Firebase handles the email delivery
+      try {
+        await sendSignInLinkToEmail(clientAuth, step1.email, {
+          url: `${window.location.origin}/auth/signup`,
+          handleCodeInApp: true,
+        });
+      } catch (emailErr) {
+        setStep1ApiError(emailErr instanceof Error ? emailErr.message : 'Failed to send sign-in link. Please try again.');
+        return;
+      }
+      window.localStorage.setItem('terepay_signup_email', step1.email);
+      window.localStorage.setItem('terepay_signup_step1', JSON.stringify(step1));
       setResendCooldown(60);
       setStep(2);
     } catch { setStep1ApiError('Network error. Please try again.'); }
@@ -352,42 +362,24 @@ export default function SignupPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step1, executeRecaptcha]);
 
-  // Step 2 verify
-  const handleVerify = useCallback(async () => {
-    const code = otpDigits.join('');
-    if (code.length < 6) { setOtpError('Please enter the complete 6-digit code.'); return; }
-    setOtpError('');
-    setOtpLoading(true);
-    try {
-      const res = await fetch('/api/auth/verify-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: step1.email, code }),
-      });
-      const data = await res.json();
-      if (!res.ok) { setOtpError(data.error?.message ?? 'Incorrect code. Please try again.'); return; }
-      setVerificationToken(data.verificationToken);
-      setStep(3);
-    } catch { setOtpError('Network error. Please try again.'); }
-    finally { setOtpLoading(false); }
-  }, [otpDigits, step1.email]);
-
   const handleResend = useCallback(async () => {
     if (resendCooldown > 0) return;
-    setOtpDigits(['', '', '', '', '', '']);
-    setOtpError('');
-    setDevCode('');
+    setStep2Error('');
+    setStep2Sending(true);
     try {
-      const res = await fetch('/api/auth/send-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: step1.email }),
+      await sendSignInLinkToEmail(clientAuth, step1.email, {
+        url: `${window.location.origin}/auth/signup`,
+        handleCodeInApp: true,
       });
-      const data = await res.json();
-      if (data.code) setDevCode(data.code);
+      window.localStorage.setItem('terepay_signup_email', step1.email);
+      window.localStorage.setItem('terepay_signup_step1', JSON.stringify(step1));
       setResendCooldown(60);
-    } catch { /* ignore */ }
-  }, [resendCooldown, step1.email]);
+    } catch (err) {
+      setStep2Error(err instanceof Error ? err.message : 'Failed to resend link. Please try again.');
+    } finally {
+      setStep2Sending(false);
+    }
+  }, [resendCooldown, step1]);
 
   // Step 3 submit
   const validateStep3 = () => {
@@ -401,34 +393,53 @@ export default function SignupPage() {
 
   const handleCreateAccount = useCallback(async () => {
     if (!validateStep3()) return;
+    if (!firebaseUser) {
+      setStep3ApiError('Session expired. Please go back and request a new sign-in link.');
+      return;
+    }
     setStep3ApiError('');
     setStep3Loading(true);
     try {
+      // Link a password credential to the email-link account
+      const credential = EmailAuthProvider.credential(step1.email, password);
+      await linkWithCredential(firebaseUser, credential);
+
+      // Get a fresh ID token (proves this user's identity to the server)
+      const idToken = await firebaseUser.getIdToken(true);
+
+      // Create Firestore profile and set custom claims via server
       const recaptchaToken = executeRecaptcha ? await executeRecaptcha('signup') : undefined;
       const phone = `${step1.dialCode} ${step1.phone}`.trim();
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firstName: step1.firstName, lastName: step1.lastName, email: step1.email, phone, password, verificationToken, ...(recaptchaToken ? { recaptchaToken } : {}) }),
+        body: JSON.stringify({ firstName: step1.firstName, lastName: step1.lastName, phone, idToken, ...(recaptchaToken ? { recaptchaToken } : {}) }),
       });
       if (!res.ok) {
         const body = await res.json();
         setStep3ApiError(body.error?.message ?? 'Registration failed. Please try again.');
         return;
       }
-      const loginToken = executeRecaptcha ? await executeRecaptcha('login') : undefined;
-      await login(step1.email, password, loginToken);
-      const firebaseUser = clientAuth.currentUser;
-      if (firebaseUser && !firebaseUser.emailVerified) {
-        const continueUrl = `${window.location.origin}/applicant/verify-email`;
-        await sendEmailVerification(firebaseUser, { url: continueUrl, handleCodeInApp: false }).catch(() => { /* non-critical */ });
+
+      // Establish session cookie using the current user's token
+      const sessionRes = await fetch('/api/auth/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken }),
+      });
+      if (!sessionRes.ok) {
+        // Session creation failed — try full login as fallback
+        const loginToken = executeRecaptcha ? await executeRecaptcha('login') : undefined;
+        await login(step1.email, password, loginToken);
       }
-      router.push('/applicant/verify-email');
+
+      // Email is already verified by Firebase email link — go straight to dashboard
+      router.push('/applicant/dashboard');
     } catch (err) {
       setStep3ApiError(err instanceof Error ? err.message : 'Registration failed. Please try again.');
     } finally { setStep3Loading(false); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step1, password, verificationToken, executeRecaptcha]);
+  }, [step1, password, firebaseUser, executeRecaptcha]);
 
   return (
     <div className="flex min-h-screen">
@@ -477,9 +488,16 @@ export default function SignupPage() {
                     Email address <span className="text-red-500">*</span>
                   </label>
                   <input id="email" type="email" autoComplete="email" value={step1.email}
-                    onChange={(e) => setStep1({ ...step1, email: e.target.value })}
+                    onChange={(e) => { setStep1({ ...step1, email: e.target.value }); setStep1Errors((prev) => ({ ...prev, email: undefined })); }}
                     className={inputCls} placeholder="you@example.com" />
-                  {step1Errors.email && <p className={errorCls}>{step1Errors.email}</p>}
+                  {step1Errors.email && (
+                    <p className={errorCls}>
+                      {step1Errors.email}{' '}
+                      {step1Errors.email.toLowerCase().includes('already exists') && (
+                        <Link href="/auth/login" className="underline font-medium">Sign in instead</Link>
+                      )}
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -510,7 +528,7 @@ export default function SignupPage() {
 
                 <button onClick={handleStep1Continue} disabled={step1Loading}
                   className="w-full py-3 px-4 bg-[#F5A523] hover:bg-[#E08B00] text-white font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-2">
-                  {step1Loading ? 'Sending code…' : 'Continue'}
+                  {step1Loading ? 'Sending link…' : 'Continue'}
                 </button>
 
                 <p className="text-center text-sm text-gray-500">
@@ -524,51 +542,97 @@ export default function SignupPage() {
           {/* ---- STEP 2 ---- */}
           {step === 2 && (
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-1">Verify your email</h1>
-              <p className="text-sm text-gray-500 mb-1">We&apos;ve sent a 6-digit code to</p>
-              <p className="text-sm font-semibold text-gray-800 mb-7">{step1.email}</p>
-
-              <OtpInputs value={otpDigits} onChange={setOtpDigits} />
-
-              {otpError && (
-                <p role="alert" className="mt-4 text-sm text-red-500 text-center">{otpError}</p>
-              )}
-
-              {/* Spam notice */}
-              <div className="mt-5 border-l-4 border-[#F5A523] bg-[#FEF7E9] rounded-r-xl px-4 py-3 text-sm text-gray-700">
-                <span className="mr-1.5">📬</span>
-                <strong>Can&apos;t find the email?</strong> Check your <strong>spam</strong> or <strong>junk</strong> folder — verification emails are sometimes filtered. The code is valid for 10 minutes.
-              </div>
-
-              {/* Dev mode banner */}
-              {devCode && (
-                <div className="mt-3 bg-yellow-50 border border-yellow-300 rounded-xl px-4 py-2.5 text-xs text-yellow-800">
-                  <strong>DEV MODE</strong> — Your code is:{' '}
-                  <span className="font-mono font-bold tracking-widest">{devCode}</span>
-                </div>
-              )}
-
-              <p className="mt-5 text-center text-sm text-gray-500">
-                Didn&apos;t receive it?{' '}
-                {resendCooldown > 0 ? (
-                  <span className="text-gray-400">Resend in {resendCooldown}s</span>
-                ) : (
-                  <button onClick={handleResend} className="text-[#F5A523] hover:text-[#E08B00] font-medium underline-offset-2 hover:underline">
-                    Resend code
+              {emailMissing ? (
+                /* User opened the link on a different device — ask for email */
+                <>
+                  <h1 className="text-2xl font-bold text-gray-900 mb-1">Confirm your email</h1>
+                  <p className="text-sm text-gray-500 mb-7">
+                    It looks like you opened the sign-in link on a different device. Enter the email address you used to sign up.
+                  </p>
+                  <input
+                    type="email"
+                    autoComplete="email"
+                    value={emailMissingInput}
+                    onChange={(e) => setEmailMissingInput(e.target.value)}
+                    className={inputCls}
+                    placeholder="you@example.com"
+                  />
+                  {step2Error && <p role="alert" className="mt-3 text-sm text-red-500">{step2Error}</p>}
+                  <button
+                    disabled={!emailMissingInput.trim()}
+                    onClick={() => {
+                      const email = emailMissingInput.trim();
+                      setStep2Error('');
+                      setEmailMissing(false);
+                      signInWithEmailLink(clientAuth, email, window.location.href)
+                        .then((result) => {
+                          window.history.replaceState({}, document.title, window.location.pathname);
+                          setFirebaseUser(result.user);
+                          setStep1((prev) => ({ ...prev, email }));
+                          setStep(3);
+                        })
+                        .catch((err: Error) => {
+                          setEmailMissing(true);
+                          setStep2Error(err.message ?? 'Verification failed. Please request a new link.');
+                        });
+                    }}
+                    className="mt-4 w-full py-3 bg-[#F5A523] hover:bg-[#E08B00] text-white font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Continue
                   </button>
-                )}
-              </p>
+                </>
+              ) : (
+                /* Normal flow — user is on the same device */
+                <>
+                  <div className="flex flex-col items-center text-center mb-8">
+                    <div className="w-16 h-16 bg-[#FEF7E9] rounded-full flex items-center justify-center text-3xl mb-4" aria-hidden="true">
+                      📬
+                    </div>
+                    <h1 className="text-2xl font-bold text-gray-900 mb-1">Check your inbox</h1>
+                    <p className="text-sm text-gray-500">We sent a sign-in link to</p>
+                    <p className="text-sm font-semibold text-gray-800 mt-0.5">{step1.email}</p>
+                  </div>
 
-              <div className="flex gap-3 mt-7">
-                <button onClick={() => { setStep(1); setOtpDigits(['', '', '', '', '', '']); setOtpError(''); }}
-                  className="flex-1 py-3 border border-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-colors">
-                  Back
-                </button>
-                <button onClick={handleVerify} disabled={otpLoading || otpDigits.join('').length < 6}
-                  className="flex-1 py-3 bg-[#F5A523] hover:bg-[#E08B00] text-white font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                  {otpLoading ? 'Verifying…' : 'Verify'}
-                </button>
-              </div>
+                  <ol className="border border-gray-200 rounded-xl divide-y divide-gray-100 text-sm text-gray-600">
+                    <li className="px-4 py-3">1. Open the email from <strong>TerePay</strong></li>
+                    <li className="px-4 py-3">2. Click the <strong>Sign in to TerePay</strong> link</li>
+                    <li className="px-4 py-3">3. You&apos;ll be brought back here to set your password</li>
+                  </ol>
+
+                  <div className="mt-4 border-l-4 border-[#F5A523] bg-[#FEF7E9] rounded-r-xl px-4 py-3 text-sm text-gray-700">
+                    <strong>Can&apos;t find it?</strong> Check your <strong>spam</strong> or <strong>junk</strong> folder. The link expires in <strong>1 hour</strong>.
+                  </div>
+
+                  {step2Error && (
+                    <p role="alert" className="mt-4 text-sm text-red-500 bg-red-50 border border-red-200 rounded-xl px-4 py-3">{step2Error}</p>
+                  )}
+
+                  <p className="mt-5 text-center text-sm text-gray-500">
+                    Didn&apos;t receive it?{' '}
+                    {resendCooldown > 0 ? (
+                      <span className="text-gray-400">Resend in {resendCooldown}s</span>
+                    ) : (
+                      <button onClick={handleResend} disabled={step2Sending} className="text-[#F5A523] hover:text-[#E08B00] font-medium underline-offset-2 hover:underline disabled:opacity-50">
+                        {step2Sending ? 'Sending…' : 'Resend link'}
+                      </button>
+                    )}
+                  </p>
+
+                  <div className="mt-7">
+                    <button
+                      onClick={() => {
+                        setStep(1);
+                        setStep2Error('');
+                        window.localStorage.removeItem('terepay_signup_email');
+                        window.localStorage.removeItem('terepay_signup_step1');
+                      }}
+                      className="w-full py-3 border border-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-colors"
+                    >
+                      Back
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           )}
 

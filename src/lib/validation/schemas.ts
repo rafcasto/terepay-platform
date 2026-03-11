@@ -10,19 +10,12 @@ export const loginSchema = z.object({
 });
 
 export const signupSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  password: z
-    .string()
-    .min(8, 'Password must be at least 8 characters')
-    .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
-    .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
-    .regex(/[0-9]/, 'Password must contain at least one number')
-    .regex(/[^a-zA-Z0-9]/, 'Password must contain at least one special character'),
   firstName: z.string().min(1, 'First name is required').max(50),
   lastName: z.string().min(1, 'Last name is required').max(50),
   // role is hardcoded to 'applicant' server-side; not accepted from client
   phone: z.string().min(7, 'Phone number is required').max(30).optional(),
-  verificationToken: z.string().uuid('Invalid verification token').optional(),
+  // Firebase ID token from signInWithEmailLink — proves email ownership
+  idToken: z.string().min(1, 'Firebase ID token is required'),
   recaptchaToken: z.string().min(1).optional(),
 });
 

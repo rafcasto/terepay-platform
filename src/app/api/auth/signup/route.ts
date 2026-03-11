@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { email, password, firstName, lastName, phone, verificationToken, recaptchaToken } = signupSchema.parse(body);
+    const { firstName, lastName, phone, idToken, recaptchaToken } = signupSchema.parse(body);
 
     if (recaptchaToken) {
       const captchaOk = await verifyRecaptcha(recaptchaToken, 'signup');
@@ -30,39 +30,34 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Verify the email OTP token produced by POST /api/auth/verify-otp
-    if (verificationToken) {
-      const tokenDoc = await adminDb.collection('verifiedTokens').doc(verificationToken).get();
-      if (
-        !tokenDoc.exists ||
-        tokenDoc.data()?.email !== email.toLowerCase().trim() ||
-        tokenDoc.data()?.expiresAt < Date.now()
-      ) {
-        throw new AppError('INVALID_VERIFICATION', 400, 'Email verification failed or expired. Please restart the signup process.');
-      }
-      // Consume the token — single-use
-      await tokenDoc.ref.delete();
-    }
-
-    // Create the Firebase Auth user
-    let userRecord;
+    // Verify the Firebase ID token issued by signInWithEmailLink on the client.
+    // This proves the user verified ownership of their email address.
+    let decodedToken;
     try {
-      userRecord = await adminAuth.createUser({ email, password, displayName: `${firstName} ${lastName}` });
-    } catch (err: unknown) {
-      if (typeof err === 'object' && err !== null && 'code' in err && (err as { code: string }).code === 'auth/email-already-exists') {
-        throw new AppError('CONFLICT', 409, 'An account with this email already exists');
-      }
-      throw err;
+      decodedToken = await adminAuth.verifyIdToken(idToken);
+    } catch {
+      throw new AppError('INVALID_TOKEN', 401, 'Invalid or expired auth token. Please restart the sign-up process.');
     }
 
-    // Role is ALWAYS 'applicant' from the public signup endpoint
-    await adminAuth.setCustomUserClaims(userRecord.uid, { role: 'applicant' });
+    const { uid, email } = decodedToken;
+    if (!email) {
+      throw new AppError('INVALID_TOKEN', 401, 'Token is missing email claim.');
+    }
 
-    // Create the user document in Firestore
+    // Idempotency — skip if profile already exists (handles double-submit)
+    const existingProfile = await adminDb.collection('users').doc(uid).get();
+    if (existingProfile.exists) {
+      return NextResponse.json({ uid }, { status: 200 });
+    }
+
+    // Set applicant role as a custom claim
+    await adminAuth.setCustomUserClaims(uid, { role: 'applicant' });
+
+    // Create the Firestore user document
     const now = FieldValue.serverTimestamp();
-    await adminDb.collection('users').doc(userRecord.uid).set({
-      uid: userRecord.uid,
-      email,
+    await adminDb.collection('users').doc(uid).set({
+      uid,
+      email: email.toLowerCase().trim(),
       firstName,
       lastName,
       phone: phone ?? null,
@@ -70,13 +65,13 @@ export async function POST(request: NextRequest) {
       profileComplete: false,
       status: 'active',
       phoneVerified: false,
-      emailVerified: false,
+      emailVerified: true, // Firebase email link sets emailVerified = true
       createdAt: now,
       updatedAt: now,
     });
 
     await auditLog({
-      userId: userRecord.uid,
+      userId: uid,
       action: 'signup_success',
       targetType: 'auth',
       outcome: 'success',
@@ -84,7 +79,7 @@ export async function POST(request: NextRequest) {
       userAgent: request.headers.get('user-agent') ?? '',
     });
 
-    return NextResponse.json({ uid: userRecord.uid }, { status: 201 });
+    return NextResponse.json({ uid }, { status: 201 });
   } catch (err) {
     if (err instanceof ZodError) {
       return errorResponse(
