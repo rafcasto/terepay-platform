@@ -10,6 +10,7 @@ import {
   signInWithEmailAndPassword,
   EmailAuthProvider,
   linkWithCredential,
+  updatePassword,
   type User as FirebaseUser,
 } from 'firebase/auth';
 import { clientAuth } from '@/lib/firebase/client';
@@ -409,19 +410,24 @@ export default function SignupPage() {
     setStep3ApiError('');
     setStep3Loading(true);
     try {
-      // Link a password credential to the email-link account
+      // Link a password credential to the email-link account.
+      // If a previous partial attempt already linked a password, update it to
+      // the one the user just entered rather than silently keeping the old one.
       const credential = EmailAuthProvider.credential(step1.email, password);
       try {
         await linkWithCredential(firebaseUser, credential);
       } catch (linkErr: unknown) {
-        // A previous attempt already linked the password — safe to continue.
-        if ((linkErr as { code?: string }).code !== 'auth/provider-already-linked') throw linkErr;
+        if ((linkErr as { code?: string }).code === 'auth/provider-already-linked') {
+          await updatePassword(firebaseUser, password);
+        } else {
+          throw linkErr;
+        }
       }
 
-      // Get a fresh ID token (proves this user's identity to the server)
+      // Get an initial ID token to prove identity to the signup endpoint.
       const idToken = await firebaseUser.getIdToken(true);
 
-      // Create Firestore profile and set custom claims via server
+      // Create Firestore profile and set custom claims (role: 'applicant') via server.
       const recaptchaToken = executeRecaptcha ? await executeRecaptcha('signup') : undefined;
       const phone = `${step1.dialCode} ${step1.phone}`.trim();
       const res = await fetch('/api/auth/signup', {
@@ -435,11 +441,15 @@ export default function SignupPage() {
         return;
       }
 
-      // Establish session cookie using the current user's token
+      // Force-refresh the token AFTER custom claims are set so the session
+      // cookie contains role: 'applicant' — required by the middleware.
+      const freshIdToken = await firebaseUser.getIdToken(true);
+
+      // Establish session cookie using the fresh token (with role claim).
       const sessionRes = await fetch('/api/auth/session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken }),
+        body: JSON.stringify({ idToken: freshIdToken }),
       });
       if (!sessionRes.ok) {
         // Session creation failed — try full login as fallback
