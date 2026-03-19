@@ -35,7 +35,9 @@ export default function OnboardingLayout({ children }: Props) {
         </header>
 
         {/* Mobile step progress */}
-        <OnboardingStepTracker />
+        <div className="sm:hidden">
+          <OnboardingStepTracker />
+        </div>
 
         <main className="flex-1 bg-white overflow-auto">
           {children}
