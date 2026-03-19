@@ -166,13 +166,13 @@ export const verifySmsOtpSchema = z.object({
 export const kycProfileSchema = z.object({
   dateOfBirth: z.string().min(1, 'Date of birth is required'),
   immigrationStatus: z.enum(['student', 'work_visa', 'resident', 'permanent_resident', 'citizen'], {
-    required_error: 'Immigration status is required',
+    message: 'Immigration status is required',
   }),
   housingStatus: z.enum(['rent', 'own', 'flatmates'], {
-    required_error: 'Housing status is required',
+    message: 'Housing status is required',
   }),
   timeAtAddress: z.enum(['lt_6mo', '6_12mo', '1_2yr', '2_5yr', 'gt_5yr'], {
-    required_error: 'Please select how long you have lived at this address',
+    message: 'Please select how long you have lived at this address',
   }),
   address: z.string().min(1, 'Address is required').max(200),
   suburb: z.string().max(100).optional(),
