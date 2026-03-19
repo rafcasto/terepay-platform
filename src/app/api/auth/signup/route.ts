@@ -63,6 +63,7 @@ export async function POST(request: NextRequest) {
       phone: phone ?? null,
       role: 'applicant',
       profileComplete: false,
+      kycStatus: 'not_started',
       status: 'active',
       phoneVerified: false,
       emailVerified: true, // Firebase email link sets emailVerified = true

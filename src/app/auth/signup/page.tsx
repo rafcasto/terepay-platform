@@ -457,8 +457,8 @@ export default function SignupPage() {
         await login(step1.email, password, loginToken);
       }
 
-      // Email is already verified by Firebase email link — go straight to dashboard
-      router.push('/applicant/dashboard');
+      // Email is already verified by Firebase email link — start KYC onboarding
+      router.push('/applicant/onboarding');
     } catch (err) {
       setStep3ApiError(err instanceof Error ? err.message : 'Registration failed. Please try again.');
     } finally { setStep3Loading(false); }

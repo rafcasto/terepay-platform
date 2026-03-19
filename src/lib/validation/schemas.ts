@@ -147,6 +147,55 @@ export type ApproveApplicationInput = z.infer<typeof approveApplicationSchema>;
 export type RejectApplicationInput = z.infer<typeof rejectApplicationSchema>;
 
 // ---------------------------------------------------------------------------
+// KYC schemas
+// ---------------------------------------------------------------------------
+
+export const sendSmsOtpSchema = z.object({
+  phone: z
+    .string()
+    .min(7, 'Phone number is required')
+    .max(15)
+    .regex(/^[0-9\s\-()]+$/, 'Invalid phone number'),
+});
+
+export const verifySmsOtpSchema = z.object({
+  phone: z.string().min(7).max(15),
+  code: z.string().length(6, 'Code must be 6 digits').regex(/^\d{6}$/, 'Code must be numeric'),
+});
+
+export const kycProfileSchema = z.object({
+  dateOfBirth: z.string().min(1, 'Date of birth is required'),
+  immigrationStatus: z.enum(['student', 'work_visa', 'resident', 'permanent_resident', 'citizen'], {
+    required_error: 'Immigration status is required',
+  }),
+  housingStatus: z.enum(['rent', 'own', 'flatmates'], {
+    required_error: 'Housing status is required',
+  }),
+  timeAtAddress: z.enum(['lt_6mo', '6_12mo', '1_2yr', '2_5yr', 'gt_5yr'], {
+    required_error: 'Please select how long you have lived at this address',
+  }),
+  address: z.string().min(1, 'Address is required').max(200),
+  suburb: z.string().max(100).optional(),
+  city: z.string().min(1, 'City is required').max(100),
+  postCode: z.string().min(1, 'Post code is required').max(20),
+  country: z.string().max(100).optional(),
+});
+
+export const kycDocumentSchema = z.object({
+  documents: z.array(z.object({
+    docType: z.string().min(1),
+    driveFileId: z.string().min(1),
+    fileName: z.string().min(1),
+    mimeType: z.string().min(1),
+  })).min(1, 'At least one document is required'),
+});
+
+export type SendSmsOtpInput = z.infer<typeof sendSmsOtpSchema>;
+export type VerifySmsOtpInput = z.infer<typeof verifySmsOtpSchema>;
+export type KycProfileInput = z.infer<typeof kycProfileSchema>;
+export type KycDocumentInput = z.infer<typeof kycDocumentSchema>;
+
+// ---------------------------------------------------------------------------
 // TerePay 8-section loan application schema (NZD, 8-week term)
 // ---------------------------------------------------------------------------
 

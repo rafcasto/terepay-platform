@@ -21,6 +21,7 @@ function makeLimiter(limiter: Ratelimit['limiter'], prefix: string) {
 
 export const authLoginLimiter = makeLimiter(Ratelimit.slidingWindow(5, '1 m'), 'rl:auth:login');
 export const authSignupLimiter = makeLimiter(Ratelimit.slidingWindow(3, '5 m'), 'rl:auth:signup');
+export const kycSmsLimiter = makeLimiter(Ratelimit.slidingWindow(3, '10 m'), 'rl:kyc:sms');
 export const paymentLimiter = makeLimiter(Ratelimit.slidingWindow(5, '1 m'), 'rl:payments');
 export const defaultLimiter = makeLimiter(Ratelimit.fixedWindow(60, '1 m'), 'rl:default');
 

@@ -2,6 +2,18 @@ import type { Timestamp } from 'firebase-admin/firestore';
 
 export type UserRole = 'applicant' | 'lender';
 export type UserStatus = 'active' | 'suspended' | 'inactive';
+export type KycStatus = 'not_started' | 'in_progress' | 'submitted' | 'approved' | 'rejected';
+export type ImmigrationStatus = 'student' | 'work_visa' | 'resident' | 'permanent_resident' | 'citizen';
+export type HousingStatus = 'rent' | 'own' | 'flatmates';
+export type TimeAtAddress = 'lt_6mo' | '6_12mo' | '1_2yr' | '2_5yr' | 'gt_5yr';
+
+export interface IdentityDocument {
+  docType: string;
+  driveFileId: string;
+  fileName: string;
+  mimeType: string;
+  uploadedAt: Timestamp;
+}
 
 export interface User {
   uid: string;
@@ -10,8 +22,10 @@ export interface User {
   lastName: string;
   role: UserRole;
   profileComplete: boolean;
+  kycStatus: KycStatus;
   status: UserStatus;
   profilePhotoUrl?: string;
+  phoneNumber?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
   lastLoginAt?: Timestamp;
@@ -24,10 +38,17 @@ export interface ApplicantProfile {
   ssn?: string;               // 🔒 Encrypted (last 4 digits)
   phone: string;
   address: string;
+  suburb?: string;
   city: string;
+  postCode?: string;
   state: string;
   zipCode: string;
   country: string;
+  housingStatus?: HousingStatus;
+  timeAtAddress?: TimeAtAddress;
+  immigrationStatus?: ImmigrationStatus;
+  kycDocuments?: IdentityDocument[];
+  profileLastUpdatedAt?: Timestamp;
   employmentStatus: 'employed' | 'self-employed' | 'unemployed' | 'retired';
   employerName?: string;
   jobTitle?: string;

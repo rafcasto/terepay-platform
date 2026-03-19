@@ -1,4 +1,5 @@
 import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 import { getAdminDb, verifySessionOrIdToken } from '@/lib/firebase/admin';
 import Link from 'next/link';
 import Badge from '@/components/shared/Badge';
@@ -70,6 +71,12 @@ export default async function ApplicantDashboard() {
 
   const decoded = await verifySessionOrIdToken(session).catch(() => null);
   if (!decoded) return null;
+
+  // Block dashboard until KYC onboarding is complete
+  const userSnap = await getAdminDb().collection('users').doc(decoded.uid).get();
+  if (userSnap.exists && !userSnap.data()?.profileComplete) {
+    redirect('/applicant/onboarding');
+  }
 
   const { user, recentApplications } = await getDashboardData(decoded.uid);
 

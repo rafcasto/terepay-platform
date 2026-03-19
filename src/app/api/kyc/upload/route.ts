@@ -1,0 +1,137 @@
+import { type NextRequest, NextResponse } from 'next/server';
+import { google } from 'googleapis';
+import { withAuth } from '@/lib/auth/middleware';
+import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
+import { Readable } from 'stream';
+
+export const dynamic = 'force-dynamic';
+
+// Max file size: 10 MB
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+
+const ALLOWED_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'application/pdf',
+]);
+
+function getDriveClient() {
+  const email = process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_EMAIL;
+  const privateKey = process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_PRIVATE_KEY;
+
+  if (!email || !privateKey) {
+    throw new AppError('CONFIG_ERROR', 500, 'Google Drive credentials are not configured');
+  }
+
+  const auth = new google.auth.JWT({
+    email,
+    key: privateKey.replace(/\\n/g, '\n'),
+    scopes: ['https://www.googleapis.com/auth/drive'],
+  });
+
+  return google.drive({ version: 'v3', auth });
+}
+
+/**
+ * POST /api/kyc/upload
+ * Uploads a single KYC document to Google Drive.
+ * Expects multipart/form-data with fields:
+ *   - file: the document file
+ *   - docType: string label (e.g. "nz_passport", "proof_of_address")
+ *
+ * Returns: { driveFileId, fileName, mimeType }
+ */
+export async function POST(request: NextRequest) {
+  try {
+    const { uid } = await withAuth(request, ['applicant']);
+
+    const formData = await request.formData();
+    const file = formData.get('file') as File | null;
+    const docType = formData.get('docType') as string | null;
+
+    if (!file) {
+      return errorResponse(new AppError('VALIDATION_ERROR', 422, 'No file provided'));
+    }
+    if (!docType) {
+      return errorResponse(new AppError('VALIDATION_ERROR', 422, 'Document type is required'));
+    }
+    if (file.size > MAX_FILE_SIZE) {
+      return errorResponse(new AppError('FILE_TOO_LARGE', 413, 'File must be smaller than 10 MB'));
+    }
+    if (!ALLOWED_MIME_TYPES.has(file.type)) {
+      return errorResponse(new AppError('INVALID_FILE_TYPE', 415, 'Only JPEG, PNG, WebP, and PDF files are accepted'));
+    }
+
+    const parentFolderId = process.env.GOOGLE_DRIVE_KYC_FOLDER_ID;
+    if (!parentFolderId) {
+      throw new AppError('CONFIG_ERROR', 500, 'Google Drive KYC folder ID is not configured');
+    }
+
+    const drive = getDriveClient();
+
+    // Ensure a per-user subfolder exists (create if absent)
+    const userFolderId = await getOrCreateUserFolder(drive, parentFolderId, uid);
+
+    // Convert Web API File → Node Readable stream
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const stream = Readable.from(buffer);
+
+    // Sanitise filename to prevent path traversal
+    const safeFileName = sanitiseFileName(file.name);
+
+    const uploadedFile = await drive.files.create({
+      requestBody: {
+        name: `${docType}_${Date.now()}_${safeFileName}`,
+        parents: [userFolderId],
+      },
+      media: {
+        mimeType: file.type,
+        body: stream,
+      },
+      fields: 'id,name,mimeType',
+    });
+
+    const driveFileId = uploadedFile.data.id!;
+    const fileName = uploadedFile.data.name!;
+    const mimeType = uploadedFile.data.mimeType!;
+
+    return NextResponse.json({ driveFileId, fileName, mimeType });
+  } catch (err) {
+    if (err instanceof AppError) return errorResponse(err);
+    return internalError();
+  }
+}
+
+/**
+ * Find or create a folder named after the user UID inside the KYC parent folder.
+ */
+async function getOrCreateUserFolder(
+  drive: ReturnType<typeof google.drive>,
+  parentFolderId: string,
+  uid: string,
+): Promise<string> {
+  const query = `'${parentFolderId}' in parents and name = '${uid}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
+  const existing = await drive.files.list({ q: query, fields: 'files(id)', pageSize: 1 });
+
+  if (existing.data.files && existing.data.files.length > 0) {
+    return existing.data.files[0].id!;
+  }
+
+  const folder = await drive.files.create({
+    requestBody: {
+      name: uid,
+      mimeType: 'application/vnd.google-apps.folder',
+      parents: [parentFolderId],
+    },
+    fields: 'id',
+  });
+
+  return folder.data.id!;
+}
+
+/** Strip path separators and control characters from a filename. */
+function sanitiseFileName(name: string): string {
+  return name.replace(/[/\\:*?"<>|]/g, '_').slice(0, 100);
+}

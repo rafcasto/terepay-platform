@@ -50,6 +50,8 @@ export async function GET(request: NextRequest) {
         lastName: data.lastName,
         role: data.role,
         profileComplete: data.profileComplete,
+        kycStatus: data.kycStatus ?? 'not_started',
+        phoneVerified: data.phoneVerified ?? false,
         emailVerified: liveEmailVerified,
       },
     });
