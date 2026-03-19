@@ -3,31 +3,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import {
-  sendSignInLinkToEmail,
-  isSignInWithEmailLink,
-  signInWithEmailLink,
-  signInWithEmailAndPassword,
-  EmailAuthProvider,
-  linkWithCredential,
-  updatePassword,
-  type User as FirebaseUser,
-} from 'firebase/auth';
+import { createUserWithEmailAndPassword, deleteUser } from 'firebase/auth';
 import { clientAuth } from '@/lib/firebase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 // ---------------------------------------------------------------------------
-// Types
+// Constants
 // ---------------------------------------------------------------------------
-
-interface Step1Data {
-  firstName: string;
-  lastName: string;
-  email: string;
-  dialCode: string;
-  phone: string;
-}
 
 const DIAL_CODES = [
   { flag: '🇳🇿', code: '+64', country: 'NZ' },
@@ -40,26 +23,29 @@ const DIAL_CODES = [
   { flag: '🇸🇬', code: '+65', country: 'SG' },
 ];
 
-// ---------------------------------------------------------------------------
-// Left brand panel — slides
-// ---------------------------------------------------------------------------
-
 const SLIDES = [
-  {
-    heading: 'Getting funded starts here.',
-    body: 'Apply in minutes and receive a lending decision within 24 hours.',
-  },
-  {
-    heading: 'Secure by design.',
-    body: 'End-to-end encryption and strict access controls protect your data at every step.',
-  },
-  {
-    heading: 'Transparent terms.',
-    body: 'Clear repayment schedules. No hidden fees. Ever.',
-  },
+  { heading: 'Getting funded starts here.', body: 'Apply in minutes and receive a lending decision within 24 hours.' },
+  { heading: 'Secure by design.', body: 'End-to-end encryption and strict access controls protect your data at every step.' },
+  { heading: 'Transparent terms.', body: 'Clear repayment schedules. No hidden fees. Ever.' },
 ];
 
-function BrandPanel({ step }: { step: number }) {
+const PASSWORD_RULES = [
+  { label: '8 characters', test: (p: string) => p.length >= 8 },
+  { label: '1 upper case', test: (p: string) => /[A-Z]/.test(p) },
+  { label: '1 lower case', test: (p: string) => /[a-z]/.test(p) },
+  { label: '1 number',     test: (p: string) => /[0-9]/.test(p) },
+  { label: 'special char', test: (p: string) => /[^a-zA-Z0-9]/.test(p) },
+];
+
+const inputCls =
+  'w-full px-3.5 py-3 border border-gray-200 rounded-xl bg-gray-50 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#F5A523] focus:border-[#F5A523] focus:bg-white transition-all';
+const errorCls = 'mt-1 text-xs text-red-500';
+
+// ---------------------------------------------------------------------------
+// Brand panel
+// ---------------------------------------------------------------------------
+
+function BrandPanel() {
   const [slideIdx, setSlideIdx] = useState(0);
 
   useEffect(() => {
@@ -69,14 +55,8 @@ function BrandPanel({ step }: { step: number }) {
 
   return (
     <div className="hidden md:flex flex-col justify-between bg-[#0D1B2A] text-white px-10 py-12 w-[42%] min-h-screen relative overflow-hidden">
-      {/* Background geometric illustration */}
       <div className="absolute inset-0 pointer-events-none select-none" aria-hidden="true">
-        <svg
-          viewBox="0 0 400 500"
-          className="absolute bottom-0 right-0 w-full h-full opacity-[0.07]"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
+        <svg viewBox="0 0 400 500" className="absolute bottom-0 right-0 w-full h-full opacity-[0.07]" fill="none" xmlns="http://www.w3.org/2000/svg">
           {Array.from({ length: 6 }).map((_, row) =>
             Array.from({ length: 5 }).map((_, col) => {
               const x = col * 80 + (row % 2) * 40 + 10;
@@ -103,20 +83,12 @@ function BrandPanel({ step }: { step: number }) {
         </svg>
       </div>
 
-      {/* Logo */}
       <div className="relative z-10">
         <span className="text-2xl font-extrabold text-[#F5A523] tracking-tight">TerePay</span>
       </div>
 
-      {/* Central illustration + headline */}
       <div className="relative z-10 flex-1 flex flex-col justify-center gap-8 mt-12">
-        <svg
-          viewBox="0 0 220 180"
-          className="w-48 mx-auto"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          aria-hidden="true"
-        >
+        <svg viewBox="0 0 220 180" className="w-48 mx-auto" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
           <ellipse cx="110" cy="155" rx="80" ry="12" fill="#F5A523" fillOpacity="0.15" />
           <rect x="90" y="80" width="40" height="70" rx="4" fill="#F5A523" fillOpacity="0.25" />
           <rect x="96" y="60" width="28" height="30" rx="3" fill="#F5A523" fillOpacity="0.4" />
@@ -132,87 +104,33 @@ function BrandPanel({ step }: { step: number }) {
           <line x1="110" y1="44" x2="160" y2="76" stroke="#F5A523" strokeWidth="1" strokeOpacity="0.4" />
         </svg>
 
-        {/* Rotating slides */}
         <div className="relative text-center h-[100px] flex flex-col items-center justify-center">
           {SLIDES.map((slide, i) => (
-            <div
-              key={i}
-              className="absolute inset-0 flex flex-col items-center justify-center transition-opacity duration-700"
-              style={{ opacity: i === slideIdx ? 1 : 0 }}
-              aria-hidden={i !== slideIdx}
-            >
+            <div key={i} className="absolute inset-0 flex flex-col items-center justify-center transition-opacity duration-700"
+              style={{ opacity: i === slideIdx ? 1 : 0 }} aria-hidden={i !== slideIdx}>
               <h2 className="text-2xl font-bold leading-snug max-w-xs mx-auto">{slide.heading}</h2>
               <p className="mt-2 text-sm text-white/60 max-w-xs mx-auto leading-relaxed">{slide.body}</p>
             </div>
           ))}
         </div>
 
-        {/* Slide dots */}
         <div className="flex items-center justify-center gap-2 mt-8">
           {SLIDES.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => setSlideIdx(i)}
-              aria-label={`Go to slide ${i + 1}`}
+            <button key={i} onClick={() => setSlideIdx(i)} aria-label={`Go to slide ${i + 1}`}
               className="transition-all duration-300 border-0 p-0"
-              style={{
-                width: i === slideIdx ? 24 : 8,
-                height: 8,
-                borderRadius: 99,
-                background: i === slideIdx ? '#F5A523' : 'rgba(255,255,255,0.3)',
-                cursor: 'pointer',
-              }}
-            />
+              style={{ width: i === slideIdx ? 24 : 8, height: 8, borderRadius: 99, background: i === slideIdx ? '#F5A523' : 'rgba(255,255,255,0.3)', cursor: 'pointer' }} />
           ))}
         </div>
       </div>
 
-      <div className="relative z-10 text-xs text-white/40 mt-8">Step {step} of 3</div>
+      <div className="relative z-10 text-xs text-white/40 mt-8">© {new Date().getFullYear()} TerePay</div>
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Progress bar
+// Password strength badges
 // ---------------------------------------------------------------------------
-
-function ProgressBar({ step }: { step: number }) {
-  return (
-    <div
-      className="flex gap-1.5 mb-8"
-      role="progressbar"
-      aria-valuenow={step}
-      aria-valuemin={1}
-      aria-valuemax={3}
-      aria-label={`Step ${step} of 3`}
-    >
-      {[1, 2, 3].map((s) => (
-        <div
-          key={s}
-          className="h-1 flex-1 rounded-full transition-colors duration-300"
-          style={{ background: s <= step ? '#F5A523' : '#E5E7EB' }}
-        />
-      ))}
-    </div>
-  );
-}
-
-const inputCls =
-  'w-full px-3.5 py-3 border border-gray-200 rounded-xl bg-gray-50 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#F5A523] focus:border-[#F5A523] focus:bg-white transition-all';
-
-const errorCls = 'mt-1 text-xs text-red-500';
-
-// ---------------------------------------------------------------------------
-// Password strength
-// ---------------------------------------------------------------------------
-
-const PASSWORD_RULES = [
-  { label: '8 characters', test: (p: string) => p.length >= 8 },
-  { label: '1 upper case', test: (p: string) => /[A-Z]/.test(p) },
-  { label: '1 lower case', test: (p: string) => /[a-z]/.test(p) },
-  { label: '1 number',     test: (p: string) => /[0-9]/.test(p) },
-  { label: 'special char', test: (p: string) => /[^a-zA-Z0-9]/.test(p) },
-];
 
 function PasswordStrengthBadges({ password }: { password: string }) {
   return (
@@ -220,15 +138,8 @@ function PasswordStrengthBadges({ password }: { password: string }) {
       {PASSWORD_RULES.map((rule) => {
         const ok = rule.test(password);
         return (
-          <span
-            key={rule.label}
-            className={`flex items-center gap-1 text-xs font-medium transition-colors ${ok ? 'text-green-600' : 'text-gray-400'}`}
-          >
-            <span
-              className={`inline-flex items-center justify-center w-3.5 h-3.5 rounded-full border text-[9px] transition-all ${ok ? 'bg-green-600 border-green-600 text-white' : 'border-gray-300 text-transparent'}`}
-            >
-              ✓
-            </span>
+          <span key={rule.label} className={`flex items-center gap-1 text-xs font-medium transition-colors ${ok ? 'text-green-600' : 'text-gray-400'}`}>
+            <span className={`inline-flex items-center justify-center w-3.5 h-3.5 rounded-full border text-[9px] transition-all ${ok ? 'bg-green-600 border-green-600 text-white' : 'border-gray-300 text-transparent'}`}>✓</span>
             {rule.label}
           </span>
         );
@@ -246,479 +157,210 @@ export default function SignupPage() {
   const router = useRouter();
   const { executeRecaptcha } = useGoogleReCaptcha();
 
-  const [step, setStep] = useState(1);
-
-  // Step 1
-  const [step1, setStep1] = useState<Step1Data>({ firstName: '', lastName: '', email: '', dialCode: '+64', phone: '' });
-  const [step1Errors, setStep1Errors] = useState<Partial<Record<keyof Step1Data, string>>>({});
-  const [step1Loading, setStep1Loading] = useState(false);
-  const [step1ApiError, setStep1ApiError] = useState('');
-
-  // Step 2
-  const [step2Error, setStep2Error] = useState('');
-  const [step2Sending, setStep2Sending] = useState(false);
-  const [resendCooldown, setResendCooldown] = useState(0);
-  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
-  const [emailMissing, setEmailMissing] = useState(false);
-  const [emailMissingInput, setEmailMissingInput] = useState('');
-
-  // Step 3
-  const [password, setPassword] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName]   = useState('');
+  const [email, setEmail]         = useState('');
+  const [dialCode, setDialCode]   = useState('+64');
+  const [phone, setPhone]         = useState('');
+  const [password, setPassword]           = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [step3Errors, setStep3Errors] = useState<Partial<{ password: string; confirm: string; terms: string }>>({});
-  const [step3Loading, setStep3Loading] = useState(false);
-  const [step3ApiError, setStep3ApiError] = useState('');
+  const [showPassword, setShowPassword]   = useState(false);
+  const [loading, setLoading]   = useState(false);
+  const [errors, setErrors]     = useState<Record<string, string>>({});
+  const [apiError, setApiError] = useState('');
 
-  useEffect(() => {
-    if (resendCooldown <= 0) return;
-    const t = setTimeout(() => setResendCooldown((c) => c - 1), 1000);
-    return () => clearTimeout(t);
-  }, [resendCooldown]);
-
-  // Detect return from Firebase email link and auto-complete sign-in
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (!isSignInWithEmailLink(clientAuth, window.location.href)) return;
-
-    const storedEmail = window.localStorage.getItem('terepay_signup_email') ?? '';
-    const storedStep1Raw = window.localStorage.getItem('terepay_signup_step1');
-
-    if (!storedEmail) {
-      // User opened the link on a different device — ask for email
-      setEmailMissing(true);
-      setStep(2);
-      return;
-    }
-
-    if (storedStep1Raw) {
-      try { setStep1(JSON.parse(storedStep1Raw)); } catch { /* ignore */ }
-    }
-
-    setStep(2);
-    setStep2Error('');
-
-    signInWithEmailLink(clientAuth, storedEmail, window.location.href)
-      .then((result) => {
-        window.history.replaceState({}, document.title, window.location.pathname);
-        window.localStorage.removeItem('terepay_signup_email');
-        window.localStorage.removeItem('terepay_signup_step1');
-        setFirebaseUser(result.user);
-        setStep(3);
-      })
-      .catch((err: { code?: string; message?: string }) => {
-        // auth/email-already-in-use can surface when the link was already used
-        // on another device but the account was never fully completed. Try
-        // signing in with email/password in case the password was linked in a
-        // prior partial attempt — if that works, resume at step 3.
-        if (err.code === 'auth/email-already-in-use' || err.code === 'auth/invalid-action-code') {
-          setStep2Error('This link has already been used or has expired. Please go back and request a new one.');
-          return;
-        }
-        setStep2Error(err.message ?? 'Link verification failed. Please request a new one.');
-      });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Step 1 submit
-  const validateStep1 = () => {
-    const errs: typeof step1Errors = {};
-    if (!step1.firstName.trim()) errs.firstName = 'First name is required';
-    if (!step1.lastName.trim()) errs.lastName = 'Last name is required';
-    if (!step1.email.trim() || !/^\S+@\S+\.\S+$/.test(step1.email)) errs.email = 'Valid email address is required';
-    if (!step1.phone.trim() || step1.phone.replace(/\D/g, '').length < 6) errs.phone = 'Valid phone number is required';
-    setStep1Errors(errs);
-    return Object.keys(errs).length === 0;
-  };
-
-  const handleStep1Continue = useCallback(async () => {
-    if (!validateStep1()) return;
-    setStep1ApiError('');
-    setStep1Loading(true);
-    try {
-      const recaptchaToken = executeRecaptcha ? await executeRecaptcha('send_otp') : undefined;
-      const res = await fetch('/api/auth/send-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: step1.email, ...(recaptchaToken ? { recaptchaToken } : {}) }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        if (res.status === 409) {
-          // Email already registered — show inline on the email field
-          setStep1Errors((prev) => ({ ...prev, email: data.error?.message ?? 'An account with this email already exists.' }));
-        } else {
-          setStep1ApiError(data.error?.message ?? 'Failed to send code.');
-        }
-        return;
-      }
-      // Send Firebase email link — Firebase handles the email delivery
-      try {
-        await sendSignInLinkToEmail(clientAuth, step1.email, {
-          url: `${window.location.origin}/auth/signup`,
-          handleCodeInApp: true,
-        });
-      } catch (emailErr) {
-        setStep1ApiError(emailErr instanceof Error ? emailErr.message : 'Failed to send sign-in link. Please try again.');
-        return;
-      }
-      window.localStorage.setItem('terepay_signup_email', step1.email);
-      window.localStorage.setItem('terepay_signup_step1', JSON.stringify(step1));
-      setResendCooldown(60);
-      setStep(2);
-    } catch { setStep1ApiError('Network error. Please try again.'); }
-    finally { setStep1Loading(false); }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step1, executeRecaptcha]);
-
-  const handleResend = useCallback(async () => {
-    if (resendCooldown > 0) return;
-    setStep2Error('');
-    setStep2Sending(true);
-    try {
-      await sendSignInLinkToEmail(clientAuth, step1.email, {
-        url: `${window.location.origin}/auth/signup`,
-        handleCodeInApp: true,
-      });
-      window.localStorage.setItem('terepay_signup_email', step1.email);
-      window.localStorage.setItem('terepay_signup_step1', JSON.stringify(step1));
-      setResendCooldown(60);
-    } catch (err) {
-      setStep2Error(err instanceof Error ? err.message : 'Failed to resend link. Please try again.');
-    } finally {
-      setStep2Sending(false);
-    }
-  }, [resendCooldown, step1]);
-
-  // Step 3 submit
-  const validateStep3 = () => {
-    const errs: typeof step3Errors = {};
+  const validate = useCallback(() => {
+    const errs: Record<string, string> = {};
+    if (!firstName.trim()) errs.firstName = 'First name is required';
+    if (!lastName.trim())  errs.lastName  = 'Last name is required';
+    if (!email.trim() || !/^\S+@\S+\.\S+$/.test(email)) errs.email = 'Valid email address is required';
+    if (!phone.trim() || phone.replace(/\D/g, '').length < 6) errs.phone = 'Valid phone number is required';
     if (PASSWORD_RULES.some((r) => !r.test(password))) errs.password = 'Password does not meet all requirements.';
     if (password !== confirmPassword) errs.confirm = 'Passwords do not match.';
     if (!agreedToTerms) errs.terms = 'You must accept the Terms of Service and Privacy Policy.';
-    setStep3Errors(errs);
+    setErrors(errs);
     return Object.keys(errs).length === 0;
-  };
+  }, [firstName, lastName, email, phone, password, confirmPassword, agreedToTerms]);
 
-  const handleCreateAccount = useCallback(async () => {
-    if (!validateStep3()) return;
-    if (!firebaseUser) {
-      setStep3ApiError('Session expired. Please go back and request a new sign-in link.');
-      return;
-    }
-    setStep3ApiError('');
-    setStep3Loading(true);
+  const handleSubmit = useCallback(async () => {
+    if (!validate()) return;
+    setApiError('');
+    setLoading(true);
+
+    let firebaseUser = null;
     try {
-      // Link a password credential to the email-link account.
-      // If a previous partial attempt already linked a password, update it to
-      // the one the user just entered rather than silently keeping the old one.
-      const credential = EmailAuthProvider.credential(step1.email, password);
-      try {
-        await linkWithCredential(firebaseUser, credential);
-      } catch (linkErr: unknown) {
-        if ((linkErr as { code?: string }).code === 'auth/provider-already-linked') {
-          await updatePassword(firebaseUser, password);
-        } else {
-          throw linkErr;
-        }
-      }
+      // 1. Create Firebase Auth account
+      const cred = await createUserWithEmailAndPassword(clientAuth, email.trim().toLowerCase(), password);
+      firebaseUser = cred.user;
 
-      // Get an initial ID token to prove identity to the signup endpoint.
+      // 2. Get ID token to prove identity to the signup API
       const idToken = await firebaseUser.getIdToken(true);
 
-      // Create Firestore profile and set custom claims (role: 'applicant') via server.
+      // 3. Create Firestore profile and set role: 'applicant' custom claim
       const recaptchaToken = executeRecaptcha ? await executeRecaptcha('signup') : undefined;
-      const phone = `${step1.dialCode} ${step1.phone}`.trim();
+      const fullPhone = `${dialCode} ${phone}`.trim();
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firstName: step1.firstName, lastName: step1.lastName, phone, idToken, ...(recaptchaToken ? { recaptchaToken } : {}) }),
+        body: JSON.stringify({ firstName, lastName, phone: fullPhone, idToken, ...(recaptchaToken ? { recaptchaToken } : {}) }),
       });
+
       if (!res.ok) {
         const body = await res.json();
-        setStep3ApiError(body.error?.message ?? 'Registration failed. Please try again.');
+        // Clean up orphaned Firebase account
+        await deleteUser(firebaseUser).catch(() => {});
+        setApiError(body.error?.message ?? 'Registration failed. Please try again.');
         return;
       }
 
-      // Force-refresh the token AFTER custom claims are set so the session
-      // cookie contains role: 'applicant' — required by the middleware.
-      const freshIdToken = await firebaseUser.getIdToken(true);
-
-      // Establish session cookie using the fresh token (with role claim).
-      const sessionRes = await fetch('/api/auth/session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken: freshIdToken }),
-      });
-      if (!sessionRes.ok) {
-        // Session creation failed — try full login as fallback
-        const loginToken = executeRecaptcha ? await executeRecaptcha('login') : undefined;
-        await login(step1.email, password, loginToken);
-      }
-
-      // Email is already verified by Firebase email link — start KYC onboarding
+      // 4. Sign in to get a fresh token that includes the role claim, creates session cookie
+      await login(email.trim().toLowerCase(), password);
       router.push('/applicant/onboarding');
-    } catch (err) {
-      setStep3ApiError(err instanceof Error ? err.message : 'Registration failed. Please try again.');
-    } finally { setStep3Loading(false); }
-  }, [step1, password, confirmPassword, agreedToTerms, firebaseUser, executeRecaptcha]);
+    } catch (err: unknown) {
+      if (firebaseUser) await deleteUser(firebaseUser).catch(() => {});
+      const code = (err as { code?: string }).code;
+      if (code === 'auth/email-already-in-use') {
+        setErrors((prev) => ({ ...prev, email: 'An account with this email already exists. Please sign in instead.' }));
+      } else {
+        setApiError(err instanceof Error ? err.message : 'Registration failed. Please try again.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [firstName, lastName, email, dialCode, phone, password, confirmPassword, agreedToTerms, executeRecaptcha, login, router, validate]);
 
   return (
     <div className="flex min-h-screen">
-      <BrandPanel step={step} />
+      <BrandPanel />
 
-      {/* Right form panel */}
       <div className="flex-1 flex flex-col justify-center px-6 py-12 sm:px-12 lg:px-16 overflow-y-auto">
         <div className="w-full max-w-md mx-auto">
-          {/* Mobile logo */}
           <div className="md:hidden mb-8">
             <span className="text-2xl font-extrabold text-[#F5A523]">TerePay</span>
           </div>
 
-          <ProgressBar step={step} />
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">Create your account</h1>
+          <p className="text-sm text-gray-500 mb-7">Fill in your details to get started</p>
 
-          {/* ---- STEP 1 ---- */}
-          {step === 1 && (
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-1">Create your account</h1>
-              <p className="text-sm text-gray-500 mb-7">Let&apos;s start with the basics</p>
-
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1.5">
-                      First name <span className="text-red-500">*</span>
-                    </label>
-                    <input id="firstName" type="text" autoComplete="given-name" value={step1.firstName}
-                      onChange={(e) => setStep1({ ...step1, firstName: e.target.value })}
-                      className={inputCls} placeholder="Rafael" />
-                    {step1Errors.firstName && <p className={errorCls}>{step1Errors.firstName}</p>}
-                  </div>
-                  <div>
-                    <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-1.5">
-                      Last name <span className="text-red-500">*</span>
-                    </label>
-                    <input id="lastName" type="text" autoComplete="family-name" value={step1.lastName}
-                      onChange={(e) => setStep1({ ...step1, lastName: e.target.value })}
-                      className={inputCls} placeholder="Castillo" />
-                    {step1Errors.lastName && <p className={errorCls}>{step1Errors.lastName}</p>}
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Email address <span className="text-red-500">*</span>
-                  </label>
-                  <input id="email" type="email" autoComplete="email" value={step1.email}
-                    onChange={(e) => { setStep1({ ...step1, email: e.target.value }); setStep1Errors((prev) => ({ ...prev, email: undefined })); }}
-                    className={inputCls} placeholder="you@example.com" />
-                  {step1Errors.email && (
-                    <p className={errorCls}>
-                      {step1Errors.email}{' '}
-                      {step1Errors.email.toLowerCase().includes('already exists') && (
-                        <Link href="/auth/login" className="underline font-medium">Sign in instead</Link>
-                      )}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Phone number <span className="text-red-500">*</span>
-                  </label>
-                  <div className="flex gap-2">
-                    <select
-                      aria-label="Country dial code"
-                      value={step1.dialCode}
-                      onChange={(e) => setStep1({ ...step1, dialCode: e.target.value })}
-                      className="flex-shrink-0 px-3 py-3 border border-gray-200 rounded-xl bg-gray-50 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#F5A523] focus:border-[#F5A523] transition-all"
-                    >
-                      {DIAL_CODES.map((d) => (
-                        <option key={`${d.country}-${d.code}`} value={d.code}>{d.flag} {d.code}</option>
-                      ))}
-                    </select>
-                    <input id="phone" type="tel" autoComplete="tel-national" value={step1.phone}
-                      onChange={(e) => setStep1({ ...step1, phone: e.target.value })}
-                      className={`${inputCls} flex-1`} placeholder="027 123 4567" />
-                  </div>
-                  {step1Errors.phone && <p className={errorCls}>{step1Errors.phone}</p>}
-                </div>
-
-                {step1ApiError && (
-                  <p role="alert" className="text-sm text-red-500 bg-red-50 border border-red-200 rounded-xl px-4 py-3">{step1ApiError}</p>
-                )}
-
-                <button onClick={handleStep1Continue} disabled={step1Loading}
-                  className="w-full py-3 px-4 bg-[#F5A523] hover:bg-[#E08B00] text-white font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-2">
-                  {step1Loading ? 'Sending link…' : 'Continue'}
-                </button>
-
-                <p className="text-center text-sm text-gray-500">
-                  Already have an account?{' '}
-                  <Link href="/auth/login" className="text-[#F5A523] hover:text-[#E08B00] font-medium">Sign In</Link>
-                </p>
+          <div className="space-y-4">
+            {/* Name row */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1.5">
+                  First name <span className="text-red-500">*</span>
+                </label>
+                <input id="firstName" type="text" autoComplete="given-name" value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)} className={inputCls} placeholder="Rafael" />
+                {errors.firstName && <p className={errorCls}>{errors.firstName}</p>}
+              </div>
+              <div>
+                <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Last name <span className="text-red-500">*</span>
+                </label>
+                <input id="lastName" type="text" autoComplete="family-name" value={lastName}
+                  onChange={(e) => setLastName(e.target.value)} className={inputCls} placeholder="Castillo" />
+                {errors.lastName && <p className={errorCls}>{errors.lastName}</p>}
               </div>
             </div>
-          )}
 
-          {/* ---- STEP 2 ---- */}
-          {step === 2 && (
+            {/* Email */}
             <div>
-              {emailMissing ? (
-                /* User opened the link on a different device — ask for email */
-                <>
-                  <h1 className="text-2xl font-bold text-gray-900 mb-1">Confirm your email</h1>
-                  <p className="text-sm text-gray-500 mb-7">
-                    It looks like you opened the sign-in link on a different device. Enter the email address you used to sign up.
-                  </p>
-                  <input
-                    type="email"
-                    autoComplete="email"
-                    value={emailMissingInput}
-                    onChange={(e) => setEmailMissingInput(e.target.value)}
-                    className={inputCls}
-                    placeholder="you@example.com"
-                  />
-                  {step2Error && <p role="alert" className="mt-3 text-sm text-red-500">{step2Error}</p>}
-                  <button
-                    disabled={!emailMissingInput.trim()}
-                    onClick={() => {
-                      const email = emailMissingInput.trim();
-                      setStep2Error('');
-                      setEmailMissing(false);
-                      signInWithEmailLink(clientAuth, email, window.location.href)
-                        .then((result) => {
-                          window.history.replaceState({}, document.title, window.location.pathname);
-                          setFirebaseUser(result.user);
-                          setStep1((prev) => ({ ...prev, email }));
-                          setStep(3);
-                        })
-                        .catch((err: Error) => {
-                          setEmailMissing(true);
-                          setStep2Error(err.message ?? 'Verification failed. Please request a new link.');
-                        });
-                    }}
-                    className="mt-4 w-full py-3 bg-[#F5A523] hover:bg-[#E08B00] text-white font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Continue
-                  </button>
-                </>
-              ) : (
-                /* Normal flow — user is on the same device */
-                <>
-                  <div className="flex flex-col items-center text-center mb-8">
-                    <div className="w-16 h-16 bg-[#FEF7E9] rounded-full flex items-center justify-center text-3xl mb-4" aria-hidden="true">
-                      📬
-                    </div>
-                    <h1 className="text-2xl font-bold text-gray-900 mb-1">Check your inbox</h1>
-                    <p className="text-sm text-gray-500">We sent a sign-in link to</p>
-                    <p className="text-sm font-semibold text-gray-800 mt-0.5">{step1.email}</p>
-                  </div>
-
-                  <ol className="border border-gray-200 rounded-xl divide-y divide-gray-100 text-sm text-gray-600">
-                    <li className="px-4 py-3">1. Open the email from <strong>TerePay</strong></li>
-                    <li className="px-4 py-3">2. Click the <strong>Sign in to TerePay</strong> link</li>
-                    <li className="px-4 py-3">3. You&apos;ll be brought back here to set your password</li>
-                  </ol>
-
-                  <div className="mt-4 border-l-4 border-[#F5A523] bg-[#FEF7E9] rounded-r-xl px-4 py-3 text-sm text-gray-700">
-                    <strong>Can&apos;t find it?</strong> Check your <strong>spam</strong> or <strong>junk</strong> folder. The link expires in <strong>1 hour</strong>.
-                  </div>
-
-                  {step2Error && (
-                    <p role="alert" className="mt-4 text-sm text-red-500 bg-red-50 border border-red-200 rounded-xl px-4 py-3">{step2Error}</p>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1.5">
+                Email address <span className="text-red-500">*</span>
+              </label>
+              <input id="email" type="email" autoComplete="email" value={email}
+                onChange={(e) => { setEmail(e.target.value); setErrors((p) => ({ ...p, email: '' })); }}
+                className={inputCls} placeholder="you@example.com" />
+              {errors.email && (
+                <p className={errorCls}>
+                  {errors.email}{' '}
+                  {errors.email.toLowerCase().includes('already exists') && (
+                    <Link href="/auth/login" className="underline font-medium">Sign in instead</Link>
                   )}
-
-                  <p className="mt-5 text-center text-sm text-gray-500">
-                    Didn&apos;t receive it?{' '}
-                    {resendCooldown > 0 ? (
-                      <span className="text-gray-400">Resend in {resendCooldown}s</span>
-                    ) : (
-                      <button onClick={handleResend} disabled={step2Sending} className="text-[#F5A523] hover:text-[#E08B00] font-medium underline-offset-2 hover:underline disabled:opacity-50">
-                        {step2Sending ? 'Sending…' : 'Resend link'}
-                      </button>
-                    )}
-                  </p>
-
-                  <div className="mt-7">
-                    <button
-                      onClick={() => {
-                        setStep(1);
-                        setStep2Error('');
-                        window.localStorage.removeItem('terepay_signup_email');
-                        window.localStorage.removeItem('terepay_signup_step1');
-                      }}
-                      className="w-full py-3 border border-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-colors"
-                    >
-                      Back
-                    </button>
-                  </div>
-                </>
+                </p>
               )}
             </div>
-          )}
 
-          {/* ---- STEP 3 ---- */}
-          {step === 3 && (
+            {/* Phone */}
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-1">You&apos;re almost done!</h1>
-              <p className="text-sm text-gray-500 mb-7">Create a strong password to secure your account</p>
-
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1.5">Create password</label>
-                  <div className="relative">
-                    <input id="password" type={showPassword ? 'text' : 'password'} autoComplete="new-password"
-                      value={password} onChange={(e) => setPassword(e.target.value)}
-                      className={`${inputCls} pr-14`} placeholder="Create password" />
-                    <button type="button" onClick={() => setShowPassword((v) => !v)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 hover:text-gray-800"
-                      aria-label={showPassword ? 'Hide password' : 'Show password'}>
-                      {showPassword ? 'Hide' : 'Show'}
-                    </button>
-                  </div>
-                  <PasswordStrengthBadges password={password} />
-                  {step3Errors.password && <p className={`${errorCls} mt-2`}>{step3Errors.password}</p>}
-                </div>
-
-                <div>
-                  <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1.5">Re-enter password</label>
-                  <input id="confirmPassword" type={showPassword ? 'text' : 'password'} autoComplete="new-password"
-                    value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
-                    className={inputCls} placeholder="Re-enter password" />
-                  {step3Errors.confirm && <p className={errorCls}>{step3Errors.confirm}</p>}
-                </div>
-
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input type="checkbox" checked={agreedToTerms} onChange={(e) => setAgreedToTerms(e.target.checked)}
-                    className="mt-0.5 w-4 h-4 rounded border-gray-300 accent-[#F5A523]" />
-                  <span className="text-sm text-gray-600">
-                    I agree to the{' '}
-                    <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-[#F5A523] hover:text-[#E08B00] font-medium">Terms of Service</a>
-                    {' '}and{' '}
-                    <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-[#F5A523] hover:text-[#E08B00] font-medium">Privacy Policy</a>
-                  </span>
-                </label>
-                {step3Errors.terms && <p className={errorCls}>{step3Errors.terms}</p>}
-
-                {step3ApiError && (
-                  <p role="alert" className="text-sm text-red-500 bg-red-50 border border-red-200 rounded-xl px-4 py-3">{step3ApiError}</p>
-                )}
-
-                <div className="flex gap-3 pt-1">
-                  <button onClick={() => { setStep(2); setStep3Errors({}); setStep3ApiError(''); }}
-                    className="flex-1 py-3 border border-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-colors">
-                    Back
-                  </button>
-                  <button onClick={handleCreateAccount} disabled={step3Loading || !agreedToTerms}
-                    className="flex-1 py-3 bg-[#F5A523] hover:bg-[#E08B00] text-white font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                    {step3Loading ? 'Creating account…' : 'Create'}
-                  </button>
-                </div>
+              <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1.5">
+                Mobile number <span className="text-red-500">*</span>
+              </label>
+              <div className="flex rounded-xl border border-gray-200 focus-within:ring-2 focus-within:ring-[#F5A523] focus-within:border-[#F5A523] overflow-hidden transition-all bg-gray-50 focus-within:bg-white">
+                <select aria-label="Country dial code" value={dialCode} onChange={(e) => setDialCode(e.target.value)}
+                  className="bg-transparent border-r border-gray-200 px-2 py-3 text-sm text-gray-700 outline-none shrink-0">
+                  {DIAL_CODES.map((d) => (
+                    <option key={`${d.country}-${d.code}`} value={d.code}>{d.flag} {d.code}</option>
+                  ))}
+                </select>
+                <input id="phone" type="tel" inputMode="numeric" value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="flex-1 px-3 py-3 text-sm outline-none bg-transparent" placeholder="21 123 4567" />
               </div>
+              {errors.phone && <p className={errorCls}>{errors.phone}</p>}
             </div>
-          )}
+
+            {/* Password */}
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1.5">
+                Password <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <input id="password" type={showPassword ? 'text' : 'password'} autoComplete="new-password"
+                  value={password} onChange={(e) => setPassword(e.target.value)}
+                  className={`${inputCls} pr-14`} placeholder="••••••••" />
+                <button type="button" onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 hover:text-gray-800"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}>
+                  {showPassword ? 'Hide' : 'Show'}
+                </button>
+              </div>
+              {password && <PasswordStrengthBadges password={password} />}
+              {errors.password && <p className={errorCls}>{errors.password}</p>}
+            </div>
+
+            {/* Confirm password */}
+            <div>
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1.5">
+                Confirm password <span className="text-red-500">*</span>
+              </label>
+              <input id="confirmPassword" type={showPassword ? 'text' : 'password'} autoComplete="new-password"
+                value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
+                className={inputCls} placeholder="••••••••" />
+              {errors.confirm && <p className={errorCls}>{errors.confirm}</p>}
+            </div>
+
+            {/* Terms */}
+            <div className="flex items-start gap-3 pt-1">
+              <input id="terms" type="checkbox" checked={agreedToTerms}
+                onChange={(e) => setAgreedToTerms(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 accent-[#F5A523]" />
+              <label htmlFor="terms" className="text-sm text-gray-600 leading-snug">
+                I agree to the{' '}
+                <a href="/terms" className="text-[#F5A523] hover:text-[#E08B00] underline">Terms of Service</a>{' '}
+                and{' '}
+                <a href="/privacy" className="text-[#F5A523] hover:text-[#E08B00] underline">Privacy Policy</a>
+              </label>
+            </div>
+            {errors.terms && <p className={errorCls}>{errors.terms}</p>}
+
+            {apiError && (
+              <p role="alert" className="text-sm text-red-500 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+                {apiError}
+              </p>
+            )}
+
+            <button onClick={handleSubmit} disabled={loading}
+              className="w-full py-3 px-4 bg-[#F5A523] hover:bg-[#E08B00] text-white font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-2">
+              {loading ? 'Creating account…' : 'Create account'}
+            </button>
+
+            <p className="text-center text-sm text-gray-500 pt-1">
+              Already have an account?{' '}
+              <Link href="/auth/login" className="text-[#F5A523] hover:text-[#E08B00] font-medium">Sign in</Link>
+            </p>
+          </div>
         </div>
       </div>
     </div>

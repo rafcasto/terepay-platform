@@ -31,12 +31,12 @@ export default async function OnboardingIntroPage() {
 
         {/* Step overview cards */}
         <div className="space-y-4 mb-8">
-          {/* Email — already verified */}
           <StepCard
             icon={<EmailIcon />}
-            title={<span className="line-through text-gray-400">Email verification</span>}
-            description={null}
-            badge="Verified"
+            title="Email verification"
+            description="We'll send a link to your email address to confirm it belongs to you."
+            badge={userData?.emailVerified ? 'Verified' : undefined}
+            done={Boolean(userData?.emailVerified)}
           />
 
           <StepCard
@@ -59,7 +59,7 @@ export default async function OnboardingIntroPage() {
         </div>
 
         <Link
-          href="/applicant/onboarding/verify-mobile"
+          href="/applicant/onboarding/verify-email"
           className="block w-full text-center bg-[#F5A523] hover:bg-[#E08B00] text-white font-semibold rounded-full py-3.5 px-6 transition-colors"
         >
           Continue
@@ -74,18 +74,20 @@ function StepCard({
   title,
   description,
   badge,
+  done,
 }: {
   icon: React.ReactNode;
   title: React.ReactNode;
   description: string | null;
   badge?: string;
+  done?: boolean;
 }) {
   return (
     <div className="flex items-start gap-4 rounded-xl border border-gray-100 bg-gray-50 p-4">
       <div className="shrink-0 mt-0.5">{icon}</div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <p className="text-sm font-semibold text-gray-900">{title}</p>
+          <p className={`text-sm font-semibold ${done ? 'line-through text-gray-400' : 'text-gray-900'}`}>{title}</p>
           {badge && (
             <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700">
               {badge}

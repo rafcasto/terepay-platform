@@ -39,11 +39,17 @@ export function middleware(request: NextRequest) {
     const role = payload.role as string | undefined;
 
     if (pathname.startsWith('/lender') && role !== 'lender') {
-      return NextResponse.redirect(new URL('/applicant/dashboard', request.url));
+      // Known-role mismatch → send to correct dashboard; missing/unknown role → login
+      return NextResponse.redirect(
+        new URL(role === 'applicant' ? '/applicant/dashboard' : '/auth/login', request.url),
+      );
     }
 
     if (pathname.startsWith('/applicant') && role !== 'applicant') {
-      return NextResponse.redirect(new URL('/lender/dashboard', request.url));
+      // Known-role mismatch → send to correct dashboard; missing/unknown role → login
+      return NextResponse.redirect(
+        new URL(role === 'lender' ? '/lender/dashboard' : '/auth/login', request.url),
+      );
     }
   } catch {
     // Corrupt cookie — clear and redirect to login

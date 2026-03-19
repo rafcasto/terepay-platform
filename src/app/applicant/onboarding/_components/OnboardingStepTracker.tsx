@@ -3,9 +3,10 @@
 import { usePathname } from 'next/navigation';
 
 const STEPS = [
-  { label: 'Quick intro', path: '/applicant/onboarding' },
-  { label: 'Verify mobile', path: '/applicant/onboarding/verify-mobile' },
-  { label: 'Complete profile', path: '/applicant/onboarding/profile' },
+  { label: 'Quick intro',         path: '/applicant/onboarding' },
+  { label: 'Verify email',        path: '/applicant/onboarding/verify-email' },
+  { label: 'Verify mobile',       path: '/applicant/onboarding/verify-mobile' },
+  { label: 'Complete profile',    path: '/applicant/onboarding/profile' },
   { label: 'Verify government ID', path: '/applicant/onboarding/identity' },
 ];
 

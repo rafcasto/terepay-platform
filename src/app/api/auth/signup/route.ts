@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
       kycStatus: 'not_started',
       status: 'active',
       phoneVerified: false,
-      emailVerified: true, // Firebase email link sets emailVerified = true
+      emailVerified: decodedToken.email_verified ?? false,
       createdAt: now,
       updatedAt: now,
     });

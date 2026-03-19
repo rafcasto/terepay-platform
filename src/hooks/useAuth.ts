@@ -52,7 +52,7 @@ export function useAuth() {
     setState((s) => ({ ...s, loading: true, error: null }));
     try {
       const cred = await signInWithEmailAndPassword(clientAuth, email, password);
-      const idToken = await cred.user.getIdToken();
+      const idToken = await cred.user.getIdToken(true); // force-refresh to include latest custom claims
 
       const res = await fetch('/api/auth/session', {
         method: 'POST',
