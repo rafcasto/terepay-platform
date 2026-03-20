@@ -91,6 +91,7 @@ export async function POST(request: NextRequest) {
         body: stream,
       },
       fields: 'id,name,mimeType',
+      supportsAllDrives: true,
     });
 
     const driveFileId = uploadedFile.data.id!;
@@ -100,6 +101,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ driveFileId, fileName, mimeType });
   } catch (err) {
     if (err instanceof AppError) return errorResponse(err);
+    console.error('[kyc/upload] Unexpected error:', err);
     return internalError();
   }
 }
@@ -112,8 +114,17 @@ async function getOrCreateUserFolder(
   parentFolderId: string,
   uid: string,
 ): Promise<string> {
+  if (!/^[a-zA-Z0-9_-]+$/.test(uid)) {
+    throw new AppError('VALIDATION_ERROR', 422, 'Invalid user identifier');
+  }
   const query = `'${parentFolderId}' in parents and name = '${uid}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
-  const existing = await drive.files.list({ q: query, fields: 'files(id)', pageSize: 1 });
+  const existing = await drive.files.list({
+    q: query,
+    fields: 'files(id)',
+    pageSize: 1,
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
+  });
 
   if (existing.data.files && existing.data.files.length > 0) {
     return existing.data.files[0].id!;
@@ -126,6 +137,7 @@ async function getOrCreateUserFolder(
       parents: [parentFolderId],
     },
     fields: 'id',
+    supportsAllDrives: true,
   });
 
   return folder.data.id!;
