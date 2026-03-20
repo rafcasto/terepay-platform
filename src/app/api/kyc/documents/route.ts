@@ -51,6 +51,15 @@ export async function POST(request: NextRequest) {
 
     await batch.commit();
 
+    // Clean up the upload draft — non-critical, best-effort
+    await adminDb
+      .collection('users')
+      .doc(uid)
+      .collection('applicantProfile')
+      .doc('kycDraft')
+      .delete()
+      .catch(() => {/* ignore */});
+
     return NextResponse.json({ success: true });
   } catch (err) {
     if (err instanceof ZodError) {

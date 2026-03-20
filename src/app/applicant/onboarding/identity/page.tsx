@@ -20,10 +20,11 @@ interface FileSlot {
   file: File | null;
   uploaded: UploadedDoc | null;
   uploading: boolean;
+  removing: boolean;
   error: string;
 }
 
-const PERMANENT_SLOTS: Omit<FileSlot, 'file' | 'uploaded' | 'uploading' | 'error'>[] = [
+const PERMANENT_SLOTS: Omit<FileSlot, 'file' | 'uploaded' | 'uploading' | 'removing' | 'error'>[] = [
   {
     docType: 'nz_id_primary',
     label: "NZ Driver's Licence or Passport",
@@ -38,7 +39,7 @@ const PERMANENT_SLOTS: Omit<FileSlot, 'file' | 'uploaded' | 'uploading' | 'error
   },
 ];
 
-const NON_PERMANENT_SLOTS: Omit<FileSlot, 'file' | 'uploaded' | 'uploading' | 'error'>[] = [
+const NON_PERMANENT_SLOTS: Omit<FileSlot, 'file' | 'uploaded' | 'uploading' | 'removing' | 'error'>[] = [
   {
     docType: 'foreign_passport',
     label: 'Passport (country of origin)',
@@ -60,7 +61,7 @@ const NON_PERMANENT_SLOTS: Omit<FileSlot, 'file' | 'uploaded' | 'uploading' | 'e
 ];
 
 function makeSlots(templates: typeof PERMANENT_SLOTS): FileSlot[] {
-  return templates.map((t) => ({ ...t, file: null, uploaded: null, uploading: false, error: '' }));
+  return templates.map((t) => ({ ...t, file: null, uploaded: null, uploading: false, removing: false, error: '' }));
 }
 
 export default function KycIdentityPage() {
@@ -72,19 +73,51 @@ export default function KycIdentityPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
 
-  // Skip this step if already submitted; also fetch immigration status for document slots
+  // Skip this step if already submitted; fetch immigration status and restore any upload draft
   useEffect(() => {
-    fetch('/api/users/profile')
-      .then((r) => r.json())
-      .then((d) => {
-        if (d?.data?.profileComplete) {
+    Promise.all([
+      fetch('/api/users/profile').then((r) => r.json()),
+      fetch('/api/kyc/draft').then((r) => r.json()).catch(() => ({ data: {} })),
+    ])
+      .then(([profileData, draftData]) => {
+        if (profileData?.data?.profileComplete) {
           router.replace('/applicant/dashboard');
           return;
         }
-        const status: ImmigrationStatus = d?.data?.immigrationStatus ?? d?.user?.immigrationStatus ?? 'resident';
+        const status: ImmigrationStatus =
+          profileData?.data?.immigrationStatus ?? profileData?.user?.immigrationStatus ?? 'resident';
         setImmigrationStatus(status);
+
         const isPermanent = status === 'permanent_resident' || status === 'citizen';
-        setSlots(makeSlots(isPermanent ? PERMANENT_SLOTS : NON_PERMANENT_SLOTS));
+        const templates = isPermanent ? PERMANENT_SLOTS : NON_PERMANENT_SLOTS;
+        const builtSlots = makeSlots(templates);
+
+        const uploads: Record<string, { driveFileId: string; fileName: string; mimeType: string }> =
+          draftData?.data ?? {};
+
+        // For permanent residents, infer the primary doc radio from draft
+        if (isPermanent) {
+          if (uploads['nz_passport']) setPrimaryDocType('nz_passport');
+          else if (uploads['nz_drivers_licence']) setPrimaryDocType('nz_drivers_licence');
+        }
+
+        const restoredSlots = builtSlots.map((slot) => {
+          if (slot.docType === 'nz_id_primary') {
+            const primaryType = uploads['nz_passport']
+              ? 'nz_passport'
+              : uploads['nz_drivers_licence']
+              ? 'nz_drivers_licence'
+              : null;
+            if (primaryType && uploads[primaryType]) {
+              return { ...slot, uploaded: { docType: primaryType, ...uploads[primaryType] } };
+            }
+          } else if (uploads[slot.docType]) {
+            return { ...slot, uploaded: { docType: slot.docType, ...uploads[slot.docType] } };
+          }
+          return slot;
+        });
+
+        setSlots(restoredSlots);
         setChecking(false);
       })
       .catch(() => {
@@ -159,10 +192,28 @@ export default function KycIdentityPage() {
     }
   };
 
-  const handleRemove = (index: number) => {
+  const handleRemove = async (index: number) => {
+    const slot = slots[index];
+    if (!slot.uploaded) return;
+
+    setSlots((prev) => prev.map((s, i) => (i === index ? { ...s, removing: true } : s)));
+
+    try {
+      await fetch('/api/kyc/upload', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          driveFileId: slot.uploaded.driveFileId,
+          docType: slot.uploaded.docType,
+        }),
+      });
+    } catch {
+      // If the request fails, still clear the slot — Drive cleanup can be done manually
+    }
+
     setSlots((prev) =>
       prev.map((s, i) =>
-        i === index ? { ...s, file: null, uploaded: null, error: '' } : s,
+        i === index ? { ...s, file: null, uploaded: null, error: '', removing: false } : s,
       ),
     );
   };
@@ -346,9 +397,10 @@ function FileUploadSlot({
             <button
               type="button"
               onClick={() => onRemove(index)}
-              className="shrink-0 text-xs text-red-500 hover:text-red-700 font-medium"
+              disabled={slot.removing}
+              className="shrink-0 text-xs text-red-500 hover:text-red-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Remove
+              {slot.removing ? 'Removing…' : 'Remove'}
             </button>
           </div>
         ) : slot.uploading ? (

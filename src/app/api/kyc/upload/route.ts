@@ -2,6 +2,8 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { google } from 'googleapis';
 import { withAuth } from '@/lib/auth/middleware';
 import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
+import { adminDb } from '@/lib/firebase/admin';
+import { FieldValue } from 'firebase-admin/firestore';
 import { Readable } from 'stream';
 
 export const dynamic = 'force-dynamic';
@@ -98,6 +100,22 @@ export async function POST(request: NextRequest) {
     const fileName = uploadedFile.data.name!;
     const mimeType = uploadedFile.data.mimeType!;
 
+    // Persist draft so the upload survives page refreshes
+    await adminDb
+      .collection('users')
+      .doc(uid)
+      .collection('applicantProfile')
+      .doc('kycDraft')
+      .set(
+        {
+          uploads: {
+            [docType]: { driveFileId, fileName, mimeType, uploadedAt: new Date() },
+          },
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+
     return NextResponse.json({ driveFileId, fileName, mimeType });
   } catch (err) {
     if (err instanceof AppError) return errorResponse(err);
@@ -141,6 +159,53 @@ async function getOrCreateUserFolder(
   });
 
   return folder.data.id!;
+}
+
+/**
+ * DELETE /api/kyc/upload
+ * Removes a previously uploaded KYC document from Google Drive and clears
+ * its entry from the kycDraft Firestore document.
+ * Expects JSON body: { driveFileId: string, docType: string }
+ */
+export async function DELETE(request: NextRequest) {
+  try {
+    const { uid } = await withAuth(request, ['applicant']);
+
+    const body = await request.json();
+    const driveFileId = body?.driveFileId as string | undefined;
+    const docType = body?.docType as string | undefined;
+
+    if (!driveFileId || typeof driveFileId !== 'string') {
+      return errorResponse(new AppError('VALIDATION_ERROR', 422, 'driveFileId is required'));
+    }
+    if (!docType || typeof docType !== 'string') {
+      return errorResponse(new AppError('VALIDATION_ERROR', 422, 'docType is required'));
+    }
+
+    const drive = getDriveClient();
+    try {
+      await drive.files.delete({ fileId: driveFileId, supportsAllDrives: true });
+    } catch (err: unknown) {
+      // 404 means the file is already gone — treat as success
+      if ((err as { code?: number })?.code !== 404) throw err;
+    }
+
+    await adminDb
+      .collection('users')
+      .doc(uid)
+      .collection('applicantProfile')
+      .doc('kycDraft')
+      .update({
+        [`uploads.${docType}`]: FieldValue.delete(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    if (err instanceof AppError) return errorResponse(err);
+    console.error('[kyc/upload] DELETE unexpected error:', err);
+    return internalError();
+  }
 }
 
 /** Strip path separators and control characters from a filename. */
