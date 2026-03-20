@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     batch.set(docsCollectionRef, {
       documents: documents.map((doc) => ({
         ...doc,
-        uploadedAt: now,
+        uploadedAt: new Date(),
         status: 'pending_review',
       })),
       submittedAt: now,
