@@ -25,6 +25,7 @@ const readonlyCls =
 
 export default function KycProfilePage() {
   const router = useRouter();
+  const [checking, setChecking] = useState(true);
   const [user, setUser] = useState<{ firstName?: string; lastName?: string; email?: string } | null>(null);
   const [form, setForm] = useState<ProfileForm>({
     dateOfBirth: '',
@@ -37,13 +38,26 @@ export default function KycProfilePage() {
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState('');
 
-  // Hydrate user data for read-only fields
+  // Skip this step if profile details are already saved; also hydrate read-only fields
   useEffect(() => {
-    fetch('/api/auth/me')
+    fetch('/api/users/profile')
       .then((r) => r.json())
-      .then((d) => { if (d.user) setUser(d.user); })
-      .catch(() => {});
-  }, []);
+      .then((d) => {
+        if (d?.data?.immigrationStatus) {
+          router.replace('/applicant/onboarding/identity');
+          return;
+        }
+        if (d?.data) {
+          setUser({
+            firstName: d.data.firstName,
+            lastName: d.data.lastName,
+            email: d.data.email,
+          });
+        }
+        setChecking(false);
+      })
+      .catch(() => setChecking(false));
+  }, [router]);
 
   const set = <K extends keyof ProfileForm>(key: K, value: ProfileForm[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -99,6 +113,14 @@ export default function KycProfilePage() {
 
   return (
     <div className="flex items-start justify-center min-h-full py-8 px-4">
+      {checking ? (
+        <div className="flex justify-center w-full py-16">
+          <svg className="animate-spin h-6 w-6 text-[#F5A523]" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+        </div>
+      ) : (
       <div className="w-full max-w-lg">
         <div className="mb-7">
           <h2 className="text-2xl font-bold text-[#0D1B2A]">Complete your profile</h2>
@@ -241,6 +263,7 @@ export default function KycProfilePage() {
           </button>
         </form>
       </div>
+      )}
     </div>
   );
 }

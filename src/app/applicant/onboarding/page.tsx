@@ -14,9 +14,22 @@ export default async function OnboardingIntroPage() {
 
   // If already complete, skip onboarding
   const db = getAdminDb();
-  const userSnap = await db.collection('users').doc(decoded.uid).get();
+  const [userSnap, profileSnap] = await Promise.all([
+    db.collection('users').doc(decoded.uid).get(),
+    db.collection('users').doc(decoded.uid).collection('applicantProfile').doc('profile').get(),
+  ]);
   const userData = userSnap.data();
   if (userData?.profileComplete) redirect('/applicant/dashboard');
+
+  // Determine the next incomplete step for the Continue button
+  let nextStep = '/applicant/onboarding/verify-email';
+  if (userData?.emailVerified && !userData?.phoneVerified) {
+    nextStep = '/applicant/onboarding/verify-mobile';
+  } else if (userData?.emailVerified && userData?.phoneVerified && !profileSnap.exists) {
+    nextStep = '/applicant/onboarding/profile';
+  } else if (userData?.emailVerified && userData?.phoneVerified && profileSnap.exists) {
+    nextStep = '/applicant/onboarding/identity';
+  }
 
   return (
     <div className="flex items-center justify-center min-h-full py-10 px-4">
@@ -43,23 +56,29 @@ export default async function OnboardingIntroPage() {
             icon={<MobileIcon />}
             title="Mobile verification"
             description="This helps us confirm your identity and prevent unauthorised access or usage of your account."
+            badge={userData?.phoneVerified ? 'Verified' : undefined}
+            done={Boolean(userData?.phoneVerified)}
           />
 
           <StepCard
             icon={<ProfileIcon />}
             title="Complete profile"
             description="We take security seriously, so we need to get to know you a little better before you can start."
+            badge={profileSnap.exists ? 'Saved' : undefined}
+            done={profileSnap.exists}
           />
 
           <StepCard
             icon={<IdIcon />}
             title="Identity verification"
             description="As a final security measure, we need to verify your ID. You'll need to upload a government-issued ID to complete this step."
+            badge={userData?.profileComplete ? 'Submitted' : undefined}
+            done={Boolean(userData?.profileComplete)}
           />
         </div>
 
         <Link
-          href="/applicant/onboarding/verify-email"
+          href={nextStep}
           className="block w-full text-center bg-[#F5A523] hover:bg-[#E08B00] text-white font-semibold rounded-full py-3.5 px-6 transition-colors"
         >
           Continue

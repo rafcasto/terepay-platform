@@ -65,27 +65,34 @@ function makeSlots(templates: typeof PERMANENT_SLOTS): FileSlot[] {
 
 export default function KycIdentityPage() {
   const router = useRouter();
+  const [checking, setChecking] = useState(true);
   const [immigrationStatus, setImmigrationStatus] = useState<ImmigrationStatus | null>(null);
   const [slots, setSlots] = useState<FileSlot[]>([]);
   const [primaryDocType, setPrimaryDocType] = useState<'nz_drivers_licence' | 'nz_passport'>('nz_drivers_licence');
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
 
-  // Fetch immigration status from the saved KYC profile
+  // Skip this step if already submitted; also fetch immigration status for document slots
   useEffect(() => {
     fetch('/api/users/profile')
       .then((r) => r.json())
       .then((d) => {
+        if (d?.data?.profileComplete) {
+          router.replace('/applicant/dashboard');
+          return;
+        }
         const status: ImmigrationStatus = d?.data?.immigrationStatus ?? d?.user?.immigrationStatus ?? 'resident';
         setImmigrationStatus(status);
         const isPermanent = status === 'permanent_resident' || status === 'citizen';
         setSlots(makeSlots(isPermanent ? PERMANENT_SLOTS : NON_PERMANENT_SLOTS));
+        setChecking(false);
       })
       .catch(() => {
         setImmigrationStatus('resident');
         setSlots(makeSlots(NON_PERMANENT_SLOTS));
+        setChecking(false);
       });
-  }, []);
+  }, [router]);
 
   // Update primary doc label when radio changes (permanent residents only)
   useEffect(() => {
@@ -197,6 +204,14 @@ export default function KycIdentityPage() {
 
   return (
     <div className="flex items-start justify-center min-h-full py-8 px-4">
+      {checking ? (
+        <div className="flex justify-center w-full py-16">
+          <svg className="animate-spin h-6 w-6 text-[#F5A523]" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+        </div>
+      ) : (
       <div className="w-full max-w-lg">
         <div className="mb-7">
           <h2 className="text-2xl font-bold text-[#0D1B2A]">Verify your identity</h2>
@@ -278,6 +293,7 @@ export default function KycIdentityPage() {
           Your documents are reviewed by our compliance team. You&apos;ll receive an update within 1–2 business days.
         </p>
       </div>
+      )}
     </div>
   );
 }

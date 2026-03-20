@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 type Stage = 'phone' | 'otp';
 
 export default function VerifyMobilePage() {
   const router = useRouter();
+  const [checking, setChecking] = useState(true);
   const [stage, setStage] = useState<Stage>('phone');
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
@@ -16,6 +17,20 @@ export default function VerifyMobilePage() {
 
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
   const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Skip this step if phone is already verified
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.user?.phoneVerified) {
+          router.replace('/applicant/onboarding/profile');
+        } else {
+          setChecking(false);
+        }
+      })
+      .catch(() => setChecking(false));
+  }, [router]);
 
   // ── Send OTP ────────────────────────────────────────────────────────────
   const handleSendOtp = useCallback(async () => {
@@ -116,7 +131,14 @@ export default function VerifyMobilePage() {
   return (
     <div className="flex items-center justify-center min-h-full py-10 px-4">
       <div className="w-full max-w-md">
-        {stage === 'phone' ? (
+        {checking ? (
+          <div className="flex justify-center">
+            <svg className="animate-spin h-6 w-6 text-[#F5A523]" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+          </div>
+        ) : stage === 'phone' ? (
           <PhoneStage
             phone={phone}
             setPhone={setPhone}
