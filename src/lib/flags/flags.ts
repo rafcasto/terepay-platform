@@ -31,3 +31,4 @@ export const disableSmsOtp = flag<boolean>({
 export const getNewApplicantDashboard = () => newApplicantDashboard;
 export const getPaymentTrackingV2 = () => paymentTrackingV2;
 export const getAutoUnderwriting = () => autoUnderwriting;
+export const getDisableSmsOtp = () => disableSmsOtp;
