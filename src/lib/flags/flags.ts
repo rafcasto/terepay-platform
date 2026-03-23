@@ -24,7 +24,7 @@ export const autoUnderwriting = flag<boolean>({
 
 export const disableSmsOtp = flag<boolean>({
   key: 'disable-sms-otp',
-  decide: () => false,
+  decide: () => true,
 });
 
 // Keep lazy-getter aliases for backward compatibility
