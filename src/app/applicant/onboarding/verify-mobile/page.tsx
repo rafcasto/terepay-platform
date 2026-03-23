@@ -14,6 +14,7 @@ export default function VerifyMobilePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [cooldown, setCooldown] = useState(0);
+  const [bypassMode, setBypassMode] = useState(false);
 
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
   const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -51,6 +52,7 @@ export default function VerifyMobilePage() {
         setError(data.error?.message ?? 'Failed to send code. Please try again.');
         return;
       }
+      if (data.bypassMode) setBypassMode(true);
       setStage('otp');
       startCooldown();
     } catch {
@@ -159,6 +161,7 @@ export default function VerifyMobilePage() {
             loading={loading}
             error={error}
             cooldown={cooldown}
+            bypassMode={bypassMode}
           />
         )}
       </div>
@@ -239,6 +242,7 @@ function OtpStage({
   loading,
   error,
   cooldown,
+  bypassMode,
 }: {
   phone: string;
   otp: string[];
@@ -251,14 +255,21 @@ function OtpStage({
   loading: boolean;
   error: string;
   cooldown: number;
+  bypassMode: boolean;
 }) {
   return (
     <>
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-[#0D1B2A]">Enter the code</h2>
-        <p className="text-gray-500 mt-1 text-sm">
-          We sent a 6-digit code to <span className="font-medium text-gray-700">+64 {phone}</span>
-        </p>
+        {bypassMode ? (
+          <p className="text-amber-600 mt-1 text-sm font-medium">
+            SMS verification is currently disabled. Enter <strong>000000</strong> to continue.
+          </p>
+        ) : (
+          <p className="text-gray-500 mt-1 text-sm">
+            We sent a 6-digit code to <span className="font-medium text-gray-700">+64 {phone}</span>
+          </p>
+        )}
       </div>
 
       {/* 6-digit OTP boxes */}

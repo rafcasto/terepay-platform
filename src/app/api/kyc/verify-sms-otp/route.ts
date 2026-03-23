@@ -7,6 +7,7 @@ import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { getClientIp } from '@/lib/utils/audit';
 import { adminDb } from '@/lib/firebase/admin';
 import { FieldValue } from 'firebase-admin/firestore';
+import { disableSmsOtp } from '@/lib/flags/flags';
 import { ZodError } from 'zod';
 
 export const dynamic = 'force-dynamic';
@@ -41,19 +42,28 @@ export async function POST(request: NextRequest) {
     // Normalise to E.164 (same logic as send endpoint)
     const normalised = normaliseNzPhone(phone);
 
-    const serviceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
-    if (!serviceSid) {
-      throw new AppError('CONFIG_ERROR', 500, 'Twilio Verify Service SID is not configured');
-    }
+    // If the disable-sms-otp flag is on, accept only the bypass code 000000
+    const smsDisabled = await disableSmsOtp();
+    if (smsDisabled) {
+      if (code !== '000000') {
+        return errorResponse(new AppError('INVALID_CODE', 400, 'The code you entered is incorrect or has expired.'));
+      }
+      // Bypass: skip Twilio and fall through to the Firestore update below
+    } else {
+      const serviceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
+      if (!serviceSid) {
+        throw new AppError('CONFIG_ERROR', 500, 'Twilio Verify Service SID is not configured');
+      }
 
-    const client = getTwilioClient();
-    const check = await client.verify.v2.services(serviceSid).verificationChecks.create({
-      to: normalised,
-      code,
-    });
+      const client = getTwilioClient();
+      const check = await client.verify.v2.services(serviceSid).verificationChecks.create({
+        to: normalised,
+        code,
+      });
 
-    if (check.status !== 'approved') {
-      return errorResponse(new AppError('INVALID_CODE', 400, 'The code you entered is incorrect or has expired.'));
+      if (check.status !== 'approved') {
+        return errorResponse(new AppError('INVALID_CODE', 400, 'The code you entered is incorrect or has expired.'));
+      }
     }
 
     // Mark phone as verified in Firestore

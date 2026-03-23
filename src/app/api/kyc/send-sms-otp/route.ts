@@ -5,6 +5,7 @@ import { kycSmsLimiter, checkRateLimit } from '@/lib/rate-limit/limiter';
 import { sendSmsOtpSchema } from '@/lib/validation/schemas';
 import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { getClientIp } from '@/lib/utils/audit';
+import { disableSmsOtp } from '@/lib/flags/flags';
 import { ZodError } from 'zod';
 
 export const dynamic = 'force-dynamic';
@@ -40,6 +41,12 @@ export async function POST(request: NextRequest) {
 
     // Normalise to NZ E.164 format (+64)
     const normalised = normaliseNzPhone(phone);
+
+    // If the disable-sms-otp flag is on, skip Twilio entirely
+    const smsDisabled = await disableSmsOtp();
+    if (smsDisabled) {
+      return NextResponse.json({ success: true, bypassMode: true, phone: normalised });
+    }
 
     const serviceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
     if (!serviceSid) {
