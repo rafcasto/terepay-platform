@@ -44,6 +44,7 @@ export async function POST(request: NextRequest) {
 
     // If the disable-sms-otp flag is on, skip Twilio entirely
     const smsDisabled = await disableSmsOtp();
+    console.log('[send-sms-otp] disableSmsOtp flag value:', smsDisabled);
     if (smsDisabled) {
       return NextResponse.json({ success: true, bypassMode: true, phone: normalised });
     }

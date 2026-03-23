@@ -1,5 +1,4 @@
 import { flag } from '@vercel/flags/next';
-import { createClient } from '@vercel/edge-config';
 
 // Re-export for convenience
 export { flag } from '@vercel/flags/next';
@@ -25,14 +24,10 @@ export const autoUnderwriting = flag<boolean>({
 
 export const disableSmsOtp = flag<boolean>({
   key: 'disable-sms-otp',
-  decide: async () => {
-    try {
-      const edgeConfig = createClient(process.env.EDGE_CONFIG!);
-      const value = await edgeConfig.get<boolean>('disable-sms-otp');
-      return value ?? false;
-    } catch {
-      return false;
-    }
+  decide: () => {
+    const value = process.env.DISABLE_SMS_OTP === 'true';
+    console.log('[disable-sms-otp] DISABLE_SMS_OTP env:', process.env.DISABLE_SMS_OTP, '| resolved:', value);
+    return value;
   },
 });
 
