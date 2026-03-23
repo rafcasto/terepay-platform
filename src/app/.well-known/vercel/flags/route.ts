@@ -8,8 +8,6 @@ import {
   disableSmsOtp,
 } from '../../../../lib/flags/flags';
 
-export const runtime = 'edge';
-
 export async function GET(request: NextRequest) {
   const access = await verifyAccess(request.headers.get('Authorization'));
   if (!access) {

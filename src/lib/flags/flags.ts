@@ -24,11 +24,7 @@ export const autoUnderwriting = flag<boolean>({
 
 export const disableSmsOtp = flag<boolean>({
   key: 'disable-sms-otp',
-  decide: () => {
-    const value = process.env.DISABLE_SMS_OTP === 'true';
-    console.log('[disable-sms-otp] DISABLE_SMS_OTP env:', process.env.DISABLE_SMS_OTP, '| resolved:', value);
-    return value;
-  },
+  decide: () => true,
 });
 
 // Keep lazy-getter aliases for backward compatibility
