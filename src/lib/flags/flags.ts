@@ -1,4 +1,5 @@
 import { flag } from '@vercel/flags/next';
+import { createClient } from '@vercel/edge-config';
 
 // Re-export for convenience
 export { flag } from '@vercel/flags/next';
@@ -24,7 +25,15 @@ export const autoUnderwriting = flag<boolean>({
 
 export const disableSmsOtp = flag<boolean>({
   key: 'disable-sms-otp',
-  decide: () => false,
+  decide: async () => {
+    try {
+      const edgeConfig = createClient(process.env.EDGE_CONFIG!);
+      const value = await edgeConfig.get<boolean>('disable-sms-otp');
+      return value ?? false;
+    } catch {
+      return false;
+    }
+  },
 });
 
 // Keep lazy-getter aliases for backward compatibility
