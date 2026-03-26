@@ -1,6 +1,16 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
+import { getAdminDb, verifySessionOrIdToken } from '@/lib/firebase/admin';
 import LoanStepTracker from './_components/LoanStepTracker';
+
+// Statuses that are terminal — user may start a fresh application after these
+const TERMINAL_STATUSES = new Set([
+  'declined', 'withdrawn', 'expired', 'closed_repaid',
+  // legacy
+  'rejected', 'completed',
+]);
 
 interface Props {
   children: ReactNode;
@@ -11,7 +21,28 @@ interface Props {
  * Mirrors the onboarding split-panel design: navy left panel (desktop) + white content right.
  * Intentionally does NOT include the applicant shell nav.
  */
-export default function ApplyLayout({ children }: Props) {
+export default async function ApplyLayout({ children }: Props) {
+  // Block access if the user has an active (non-draft, non-terminal) application
+  const cookieStore = await cookies();
+  const session = cookieStore.get('__session')?.value;
+  if (session) {
+    const decoded = await verifySessionOrIdToken(session).catch(() => null);
+    if (decoded) {
+      const db = getAdminDb();
+      const snap = await db
+        .collection('loanApplications')
+        .where('applicantId', '==', decoded.uid)
+        .limit(20)
+        .get();
+      const activeApp = snap.docs
+        .map((d) => ({ id: d.id, status: d.data().status as string }))
+        .find((a) => a.status !== 'draft' && !TERMINAL_STATUSES.has(a.status));
+      if (activeApp) {
+        redirect(`/applicant/applications/${activeApp.id}`);
+      }
+    }
+  }
+
   return (
     <div className="min-h-screen flex flex-col sm:flex-row">
       {/* ── Left Brand Panel (desktop only) ─────────────────────────────── */}

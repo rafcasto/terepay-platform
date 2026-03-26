@@ -117,10 +117,12 @@ export async function POST(request: NextRequest) {
         loanDetails: {
           requestedAmount: parsed.loanRequest.requestedAmount,
           currency: 'NZD',
-          loanPurpose: 'personal',
+          loanPurpose: parsed.loanRequest.loanPurpose ?? 'personal',
           purposeDescription: parsed.loanRequest.purposeDescription,
           requestedTerm: 2, // 2 payment periods = 4 fortnightly payments
         },
+        // Store the raw loanRequest so the form can be fully restored from a draft
+        loanRequest: parsed.loanRequest,
         financialInformation: {
           monthlyIncome,
           incomeSource: parsed.loanRequest.primaryIncomeSource,
@@ -177,19 +179,39 @@ export async function POST(request: NextRequest) {
 
     const applicationId = (applicationData as { applicationId: string }).applicationId;
 
-    await adminDb.collection('loanApplications').doc(applicationId).set(applicationData);
+    // Upsert: if the user already has a draft, update it rather than creating a duplicate
+    const existingDraftSnap = await adminDb
+      .collection('loanApplications')
+      .where('applicantId', '==', uid)
+      .where('status', '==', 'draft')
+      .limit(1)
+      .get();
+
+    let savedId: string;
+    if (!existingDraftSnap.empty) {
+      savedId = existingDraftSnap.docs[0].id;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { applicationId: _id, timeline: _timeline, ...updateFields } = applicationData as Record<string, unknown>;
+      await adminDb
+        .collection('loanApplications')
+        .doc(savedId)
+        .update({ ...updateFields, 'timeline.updatedAt': FieldValue.serverTimestamp() });
+    } else {
+      await adminDb.collection('loanApplications').doc(applicationId).set(applicationData);
+      savedId = applicationId;
+    }
 
     await auditLog({
       userId: uid,
       action: 'application_created',
-      targetId: applicationId,
+      targetId: savedId,
       targetType: 'application',
       outcome: 'success',
       ipAddress: ip,
       userAgent: request.headers.get('user-agent') ?? '',
     });
 
-    return NextResponse.json({ data: { applicationId } }, { status: 201 });
+    return NextResponse.json({ data: { applicationId: savedId } }, { status: 201 });
   } catch (err) {
     if (err instanceof ZodError) {
       return errorResponse(

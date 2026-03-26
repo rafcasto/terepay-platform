@@ -24,6 +24,67 @@ export default function ApplyPage() {
   );
 }
 
+const FORM_DEFAULT_VALUES = {
+  personalInfo: {
+    numberOfChildren: 0,
+    numberOfDependents: 0,
+  },
+  employment: {
+    income: {
+      salaryBeforeTax: 0,
+      salaryAfterTax: 0,
+      winz: 0,
+      otherIncome: 0,
+    },
+  },
+  livingExpenses: {
+    nonDiscretionary: {
+      food: 0, utilities: 0, personalExpenses: 0, transport: 0,
+      medical: 0, childcare: 0, accommodation: 0, healthInsurance: 0,
+      carInsurance: 0, rates: 0, education: 0, childSupport: 0, remittances: 0,
+    },
+    discretionary: {
+      restaurants: 0, entertainment: 0, travel: 0, subscriptions: 0,
+      homeImprovement: 0, cashWithdrawals: 0, other: 0,
+    },
+    subscriptionDetails: {
+      gym: { amount: 0, frequency: 'N/A' },
+      netflix: { amount: 0, frequency: 'N/A' },
+      spotify: { amount: 0, frequency: 'N/A' },
+      sports: { amount: 0, frequency: 'N/A' },
+      others: { amount: 0, frequency: 'N/A' },
+    },
+    bnpl: { afterpay: 0, klarna: 0, zip: 0 },
+  },
+  existingDebts: {
+    mortgage: { totalOwed: 0, fortnightlyPayment: 0 },
+    personalLoans: { totalOwed: 0, fortnightlyPayment: 0 },
+    carLoans: { totalOwed: 0, fortnightlyPayment: 0 },
+    creditCard: { totalOwed: 0, fortnightlyPayment: 0 },
+    bankOverdrafts: { totalOwed: 0, fortnightlyPayment: 0 },
+    otherLoans: [
+      { description: '', totalOwed: 0, fortnightlyPayment: 0 },
+      { description: '', totalOwed: 0, fortnightlyPayment: 0 },
+      { description: '', totalOwed: 0, fortnightlyPayment: 0 },
+    ],
+  },
+  loanRequest: {
+    isPEP: false,
+    remittance: { frequency: 'never', averageAmount: 0, purposes: [] },
+  },
+  declarations: {
+    infoAccurate: false,
+    understandsVerification: false,
+    authorisesContacts: false,
+    understandsTerms: false,
+    canAffordRepayments: false,
+    receivedDisclosure: false,
+    understandsConsequences: false,
+    privacyPolicy: false,
+    creditReporting: false,
+  },
+};
+
 const STEPS = [
   { title: 'Personal Information', shortTitle: 'Personal', fields: ['personalInfo'] },
   { title: 'Employment & Income', shortTitle: 'Employment', fields: ['employment'] },
@@ -53,6 +114,7 @@ function ApplyPageInner() {
   const [currentStep, setCurrentStep] = useState(
     () => Math.min(Math.max(Number(searchParams.get('step') ?? 0), 0), STEPS.length - 1)
   );
+  const [draftLoading, setDraftLoading] = useState(true);
 
   // Keep URL in sync when step changes
   useEffect(() => {
@@ -64,69 +126,43 @@ function ApplyPageInner() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: zodResolver(terepayApplicationSchema) as any,
     mode: 'onTouched',
-    defaultValues: {
-      personalInfo: {
-        numberOfChildren: 0,
-        numberOfDependents: 0,
-      },
-      employment: {
-        income: {
-          salaryBeforeTax: 0,
-          salaryAfterTax: 0,
-          winz: 0,
-          otherIncome: 0,
-        },
-      },
-      livingExpenses: {
-        nonDiscretionary: {
-          food: 0, utilities: 0, personalExpenses: 0, transport: 0,
-          medical: 0, childcare: 0, accommodation: 0, healthInsurance: 0,
-          carInsurance: 0, rates: 0, education: 0, childSupport: 0, remittances: 0,
-        },
-        discretionary: {
-          restaurants: 0, entertainment: 0, travel: 0, subscriptions: 0,
-          homeImprovement: 0, cashWithdrawals: 0, other: 0,
-        },
-        subscriptionDetails: {
-          gym: { amount: 0, frequency: 'N/A' },
-          netflix: { amount: 0, frequency: 'N/A' },
-          spotify: { amount: 0, frequency: 'N/A' },
-          sports: { amount: 0, frequency: 'N/A' },
-          others: { amount: 0, frequency: 'N/A' },
-        },
-        bnpl: { afterpay: 0, klarna: 0, zip: 0 },
-      },
-      existingDebts: {
-        mortgage: { totalOwed: 0, fortnightlyPayment: 0 },
-        personalLoans: { totalOwed: 0, fortnightlyPayment: 0 },
-        carLoans: { totalOwed: 0, fortnightlyPayment: 0 },
-        creditCard: { totalOwed: 0, fortnightlyPayment: 0 },
-        bankOverdrafts: { totalOwed: 0, fortnightlyPayment: 0 },
-        otherLoans: [
-          { description: '', totalOwed: 0, fortnightlyPayment: 0 },
-          { description: '', totalOwed: 0, fortnightlyPayment: 0 },
-          { description: '', totalOwed: 0, fortnightlyPayment: 0 },
-        ],
-      },
-      loanRequest: {
-        isPEP: false,
-        remittance: { frequency: 'never', averageAmount: 0, purposes: [] },
-      },
-      declarations: {
-        infoAccurate: false,
-        understandsVerification: false,
-        authorisesContacts: false,
-        understandsTerms: false,
-        canAffordRepayments: false,
-        receivedDisclosure: false,
-        understandsConsequences: false,
-        privacyPolicy: false,
-        creditReporting: false,
-      },
-    },
+    defaultValues: FORM_DEFAULT_VALUES,
   });
 
-  const { handleSubmit, trigger, formState: { isSubmitting } } = methods;
+  const { handleSubmit, trigger, reset, formState: { isSubmitting } } = methods;
+
+  // Load an existing draft on mount so the user can resume where they left off
+  useEffect(() => {
+    async function loadDraft() {
+      try {
+        const res = await fetch('/api/applications');
+        if (!res.ok) return;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data } = await res.json() as { data: any[] };
+        const draft = data?.find((a) => a.status === 'draft');
+        if (!draft) return;
+        const r2 = await fetch(`/api/applications/${draft.id}`);
+        if (!r2.ok) return;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: d } = await r2.json() as { data: any };
+        reset({
+          ...FORM_DEFAULT_VALUES,
+          ...(d.personalInfo   && { personalInfo:   d.personalInfo }),
+          ...(d.employment     && { employment:     d.employment }),
+          ...(d.livingExpenses && { livingExpenses: d.livingExpenses }),
+          ...(d.existingDebts  && { existingDebts:  d.existingDebts }),
+          ...(d.loanRequest    && { loanRequest:    d.loanRequest }),
+          ...(d.bankDetails    && { bankDetails:    d.bankDetails }),
+          ...(d.references     && { references:     d.references }),
+          // declarations intentionally not pre-filled - user must re-confirm consent
+        });
+      } finally {
+        setDraftLoading(false);
+      }
+    }
+    loadDraft();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reset]);
 
   const isLastStep = currentStep === STEPS.length - 1;
 
@@ -141,7 +177,11 @@ function ApplyPageInner() {
   };
 
   const handleBack = () => {
-    setCurrentStep((s) => Math.max(0, s - 1));
+    if (currentStep === 0) {
+      router.push('/applicant/applications');
+      return;
+    }
+    setCurrentStep((s) => s - 1);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -193,6 +233,18 @@ function ApplyPageInner() {
 
   const StepComponent = STEP_COMPONENTS[currentStep];
 
+  // Show spinner while loading draft data
+  if (draftLoading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 rounded-full border-2 border-[#F5A523] border-t-transparent animate-spin" />
+          <p className="text-sm text-gray-400">Loading your application...</p>
+        </div>
+      </div>
+    );
+  }
+
   // Block unverified users before rendering the form
   if (!loading && user && !user.emailVerified) {
     return (
@@ -238,8 +290,7 @@ function ApplyPageInner() {
             <button
               type="button"
               onClick={handleBack}
-              disabled={currentStep === 0}
-              className="flex-1 sm:flex-none sm:w-28 py-2.5 px-4 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="flex-1 sm:flex-none sm:w-28 py-2.5 px-4 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
             >
               Back
             </button>
