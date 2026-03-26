@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
         loanDetails: {
           requestedAmount: parsed.loanRequest.requestedAmount,
           currency: 'NZD',
-          loanPurpose: parsed.loanRequest.loanPurpose ?? 'personal',
+          loanPurpose: parsed.loanRequest.purpose ?? 'personal',
           purposeDescription: parsed.loanRequest.purposeDescription,
           requestedTerm: 2, // 2 payment periods = 4 fortnightly payments
         },

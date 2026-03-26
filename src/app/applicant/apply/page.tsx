@@ -70,7 +70,7 @@ const FORM_DEFAULT_VALUES = {
   },
   loanRequest: {
     isPEP: false,
-    remittance: { frequency: 'never', averageAmount: 0, purposes: [] },
+    remittance: { frequency: 'never' as const, averageAmount: 0, purposes: [] },
   },
   declarations: {
     infoAccurate: false,
