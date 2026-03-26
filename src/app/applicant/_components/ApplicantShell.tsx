@@ -12,8 +12,11 @@ export default function ApplicantShell({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  // During onboarding, render children only — the onboarding layout provides its own chrome
-  if (pathname?.startsWith('/applicant/onboarding')) {
+  // During onboarding or loan application, render children only — those layouts provide their own chrome
+  if (
+    pathname?.startsWith('/applicant/onboarding') ||
+    pathname?.startsWith('/applicant/apply')
+  ) {
     return <>{children}</>;
   }
 

@@ -1,14 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useForm, FormProvider } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { terepayApplicationSchema, type TerepayApplicationInput } from '@/lib/validation/schemas';
 import { useAuth } from '@/hooks/useAuth';
-
-import FormProgress from './_components/FormProgress';
 import Step1PersonalInfo from './_components/Step1PersonalInfo';
 import Step2Employment from './_components/Step2Employment';
 import Step3LivingExpenses from './_components/Step3LivingExpenses';
@@ -17,6 +15,14 @@ import Step5LoanRequest from './_components/Step5LoanRequest';
 import Step6BankDetails from './_components/Step6BankDetails';
 import Step7References from './_components/Step7References';
 import Step8Declarations from './_components/Step8Declarations';
+
+export default function ApplyPage() {
+  return (
+    <Suspense fallback={null}>
+      <ApplyPageInner />
+    </Suspense>
+  );
+}
 
 const STEPS = [
   { title: 'Personal Information', shortTitle: 'Personal', fields: ['personalInfo'] },
@@ -40,10 +46,18 @@ const STEP_COMPONENTS = [
   Step8Declarations,
 ];
 
-export default function ApplyPage() {
+function ApplyPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, loading } = useAuth();
-  const [currentStep, setCurrentStep] = useState(0);
+  const [currentStep, setCurrentStep] = useState(
+    () => Math.min(Math.max(Number(searchParams.get('step') ?? 0), 0), STEPS.length - 1)
+  );
+
+  // Keep URL in sync when step changes
+  useEffect(() => {
+    router.replace(`/applicant/apply?step=${currentStep}`, { scroll: false });
+  }, [currentStep, router]);
   const [serverError, setServerError] = useState<string | null>(null);
 
   const methods = useForm<TerepayApplicationInput>({
@@ -205,9 +219,7 @@ export default function ApplyPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <FormProgress steps={STEPS as unknown as { title: string; shortTitle: string }[]} currentStep={currentStep} />
-
+    <div className="min-h-screen bg-white">
       <FormProvider {...methods}>
         <div className="max-w-2xl mx-auto px-4 py-8 pb-32">
           {serverError && (
