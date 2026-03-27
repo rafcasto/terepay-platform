@@ -273,7 +273,7 @@ function ApplyPageInner() {
   return (
     <div className="min-h-screen bg-white">
       <FormProvider {...methods}>
-        <div className="max-w-2xl mx-auto px-4 py-8 pb-32">
+        <div className="max-w-2xl mx-auto px-4 py-8 pb-12">
           {serverError && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
               <p className="text-sm text-red-700">{serverError}</p>
@@ -283,28 +283,15 @@ function ApplyPageInner() {
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 sm:p-8">
             <StepComponent />
           </div>
-        </div>
 
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-30">
-          <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
-            <button
-              type="button"
-              onClick={handleBack}
-              className="flex-1 sm:flex-none sm:w-28 py-2.5 px-4 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              Back
-            </button>
-
-            <div className="flex-1 hidden sm:block text-center text-xs text-gray-400">
-              {currentStep + 1} / {STEPS.length}
-            </div>
-
+          {/* Navigation — matches onboarding pill style */}
+          <div className="mt-6 flex flex-col gap-3">
             {isLastStep ? (
               <button
                 type="button"
                 onClick={handleSubmit(onSubmit)}
                 disabled={isSubmitting}
-                className="flex-1 sm:flex-none sm:w-40 py-2.5 px-4 bg-[#F5A523] text-white text-sm font-semibold rounded-lg hover:bg-[#E08B00] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="w-full bg-[#F5A523] hover:bg-[#E08B00] disabled:opacity-60 text-white font-semibold rounded-full py-3.5 transition-colors"
               >
                 {isSubmitting ? 'Submitting…' : 'Submit Application'}
               </button>
@@ -312,11 +299,18 @@ function ApplyPageInner() {
               <button
                 type="button"
                 onClick={handleNext}
-                className="flex-1 sm:flex-none sm:w-28 py-2.5 px-4 bg-[#F5A523] text-white text-sm font-semibold rounded-lg hover:bg-[#E08B00] transition-colors"
+                className="w-full bg-[#F5A523] hover:bg-[#E08B00] text-white font-semibold rounded-full py-3.5 transition-colors"
               >
-                Next
+                Continue
               </button>
             )}
+            <button
+              type="button"
+              onClick={handleBack}
+              className="w-full py-3 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors"
+            >
+              {currentStep === 0 ? '← Back to Applications' : '← Back'}
+            </button>
           </div>
         </div>
       </FormProvider>
