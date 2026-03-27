@@ -56,13 +56,13 @@ export default async function ApplyLayout({ children }: Props) {
 
         <div className="mt-auto pt-10 flex flex-col gap-4">
           <Link
-            href="/applicant/applications"
+            href="/applicant/dashboard"
             className="flex items-center gap-2 text-sm text-white/50 hover:text-white/80 transition-colors"
           >
             <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
             </svg>
-            Back to Applications
+            Back to Dashboard
           </Link>
 
           <p className="text-xs text-white/30 leading-relaxed">
@@ -76,9 +76,9 @@ export default async function ApplyLayout({ children }: Props) {
         {/* Mobile top bar */}
         <header className="sm:hidden sticky top-0 z-20 bg-[#0D1B2A] px-4 h-12 flex items-center justify-between shrink-0">
           <Link
-            href="/applicant/applications"
+            href="/applicant/dashboard"
             className="flex items-center gap-1.5 text-white/70 hover:text-white transition-colors"
-            aria-label="Back to Applications"
+            aria-label="Back to Dashboard"
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
