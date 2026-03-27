@@ -360,6 +360,20 @@ export const terepayApplicationSchema = z.object({
 });
 
 export type TerepayApplicationInput = z.infer<typeof terepayApplicationSchema>;
+
+// Schema for incremental draft step saves — all sections optional, no full validation required
+export const draftApplicationSchema = z.object({
+  personalInfo: terepayApplicationSchema.shape.personalInfo.optional(),
+  employment: terepayApplicationSchema.shape.employment.optional(),
+  livingExpenses: terepayApplicationSchema.shape.livingExpenses.optional(),
+  existingDebts: terepayApplicationSchema.shape.existingDebts.optional(),
+  loanRequest: terepayApplicationSchema.shape.loanRequest.optional(),
+  bankDetails: terepayApplicationSchema.shape.bankDetails.optional(),
+  references: terepayApplicationSchema.shape.references.optional(),
+  lastCompletedStep: z.number().int().min(0).max(7).optional(),
+});
+export type DraftApplicationInput = z.infer<typeof draftApplicationSchema>;
+
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 
 // ---------------------------------------------------------------------------

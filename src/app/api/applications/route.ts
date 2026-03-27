@@ -3,7 +3,7 @@ import { adminDb, adminAuth } from '@/lib/firebase/admin';
 
 export const dynamic = 'force-dynamic';
 import { withAuth } from '@/lib/auth/middleware';
-import { createApplicationSchema, terepayApplicationSchema } from '@/lib/validation/schemas';
+import { createApplicationSchema, terepayApplicationSchema, draftApplicationSchema } from '@/lib/validation/schemas';
 import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { auditLog, getClientIp } from '@/lib/utils/audit';
 import { defaultLimiter, checkRateLimit } from '@/lib/rate-limit/limiter';
@@ -221,6 +221,89 @@ export async function POST(request: NextRequest) {
     if (err instanceof AppError) return errorResponse(err);
 
     await auditLog({ userId: uid, action: 'application_created', targetType: 'application', outcome: 'failure', ipAddress: ip });
+    return internalError();
+  }
+}
+
+/**
+ * PUT /api/applications
+ * Incrementally saves a draft step — creates the draft if it doesn't exist yet.
+ * Does NOT require a complete application; each section is optional.
+ * Used by the multi-step form to persist data as the user moves forward.
+ */
+export async function PUT(request: NextRequest) {
+  const ip = getClientIp(request);
+  let uid = 'unknown';
+  try {
+    const auth = await withAuth(request, ['applicant']);
+    uid = auth.uid;
+    await checkRateLimit(defaultLimiter, auth.uid);
+
+    const body = await request.json();
+    const parsed = draftApplicationSchema.parse(body);
+
+    const now = FieldValue.serverTimestamp();
+
+    // Find existing draft
+    const existingDraftSnap = await adminDb
+      .collection('loanApplications')
+      .where('applicantId', '==', uid)
+      .where('status', '==', 'draft')
+      .limit(1)
+      .get();
+
+    let savedId: string;
+
+    if (!existingDraftSnap.empty) {
+      savedId = existingDraftSnap.docs[0].id;
+      const updateFields: Record<string, unknown> = { 'timeline.updatedAt': now };
+      if (parsed.personalInfo !== undefined)   updateFields.personalInfo   = parsed.personalInfo;
+      if (parsed.employment !== undefined)     updateFields.employment     = parsed.employment;
+      if (parsed.livingExpenses !== undefined) updateFields.livingExpenses = parsed.livingExpenses;
+      if (parsed.existingDebts !== undefined)  updateFields.existingDebts  = parsed.existingDebts;
+      if (parsed.loanRequest !== undefined)    updateFields.loanRequest    = parsed.loanRequest;
+      if (parsed.bankDetails !== undefined)    updateFields.bankDetails    = parsed.bankDetails;
+      if (parsed.references !== undefined)     updateFields.references     = parsed.references;
+      if (parsed.lastCompletedStep !== undefined) updateFields.lastCompletedStep = parsed.lastCompletedStep;
+      await adminDb.collection('loanApplications').doc(savedId).update(updateFields);
+    } else {
+      const applicationId = randomUUID();
+      const docData: Record<string, unknown> = {
+        applicationId,
+        applicantId: uid,
+        status: 'draft',
+        timeline: { createdAt: now, updatedAt: now },
+      };
+      if (parsed.personalInfo !== undefined)   docData.personalInfo   = parsed.personalInfo;
+      if (parsed.employment !== undefined)     docData.employment     = parsed.employment;
+      if (parsed.livingExpenses !== undefined) docData.livingExpenses = parsed.livingExpenses;
+      if (parsed.existingDebts !== undefined)  docData.existingDebts  = parsed.existingDebts;
+      if (parsed.loanRequest !== undefined)    docData.loanRequest    = parsed.loanRequest;
+      if (parsed.bankDetails !== undefined)    docData.bankDetails    = parsed.bankDetails;
+      if (parsed.references !== undefined)     docData.references     = parsed.references;
+      if (parsed.lastCompletedStep !== undefined) docData.lastCompletedStep = parsed.lastCompletedStep;
+      await adminDb.collection('loanApplications').doc(applicationId).set(docData);
+      savedId = applicationId;
+    }
+
+    await auditLog({
+      userId: uid,
+      action: 'application_draft_saved',
+      targetId: savedId,
+      targetType: 'application',
+      outcome: 'success',
+      ipAddress: ip,
+    });
+
+    return NextResponse.json({ data: { id: savedId } });
+  } catch (err) {
+    if (err instanceof ZodError) {
+      return errorResponse(
+        new AppError('VALIDATION_ERROR', 422, 'Invalid request', err.flatten().fieldErrors),
+      );
+    }
+    if (err instanceof AppError) return errorResponse(err);
+    await auditLog({ userId: uid, action: 'application_draft_saved', targetType: 'application', outcome: 'failure', ipAddress: ip });
     return internalError();
   }
 }

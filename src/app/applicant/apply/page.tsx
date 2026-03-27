@@ -115,6 +115,7 @@ function ApplyPageInner() {
     () => Math.min(Math.max(Number(searchParams.get('step') ?? 0), 0), STEPS.length - 1)
   );
   const [draftLoading, setDraftLoading] = useState(true);
+  const [draftId, setDraftId] = useState<string | null>(null);
 
   // Keep URL in sync when step changes
   useEffect(() => {
@@ -145,6 +146,10 @@ function ApplyPageInner() {
         if (!r2.ok) return;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data: d } = await r2.json() as { data: any };
+        setDraftId(draft.id);
+        if (typeof d.lastCompletedStep === 'number') {
+          setCurrentStep(Math.min(d.lastCompletedStep + 1, STEPS.length - 1));
+        }
         reset({
           ...FORM_DEFAULT_VALUES,
           ...(d.personalInfo   && { personalInfo:   d.personalInfo }),
@@ -166,11 +171,31 @@ function ApplyPageInner() {
 
   const isLastStep = currentStep === STEPS.length - 1;
 
+  // Best-effort background save of a single form section to Firestore.
+  // Creates the draft document on first call; subsequent calls update it.
+  // Failures are swallowed — the full submit on step 8 acts as the safety net.
+  const saveDraftStep = async (step: number) => {
+    const sectionKey = STEPS[step].fields[0] as keyof TerepayApplicationInput;
+    const sectionData = methods.getValues(sectionKey);
+    const res = await fetch('/api/applications', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [sectionKey]: sectionData, lastCompletedStep: step }),
+    });
+    if (res.ok) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const json = await res.json() as { data: { id: string } };
+      setDraftId((prev) => prev ?? json.data.id);
+    }
+  };
+
   const handleNext = async () => {
     const fields = STEPS[currentStep].fields;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const valid = await trigger(fields as any);
     if (valid) {
+      // Best-effort background save — does not block navigation
+      saveDraftStep(currentStep).catch(() => {});
       setCurrentStep((s) => s + 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }

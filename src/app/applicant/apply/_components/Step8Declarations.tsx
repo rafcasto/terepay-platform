@@ -71,7 +71,8 @@ export default function Step8Declarations() {
       <div>
         <h2 className="text-xl font-bold text-gray-900">Declarations &amp; Consent</h2>
         <p className="text-sm text-gray-500 mt-1">
-          Please read and confirm each declaration before submitting your application.
+          Please read and confirm each declaration before submitting your application.{' '}
+          For legal compliance, your consent must be confirmed fresh each time you submit.
         </p>
       </div>
 
