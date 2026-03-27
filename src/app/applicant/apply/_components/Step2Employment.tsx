@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
 import type { TerepayApplicationInput } from '@/lib/validation/schemas';
 
@@ -9,22 +10,26 @@ const selectCls = inputCls + ' appearance-none';
 const labelCls = 'block text-sm font-medium text-gray-700 mb-1';
 const errorCls = 'mt-1 text-xs text-red-600';
 
-function NzdInput({ name, ...props }: { name: string } & React.InputHTMLAttributes<HTMLInputElement>) {
-  return (
-    <div className="relative">
-      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400 select-none">
-        $
-      </span>
-      <input
-        type="number"
-        min={0}
-        step="0.01"
-        className="w-full pl-6 pr-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#F5A523] focus:border-[#F5A523] focus:outline-none transition-colors bg-white"
-        {...props}
-      />
-    </div>
-  );
-}
+const NzdInput = React.forwardRef<
+  HTMLInputElement,
+  { name: string } & React.InputHTMLAttributes<HTMLInputElement>
+>(({ name, ...props }, ref) => (
+  <div className="relative">
+    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400 select-none">
+      $
+    </span>
+    <input
+      ref={ref}
+      name={name}
+      type="number"
+      min={0}
+      step="0.01"
+      className="w-full pl-6 pr-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#F5A523] focus:border-[#F5A523] focus:outline-none transition-colors bg-white"
+      {...props}
+    />
+  </div>
+));
+NzdInput.displayName = 'NzdInput';
 
 export default function Step2Employment() {
   const {
