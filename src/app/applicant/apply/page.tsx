@@ -178,7 +178,7 @@ function ApplyPageInner() {
 
   const handleBack = () => {
     if (currentStep === 0) {
-      router.push('/applicant/applications');
+      router.push('/applicant/dashboard');
       return;
     }
     setCurrentStep((s) => s - 1);
