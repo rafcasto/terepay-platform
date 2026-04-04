@@ -90,7 +90,15 @@ export default async function ApplicationDetailPage({
   const app = { applicationId: snap.id, ...snap.data() } as LoanApplication & Record<string, unknown>;
   const status = app.status as AnyApplicationStatus;
 
-  if (app.applicantId !== decoded.uid) notFound();
+  // Ownership check: own application OR lender-created application claimed via customerId
+  const userDoc = await db.collection('users').doc(decoded.uid).get();
+  const userCustomerId: string | undefined = userDoc.data()?.customerId;
+
+  const isOwner =
+    app.applicantId === decoded.uid ||
+    (userCustomerId !== undefined && (app as Record<string, unknown>).offlineCustomerId === userCustomerId);
+
+  if (!isOwner) notFound();
 
   const banner = STATUS_BANNERS[status] ?? STATUS_BANNERS.pending_review;
   const ld = app.loanDetails;

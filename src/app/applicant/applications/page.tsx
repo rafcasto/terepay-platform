@@ -55,13 +55,49 @@ export default async function ApplicantApplicationsPage() {
   if (!decoded) return null;
 
   const db = getAdminDb();
-  const snapshot = await db
-    .collection('loanApplications')
-    .where('applicantId', '==', decoded.uid)
-    .orderBy('timeline.createdAt', 'desc')
-    .get();
 
-  const applications = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+  // Fetch the user document to check for an offline customer link
+  const userSnap = await db.collection('users').doc(decoded.uid).get();
+  const customerId: string | undefined = userSnap.data()?.customerId;
+
+  // Run both queries in parallel: own applications + offline-customer applications
+  const [ownSnap, offlineSnap] = await Promise.all([
+    db
+      .collection('loanApplications')
+      .where('applicantId', '==', decoded.uid)
+      .orderBy('timeline.createdAt', 'desc')
+      .get(),
+    customerId
+      ? db
+          .collection('loanApplications')
+          .where('offlineCustomerId', '==', customerId)
+          .orderBy('timeline.createdAt', 'desc')
+          .get()
+      : Promise.resolve(null),
+  ]);
+
+  // Merge and deduplicate by document ID, preserving most-recent-first order
+  const seen = new Set<string>();
+  const merged: Array<{ id: string } & Record<string, unknown>> = [];
+
+  for (const snap of [ownSnap, offlineSnap]) {
+    if (!snap) continue;
+    for (const d of snap.docs) {
+      if (!seen.has(d.id)) {
+        seen.add(d.id);
+        merged.push({ id: d.id, ...d.data() });
+      }
+    }
+  }
+
+  // Sort by createdAt descending (Firestore timestamps)
+  merged.sort((a, b) => {
+    const ta = (a.timeline as Record<string, unknown>)?.createdAt as { _seconds?: number } | undefined;
+    const tb = (b.timeline as Record<string, unknown>)?.createdAt as { _seconds?: number } | undefined;
+    return (tb?._seconds ?? 0) - (ta?._seconds ?? 0);
+  });
+
+  const applications = merged;
 
   return (
     <div className="p-8">

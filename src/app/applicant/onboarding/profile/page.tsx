@@ -10,6 +10,8 @@ interface ProfileForm {
   housingStatus: string;
   timeAtAddress: string;
   addressValue: AddressValue;
+  isExistingClient: boolean | null;
+  customerId: string;
 }
 
 type FieldErrors = Partial<Record<string, string>>;
@@ -33,6 +35,8 @@ export default function KycProfilePage() {
     housingStatus: '',
     timeAtAddress: '',
     addressValue: { address: '', suburb: '', city: '', postCode: '', country: 'New Zealand' },
+    isExistingClient: null,
+    customerId: '',
   });
   const [errors, setErrors] = useState<FieldErrors>({});
   const [loading, setLoading] = useState(false);
@@ -73,6 +77,15 @@ export default function KycProfilePage() {
     if (!form.addressValue.address) errs.address = 'Address is required';
     if (!form.addressValue.city) errs.city = 'City is required';
     if (!form.addressValue.postCode) errs.postCode = 'Post code is required';
+    if (form.isExistingClient === null) errs.isExistingClient = 'Please answer this question';
+    if (form.isExistingClient === true && !form.customerId.trim())
+      errs.customerId = 'Customer ID is required';
+    if (
+      form.isExistingClient === true &&
+      form.customerId.trim() &&
+      !/^TERE\d{3,}$/.test(form.customerId.trim().toUpperCase())
+    )
+      errs.customerId = 'Enter a valid TerePay Customer ID (e.g. TERE001)';
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -83,6 +96,27 @@ export default function KycProfilePage() {
     setLoading(true);
     setApiError('');
     try {
+      // ── If existing client: claim offline record first ──────────────────
+      if (form.isExistingClient === true) {
+        const claimRes = await fetch(
+          `/api/customers/${encodeURIComponent(form.customerId.trim().toUpperCase())}/claim`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dateOfBirth: form.dateOfBirth }),
+          },
+        );
+        if (!claimRes.ok) {
+          const claimData = await claimRes.json();
+          setApiError(
+            claimData.error?.message ??
+              'Details do not match. Please contact TerePay support.',
+          );
+          return;
+        }
+      }
+
+      // ── Save profile details ────────────────────────────────────────────
       const res = await fetch('/api/kyc/profile', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -144,6 +178,66 @@ export default function KycProfilePage() {
           <div>
             <label className={labelCls}>Email address</label>
             <input type="email" value={user?.email ?? ''} readOnly className={readonlyCls} tabIndex={-1} />
+          </div>
+
+          {/* ── Existing TerePay client? ────────────────────────────── */}
+          <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-4">
+            <p className="text-sm font-medium text-gray-700 mb-3">
+              Are you an existing TerePay client?{' '}
+              <span className="text-red-500">*</span>
+            </p>
+            <div className="flex gap-3">
+              {(['yes', 'no'] as const).map((opt) => {
+                const isSelected =
+                  opt === 'yes' ? form.isExistingClient === true : form.isExistingClient === false;
+                return (
+                  <label
+                    key={opt}
+                    className={[
+                      'flex-1 text-center py-2.5 px-4 rounded-lg border-2 text-sm font-medium cursor-pointer transition-colors capitalize',
+                      isSelected
+                        ? 'border-[#F5A523] bg-[#FEF7E9] text-[#E08B00]'
+                        : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300',
+                    ].join(' ')}
+                  >
+                    <input
+                      type="radio"
+                      name="isExistingClient"
+                      className="sr-only"
+                      onChange={() =>
+                        set('isExistingClient', opt === 'yes' ? true : false)
+                      }
+                      checked={isSelected}
+                    />
+                    {opt === 'yes' ? 'Yes' : 'No'}
+                  </label>
+                );
+              })}
+            </div>
+            {errors.isExistingClient && <p className={errorCls}>{errors.isExistingClient}</p>}
+
+            {/* Customer ID field (shown only when Yes is selected) */}
+            {form.isExistingClient === true && (
+              <div className="mt-4">
+                <label className={labelCls}>
+                  TerePay Customer ID <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={form.customerId}
+                  onChange={(e) => {
+                    set('customerId', e.target.value.toUpperCase());
+                    setErrors((prev) => ({ ...prev, customerId: undefined }));
+                  }}
+                  placeholder="e.g. TERE001"
+                  className={inputCls + ' font-mono uppercase'}
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Your Customer ID was provided by TerePay. Enter it here to link your existing records.
+                </p>
+                {errors.customerId && <p className={errorCls}>{errors.customerId}</p>}
+              </div>
+            )}
           </div>
 
           {/* ── Date of birth ───────────────────────────────────────────── */}

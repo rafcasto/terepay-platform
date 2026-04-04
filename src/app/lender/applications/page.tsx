@@ -107,6 +107,15 @@ export default async function LenderApplicationsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Applications</h1>
           <p className="text-gray-500 mt-1 text-sm">{applications.length} total application{applications.length !== 1 ? 's' : ''}</p>
         </div>
+        <Link
+          href="/lender/applications/new"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-[#F5A523] text-white text-sm font-medium rounded-lg hover:bg-[#E08B00] transition-colors"
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          New Application
+        </Link>
       </div>
 
       {sections.map(({ title, apps }) => (

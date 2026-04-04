@@ -9,6 +9,9 @@ import { auditLog, getClientIp } from '@/lib/utils/audit';
 import { FieldValue } from 'firebase-admin/firestore';
 import { ZodError } from 'zod';
 import { randomUUID } from 'crypto';
+import { generateAffordabilityPdf } from '@/lib/pdf/affordability-report';
+import { getDriveClient, getOrCreateSubfolder, uploadBufferToDrive } from '@/lib/gdrive/client';
+import type { AffordabilityAssessment, LoanApplication } from '@/types/application';
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -204,6 +207,58 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     });
 
     await batch.commit();
+
+    // --- Non-blocking: generate PDF and upload to Google Drive ---
+    const applicantUid: string | undefined = appData.applicantId;
+    if (applicantUid) {
+      const parentKycFolderId = process.env.GOOGLE_DRIVE_KYC_FOLDER_ID;
+      if (parentKycFolderId) {
+        (async () => {
+          try {
+            // Build minimal assessment object for PDF (serverTimestamp not yet resolved, use Date.now)
+            const assessmentForPdf: AffordabilityAssessment = {
+              assessmentId,
+              applicationId: id,
+              version: nextVersion,
+              lenderId: auth.uid,
+              lenderName: lenderName ?? '',
+              assessedAt: { toDate: () => new Date() } as unknown as import('firebase-admin/firestore').Timestamp,
+              status: 'complete',
+              isSuperseded: false,
+              checklist: { ...parsed.checklist, daysOfTransactionData },
+              incomeRows,
+              expenseRows,
+              householdMultiplier: parsed.householdMultiplier,
+              catalogVersionId: parsed.catalogVersionId,
+              totalVerifiedIncome,
+              totalExpenses,
+              netDisposableIncome,
+              loanFortnightlyPayment,
+              finalAvailableSurplus,
+              hardDeclineTriggers,
+              redFlagsRaised: [],
+              redFlagsAcknowledged: parsed.redFlagsAcknowledged,
+              surplusRating,
+              recommendation,
+            };
+            const appForPdf = { ...appData, applicationId: id } as LoanApplication;
+            const pdfBuffer = await generateAffordabilityPdf(assessmentForPdf, appForPdf);
+            const dateStr = new Date().toISOString().split('T')[0];
+            const pdfFileName = `affordability_assessment_v${nextVersion}_${dateStr}.pdf`;
+            const drive = getDriveClient();
+            const userFolderId = await getOrCreateSubfolder(drive, parentKycFolderId, applicantUid);
+            const { fileId: pdfDriveFileId } = await uploadBufferToDrive(drive, userFolderId, pdfFileName, 'application/pdf', pdfBuffer);
+            await adminDb.collection('affordabilityAssessments').doc(assessmentId).update({
+              pdfDriveFileId,
+              pdfFileName,
+              pdfUploadedAt: FieldValue.serverTimestamp(),
+            });
+          } catch (pdfErr) {
+            console.error('[affordability] PDF generation/upload failed (non-blocking):', pdfErr);
+          }
+        })();
+      }
+    }
 
     await auditLog({
       userId: auth.uid,

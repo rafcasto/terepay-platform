@@ -7,6 +7,7 @@ import MobileBottomNav from '@/components/shared/MobileBottomNav';
 const NAV_ITEMS = [
   { href: '/lender/dashboard', label: 'Dashboard' },
   { href: '/lender/applications', label: 'Applications' },
+  { href: '/lender/customers', label: 'Customers' },
   { href: '/lender/portfolio', label: 'Portfolio' },
   { href: '/lender/profile', label: 'Profile' },
 ];

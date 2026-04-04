@@ -240,6 +240,18 @@ export default async function LenderApplicationDetailPage({
                 {app.affordabilityStatus === 'complete' ? 'Re-assess →' : 'Start Assessment →'}
               </Link>
             )}
+            {app.affordabilityStatus === 'complete' && (
+              <a
+                href={`/api/applications/${id}/affordability/pdf`}
+                download
+                className="inline-flex items-center gap-1.5 text-sm text-white bg-orange-600 hover:bg-orange-700 px-3 py-1.5 rounded-lg font-medium transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+                </svg>
+                Download Assessment PDF
+              </a>
+            )}
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
             <div className={`rounded-lg p-3 ${app.affordabilityStatus === 'complete' ? 'bg-green-50 text-green-700' : 'bg-gray-50 text-gray-500'}`}>

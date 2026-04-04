@@ -31,6 +31,28 @@ export interface User {
   lastLoginAt?: Timestamp;
   phoneVerified: boolean;
   emailVerified: boolean;
+  /** Friendly TerePay customer ID (e.g. TERE001) — set when claiming an offline profile */
+  customerId?: string;
+}
+
+export type OfflineCustomerStatus = 'unlinked' | 'linked';
+
+export interface OfflineCustomer {
+  /** Document ID and friendly key, e.g. "TERE001" */
+  customerId: string;
+  firstName: string;
+  lastName: string;
+  /** Required — used for 3-way ownership verification */
+  email: string;
+  /** Required — YYYY-MM-DD, used for 3-way ownership verification */
+  dateOfBirth: string;
+  phone?: string;
+  notes?: string;
+  createdByLenderId: string;
+  createdAt: Timestamp;
+  status: OfflineCustomerStatus;
+  linkedUid?: string;
+  linkedAt?: Timestamp;
 }
 
 export interface ApplicantProfile {

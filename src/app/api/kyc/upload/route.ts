@@ -1,10 +1,10 @@
 import { type NextRequest, NextResponse } from 'next/server';
-import { google } from 'googleapis';
+import { Readable } from 'stream';
 import { withAuth } from '@/lib/auth/middleware';
 import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { adminDb } from '@/lib/firebase/admin';
 import { FieldValue } from 'firebase-admin/firestore';
-import { Readable } from 'stream';
+import { getDriveClient, getOrCreateSubfolder } from '@/lib/gdrive/client';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,23 +17,6 @@ const ALLOWED_MIME_TYPES = new Set([
   'image/webp',
   'application/pdf',
 ]);
-
-function getDriveClient() {
-  const email = process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_EMAIL;
-  const privateKey = process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_PRIVATE_KEY;
-
-  if (!email || !privateKey) {
-    throw new AppError('CONFIG_ERROR', 500, 'Google Drive credentials are not configured');
-  }
-
-  const auth = new google.auth.JWT({
-    email,
-    key: privateKey.replace(/\\n/g, '\n'),
-    scopes: ['https://www.googleapis.com/auth/drive'],
-  });
-
-  return google.drive({ version: 'v3', auth });
-}
 
 /**
  * POST /api/kyc/upload
@@ -73,7 +56,7 @@ export async function POST(request: NextRequest) {
     const drive = getDriveClient();
 
     // Ensure a per-user subfolder exists (create if absent)
-    const userFolderId = await getOrCreateUserFolder(drive, parentFolderId, uid);
+    const userFolderId = await getOrCreateSubfolder(drive, parentFolderId, uid);
 
     // Convert Web API File → Node Readable stream
     const arrayBuffer = await file.arrayBuffer();
@@ -124,42 +107,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-/**
- * Find or create a folder named after the user UID inside the KYC parent folder.
- */
-async function getOrCreateUserFolder(
-  drive: ReturnType<typeof google.drive>,
-  parentFolderId: string,
-  uid: string,
-): Promise<string> {
-  if (!/^[a-zA-Z0-9_-]+$/.test(uid)) {
-    throw new AppError('VALIDATION_ERROR', 422, 'Invalid user identifier');
-  }
-  const query = `'${parentFolderId}' in parents and name = '${uid}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
-  const existing = await drive.files.list({
-    q: query,
-    fields: 'files(id)',
-    pageSize: 1,
-    supportsAllDrives: true,
-    includeItemsFromAllDrives: true,
-  });
 
-  if (existing.data.files && existing.data.files.length > 0) {
-    return existing.data.files[0].id!;
-  }
-
-  const folder = await drive.files.create({
-    requestBody: {
-      name: uid,
-      mimeType: 'application/vnd.google-apps.folder',
-      parents: [parentFolderId],
-    },
-    fields: 'id',
-    supportsAllDrives: true,
-  });
-
-  return folder.data.id!;
-}
 
 /**
  * DELETE /api/kyc/upload

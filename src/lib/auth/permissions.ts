@@ -2,10 +2,13 @@ import type { UserRole } from '@/types/user';
 
 type Permission =
   | 'applications:create'
+  | 'applications:create:on_behalf'
   | 'applications:read:own'
   | 'applications:read:all'
   | 'applications:update:own'
   | 'applications:approve'
+  | 'customers:create'
+  | 'customers:read:all'
   | 'users:read:own'
   | 'users:update:own'
   | 'users:read:all'
@@ -26,6 +29,9 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   lender: [
     'applications:read:all',
     'applications:approve',
+    'applications:create:on_behalf',
+    'customers:create',
+    'customers:read:all',
     'users:read:own',
     'users:update:own',
     'users:read:all',

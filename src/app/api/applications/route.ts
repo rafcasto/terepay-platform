@@ -8,8 +8,125 @@ import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { auditLog, getClientIp } from '@/lib/utils/audit';
 import { defaultLimiter, checkRateLimit } from '@/lib/rate-limit/limiter';
 import { FieldValue } from 'firebase-admin/firestore';
-import { ZodError } from 'zod';
+import { ZodError, z } from 'zod';
 import { randomUUID } from 'crypto';
+
+// ---------------------------------------------------------------------------
+// Lender on-behalf schema + helper
+// ---------------------------------------------------------------------------
+
+const lenderApplicationSchema = z.object({
+  /** Firebase UID of an online applicant */
+  applicantId: z.string().min(1).optional(),
+  /** Offline customer ID, e.g. "TERE001" */
+  offlineCustomerId: z.string().regex(/^TERE\d{3,}$/).optional(),
+  personalInfo: z.any().optional(),
+  employment: z.any().optional(),
+  livingExpenses: z.any().optional(),
+  existingDebts: z.any().optional(),
+  loanRequest: z.any().optional(),
+  bankDetails: z.any().optional(),
+  references: z.any().optional(),
+  declarations: z.any().optional(),
+}).refine((d) => d.applicantId || d.offlineCustomerId, {
+  message: 'Either applicantId or offlineCustomerId is required',
+});
+
+async function handleLenderApplication(
+  request: NextRequest,
+  lenderUid: string,
+  ip: string,
+): Promise<Response> {
+  const body = await request.json();
+  const parsed = lenderApplicationSchema.parse(body);
+
+  let customerRef: string | null = null;
+  let customerType: 'online' | 'offline';
+
+  if (parsed.applicantId) {
+    // Verify the online applicant exists
+    const userSnap = await adminDb.collection('users').doc(parsed.applicantId).get();
+    if (!userSnap.exists || userSnap.data()?.role !== 'applicant') {
+      return errorResponse(new AppError('NOT_FOUND', 404, 'Applicant not found'));
+    }
+    customerRef = parsed.applicantId;
+    customerType = 'online';
+  } else {
+    // Verify the offline customer exists
+    const custSnap = await adminDb.collection('offlineCustomers').doc(parsed.offlineCustomerId!).get();
+    if (!custSnap.exists) {
+      return errorResponse(new AppError('NOT_FOUND', 404, 'Offline customer not found'));
+    }
+    customerRef = parsed.offlineCustomerId!;
+    customerType = 'offline';
+  }
+
+  const applicationId = randomUUID();
+  const now = FieldValue.serverTimestamp();
+
+  const applicationData: Record<string, unknown> = {
+    applicationId,
+    status: 'pending_review',
+    createdByLenderId: lenderUid,
+    ...(customerType === 'online'
+      ? { applicantId: customerRef }
+      : { offlineCustomerId: customerRef }),
+    ...(parsed.personalInfo   && { personalInfo:   parsed.personalInfo }),
+    ...(parsed.employment     && { employment:     parsed.employment }),
+    ...(parsed.livingExpenses && { livingExpenses: parsed.livingExpenses }),
+    ...(parsed.existingDebts  && { existingDebts:  parsed.existingDebts }),
+    ...(parsed.loanRequest    && { loanRequest:    parsed.loanRequest }),
+    ...(parsed.bankDetails    && { bankDetails:    parsed.bankDetails }),
+    ...(parsed.references     && { references:     parsed.references }),
+    ...(parsed.declarations   && { declarations:   parsed.declarations }),
+    documents: [],
+    underwriting: { notes: '', underwriterIds: [] },
+    timeline: { createdAt: now, updatedAt: now, submittedAt: now },
+    metadata: { comments: [], internalNotes: '' },
+  };
+
+  // Add computed financial fields if loanRequest is present
+  if (parsed.employment?.income && parsed.loanRequest) {
+    const inc = parsed.employment.income;
+    const fortnightlyIncome =
+      (inc.salaryAfterTax ?? 0) + (inc.winz ?? 0) + (inc.otherIncome ?? 0);
+    applicationData.financialInformation = {
+      monthlyIncome: fortnightlyIncome * 2,
+      incomeSource: parsed.loanRequest.primaryIncomeSource ?? '',
+      employmentType: parsed.employment.employmentStatus ?? '',
+      monthlyExpenses: 0,
+      currentDebts: 0,
+      existingLoans: 0,
+      debtToIncomeRatio: 0,
+      savingsBalance: 0,
+      assets: {},
+    };
+    if (parsed.loanRequest.requestedAmount) {
+      applicationData.loanDetails = {
+        requestedAmount: parsed.loanRequest.requestedAmount,
+        currency: 'NZD',
+        loanPurpose: parsed.loanRequest.purpose ?? 'personal',
+        purposeDescription: parsed.loanRequest.purposeDescription ?? '',
+        requestedTerm: 2,
+      };
+    }
+  }
+
+  await adminDb.collection('loanApplications').doc(applicationId).set(applicationData);
+
+  await auditLog({
+    userId: lenderUid,
+    action: 'application_created_on_behalf',
+    targetId: applicationId,
+    targetType: 'application',
+    outcome: 'success',
+    ipAddress: ip,
+    userAgent: request.headers.get('user-agent') ?? '',
+  });
+
+  return NextResponse.json({ data: { applicationId } }, { status: 201 });
+}
+
 
 /**
  * GET /api/applications
@@ -49,7 +166,8 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/applications
- * Creates a new loan application (applicants only).
+ * - Applicant: creates a new loan application for themselves.
+ * - Lender: creates a loan application on behalf of an online or offline customer.
  */
 export async function POST(request: NextRequest) {
   const ip = getClientIp(request);
@@ -61,9 +179,15 @@ export async function POST(request: NextRequest) {
       return errorResponse(new AppError('RATE_LIMITED', 429, 'Too many requests.'));
     }
 
-    const auth = await withAuth(request, ['applicant']);
+    const auth = await withAuth(request);
     uid = auth.uid;
 
+    // ── Lender: on-behalf-of path ──────────────────────────────────────────
+    if (auth.role === 'lender') {
+      return await handleLenderApplication(request, auth.uid, ip);
+    }
+
+    // ── Applicant: self-serve path ─────────────────────────────────────────
     // Check live Firebase Auth state — the session cookie is issued at login and
     // its email_verified claim never updates after the user verifies their email.
     const liveUser = await adminAuth.getUser(uid);
