@@ -100,6 +100,7 @@ export async function POST(
     });
     batch.update(userRef, {
       customerId,
+      isExistingCustomer: true,
       updatedAt: FieldValue.serverTimestamp(),
     });
     await batch.commit();

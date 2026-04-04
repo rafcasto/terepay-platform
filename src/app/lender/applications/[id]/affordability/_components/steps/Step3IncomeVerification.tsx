@@ -9,6 +9,7 @@ interface Props {
   totalIncome: number;
   onNext: () => void;
   onBack: () => void;
+  validationErrors?: string[];
 }
 
 export default function Step3IncomeVerification({
@@ -17,6 +18,7 @@ export default function Step3IncomeVerification({
   totalIncome,
   onNext,
   onBack,
+  validationErrors,
 }: Props) {
   return (
     <div className="space-y-6">
@@ -26,6 +28,16 @@ export default function Step3IncomeVerification({
           All amounts in NZD per fortnight. Verify income with payslips and bank statements.
         </p>
       </div>
+
+      {/* Validation errors */}
+      {validationErrors && validationErrors.length > 0 && (
+        <div className="bg-red-50 border border-red-300 rounded-xl p-4">
+          <p className="text-sm font-semibold text-red-800 mb-2">Please resolve the following before proceeding:</p>
+          <ul className="list-disc list-inside space-y-1 text-sm text-red-700">
+            {validationErrors.map((e) => <li key={e}>{e}</li>)}
+          </ul>
+        </div>
+      )}
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
         <table className="w-full text-sm">

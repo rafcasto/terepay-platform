@@ -12,8 +12,8 @@ import { ZodError } from 'zod';
 type RouteParams = { params: Promise<{ id: string }> };
 
 const LOAN_INTEREST_RATE = 0.047; // 4.7% for 8 weeks
-const ESTABLISHMENT_FEE_NEW = 50;
-const ESTABLISHMENT_FEE_REPEAT = 20;
+const APPLICATION_FEE_NEW = 50;
+const APPLICATION_FEE_EXISTING = 30;
 
 /**
  * POST /api/applications/[id]/decision
@@ -85,14 +85,25 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const now = FieldValue.serverTimestamp();
     const approvedAmount = parsed.approvedAmount ?? appData.loanDetails?.requestedAmount;
 
-    // Determine if new or repeat customer
+    // Determine if existing customer:
+    // 1. Lender manually flagged the application
+    // 2. User profile carries the flag (from previous approval or offline claim)
+    // 3. Applicant has any prior approved/active loans
+    const applicantUserSnap = await adminDb.collection('users').doc(appData.applicantId).get();
+    const applicantUserData = applicantUserSnap.data();
+
     const previousLoansSnap = await adminDb
       .collection('loanApplications')
       .where('applicantId', '==', appData.applicantId)
       .where('status', 'in', ['approved', 'disbursed', 'active', 'closed_repaid'])
       .get();
-    const isRepeatCustomer = previousLoansSnap.size > 0;
-    const establishmentFee = isRepeatCustomer ? ESTABLISHMENT_FEE_REPEAT : ESTABLISHMENT_FEE_NEW;
+
+    const isExistingCustomer =
+      appData.isExistingCustomer === true ||
+      applicantUserData?.isExistingCustomer === true ||
+      previousLoansSnap.size > 0;
+
+    const applicationFee = isExistingCustomer ? APPLICATION_FEE_EXISTING : APPLICATION_FEE_NEW;
 
     const fortnightlyPayment = approvedAmount
       ? Math.round(((approvedAmount * (1 + LOAN_INTEREST_RATE)) / 4) * 100) / 100
@@ -112,11 +123,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           approvedAmount,
         },
         'loanDetails.approvedAmount': approvedAmount,
-        'loanDetails.establishmentFee': establishmentFee,
+        'loanDetails.applicationFee': applicationFee,
         'loanDetails.fortnightlyPayment': fortnightlyPayment,
         'loanDetails.totalRepayment': totalRepayment,
         'timeline.approvedAt': now,
         'timeline.updatedAt': now,
+      });
+      // Mark applicant as existing customer for all future applications
+      await adminDb.collection('users').doc(appData.applicantId).update({
+        isExistingCustomer: true,
+        updatedAt: now,
       });
     } else {
       await appRef.update({

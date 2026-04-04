@@ -7,9 +7,6 @@ import {
   StyleSheet,
   Font,
   renderToBuffer,
-  Svg,
-  Rect,
-  Path,
 } from '@react-pdf/renderer';
 import type { AffordabilityAssessment, LoanApplication } from '@/types/application';
 
@@ -88,23 +85,8 @@ function refFromAssessment(a: AffordabilityAssessment): string {
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
-// TerePay logo: three ascending bars (orange) + wordmark
 const TerePayLogo = () => (
-  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-    <Svg width={38} height={34} viewBox="0 0 38 34">
-      {/* Bar 1 - shortest */}
-      <Rect x="1" y="18" width="9" height="15" fill={orange} rx="1" />
-      {/* Bar 2 - medium */}
-      <Rect x="14" y="10" width="9" height="23" fill={orange} rx="1" />
-      {/* Bar 3 - tallest */}
-      <Rect x="27" y="2" width="9" height="31" fill={orange} rx="1" />
-      {/* Rising arrow tip on bar 3 */}
-      <Path d="M23 6 L31.5 0 L38 5" fill={orange} />
-    </Svg>
-    <View style={{ marginLeft: 5 }}>
-      <Text style={{ fontSize: 14, fontFamily: 'Helvetica-Bold', color: orange, lineHeight: 1 }}>TerePay</Text>
-    </View>
-  </View>
+  <Text style={{ fontSize: 16, fontFamily: 'Helvetica-Bold', color: orange }}>TerePay</Text>
 );
 
 const SectionTitle = ({ title }: { title: string }) => (
@@ -202,7 +184,7 @@ const AffordabilityReportDocument = ({ assessment, application }: Props) => {
   // Loan details
   const loanPrincipal = application.loanDetails?.requestedAmount ?? 0;
   const approvedAmount = application.loanDetails?.approvedAmount ?? loanPrincipal;
-  const estFee = application.loanDetails?.establishmentFee ?? 0;
+  const estFee = application.loanDetails?.applicationFee ?? 0;
   const totalRepayable = application.loanDetails?.totalRepayment ?? (approvedAmount + estFee);
 
   // Existing debts rows
@@ -403,7 +385,7 @@ const AffordabilityReportDocument = ({ assessment, application }: Props) => {
         <Text style={styles.subHeading}>{`5.1 TerePay Loan Cost - ${fmt(approvedAmount, 0)}`}</Text>
         <TableHeaderRow cols={['Component', 'Amount']} />
         <TableRow shade cells={['Loan Principal', fmt(approvedAmount)]} />
-        <TableRow cells={['Establishment Fee', fmt(estFee)]} />
+        <TableRow cells={['Application Fee', fmt(estFee)]} />
         <TableRow shade cells={['Total Repayable', fmt(totalRepayable)]} />
         <TableRow cells={['Repayment per Fortnight', fmt(loanFNPayment)]} bold={0} />
 
@@ -444,7 +426,7 @@ const AffordabilityReportDocument = ({ assessment, application }: Props) => {
         <Text style={styles.subHeading}>Loan Terms:</Text>
         <TableHeaderRow cols={['Component', 'Detail']} />
         <TableRow shade cells={['Approved Amount', fmt(approvedAmount)]} />
-        <TableRow cells={['Establishment Fee', fmt(estFee)]} />
+        <TableRow cells={['Application Fee', fmt(estFee)]} />
         <TableRow shade cells={['Total Repayable', fmt(totalRepayable)]} />
         <TableRow cells={['Repayment Schedule', loanFNPayment > 0 ? `Fortnightly payments of ${fmt(loanFNPayment)}` : '-']} />
         <TableRow shade cells={['Repayment Method', bank?.paymentMethod === 'direct_debit' ? `Direct Debit - ${bank.accountNumber ?? '-'}` : (bank?.paymentMethod ?? '-')]} />

@@ -6,6 +6,7 @@ import type { LoanApplication } from '@/types/application';
 import ApplicationActions from './ApplicationActions';
 import AddNoteForm from './AddNoteForm';
 import DecisionForm from './DecisionForm';
+import ExistingCustomerToggle from './ExistingCustomerToggle';
 
 export const dynamic = 'force-dynamic';
 
@@ -170,6 +171,10 @@ export default async function LenderApplicationDetailPage({
               <Field label="Household" value={pi.householdType?.replace(/_/g, ' ')} />
               <Field label="Children" value={pi.numberOfChildren} />
               <Field label="Dependents" value={pi.numberOfDependents} />
+              <ExistingCustomerToggle
+                applicationId={id}
+                initialValue={Boolean(app.isExistingCustomer)}
+              />
             </dl>
           </section>
         )}

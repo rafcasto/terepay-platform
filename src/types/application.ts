@@ -181,6 +181,43 @@ export interface HouseholdMultiplier {
 }
 
 // ---------------------------------------------------------------------------
+// Affordability Assessment Draft (persisted step-by-step)
+// ---------------------------------------------------------------------------
+export interface AffordabilityDraftData {
+  currentStep: number;
+  checklist: {
+    centrixReportObtained: boolean;
+    centrixReportNumber: string;
+    firstTransactionVerified: boolean;
+    firstTransactionDate: string;
+    payslipsReceived: boolean;
+    creditReportObtained: boolean;
+    employmentVerified: boolean;
+    employmentVerificationMethod: string;
+    visaConfirmed: boolean;
+    visaExpiryDate: string;
+  };
+  incomeRows: Array<{
+    category: string;
+    centrixAmount: number;
+    verifiedAmount: number;
+    adjustment: number;
+    adjustmentReason: string;
+    finalAmount: number;
+  }>;
+  expenseRows: Array<{
+    category: string;
+    centrixAmount: number;
+    benchmarkAmount: number;
+    adjustment: number;
+    adjustmentReason: string;
+    finalAmount: number;
+  }>;
+  recommendation: 'proceed' | 'decline';
+  savedAt: Timestamp;
+}
+
+// ---------------------------------------------------------------------------
 // Main LoanApplication type
 // ---------------------------------------------------------------------------
 export interface LoanApplication {
@@ -199,7 +236,7 @@ export interface LoanApplication {
     purposeDescription: string;
     // Filled on approval
     approvedAmount?: number;
-    establishmentFee?: number;
+    applicationFee?: number;
     fortnightlyPayment?: number;
     totalRepayment?: number;
     disbursementDate?: string;
@@ -232,8 +269,10 @@ export interface LoanApplication {
   // Affordability assessment IDs (most recent first)
   affordabilityAssessmentIds: string[];
   affordabilityStatus: 'not_started' | 'in_progress' | 'complete';
-
-  // Credit check
+  /** Persisted step-by-step draft while the lender is filling the assessment */
+  affordabilityDraft?: AffordabilityDraftData;
+  /** True when the applicant is flagged as an existing customer ($30 fee) */
+  isExistingCustomer?: boolean;
   creditCheck?: {
     reportNumber: string;
     reportDate: string;

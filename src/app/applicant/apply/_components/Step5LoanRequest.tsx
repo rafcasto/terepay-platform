@@ -68,7 +68,7 @@ export default function Step5LoanRequest() {
           <div><span className="font-semibold">APR:</span> 49%</div>
           <div><span className="font-semibold">Interest:</span> 4.7% for 8 weeks</div>
           <div><span className="font-semibold">New customer fee:</span> $50</div>
-          <div><span className="font-semibold">Repeat customer fee:</span> $20</div>
+          <div><span className="font-semibold">Existing customer fee:</span> $30</div>
         </div>
       </div>
 
@@ -101,7 +101,7 @@ export default function Step5LoanRequest() {
             <span className="font-bold">${fortnightlyPayment.toFixed(2)}</span>
           </p>
           <p className="text-xs text-green-600">
-            Total repayable: ${totalRepayable.toFixed(2)} (incl. $50 establishment fee &amp; 4.7% interest)
+            Total repayable: ${totalRepayable.toFixed(2)} (incl. $50 application fee &amp; 4.7% interest)
           </p>
         </div>
       )}

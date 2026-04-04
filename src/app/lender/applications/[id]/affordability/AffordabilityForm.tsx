@@ -19,12 +19,43 @@ import {
   calcIncomeRow,
   calcExpenseRow,
 } from './_components/types';
+import type { AffordabilityDraftData } from '@/types/application';
 
 interface BenchmarkEntry {
   benchmarkId: string;
   categoryName: string;
   fortnightlyAmount: number;
 }
+
+// ─── Per-step validation ─────────────────────────────────────────────────────
+
+function validateStep1(checklist: Checklist, daysOfData: number): string[] {
+  const errors: string[] = [];
+  if (!checklist.centrixReportObtained) errors.push('Centrix report must be obtained');
+  if (!checklist.centrixReportNumber.trim()) errors.push('Centrix report number is required');
+  if (!checklist.firstTransactionVerified) errors.push('First transaction date must be verified');
+  if (!checklist.firstTransactionDate) errors.push('First transaction date is required');
+  if (daysOfData > 0 && daysOfData < 90) errors.push('At least 90 days of transaction data required');
+  if (!checklist.payslipsReceived) errors.push('Payslips must be received');
+  if (!checklist.creditReportObtained) errors.push('Credit report must be obtained');
+  if (!checklist.employmentVerified) errors.push('Employment must be verified');
+  if (checklist.employmentVerified && !checklist.employmentVerificationMethod.trim())
+    errors.push('Employment verification method is required');
+  if (!checklist.visaConfirmed) errors.push('Visa status must be confirmed');
+  if (checklist.visaConfirmed && !checklist.visaExpiryDate)
+    errors.push('Visa expiry date is required when visa is confirmed');
+  return errors;
+}
+
+function validateStep2(incomeRows: IncomeRow[]): string[] {
+  const hasIncome = incomeRows.some((r) => r.centrixAmount > 0 || r.verifiedAmount > 0);
+  if (!hasIncome) {
+    return ['At least one income source must have a Centrix or Verified amount entered'];
+  }
+  return [];
+}
+
+// ─── Props ───────────────────────────────────────────────────────────────────
 
 interface Props {
   applicationId: string;
@@ -40,6 +71,7 @@ interface Props {
   visaExpiryDate?: string;
   catalogVersionId: string;
   isReassessment: boolean;
+  initialDraft?: AffordabilityDraftData | null;
 }
 
 export default function AffordabilityForm({
@@ -56,50 +88,64 @@ export default function AffordabilityForm({
   visaExpiryDate,
   catalogVersionId,
   isReassessment,
+  initialDraft,
 }: Props) {
   const router = useRouter();
   const hMult = HOUSEHOLD_MULTIPLIERS[householdType] ?? 1.0;
 
-  const [currentStep, setCurrentStep] = useState(0);
+  const [currentStep, setCurrentStep] = useState(initialDraft?.currentStep ?? 0);
 
-  const [checklist, setChecklist] = useState<Checklist>({
-    centrixReportObtained: false,
-    centrixReportNumber: '',
-    firstTransactionVerified: false,
-    firstTransactionDate: '',
-    payslipsReceived: false,
-    creditReportObtained: false,
-    employmentVerified: false,
-    employmentVerificationMethod: '',
-    visaConfirmed: false,
-    visaExpiryDate: visaExpiryDate ?? '',
-  });
+  const [checklist, setChecklist] = useState<Checklist>(() =>
+    initialDraft?.checklist
+      ? (initialDraft.checklist as Checklist)
+      : {
+          centrixReportObtained: false,
+          centrixReportNumber: '',
+          firstTransactionVerified: false,
+          firstTransactionDate: '',
+          payslipsReceived: false,
+          creditReportObtained: false,
+          employmentVerified: false,
+          employmentVerificationMethod: '',
+          visaConfirmed: false,
+          visaExpiryDate: visaExpiryDate ?? '',
+        },
+  );
 
-  const [incomeRows, setIncomeRows] = useState<IncomeRow[]>(() =>
-    INCOME_CATEGORIES.map((cat) => ({
+  const [incomeRows, setIncomeRows] = useState<IncomeRow[]>(() => {
+    if (initialDraft?.incomeRows?.length) {
+      return initialDraft.incomeRows as IncomeRow[];
+    }
+    return INCOME_CATEGORIES.map((cat) => ({
       category: cat,
       centrixAmount: 0,
       verifiedAmount: preFillIncome[cat] ?? 0,
       adjustment: 0,
       adjustmentReason: '',
       finalAmount: preFillIncome[cat] ?? 0,
-    })),
-  );
+    }));
+  });
 
-  const [expenseRows, setExpenseRows] = useState<ExpenseRow[]>(() =>
-    EXPENSE_CATEGORIES.map((cat) => ({
+  const [expenseRows, setExpenseRows] = useState<ExpenseRow[]>(() => {
+    if (initialDraft?.expenseRows?.length) {
+      return initialDraft.expenseRows as ExpenseRow[];
+    }
+    return EXPENSE_CATEGORIES.map((cat) => ({
       category: cat,
       centrixAmount: 0,
       benchmarkAmount: 0,
       adjustment: preFillExpenses[cat] ?? 0,
       adjustmentReason: '',
       finalAmount: preFillExpenses[cat] ?? 0,
-    })),
-  );
+    }));
+  });
 
-  const [recommendation, setRecommendation] = useState<'proceed' | 'decline'>('proceed');
+  const [recommendation, setRecommendation] = useState<'proceed' | 'decline'>(
+    initialDraft?.recommendation ?? 'proceed',
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [stepErrors, setStepErrors] = useState<string[]>([]);
 
   useEffect(() => {
     fetch('/api/benchmarks')
@@ -199,8 +245,39 @@ export default function AffordabilityForm({
     }
   };
 
-  const next = () => setCurrentStep((s) => Math.min(s + 1, 4));
-  const back = () => setCurrentStep((s) => Math.max(s - 1, 0));
+  const next = () => {
+    // Validate the current step before advancing
+    let errors: string[] = [];
+    if (currentStep === 1) errors = validateStep1(checklist, daysOfData);
+    else if (currentStep === 2) errors = validateStep2(incomeRows);
+
+    if (errors.length > 0) {
+      setStepErrors(errors);
+      return;
+    }
+    setStepErrors([]);
+
+    const nextStep = Math.min(currentStep + 1, 4);
+    setCurrentStep(nextStep);
+
+    // Persist draft after each successful advance (fire-and-forget)
+    fetch(`/api/applications/${applicationId}/affordability`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        currentStep: nextStep,
+        checklist,
+        incomeRows,
+        expenseRows,
+        recommendation,
+      }),
+    }).catch(() => undefined);
+  };
+
+  const back = () => {
+    setStepErrors([]);
+    setCurrentStep((s) => Math.max(s - 1, 0));
+  };
 
   return (
     <div className="min-h-screen flex flex-col sm:flex-row">
@@ -273,6 +350,7 @@ export default function AffordabilityForm({
                 daysOfData={daysOfData}
                 onNext={next}
                 onBack={back}
+                validationErrors={stepErrors}
               />
             )}
             {currentStep === 2 && (
@@ -282,6 +360,7 @@ export default function AffordabilityForm({
                 totalIncome={totalIncome}
                 onNext={next}
                 onBack={back}
+                validationErrors={stepErrors}
               />
             )}
             {currentStep === 3 && (

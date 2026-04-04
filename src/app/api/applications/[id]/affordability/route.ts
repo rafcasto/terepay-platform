@@ -287,3 +287,49 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return internalError();
   }
 }
+
+/**
+ * PATCH /api/applications/[id]/affordability
+ * Lender saves an in-progress affordability assessment draft step-by-step.
+ * Lightweight — no computation, just persists the current wizard state.
+ */
+export async function PATCH(request: NextRequest, { params }: RouteParams) {
+  try {
+    const auth = await withAuth(request, ['lender']);
+    const { id } = await params;
+
+    const appRef = adminDb.collection('loanApplications').doc(id);
+    const appDoc = await appRef.get();
+    if (!appDoc.exists) throw new AppError('NOT_FOUND', 404, 'Application not found');
+
+    const { currentStep, checklist, incomeRows, expenseRows, recommendation } =
+      await request.json();
+
+    await appRef.update({
+      affordabilityDraft: {
+        currentStep: currentStep ?? 0,
+        checklist: checklist ?? {},
+        incomeRows: incomeRows ?? [],
+        expenseRows: expenseRows ?? [],
+        recommendation: recommendation ?? 'proceed',
+        savedAt: FieldValue.serverTimestamp(),
+      },
+    });
+
+    await auditLog({
+      userId: auth.uid,
+      action: 'affordability_draft_saved',
+      targetId: id,
+      targetType: 'application',
+      outcome: 'success',
+      ipAddress: getClientIp(request),
+      changes: { currentStep },
+    });
+
+    return NextResponse.json({ data: { saved: true } });
+  } catch (err) {
+    if (err instanceof AppError) return errorResponse(err);
+    return internalError();
+  }
+}
+

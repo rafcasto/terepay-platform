@@ -8,6 +8,7 @@ interface Props {
   daysOfData: number;
   onNext: () => void;
   onBack: () => void;
+  validationErrors?: string[];
 }
 
 export default function Step2DataChecklist({
@@ -16,6 +17,7 @@ export default function Step2DataChecklist({
   daysOfData,
   onNext,
   onBack,
+  validationErrors,
 }: Props) {
   const update = (patch: Partial<Checklist>) => onChange({ ...checklist, ...patch });
   const hasEnoughData = daysOfData >= 90;
@@ -28,6 +30,16 @@ export default function Step2DataChecklist({
           Verify all documents and data before proceeding with income verification.
         </p>
       </div>
+
+      {/* Validation errors */}
+      {validationErrors && validationErrors.length > 0 && (
+        <div className="bg-red-50 border border-red-300 rounded-xl p-4">
+          <p className="text-sm font-semibold text-red-800 mb-2">Please complete all required items before proceeding:</p>
+          <ul className="list-disc list-inside space-y-1 text-sm text-red-700">
+            {validationErrors.map((e) => <li key={e}>{e}</li>)}
+          </ul>
+        </div>
+      )}
 
       <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
         {/* 1. Centrix Report */}

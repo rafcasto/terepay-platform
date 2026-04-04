@@ -157,6 +157,9 @@ export default async function AffordabilityPage(props: {
   const catalogVersionId = `benchmarks-${today.toISOString().slice(0, 10)}`;
   const isReassessment = application.affordabilityStatus === 'complete';
 
+  // Load any persisted draft so the lender can resume where they left off
+  const initialDraft = application.affordabilityDraft ?? null;
+
   return (
     <AffordabilityForm
       applicationId={id}
@@ -172,6 +175,7 @@ export default async function AffordabilityPage(props: {
       visaExpiryDate={visaExpiryDate}
       catalogVersionId={catalogVersionId}
       isReassessment={isReassessment}
+      initialDraft={initialDraft}
     />
   );
 }

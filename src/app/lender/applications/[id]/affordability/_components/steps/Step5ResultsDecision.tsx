@@ -149,10 +149,11 @@ export default function Step5ResultsDecision({
         )}
       </div>
 
-      {/* Error */}
+      {/* Submission error */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
-          {error}
+        <div className="bg-red-50 border-2 border-red-300 rounded-xl p-4">
+          <p className="font-semibold text-red-800 mb-1">Submission failed</p>
+          <p className="text-sm text-red-700">{error}</p>
         </div>
       )}
 
