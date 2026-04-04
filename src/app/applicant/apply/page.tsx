@@ -141,7 +141,21 @@ function ApplyPageInner() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data } = await res.json() as { data: any[] };
         const draft = data?.find((a) => a.status === 'draft');
-        if (!draft) return;
+        if (!draft) {
+          // Create a draft immediately so it appears in Firestore from the first visit
+          const createRes = await fetch('/api/applications', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({}),
+          });
+          if (createRes.ok) {
+            const json = await createRes.json() as { data: { id: string } };
+            setDraftId(json.data.id);
+          }
+          // Always start at step 0 for new applications — overrides any ?step=N URL param
+          setCurrentStep(0);
+          return;
+        }
         const r2 = await fetch(`/api/applications/${draft.id}`);
         if (!r2.ok) return;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -221,7 +235,36 @@ function ApplyPageInner() {
 
       const body = await res.json();
       if (!res.ok) {
-        throw new Error(body.error?.message ?? 'Failed to submit application');
+        const code = (body.error?.code ?? '') as string;
+        let errorMessage: string;
+        if (code === 'FORBIDDEN') {
+          errorMessage = body.error.message;
+        } else if (code === 'RATE_LIMITED') {
+          errorMessage = 'Too many requests. Please wait a moment and try again.';
+        } else if (code === 'VALIDATION_ERROR') {
+          const details = body.error?.details as Record<string, string[]> | undefined;
+          const FIELD_TO_STEP: Record<string, string> = {
+            personalInfo: 'Personal Information',
+            employment: 'Employment & Income',
+            livingExpenses: 'Living Expenses',
+            existingDebts: 'Existing Debts',
+            loanRequest: 'Loan Request',
+            bankDetails: 'Bank Account',
+            references: 'References',
+            declarations: 'Declarations & Consent',
+          };
+          if (details && Object.keys(details).length > 0) {
+            const sections = [...new Set(
+              Object.keys(details).map((k) => FIELD_TO_STEP[k.split('.')[0]] ?? k.split('.')[0])
+            )];
+            errorMessage = `Please review the following sections before submitting: ${sections.join(', ')}.`;
+          } else {
+            errorMessage = body.error?.message ?? 'Some fields are invalid. Please review your application.';
+          }
+        } else {
+          errorMessage = 'Something went wrong on our end. Please try again or contact support.';
+        }
+        throw new Error(errorMessage);
       }
 
       // Save Step 1 personal info back to the applicant profile (fire-and-forget)

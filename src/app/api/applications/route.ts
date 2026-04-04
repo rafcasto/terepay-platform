@@ -338,8 +338,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ data: { applicationId: savedId } }, { status: 201 });
   } catch (err) {
     if (err instanceof ZodError) {
+      const sectionNames: Record<string, string> = {
+        personalInfo: 'Personal Information',
+        employment: 'Employment & Income',
+        livingExpenses: 'Living Expenses',
+        existingDebts: 'Existing Debts',
+        loanRequest: 'Loan Request',
+        bankDetails: 'Bank Account',
+        references: 'References',
+        declarations: 'Declarations & Consent',
+      };
+      const fieldErrors = err.flatten().fieldErrors;
+      const sections = [...new Set(
+        Object.keys(fieldErrors).map((k) => sectionNames[k.split('.')[0]] ?? k.split('.')[0])
+      )];
+      const message = sections.length > 0
+        ? `Please review the following sections: ${sections.join(', ')}`
+        : 'Some fields in your application are invalid. Please review all sections.';
       return errorResponse(
-        new AppError('VALIDATION_ERROR', 422, 'Invalid request', err.flatten().fieldErrors),
+        new AppError('VALIDATION_ERROR', 422, message, fieldErrors),
       );
     }
     if (err instanceof AppError) return errorResponse(err);
