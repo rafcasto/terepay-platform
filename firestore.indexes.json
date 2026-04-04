@@ -56,6 +56,14 @@
         { "fieldPath": "isActive", "order": "ASCENDING" },
         { "fieldPath": "householdType", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "affordabilityAssessments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "applicationId", "order": "ASCENDING" },
+        { "fieldPath": "version", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

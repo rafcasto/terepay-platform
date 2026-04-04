@@ -7,6 +7,9 @@ import {
   StyleSheet,
   Font,
   renderToBuffer,
+  Svg,
+  Rect,
+  Path,
 } from '@react-pdf/renderer';
 import type { AffordabilityAssessment, LoanApplication } from '@/types/application';
 
@@ -85,6 +88,25 @@ function refFromAssessment(a: AffordabilityAssessment): string {
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
+// TerePay logo: three ascending bars (orange) + wordmark
+const TerePayLogo = () => (
+  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+    <Svg width={38} height={34} viewBox="0 0 38 34">
+      {/* Bar 1 - shortest */}
+      <Rect x="1" y="18" width="9" height="15" fill={orange} rx="1" />
+      {/* Bar 2 - medium */}
+      <Rect x="14" y="10" width="9" height="23" fill={orange} rx="1" />
+      {/* Bar 3 - tallest */}
+      <Rect x="27" y="2" width="9" height="31" fill={orange} rx="1" />
+      {/* Rising arrow tip on bar 3 */}
+      <Path d="M23 6 L31.5 0 L38 5" fill={orange} />
+    </Svg>
+    <View style={{ marginLeft: 5 }}>
+      <Text style={{ fontSize: 14, fontFamily: 'Helvetica-Bold', color: orange, lineHeight: 1 }}>TerePay</Text>
+    </View>
+  </View>
+);
+
 const SectionTitle = ({ title }: { title: string }) => (
   <View>
     <Text style={styles.sectionTitle}>{title}</Text>
@@ -247,7 +269,7 @@ const AffordabilityReportDocument = ({ assessment, application }: Props) => {
 
         {/* Header */}
         <View style={styles.headerRow}>
-          <View><Text style={{ fontSize: 9, color: '#6B7280' }}>{''}</Text></View>
+          <TerePayLogo />
           <View>
             <Text style={styles.headerTitle}>AFFORDABILITY ASSESSMENT</Text>
             <Text style={[styles.headerTitle, { fontSize: 13 }]}>REPORT</Text>
@@ -310,7 +332,7 @@ const AffordabilityReportDocument = ({ assessment, application }: Props) => {
       <Page size="A4" style={styles.page}>
         <PageFooter />
         <View style={styles.headerRow}>
-          <View />
+          <TerePayLogo />
           <View>
             <Text style={styles.headerTitle}>AFFORDABILITY ASSESSMENT REPORT</Text>
             <Text style={styles.headerSub}>Date: {todayFmt()} | Ref: {refFromAssessment(assessment)}</Text>
@@ -366,7 +388,7 @@ const AffordabilityReportDocument = ({ assessment, application }: Props) => {
       <Page size="A4" style={styles.page}>
         <PageFooter />
         <View style={styles.headerRow}>
-          <View />
+          <TerePayLogo />
           <View>
             <Text style={styles.headerTitle}>AFFORDABILITY ASSESSMENT REPORT</Text>
             <Text style={styles.headerSub}>Date: {todayFmt()} | Ref: {refFromAssessment(assessment)}</Text>
@@ -434,7 +456,7 @@ const AffordabilityReportDocument = ({ assessment, application }: Props) => {
       <Page size="A4" style={styles.page}>
         <PageFooter />
         <View style={styles.headerRow}>
-          <View />
+          <TerePayLogo />
           <View>
             <Text style={styles.headerTitle}>AFFORDABILITY ASSESSMENT REPORT</Text>
             <Text style={styles.headerSub}>Date: {todayFmt()} | Ref: {refFromAssessment(assessment)}</Text>

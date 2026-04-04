@@ -24,20 +24,23 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     if (!appDoc.exists) throw new AppError('NOT_FOUND', 404, 'Application not found');
 
     // Load most recent complete assessment
+    // Simple single-field query avoids requiring a composite index.
+    // Filter and sort in memory since results are small (1 application's assessments).
     const assessmentSnap = await adminDb
       .collection('affordabilityAssessments')
       .where('applicationId', '==', id)
-      .where('isSuperseded', '==', false)
-      .where('status', '==', 'complete')
-      .orderBy('version', 'desc')
-      .limit(1)
       .get();
 
-    if (assessmentSnap.empty) {
+    const completedAssessments = assessmentSnap.docs
+      .map(d => d.data() as AffordabilityAssessment)
+      .filter(a => a.status === 'complete' && !a.isSuperseded)
+      .sort((a, b) => (b.version ?? 0) - (a.version ?? 0));
+
+    if (completedAssessments.length === 0) {
       throw new AppError('NOT_FOUND', 404, 'No completed affordability assessment found for this application');
     }
 
-    const assessmentData = assessmentSnap.docs[0].data() as AffordabilityAssessment;
+    const assessmentData = completedAssessments[0];
     const appData = { ...appDoc.data(), applicationId: id } as LoanApplication;
 
     const pdfBuffer = await generateAffordabilityPdf(assessmentData, appData);
@@ -45,7 +48,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const dateStr = new Date().toISOString().split('T')[0];
     const fileName = `affordability_assessment_v${assessmentData.version}_${dateStr}.pdf`;
 
-    return new NextResponse(pdfBuffer.buffer as ArrayBuffer, {
+    // Pass the Buffer directly — pdfBuffer.buffer is the Node.js pool ArrayBuffer
+    // (with byteOffset != 0) which causes truncated/corrupted PDF responses.
+    const arrayBuffer = pdfBuffer.buffer.slice(
+      pdfBuffer.byteOffset,
+      pdfBuffer.byteOffset + pdfBuffer.byteLength,
+    ) as ArrayBuffer;
+    return new NextResponse(arrayBuffer, {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
