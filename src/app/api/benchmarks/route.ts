@@ -19,8 +19,8 @@ export async function GET(request: NextRequest) {
     await withAuth(request, ['lender']);
 
     const [benchmarksSnap, multipliersSnap] = await Promise.all([
-      adminDb.collection('benchmarks').where('isActive', '==', true).orderBy('categoryName').get(),
-      adminDb.collection('householdMultipliers').where('isActive', '==', true).orderBy('householdType').get(),
+      adminDb.collection('benchmarks').where('isActive', '==', true).get(),
+      adminDb.collection('householdMultipliers').where('isActive', '==', true).get(),
     ]);
 
     return NextResponse.json({
