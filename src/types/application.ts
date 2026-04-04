@@ -88,22 +88,20 @@ export interface RepaymentSchedule {
 // ---------------------------------------------------------------------------
 export interface AffordabilityIncomeRow {
   category: string;
-  statedAmount: number;       // pre-filled from applicant form
   centrixAmount: number;      // lender enters from Centrix
   verifiedAmount: number;     // lender enters from payslips
   adjustment: number;         // lender enters
   adjustmentReason?: string;
-  finalAmount: number;        // auto: lower of centrix vs verified
+  finalAmount: number;        // auto: MIN(centrix, verified) + adjustment
 }
 
 export interface AffordabilityExpenseRow {
   category: string;
-  statedAmount: number;       // pre-filled from applicant form
   centrixAmount: number;      // lender enters from bank analysis
   benchmarkAmount: number;    // auto from catalog × multiplier
   adjustment: number;         // lender enters with reason
   adjustmentReason?: string;
-  finalAmount: number;        // auto: max of centrix, benchmark, adjustment
+  finalAmount: number;        // auto: MAX(centrix, benchmark) + adjustment
   benchmarkOverrideAcknowledged?: boolean;
 }
 
@@ -119,13 +117,17 @@ export interface AffordabilityAssessment {
 
   // Checklist
   checklist: {
-    centrixReportNumber: string;
+    centrixReportObtained: boolean;
+    centrixReportNumber?: string;
+    firstTransactionVerified: boolean;
     firstTransactionDate: string;
     daysOfTransactionData: number;       // auto-calculated
-    paylipsReceived: boolean;
+    payslipsReceived: boolean;
+    creditReportObtained: boolean;
     employmentVerified: boolean;
-    employmentVerificationMethod: string;
+    employmentVerificationMethod?: string;
     visaConfirmed: boolean;
+    visaExpiryDate?: string;
   };
 
   // Data

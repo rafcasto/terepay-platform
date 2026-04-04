@@ -116,7 +116,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const expenseRows = parsed.expenseRows.map((row) => ({
       ...row,
-      finalAmount: Math.max(row.centrixAmount, row.benchmarkAmount, row.adjustment > 0 ? row.adjustment : 0),
+      finalAmount: Math.max(0, Math.max(row.centrixAmount, row.benchmarkAmount) + row.adjustment),
     }));
 
     const totalVerifiedIncome = incomeRows.reduce((sum, r) => sum + r.finalAmount, 0);
@@ -279,9 +279,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     });
   } catch (err) {
     if (err instanceof ZodError) {
+      console.error('[affordability POST] Validation error:', JSON.stringify(err.flatten().fieldErrors, null, 2));
       return errorResponse(new AppError('VALIDATION_ERROR', 422, 'Invalid request', err.flatten().fieldErrors));
     }
     if (err instanceof AppError) return errorResponse(err);
+    console.error('[affordability POST] Unexpected error:', err);
     return internalError();
   }
 }

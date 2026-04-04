@@ -50,6 +50,68 @@ export default function BenchmarksClient({
   const [error, setError] = useState<string | null>(null);
   const [filterCategory, setFilterCategory] = useState('');
   const [filterHousehold, setFilterHousehold] = useState('');
+  const [seedProgress, setSeedProgress] = useState<string | null>(null);
+
+  const SEED_DEFAULTS: Array<{ categoryName: string; fortnightlyAmount: number }> = [
+    { categoryName: 'Food & Groceries', fortnightlyAmount: 280 },
+    { categoryName: 'Utilities', fortnightlyAmount: 100 },
+    { categoryName: 'Personal/Clothing', fortnightlyAmount: 80 },
+    { categoryName: 'Transport', fortnightlyAmount: 200 },
+    { categoryName: 'Medical', fortnightlyAmount: 60 },
+    { categoryName: 'Car Insurance', fortnightlyAmount: 60 },
+    { categoryName: 'Restaurants/Takeaways', fortnightlyAmount: 80 },
+    { categoryName: 'Entertainment', fortnightlyAmount: 50 },
+    { categoryName: 'Travel', fortnightlyAmount: 50 },
+    { categoryName: 'Subscriptions', fortnightlyAmount: 30 },
+    { categoryName: 'Childcare', fortnightlyAmount: 0 },
+    { categoryName: 'Accommodation/Rent', fortnightlyAmount: 0 },
+    { categoryName: 'Health Insurance', fortnightlyAmount: 0 },
+    { categoryName: 'Rates', fortnightlyAmount: 0 },
+    { categoryName: 'Education', fortnightlyAmount: 0 },
+    { categoryName: 'Child Support', fortnightlyAmount: 0 },
+    { categoryName: 'Remittances', fortnightlyAmount: 0 },
+  ];
+
+  const seedDefaults = async () => {
+    if (!confirm('Insert default NZ HES benchmark values? Existing active benchmarks for the same category/household will be skipped.')) return;
+    setLoading(true);
+    setSeedProgress(null);
+    let inserted = 0;
+    let skipped = 0;
+    try {
+      for (let i = 0; i < SEED_DEFAULTS.length; i++) {
+        const def = SEED_DEFAULTS[i];
+        setSeedProgress(`Seeding ${i + 1}/${SEED_DEFAULTS.length}…`);
+        const alreadyExists = benchmarks.some(
+          (b) => b.isActive && b.categoryName === def.categoryName && b.householdType === 'single',
+        );
+        if (alreadyExists) { skipped++; continue; }
+        const res = await fetch('/api/benchmarks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            categoryName: def.categoryName,
+            householdType: 'single',
+            fortnightlyAmount: def.fortnightlyAmount,
+            rangeLow: 0,
+            rangeHigh: 0,
+            source: 'NZ HES 2024',
+            effectiveFrom: '2024-01-01',
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setBenchmarks((prev) => [...prev, data.benchmark]);
+          inserted++;
+        }
+      }
+      setSeedProgress(`Done — ${inserted} inserted, ${skipped} skipped.`);
+    } catch {
+      setSeedProgress('Seeding failed — check console.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const resetForm = () => {
     setForm(EMPTY_FORM);
@@ -182,13 +244,25 @@ export default function BenchmarksClient({
           <option value="">All household types</option>
           {HOUSEHOLD_TYPES.map((h) => <option key={h} value={h}>{h.replace('_', ' + ')}</option>)}
         </select>
+        <div className="ml-auto flex gap-2">
+        <button
+          onClick={seedDefaults}
+          disabled={loading}
+          className="py-1.5 px-4 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
+        >
+          Seed Defaults
+        </button>
         <button
           onClick={openNew}
-          className="ml-auto py-1.5 px-4 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+          className="py-1.5 px-4 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
         >
           + Add Benchmark
         </button>
       </div>
+      </div>
+      {seedProgress && (
+        <p className="text-sm text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-2">{seedProgress}</p>
+      )}
 
       {/* Add/Edit Form */}
       {showForm && (

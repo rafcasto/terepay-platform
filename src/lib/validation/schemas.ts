@@ -399,30 +399,35 @@ export const reviewDocumentSchema = z.object({
 });
 
 export const affordabilityChecklistSchema = z.object({
-  centrixReportNumber: z.string().min(1, 'Centrix report number is required'),
+  centrixReportObtained: z.boolean(),
+  centrixReportNumber: z.string().optional(),
+  firstTransactionVerified: z.boolean(),
   firstTransactionDate: z.string().min(1, 'First transaction date is required'),
-  paylipsReceived: z.boolean(),
+  payslipsReceived: z.boolean(),
+  creditReportObtained: z.boolean(),
   employmentVerified: z.boolean(),
-  employmentVerificationMethod: z.string().min(1, 'Specify verification method'),
+  employmentVerificationMethod: z.string().optional(),
   visaConfirmed: z.boolean(),
+  visaExpiryDate: z.string().optional(),
+  daysOfTransactionData: z.number().int().min(0).optional(),
 });
 
 const incomeRowSchema = z.object({
   category: z.string(),
-  statedAmount: z.number().min(0),
   centrixAmount: z.number().min(0),
   verifiedAmount: z.number().min(0),
   adjustment: z.number(),
   adjustmentReason: z.string().optional(),
+  finalAmount: z.number().min(0).optional(),
 });
 
 const expenseRowSchema = z.object({
   category: z.string(),
-  statedAmount: z.number().min(0),
   centrixAmount: z.number().min(0),
   benchmarkAmount: z.number().min(0),
   adjustment: z.number(),
   adjustmentReason: z.string().optional(),
+  finalAmount: z.number().min(0).optional(),
   benchmarkOverrideAcknowledged: z.boolean().optional(),
 });
 
@@ -432,7 +437,7 @@ export const affordabilityAssessmentSchema = z.object({
   expenseRows: z.array(expenseRowSchema).check(z.minLength(1)),
   householdMultiplier: z.number().min(1),
   catalogVersionId: z.string(),
-  redFlagsAcknowledged: z.record(z.string(), z.string()),
+  redFlagsAcknowledged: z.record(z.string(), z.string()).optional().default({}),
   recommendation: z.enum(['proceed', 'decline']),
 });
 

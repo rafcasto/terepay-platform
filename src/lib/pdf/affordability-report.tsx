@@ -285,13 +285,13 @@ const AffordabilityReportDocument = ({ assessment, application }: Props) => {
         {/* Section 2 – Income Verification */}
         <SectionTitle title="2. INCOME VERIFICATION" />
         <Text style={{ fontSize: 8, marginBottom: 6 }}>
-          {`Income verified from ${assessment.checklist.paylipsReceived ? 'payslips' : 'stated income'} (${emp?.employerName ?? '-'}, Employment verified: ${assessment.checklist.employmentVerified ? 'Yes' : 'No'} via ${assessment.checklist.employmentVerificationMethod ?? '-'}).`}
+          {`Income verified from ${assessment.checklist.payslipsReceived ? 'payslips' : 'stated income'} (${emp?.employerName ?? '-'}, Employment verified: ${assessment.checklist.employmentVerified ? 'Yes' : 'No'} via ${assessment.checklist.employmentVerificationMethod ?? '-'}).`}
         </Text>
 
-        <TableHeaderRow cols={['Income Source', 'Stated (FN)', 'Centrix (FN)', 'Verified (FN)', 'Final (FN)']} />
+        <TableHeaderRow cols={['Income Source', 'Centrix (FN)', 'Verified (FN)', 'Final (FN)']} />
         {incomeRows.map((row, i) => (
           <TableRow key={i} shade={i % 2 === 0}
-            cells={[row.category, fmt(row.statedAmount), fmt(row.centrixAmount), fmt(row.verifiedAmount), fmt(row.finalAmount)]}
+            cells={[row.category, fmt(row.centrixAmount), fmt(row.verifiedAmount), fmt(row.finalAmount)]}
           />
         ))}
         {incomeRows.length === 0 && emp && (

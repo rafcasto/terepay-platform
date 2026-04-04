@@ -179,12 +179,17 @@ export default function AffordabilityForm({
           expenseRows,
           householdMultiplier: hMult,
           catalogVersionId,
+          redFlagsAcknowledged: {},
           recommendation: hardDeclines.length > 0 ? 'decline' : recommendation,
         }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error((data as { message?: string }).message ?? 'Failed to submit assessment');
+        const msg =
+          (data as { error?: { message?: string }; message?: string })?.error?.message ??
+          (data as { message?: string })?.message ??
+          'Failed to submit assessment';
+        throw new Error(msg);
       }
       router.push(`/lender/applications/${applicationId}`);
       router.refresh();
