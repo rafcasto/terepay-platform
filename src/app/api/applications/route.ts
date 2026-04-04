@@ -42,6 +42,7 @@ async function handleLenderApplication(
 
   let customerRef: string | null = null;
   let customerType: 'online' | 'offline';
+  let inheritedIsExistingCustomer = false;
 
   if (parsed.applicantId) {
     // Verify the online applicant exists
@@ -51,6 +52,7 @@ async function handleLenderApplication(
     }
     customerRef = parsed.applicantId;
     customerType = 'online';
+    inheritedIsExistingCustomer = userSnap.data()?.isExistingCustomer === true;
   } else {
     // Verify the offline customer exists
     const custSnap = await adminDb.collection('offlineCustomers').doc(parsed.offlineCustomerId!).get();
@@ -59,6 +61,7 @@ async function handleLenderApplication(
     }
     customerRef = parsed.offlineCustomerId!;
     customerType = 'offline';
+    inheritedIsExistingCustomer = custSnap.data()?.isExistingCustomer === true;
   }
 
   const applicationId = randomUUID();
@@ -67,6 +70,7 @@ async function handleLenderApplication(
   const applicationData: Record<string, unknown> = {
     applicationId,
     status: 'pending_review',
+    isExistingCustomer: inheritedIsExistingCustomer,
     createdByLenderId: lenderUid,
     ...(customerType === 'online'
       ? { applicantId: customerRef }
@@ -197,6 +201,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Fetch Firestore user doc to inherit the isExistingCustomer flag onto the application
+    const userDoc = await adminDb.collection('users').doc(uid).get();
+    const applicantIsExistingCustomer: boolean = userDoc.data()?.isExistingCustomer === true;
+
     const body = await request.json();
 
     // Accept both TerePay 8-section form and legacy simple form
@@ -300,6 +308,9 @@ export async function POST(request: NextRequest) {
         metadata: { comments: [], internalNotes: '' },
       };
     }
+
+    // Inherit the customer's existing-customer flag onto every application
+    applicationData.isExistingCustomer = applicantIsExistingCustomer;
 
     const applicationId = (applicationData as { applicationId: string }).applicationId;
 

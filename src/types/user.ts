@@ -33,6 +33,8 @@ export interface User {
   emailVerified: boolean;
   /** Friendly TerePay customer ID (e.g. TERE001) — set when claiming an offline profile */
   customerId?: string;
+  /** Whether this customer has had at least one loan approved. Controls application fee tier. */
+  isExistingCustomer?: boolean;
 }
 
 export type OfflineCustomerStatus = 'unlinked' | 'linked';
@@ -53,6 +55,9 @@ export interface OfflineCustomer {
   status: OfflineCustomerStatus;
   linkedUid?: string;
   linkedAt?: Timestamp;
+  /** Whether this offline customer has had at least one loan approved. Controls application fee tier. */
+  isExistingCustomer?: boolean;
+  updatedAt?: Timestamp;
 }
 
 export interface ApplicantProfile {

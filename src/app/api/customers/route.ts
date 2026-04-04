@@ -100,6 +100,7 @@ export async function GET(request: NextRequest) {
       email?: string;
       customerId?: string;
       status?: string;
+      isExistingCustomer?: boolean;
     };
 
     const results: CustomerResult[] = [];
@@ -122,6 +123,7 @@ export async function GET(request: NextRequest) {
             lastName: d.lastName ?? '',
             email: d.email,
             customerId: d.customerId,
+            isExistingCustomer: d.isExistingCustomer === true,
           });
         }
       }
@@ -146,6 +148,7 @@ export async function GET(request: NextRequest) {
             email: d.email,
             customerId: d.customerId,
             status: d.status,
+            isExistingCustomer: d.isExistingCustomer === true,
           });
         }
       }
