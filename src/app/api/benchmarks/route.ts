@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
 
     const benchmarkId = randomUUID();
 
-    await adminDb.collection('benchmarks').doc(benchmarkId).set({
+    const benchmarkData = {
       benchmarkId,
       categoryName: parsed.categoryName,
       householdType: parsed.householdType,
@@ -58,9 +58,13 @@ export async function POST(request: NextRequest) {
       effectiveFrom: parsed.effectiveFrom,
       effectiveTo: parsed.effectiveTo ?? null,
       createdBy: auth.uid,
-      lastUpdated: FieldValue.serverTimestamp(),
       isActive: true,
       previousVersionId: null,
+    };
+
+    await adminDb.collection('benchmarks').doc(benchmarkId).set({
+      ...benchmarkData,
+      lastUpdated: FieldValue.serverTimestamp(),
     });
 
     await auditLog({
@@ -73,7 +77,7 @@ export async function POST(request: NextRequest) {
       changes: { categoryName: parsed.categoryName, fortnightlyAmount: parsed.fortnightlyAmount },
     });
 
-    return NextResponse.json({ benchmarkId }, { status: 201 });
+    return NextResponse.json({ benchmarkId, benchmark: benchmarkData }, { status: 201 });
   } catch (err) {
     if (err instanceof ZodError) {
       return errorResponse(new AppError('VALIDATION_ERROR', 422, 'Invalid request', err.flatten().fieldErrors));

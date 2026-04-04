@@ -79,7 +79,22 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       },
     });
 
-    return NextResponse.json({ benchmarkId: newBenchmarkId });
+    const newBenchmarkData = {
+      benchmarkId: newBenchmarkId,
+      categoryName: parsed.categoryName,
+      householdType: parsed.householdType,
+      fortnightlyAmount: parsed.fortnightlyAmount,
+      rangeLow: parsed.rangeLow,
+      rangeHigh: parsed.rangeHigh,
+      source: parsed.source,
+      effectiveFrom: parsed.effectiveFrom,
+      effectiveTo: parsed.effectiveTo ?? null,
+      createdBy: auth.uid,
+      isActive: true,
+      previousVersionId: id,
+    };
+
+    return NextResponse.json({ benchmarkId: newBenchmarkId, newBenchmark: newBenchmarkData });
   } catch (err) {
     if (err instanceof ZodError) {
       return errorResponse(new AppError('VALIDATION_ERROR', 422, 'Invalid request', err.flatten().fieldErrors));

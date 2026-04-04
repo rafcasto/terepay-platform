@@ -100,9 +100,25 @@ export default function BenchmarksClient({
           }),
         });
         if (res.ok) {
-          const data = await res.json();
-          setBenchmarks((prev) => [...prev, data.benchmark]);
+          const { benchmarkId } = await res.json();
+          setBenchmarks((prev) => [
+            ...prev,
+            {
+              benchmarkId,
+              categoryName: def.categoryName,
+              householdType: 'single',
+              fortnightlyAmount: def.fortnightlyAmount,
+              rangeLow: 0,
+              rangeHigh: 0,
+              source: 'NZ HES 2024',
+              effectiveFrom: '2024-01-01',
+              isActive: true,
+            },
+          ]);
           inserted++;
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          console.error('[seed benchmark] failed for', def.categoryName, errData);
         }
       }
       setSeedProgress(`Done — ${inserted} inserted, ${skipped} skipped.`);
@@ -172,15 +188,13 @@ export default function BenchmarksClient({
         });
       }
 
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.message ?? 'Request failed');
+        throw new Error(data?.error?.message ?? data?.message ?? 'Request failed');
       }
 
-      const data = await res.json();
-      const newEntry: BenchmarkEntry = editTarget
-        ? data.newBenchmark
-        : data.benchmark;
+      const newEntry: BenchmarkEntry = editTarget ? data.newBenchmark : data.benchmark;
+      if (!newEntry) throw new Error('Unexpected response from server — missing benchmark data');
 
       if (editTarget) {
         // Replace old with new version
