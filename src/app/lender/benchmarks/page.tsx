@@ -5,10 +5,23 @@ import BenchmarksClient from './BenchmarksClient';
 
 export const dynamic = 'force-dynamic';
 
+// Firestore Timestamp instances can't cross the Server→Client boundary.
+// Convert every Timestamp-like value to an ISO string before passing props.
+function serializeTimestamps(obj: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(obj).map(([k, v]) => {
+      if (v !== null && typeof v === 'object' && typeof (v as { toDate?: unknown }).toDate === 'function') {
+        return [k, (v as { toDate: () => Date }).toDate().toISOString()];
+      }
+      return [k, v];
+    }),
+  );
+}
+
 async function getBenchmarks() {
   const db = getAdminDb();
   const snap = await db.collection('benchmarks').orderBy('categoryName').get();
-  return snap.docs.map((d) => ({ benchmarkId: d.id, ...d.data() }));
+  return snap.docs.map((d) => serializeTimestamps({ benchmarkId: d.id, ...d.data() }));
 }
 
 export default async function BenchmarksPage() {
