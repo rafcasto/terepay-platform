@@ -39,7 +39,6 @@ export default async function LenderCustomersPage() {
     adminDb
       .collection('users')
       .where('role', '==', 'applicant')
-      .orderBy('createdAt', 'desc')
       .limit(200)
       .get(),
     adminDb
