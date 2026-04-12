@@ -268,12 +268,14 @@ function ApplyPageInner() {
       }
 
       // Immediately transition from draft → pending_review so it appears in the lender dashboard
-      const applicationId = (body.data as { id: string }).id;
+      const applicationId = (body.data as { applicationId: string }).applicationId ?? draftId;
+      if (!applicationId) {
+        throw new Error('Application ID missing after save. Please try again.');
+      }
       const submitRes = await fetch(`/api/applications/${applicationId}/submit`, { method: 'POST' });
       if (!submitRes.ok) {
-        // Application was saved but submit failed — don't block the user, redirect anyway
-        // The applicant can submit from the applications list page
-        console.error('Failed to auto-submit application after save');
+        const submitBody = await submitRes.json().catch(() => ({})) as { error?: { message?: string } };
+        throw new Error(submitBody.error?.message ?? 'Your application was saved but could not be submitted. Please try again.');
       }
 
       // Save Step 1 personal info back to the applicant profile (fire-and-forget)
