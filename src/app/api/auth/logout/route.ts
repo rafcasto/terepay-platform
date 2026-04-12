@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const response = NextResponse.json({ status: 'ok' });
+    const response = NextResponse.redirect(new URL('/auth/login', request.url));
     response.cookies.set('__session', '', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
