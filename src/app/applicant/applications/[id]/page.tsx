@@ -47,6 +47,14 @@ const STATUS_LABELS: Record<string, string> = {
   rejected: 'Declined',
 };
 
+const NEXT_STEPS = [
+  { label: 'Application Submitted', description: 'Your application has been received and is in the queue.', done: true },
+  { label: 'Lender Review', description: 'A lender will pick up your application and begin the assessment.', isNext: true },
+  { label: 'Credit & Income Check', description: 'We verify your income, expenses, and run a credit report.' },
+  { label: 'Decision', description: 'You will be notified of the outcome, typically within 1–2 business days.' },
+  { label: 'Disbursement', description: 'If approved and accepted, funds are transferred directly to your bank account.' },
+];
+
 function Field({ label, value }: { label: string; value?: string | number | null }) {
   return (
     <div>
@@ -72,10 +80,14 @@ const fmtDate = (ts?: { _seconds?: number; toDate?: () => Date } | null) => {
 
 export default async function ApplicationDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { id } = await params;
+  const sp = await searchParams;
+  const justSubmitted = sp.submitted === 'true';
   const cookieStore = await cookies();
   const session = cookieStore.get('__session')?.value;
   if (!session) return null;
@@ -115,6 +127,75 @@ export default async function ApplicationDetailPage({
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 space-y-5">
+
+      {/* Success + progress timeline — shown immediately after form submission */}
+      {justSubmitted && (
+        <div className="space-y-4">
+          <div className="bg-white rounded-2xl border border-green-200 p-6 text-center shadow-sm">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-green-50">
+              <svg className="h-7 w-7 text-green-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+              </svg>
+            </div>
+            <h1 className="text-xl font-bold text-gray-900 mb-1">
+              Application Submitted{pi?.firstName ? `, ${pi.firstName}` : ''}!
+            </h1>
+            <p className="text-sm text-gray-500 mb-3">
+              Your application is now with our team. We&apos;ll keep you updated every step of the way.
+            </p>
+            {app.referenceNumber && (
+              <span className="inline-block text-xs font-mono text-indigo-600 bg-indigo-50 rounded-lg px-3 py-1.5">
+                Reference: {app.referenceNumber as string}
+              </span>
+            )}
+          </div>
+
+          <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+            <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">What happens next</h2>
+            <ol className="space-y-0">
+              {NEXT_STEPS.map((step, i) => {
+                const isLast = i === NEXT_STEPS.length - 1;
+                const isNext = (step as Record<string, unknown>).isNext === true;
+                return (
+                  <li key={step.label} className="flex gap-3">
+                    <div className="flex flex-col items-center">
+                      <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 ${
+                        step.done ? 'border-green-500 bg-green-500' : isNext ? 'border-[#F5A523] bg-[#FEF7E9]' : 'border-gray-200 bg-white'
+                      }`}>
+                        {step.done ? (
+                          <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                          </svg>
+                        ) : (
+                          <span className={`text-xs font-bold ${isNext ? 'text-[#F5A523]' : 'text-gray-300'}`}>{i + 1}</span>
+                        )}
+                      </div>
+                      {!isLast && (
+                        <div className={`mt-0.5 mb-0.5 w-0.5 flex-1 min-h-[16px] ${step.done ? 'bg-green-200' : 'bg-gray-100'}`} />
+                      )}
+                    </div>
+                    <div className={isLast ? 'pb-0' : 'pb-4'}>
+                      <p className={`text-sm font-semibold ${
+                        step.done ? 'text-green-700' : isNext ? 'text-[#E08B00]' : 'text-gray-400'
+                      }`}>
+                        {step.label}
+                      </p>
+                      <p className={`text-xs mt-0.5 leading-relaxed ${
+                        step.done || isNext ? 'text-gray-500' : 'text-gray-300'
+                      }`}>
+                        {step.description}
+                      </p>
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+
+          <div className="border-t border-gray-100" />
+        </div>
+      )}
+
       {/* Breadcrumb */}
       <Link href="/applicant/applications" className="text-sm text-indigo-600 hover:underline">
         ← All Applications

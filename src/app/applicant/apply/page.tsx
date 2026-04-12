@@ -301,7 +301,7 @@ function ApplyPageInner() {
         }),
       }).catch(() => {/* non-critical — application already submitted */});
 
-      router.push('/applicant/applications');
+      router.push(`/applicant/applications/${applicationId}?submitted=true`);
     } catch (err) {
       setServerError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
       window.scrollTo({ top: 0, behavior: 'smooth' });

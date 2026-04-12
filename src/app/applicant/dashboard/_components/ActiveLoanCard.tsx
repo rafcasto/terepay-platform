@@ -95,9 +95,9 @@ export default function ActiveLoanCard({ activeLoan, hasPendingApp }: ActiveLoan
         </p>
         <Link
           href="/applicant/applications"
-          className="inline-flex items-center text-sm text-[#F5A523] hover:text-[#E08B00] font-medium transition-colors"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#F5A523] text-white text-sm font-semibold hover:bg-[#E08B00] transition-colors"
         >
-          View status →
+          Track Loan Progress →
         </Link>
       </div>
     );
