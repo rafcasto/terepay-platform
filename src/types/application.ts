@@ -215,7 +215,7 @@ export interface AffordabilityDraftData {
     finalAmount: number;
   }>;
   recommendation: 'proceed' | 'decline';
-  savedAt: Timestamp;
+  savedAt: string;
 }
 
 // ---------------------------------------------------------------------------
