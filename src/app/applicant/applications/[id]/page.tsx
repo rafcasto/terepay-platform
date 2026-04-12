@@ -47,13 +47,22 @@ const STATUS_LABELS: Record<string, string> = {
   rejected: 'Declined',
 };
 
-const NEXT_STEPS = [
-  { label: 'Application Submitted', description: 'Your application has been received and is in the queue.', done: true },
-  { label: 'Lender Review', description: 'A lender will pick up your application and begin the assessment.', isNext: true },
-  { label: 'Credit & Income Check', description: 'We verify your income, expenses, and run a credit report.' },
-  { label: 'Decision', description: 'You will be notified of the outcome, typically within 1–2 business days.' },
-  { label: 'Disbursement', description: 'If approved and accepted, funds are transferred directly to your bank account.' },
+const PROGRESS_STEPS = [
+  { label: 'Application Submitted', description: 'Your application has been received and queued for review.' },
+  { label: 'Lender Review', description: 'A lender picks up your application and begins the assessment.' },
+  { label: 'Credit & Income Check', description: 'Income, expenses, and credit are verified before a decision.' },
+  { label: 'Decision', description: 'You are notified of the loan outcome, typically within 1–2 business days.' },
+  { label: 'Funds Disbursed', description: 'Funds are transferred directly to your bank account.' },
 ];
+
+// Number of steps fully completed (green tick) for each status.
+// The step at index `completedCount` is the current active one.
+const STATUS_COMPLETED_COUNT: Record<string, number> = {
+  draft: 0, pending_review: 1, under_assessment: 1, waiting_for_docs: 1,
+  credit_check: 2, approved: 3, loan_accepted: 4,
+  disbursed: 5, active: 5, closed_repaid: 5, declined: 3, withdrawn: 1, expired: 1,
+  submitted: 1, under_review: 1, funded: 5, completed: 5, rejected: 3,
+};
 
 function Field({ label, value }: { label: string; value?: string | number | null }) {
   return (
@@ -125,94 +134,91 @@ export default async function ApplicationDetailPage({
   const documents = app.documents ?? [];
   const timeline = app.timeline as Record<string, { _seconds?: number; toDate?: () => Date }> | undefined;
 
+  const completedCount = STATUS_COMPLETED_COUNT[status as string] ?? 1;
+  const isDeclined = status === 'declined' || status === 'rejected';
+  const isAllDone = completedCount >= PROGRESS_STEPS.length;
+
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 space-y-5">
 
-      {/* Success + progress timeline — shown immediately after form submission */}
+      {/* Dashboard link */}
+      <Link href="/applicant/dashboard" className="text-sm text-indigo-600 hover:underline">
+        ← Dashboard
+      </Link>
+
+      {/* Success card — only shown immediately after submission */}
       {justSubmitted && (
-        <div className="space-y-4">
-          <div className="bg-white rounded-2xl border border-green-200 p-6 text-center shadow-sm">
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-green-50">
-              <svg className="h-7 w-7 text-green-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-              </svg>
-            </div>
-            <h1 className="text-xl font-bold text-gray-900 mb-1">
-              Application Submitted{pi?.firstName ? `, ${pi.firstName}` : ''}!
-            </h1>
-            <p className="text-sm text-gray-500 mb-3">
-              Your application is now with our team. We&apos;ll keep you updated every step of the way.
-            </p>
-            {app.referenceNumber && (
-              <span className="inline-block text-xs font-mono text-indigo-600 bg-indigo-50 rounded-lg px-3 py-1.5">
-                Reference: {app.referenceNumber as string}
-              </span>
-            )}
+        <div className="bg-white rounded-2xl border border-green-200 p-6 text-center shadow-sm">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-green-50">
+            <svg className="h-7 w-7 text-green-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+            </svg>
           </div>
-
-          <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
-            <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">What happens next</h2>
-            <ol className="space-y-0">
-              {NEXT_STEPS.map((step, i) => {
-                const isLast = i === NEXT_STEPS.length - 1;
-                const isNext = (step as Record<string, unknown>).isNext === true;
-                return (
-                  <li key={step.label} className="flex gap-3">
-                    <div className="flex flex-col items-center">
-                      <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 ${
-                        step.done ? 'border-green-500 bg-green-500' : isNext ? 'border-[#F5A523] bg-[#FEF7E9]' : 'border-gray-200 bg-white'
-                      }`}>
-                        {step.done ? (
-                          <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                          </svg>
-                        ) : (
-                          <span className={`text-xs font-bold ${isNext ? 'text-[#F5A523]' : 'text-gray-300'}`}>{i + 1}</span>
-                        )}
-                      </div>
-                      {!isLast && (
-                        <div className={`mt-0.5 mb-0.5 w-0.5 flex-1 min-h-[16px] ${step.done ? 'bg-green-200' : 'bg-gray-100'}`} />
-                      )}
-                    </div>
-                    <div className={isLast ? 'pb-0' : 'pb-4'}>
-                      <p className={`text-sm font-semibold ${
-                        step.done ? 'text-green-700' : isNext ? 'text-[#E08B00]' : 'text-gray-400'
-                      }`}>
-                        {step.label}
-                      </p>
-                      <p className={`text-xs mt-0.5 leading-relaxed ${
-                        step.done || isNext ? 'text-gray-500' : 'text-gray-300'
-                      }`}>
-                        {step.description}
-                      </p>
-                    </div>
-                  </li>
-                );
-              })}
-            </ol>
-          </div>
-
-          <div className="flex flex-col gap-3">
-            <Link
-              href="/applicant/dashboard"
-              className="w-full py-3 px-4 bg-[#F5A523] text-white text-sm font-semibold rounded-xl text-center hover:bg-[#E08B00] transition-colors"
-            >
-              Go to Dashboard
-            </Link>
-            <Link
-              href={`/applicant/applications/${id}`}
-              className="w-full py-3 px-4 border border-gray-200 text-gray-700 text-sm font-medium rounded-xl text-center hover:bg-gray-50 transition-colors"
-            >
-              View Application Details
-            </Link>
-          </div>
+          <h1 className="text-xl font-bold text-gray-900 mb-1">
+            Application Submitted{pi?.firstName ? `, ${pi.firstName}` : ''}!
+          </h1>
+          <p className="text-sm text-gray-500 mb-3">
+            Your application is now with our team. We&apos;ll keep you updated every step of the way.
+          </p>
+          {app.referenceNumber && (
+            <span className="inline-block text-xs font-mono text-indigo-600 bg-indigo-50 rounded-lg px-3 py-1.5">
+              Reference: {app.referenceNumber as string}
+            </span>
+          )}
         </div>
       )}
 
-      {/* Breadcrumb */}
-      <Link href="/applicant/applications" className="text-sm text-indigo-600 hover:underline">
-        ← All Applications
-      </Link>
+      {/* Loan Progress Timeline — always visible, reflects current status */}
+      <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">Loan Progress</h2>
+        <ol className="space-y-0">
+          {PROGRESS_STEPS.map((step, i) => {
+            const isDone = i < completedCount;
+            const isCurrent = !isAllDone && !isDeclined && i === completedCount;
+            const isDeclinedStep = isDeclined && i === completedCount;
+            const isLast = i === PROGRESS_STEPS.length - 1;
+            return (
+              <li key={step.label} className="flex gap-3">
+                <div className="flex flex-col items-center">
+                  <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 ${
+                    isDone ? 'border-green-500 bg-green-500'
+                    : isCurrent ? 'border-[#F5A523] bg-[#FEF7E9]'
+                    : isDeclinedStep ? 'border-red-400 bg-red-50'
+                    : 'border-gray-200 bg-white'
+                  }`}>
+                    {isDone ? (
+                      <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                      </svg>
+                    ) : isDeclinedStep ? (
+                      <svg className="h-3.5 w-3.5 text-red-500" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                      </svg>
+                    ) : (
+                      <span className={`text-xs font-bold ${isCurrent ? 'text-[#F5A523]' : 'text-gray-300'}`}>{i + 1}</span>
+                    )}
+                  </div>
+                  {!isLast && (
+                    <div className={`mt-0.5 mb-0.5 w-0.5 flex-1 min-h-[16px] ${isDone ? 'bg-green-200' : 'bg-gray-100'}`} />
+                  )}
+                </div>
+                <div className={isLast ? 'pb-0' : 'pb-4'}>
+                  <p className={`text-sm font-semibold ${
+                    isDone ? 'text-green-700' : isCurrent ? 'text-[#E08B00]' : isDeclinedStep ? 'text-red-600' : 'text-gray-400'
+                  }`}>
+                    {isDeclinedStep ? 'Application Declined' : step.label}
+                  </p>
+                  <p className={`text-xs mt-0.5 leading-relaxed ${
+                    isDone || isCurrent ? 'text-gray-500' : isDeclinedStep ? 'text-red-400' : 'text-gray-300'
+                  }`}>
+                    {isDeclinedStep ? 'Your application was not approved at this time.' : step.description}
+                  </p>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      </div>
 
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
@@ -388,7 +394,7 @@ export default async function ApplicationDetailPage({
 
       {/* Draft Actions */}
       {status === 'draft' && (
-        <div className="flex gap-3 mt-2">
+        <div className="flex gap-3">
           <Link
             href={`/applicant/apply`}
             className="px-4 py-2 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
@@ -398,6 +404,14 @@ export default async function ApplicationDetailPage({
           <SubmitButton id={id} />
         </div>
       )}
+
+      {/* Back to Dashboard */}
+      <Link
+        href="/applicant/dashboard"
+        className="block w-full py-3 px-4 border border-gray-200 text-gray-700 text-sm font-medium rounded-xl text-center hover:bg-gray-50 transition-colors"
+      >
+        ← Back to Dashboard
+      </Link>
     </div>
   );
 }
