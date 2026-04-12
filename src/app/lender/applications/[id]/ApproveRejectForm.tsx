@@ -6,16 +6,16 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 
-// Client-side shape — keeps the form simple
+// Client-side shape — must match backend Zod schema (approveApplicationSchema / rejectApplicationSchema)
 const approveSchema = z.object({
   approvedAmount: z.number().positive('Required'),
-  interestRate: z.number().min(0).max(100),
-  term: z.number().int().positive(),
-  notes: z.string().optional(),
+  approvedRate: z.number().min(0).max(100),
+  approvedTerm: z.number().int().positive(),
+  comments: z.string().optional(),
 });
 
 const rejectSchema = z.object({
-  rejectionReason: z.string().min(10, 'Please provide a reason (min 10 chars)'),
+  comments: z.string().min(10, 'Please provide a reason (min 10 chars)'),
 });
 
 type ApproveInput = z.infer<typeof approveSchema>;
@@ -38,8 +38,8 @@ export default function ApproveRejectForm({
     resolver: zodResolver(approveSchema),
     defaultValues: {
       approvedAmount: requestedAmount,
-      interestRate: 12,
-      term: requestedTerm ?? 12,
+      approvedRate: 12,
+      approvedTerm: requestedTerm ?? 12,
     },
   });
 
@@ -108,18 +108,18 @@ export default function ApproveRejectForm({
             <input
               type="number"
               step="0.01"
-              {...approveForm.register('interestRate', { valueAsNumber: true })}
+              {...approveForm.register('approvedRate', { valueAsNumber: true })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-green-500 focus:outline-none"
             />
-            {approveForm.formState.errors.interestRate && (
-              <p className="mt-1 text-xs text-red-600">{approveForm.formState.errors.interestRate.message}</p>
+            {approveForm.formState.errors.approvedRate && (
+              <p className="mt-1 text-xs text-red-600">{approveForm.formState.errors.approvedRate.message}</p>
             )}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Term (months)</label>
             <input
               type="number"
-              {...approveForm.register('term', { valueAsNumber: true })}
+              {...approveForm.register('approvedTerm', { valueAsNumber: true })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-green-500 focus:outline-none"
             />
           </div>
@@ -128,7 +128,7 @@ export default function ApproveRejectForm({
           <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
           <textarea
             rows={2}
-            {...approveForm.register('notes')}
+            {...approveForm.register('comments')}
             className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-green-500 focus:outline-none resize-none"
           />
         </div>
@@ -156,12 +156,12 @@ export default function ApproveRejectForm({
         <label className="block text-sm font-medium text-gray-700 mb-1">Rejection Reason</label>
         <textarea
           rows={3}
-          {...rejectForm.register('rejectionReason')}
+          {...rejectForm.register('comments')}
           className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-red-500 focus:outline-none resize-none"
           placeholder="Explain why this application is being rejected…"
         />
-        {rejectForm.formState.errors.rejectionReason && (
-          <p className="mt-1 text-xs text-red-600">{rejectForm.formState.errors.rejectionReason.message}</p>
+        {rejectForm.formState.errors.comments && (
+          <p className="mt-1 text-xs text-red-600">{rejectForm.formState.errors.comments.message}</p>
         )}
       </div>
       {serverError && <p className="text-sm text-red-600">{serverError}</p>}
