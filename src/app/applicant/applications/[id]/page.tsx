@@ -192,7 +192,20 @@ export default async function ApplicationDetailPage({
             </ol>
           </div>
 
-          <div className="border-t border-gray-100" />
+          <div className="flex flex-col gap-3">
+            <Link
+              href="/applicant/dashboard"
+              className="w-full py-3 px-4 bg-[#F5A523] text-white text-sm font-semibold rounded-xl text-center hover:bg-[#E08B00] transition-colors"
+            >
+              Go to Dashboard
+            </Link>
+            <Link
+              href={`/applicant/applications/${id}`}
+              className="w-full py-3 px-4 border border-gray-200 text-gray-700 text-sm font-medium rounded-xl text-center hover:bg-gray-50 transition-colors"
+            >
+              View Application Details
+            </Link>
+          </div>
         </div>
       )}
 

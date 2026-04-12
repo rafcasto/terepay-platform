@@ -9,10 +9,10 @@ export type ActiveLoanData = {
 
 interface ActiveLoanCardProps {
   activeLoan: ActiveLoanData;
-  hasPendingApp: boolean;
+  pendingAppId: string | null;
 }
 
-export default function ActiveLoanCard({ activeLoan, hasPendingApp }: ActiveLoanCardProps) {
+export default function ActiveLoanCard({ activeLoan, pendingAppId }: ActiveLoanCardProps) {
   // State A — active or delinquent loan
   if (activeLoan) {
     const total = activeLoan.totalPaid + activeLoan.remainingBalance;
@@ -83,7 +83,7 @@ export default function ActiveLoanCard({ activeLoan, hasPendingApp }: ActiveLoan
   }
 
   // State B — application submitted, waiting for decision
-  if (hasPendingApp) {
+  if (pendingAppId) {
     return (
       <div className="rounded-2xl bg-[#0D1B2A] p-5 mb-6 text-white">
         <p className="text-xs font-semibold tracking-widest text-white/50 uppercase mb-4">
@@ -94,7 +94,7 @@ export default function ActiveLoanCard({ activeLoan, hasPendingApp }: ActiveLoan
           We&apos;re processing your application. We&apos;ll notify you of any updates.
         </p>
         <Link
-          href="/applicant/applications"
+          href={`/applicant/applications/${pendingAppId}`}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#F5A523] text-white text-sm font-semibold hover:bg-[#E08B00] transition-colors"
         >
           Track Loan Progress →
