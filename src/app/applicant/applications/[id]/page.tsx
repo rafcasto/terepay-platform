@@ -59,7 +59,7 @@ const PROGRESS_STEPS = [
 // The step at index `completedCount` is the current active one.
 const STATUS_COMPLETED_COUNT: Record<string, number> = {
   draft: 0, pending_review: 1, under_assessment: 1, waiting_for_docs: 1,
-  credit_check: 2, approved: 3, loan_accepted: 4,
+  credit_check: 2, approved: 4, loan_accepted: 4,
   disbursed: 5, active: 5, closed_repaid: 5, declined: 3, withdrawn: 1, expired: 1,
   submitted: 1, under_review: 1, funded: 5, completed: 5, rejected: 3,
 };

@@ -95,7 +95,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     if (!appDoc.exists) throw new AppError('NOT_FOUND', 404, 'Application not found');
 
     const appData = appDoc.data()!;
-    if (!['under_assessment', 'waiting_for_docs'].includes(appData.status)) {
+    if (!['under_assessment', 'waiting_for_docs', 'credit_check'].includes(appData.status)) {
       throw new AppError('BAD_REQUEST', 400, `Cannot submit assessment while status is: ${appData.status}`);
     }
 
@@ -200,11 +200,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     });
 
     const now = FieldValue.serverTimestamp();
-    batch.update(appRef, {
+    const statusUpdate: Record<string, unknown> = {
       affordabilityStatus: 'complete',
       affordabilityAssessmentIds: FieldValue.arrayUnion(assessmentId),
       'timeline.updatedAt': now,
-    });
+    };
+    if (appData.status === 'under_assessment') {
+      statusUpdate.status = 'credit_check';
+      statusUpdate['timeline.creditCheckStartedAt'] = now;
+    }
+    batch.update(appRef, statusUpdate);
 
     await batch.commit();
 
