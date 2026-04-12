@@ -267,6 +267,15 @@ function ApplyPageInner() {
         throw new Error(errorMessage);
       }
 
+      // Immediately transition from draft → pending_review so it appears in the lender dashboard
+      const applicationId = (body.data as { id: string }).id;
+      const submitRes = await fetch(`/api/applications/${applicationId}/submit`, { method: 'POST' });
+      if (!submitRes.ok) {
+        // Application was saved but submit failed — don't block the user, redirect anyway
+        // The applicant can submit from the applications list page
+        console.error('Failed to auto-submit application after save');
+      }
+
       // Save Step 1 personal info back to the applicant profile (fire-and-forget)
       const pi = data.personalInfo;
       fetch('/api/users/profile', {

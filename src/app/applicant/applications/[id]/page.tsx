@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { getAdminDb, verifySessionOrIdToken } from '@/lib/firebase/admin';
 import type { LoanApplication, AnyApplicationStatus } from '@/types/application';
 import SubmitButton from './SubmitButton';
+import AcceptOfferButton from './_components/AcceptOfferButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +15,8 @@ const STATUS_BANNERS: Record<string, { bg: string; text: string; message: string
   under_assessment: { bg: 'bg-blue-50 border-blue-200', text: 'text-blue-800', message: 'A lender is currently assessing your application. No action needed.' },
   waiting_for_docs: { bg: 'bg-orange-50 border-orange-300', text: 'text-orange-800', message: 'Additional documents have been requested. Please upload them below.' },
   credit_check: { bg: 'bg-purple-50 border-purple-200', text: 'text-purple-800', message: 'Your application is undergoing a credit check. This may take 1–2 business days.' },
-  approved: { bg: 'bg-green-50 border-green-300', text: 'text-green-800', message: '🎉 Congratulations! Your loan application has been approved.' },
+  approved: { bg: 'bg-green-50 border-green-300', text: 'text-green-800', message: '🎉 Congratulations! Your loan application has been approved. Please review the terms below and accept your loan offer.' },
+  loan_accepted: { bg: 'bg-emerald-50 border-emerald-300', text: 'text-emerald-800', message: '✅ You have accepted your loan offer. Funds will be disbursed shortly.' },
   disbursed: { bg: 'bg-emerald-50 border-emerald-200', text: 'text-emerald-800', message: 'Your loan has been disbursed. Please check your bank account.' },
   active: { bg: 'bg-teal-50 border-teal-200', text: 'text-teal-800', message: 'Your loan is active. Repayments are scheduled fortnightly.' },
   closed_repaid: { bg: 'bg-gray-50 border-gray-200', text: 'text-gray-700', message: 'Your loan has been fully repaid. Thank you!' },
@@ -30,6 +32,7 @@ const STATUS_LABELS: Record<string, string> = {
   waiting_for_docs: 'Documents Requested',
   credit_check: 'Credit Check',
   approved: 'Approved',
+  loan_accepted: 'Loan Accepted',
   disbursed: 'Disbursed',
   active: 'Active',
   closed_repaid: 'Repaid',
@@ -138,6 +141,7 @@ export default async function ApplicationDetailPage({
       {/* Status Banner */}
       <div className={`rounded-xl border p-4 text-sm font-medium ${banner.bg} ${banner.text}`}>
         {banner.message}
+        {status === 'approved' && <AcceptOfferButton applicationId={id} />}
       </div>
 
       {/* Document Request Banner */}

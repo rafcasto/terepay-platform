@@ -10,6 +10,7 @@ export type ApplicationStatus =
   | 'waiting_for_docs'
   | 'credit_check'
   | 'approved'
+  | 'loan_accepted'
   | 'disbursed'
   | 'active'
   | 'closed_repaid'
