@@ -51,20 +51,9 @@ export default function Step8Declarations() {
   const {
     register,
     formState: { errors },
-    setValue,
-    watch,
   } = useFormContext<TerepayApplicationInput>();
 
   const e = errors.declarations;
-  const allKeys = [...DECLARATIONS, ...PRIVACY_DECLARATIONS].map((d) => d.key);
-  const allValues = watch(allKeys.map((k) => `declarations.${k}` as `declarations.${typeof k}`));
-  const allChecked = allValues.every(Boolean);
-
-  const handleCheckAll = (checked: boolean) => {
-    allKeys.forEach((k) => {
-      setValue(`declarations.${k}`, checked, { shouldValidate: true });
-    });
-  };
 
   return (
     <div className="space-y-6">
@@ -75,19 +64,6 @@ export default function Step8Declarations() {
           For legal compliance, your consent must be confirmed fresh each time you submit.
         </p>
       </div>
-
-      {/* Check all */}
-      <label className="flex items-center gap-3 cursor-pointer bg-[#FEF7E9] border border-[#F5A523]/30 rounded-xl p-4">
-        <input
-          type="checkbox"
-          checked={allChecked}
-          onChange={(ev) => handleCheckAll(ev.target.checked)}
-          className="h-5 w-5 rounded border-gray-300 text-[#F5A523] focus:ring-[#F5A523]"
-        />
-        <span className="text-sm font-semibold text-[#E08B00]">
-          I confirm all declarations below
-        </span>
-      </label>
 
       {/* Individual declarations */}
       <div className="space-y-4">

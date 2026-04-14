@@ -144,6 +144,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ status: 'approved' });
   } catch (err) {
     if (err instanceof ZodError) {
+      console.error('[approve] Zod validation failed:', JSON.stringify(err.flatten().fieldErrors));
       return errorResponse(
         new AppError('VALIDATION_ERROR', 422, 'Invalid request', err.flatten().fieldErrors),
       );

@@ -267,6 +267,17 @@ function ApplyPageInner() {
         throw new Error(errorMessage);
       }
 
+      // Immediately transition from draft → pending_review so it appears in the lender dashboard
+      const applicationId = (body.data as { applicationId: string }).applicationId ?? draftId;
+      if (!applicationId) {
+        throw new Error('Application ID missing after save. Please try again.');
+      }
+      const submitRes = await fetch(`/api/applications/${applicationId}/submit`, { method: 'POST' });
+      if (!submitRes.ok) {
+        const submitBody = await submitRes.json().catch(() => ({})) as { error?: { message?: string } };
+        throw new Error(submitBody.error?.message ?? 'Your application was saved but could not be submitted. Please try again.');
+      }
+
       // Save Step 1 personal info back to the applicant profile (fire-and-forget)
       const pi = data.personalInfo;
       fetch('/api/users/profile', {
@@ -292,7 +303,7 @@ function ApplyPageInner() {
         }),
       }).catch(() => {/* non-critical — application already submitted */});
 
-      router.push('/applicant/applications');
+      router.push(`/applicant/applications/${applicationId}?submitted=true`);
     } catch (err) {
       setServerError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
       window.scrollTo({ top: 0, behavior: 'smooth' });

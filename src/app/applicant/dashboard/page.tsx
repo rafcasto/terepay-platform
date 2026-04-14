@@ -11,6 +11,7 @@ const PENDING_STATUSES = new Set([
   'waiting_for_docs',
   'credit_check',
   'approved',
+  'loan_accepted',
   'disbursed',
 ]);
 
@@ -57,14 +58,14 @@ async function getDashboardData(uid: string) {
     };
   }
 
-  const hasPendingApp = appsSnap.docs.some((d) =>
+  const pendingAppDoc = appsSnap.docs.find((d) =>
     PENDING_STATUSES.has(d.data().status as string),
   );
 
   return {
     user: userSnap.data(),
     activeLoan,
-    hasPendingApp,
+    pendingAppId: pendingAppDoc?.id ?? null,
   };
 }
 
@@ -81,7 +82,7 @@ export default async function ApplicantDashboard() {
   const nextOnboardingStep = await resolveOnboardingStep(decoded.uid);
   if (nextOnboardingStep) redirect(nextOnboardingStep);
 
-  const { user, activeLoan, hasPendingApp } = await getDashboardData(decoded.uid);
+  const { user, activeLoan, pendingAppId } = await getDashboardData(decoded.uid);
 
   const greeting = getGreeting();
 
@@ -94,7 +95,7 @@ export default async function ApplicantDashboard() {
       </h1>
 
       {/* Loan status card */}
-      <ActiveLoanCard activeLoan={activeLoan} hasPendingApp={hasPendingApp} />
+      <ActiveLoanCard activeLoan={activeLoan} pendingAppId={pendingAppId} />
 
       {/* Quick actions */}
       <QuickActions />

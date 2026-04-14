@@ -158,7 +158,14 @@ export default async function AffordabilityPage(props: {
   const isReassessment = application.affordabilityStatus === 'complete';
 
   // Load any persisted draft so the lender can resume where they left off
-  const initialDraft = application.affordabilityDraft ?? null;
+  // Serialize Firestore Timestamp to a plain ISO string so it can be passed to a Client Component
+  const initialDraft = application.affordabilityDraft
+    ? {
+        ...application.affordabilityDraft,
+        savedAt: (application.affordabilityDraft.savedAt as unknown as { toDate?: () => Date })?.toDate?.()?.toISOString()
+          ?? new Date().toISOString(),
+      }
+    : null;
 
   return (
     <AffordabilityForm

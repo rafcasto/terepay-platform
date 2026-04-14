@@ -12,6 +12,7 @@ const STATUS_VARIANT: Record<string, BadgeVariant> = {
   waiting_for_docs: 'warning',
   credit_check: 'info',
   approved: 'success',
+  loan_accepted: 'success',
   disbursed: 'success',
   active: 'success',
   closed_repaid: 'default',
@@ -32,6 +33,7 @@ const STATUS_LABEL: Record<string, string> = {
   waiting_for_docs: 'Waiting for Docs',
   credit_check: 'Credit Check',
   approved: 'Approved',
+  loan_accepted: 'Loan Accepted',
   disbursed: 'Disbursed',
   active: 'Active',
   closed_repaid: 'Closed — Repaid',
@@ -47,8 +49,8 @@ const STATUS_LABEL: Record<string, string> = {
 
 const ALL_STATUSES = [
   'pending_review', 'under_assessment', 'waiting_for_docs', 'credit_check',
-  'approved', 'disbursed', 'active', 'closed_repaid', 'declined', 'withdrawn', 'expired',
-  'submitted', 'under_review', 'rejected', 'funded', 'completed',
+  'approved', 'loan_accepted', 'disbursed', 'active', 'closed_repaid', 'declined', 'withdrawn',
+  // Note: 'expired', legacy statuses fetched via a second query if needed (Firestore 'in' limit = 10)
 ];
 
 const fmt = (n: number) =>
@@ -87,11 +89,11 @@ export default async function LenderApplicationsPage() {
   });
   const inProgress = applications.filter((a) => {
     const s = (a as Record<string, unknown>).status as string;
-    return ['under_assessment', 'waiting_for_docs', 'credit_check'].includes(s);
+    return ['under_assessment', 'waiting_for_docs', 'credit_check', 'loan_accepted'].includes(s);
   });
   const decided = applications.filter((a) => {
     const s = (a as Record<string, unknown>).status as string;
-    return ['approved', 'disbursed', 'active', 'closed_repaid', 'declined', 'withdrawn', 'expired'].includes(s);
+    return ['approved', 'disbursed', 'active', 'closed_repaid', 'declined', 'withdrawn'].includes(s);
   });
 
   const sections = [

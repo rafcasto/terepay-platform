@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { getAdminDb, verifySessionOrIdToken } from '@/lib/firebase/admin';
 import type { LoanApplication, AnyApplicationStatus } from '@/types/application';
 import SubmitButton from './SubmitButton';
+import AcceptOfferButton from './_components/AcceptOfferButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +15,8 @@ const STATUS_BANNERS: Record<string, { bg: string; text: string; message: string
   under_assessment: { bg: 'bg-blue-50 border-blue-200', text: 'text-blue-800', message: 'A lender is currently assessing your application. No action needed.' },
   waiting_for_docs: { bg: 'bg-orange-50 border-orange-300', text: 'text-orange-800', message: 'Additional documents have been requested. Please upload them below.' },
   credit_check: { bg: 'bg-purple-50 border-purple-200', text: 'text-purple-800', message: 'Your application is undergoing a credit check. This may take 1–2 business days.' },
-  approved: { bg: 'bg-green-50 border-green-300', text: 'text-green-800', message: '🎉 Congratulations! Your loan application has been approved.' },
+  approved: { bg: 'bg-green-50 border-green-300', text: 'text-green-800', message: '🎉 Congratulations! Your loan application has been approved. Please review the terms below and accept your loan offer.' },
+  loan_accepted: { bg: 'bg-emerald-50 border-emerald-300', text: 'text-emerald-800', message: '✅ You have accepted your loan offer. Funds will be disbursed shortly.' },
   disbursed: { bg: 'bg-emerald-50 border-emerald-200', text: 'text-emerald-800', message: 'Your loan has been disbursed. Please check your bank account.' },
   active: { bg: 'bg-teal-50 border-teal-200', text: 'text-teal-800', message: 'Your loan is active. Repayments are scheduled fortnightly.' },
   closed_repaid: { bg: 'bg-gray-50 border-gray-200', text: 'text-gray-700', message: 'Your loan has been fully repaid. Thank you!' },
@@ -30,6 +32,7 @@ const STATUS_LABELS: Record<string, string> = {
   waiting_for_docs: 'Documents Requested',
   credit_check: 'Credit Check',
   approved: 'Approved',
+  loan_accepted: 'Loan Accepted',
   disbursed: 'Disbursed',
   active: 'Active',
   closed_repaid: 'Repaid',
@@ -42,6 +45,23 @@ const STATUS_LABELS: Record<string, string> = {
   funded: 'Funded',
   completed: 'Completed',
   rejected: 'Declined',
+};
+
+const PROGRESS_STEPS = [
+  { label: 'Application Submitted', description: 'Your application has been received and queued for review.' },
+  { label: 'Lender Review', description: 'A lender picks up your application and begins the assessment.' },
+  { label: 'Credit & Income Check', description: 'Income, expenses, and credit are verified before a decision.' },
+  { label: 'Decision', description: 'You are notified of the loan outcome, typically within 1–2 business days.' },
+  { label: 'Funds Disbursed', description: 'Funds are transferred directly to your bank account.' },
+];
+
+// Number of steps fully completed (green tick) for each status.
+// The step at index `completedCount` is the current active one.
+const STATUS_COMPLETED_COUNT: Record<string, number> = {
+  draft: 0, pending_review: 1, under_assessment: 1, waiting_for_docs: 1,
+  credit_check: 2, approved: 4, loan_accepted: 4,
+  disbursed: 5, active: 5, closed_repaid: 5, declined: 3, withdrawn: 1, expired: 1,
+  submitted: 1, under_review: 1, funded: 5, completed: 5, rejected: 3,
 };
 
 function Field({ label, value }: { label: string; value?: string | number | null }) {
@@ -69,10 +89,14 @@ const fmtDate = (ts?: { _seconds?: number; toDate?: () => Date } | null) => {
 
 export default async function ApplicationDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { id } = await params;
+  const sp = await searchParams;
+  const justSubmitted = sp.submitted === 'true';
   const cookieStore = await cookies();
   const session = cookieStore.get('__session')?.value;
   if (!session) return null;
@@ -110,12 +134,91 @@ export default async function ApplicationDetailPage({
   const documents = app.documents ?? [];
   const timeline = app.timeline as Record<string, { _seconds?: number; toDate?: () => Date }> | undefined;
 
+  const completedCount = STATUS_COMPLETED_COUNT[status as string] ?? 1;
+  const isDeclined = status === 'declined' || status === 'rejected';
+  const isAllDone = completedCount >= PROGRESS_STEPS.length;
+
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 space-y-5">
-      {/* Breadcrumb */}
-      <Link href="/applicant/applications" className="text-sm text-indigo-600 hover:underline">
-        ← All Applications
+
+      {/* Dashboard link */}
+      <Link href="/applicant/dashboard" className="text-sm text-indigo-600 hover:underline">
+        ← Dashboard
       </Link>
+
+      {/* Success card — only shown immediately after submission */}
+      {justSubmitted && (
+        <div className="bg-white rounded-2xl border border-green-200 p-6 text-center shadow-sm">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-green-50">
+            <svg className="h-7 w-7 text-green-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+            </svg>
+          </div>
+          <h1 className="text-xl font-bold text-gray-900 mb-1">
+            Application Submitted{pi?.firstName ? `, ${pi.firstName}` : ''}!
+          </h1>
+          <p className="text-sm text-gray-500 mb-3">
+            Your application is now with our team. We&apos;ll keep you updated every step of the way.
+          </p>
+          {app.referenceNumber && (
+            <span className="inline-block text-xs font-mono text-indigo-600 bg-indigo-50 rounded-lg px-3 py-1.5">
+              Reference: {app.referenceNumber as string}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Loan Progress Timeline — always visible, reflects current status */}
+      <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">Loan Progress</h2>
+        <ol className="space-y-0">
+          {PROGRESS_STEPS.map((step, i) => {
+            const isDone = i < completedCount;
+            const isCurrent = !isAllDone && !isDeclined && i === completedCount;
+            const isDeclinedStep = isDeclined && i === completedCount;
+            const isLast = i === PROGRESS_STEPS.length - 1;
+            return (
+              <li key={step.label} className="flex gap-3">
+                <div className="flex flex-col items-center">
+                  <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 ${
+                    isDone ? 'border-green-500 bg-green-500'
+                    : isCurrent ? 'border-[#F5A523] bg-[#FEF7E9]'
+                    : isDeclinedStep ? 'border-red-400 bg-red-50'
+                    : 'border-gray-200 bg-white'
+                  }`}>
+                    {isDone ? (
+                      <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                      </svg>
+                    ) : isDeclinedStep ? (
+                      <svg className="h-3.5 w-3.5 text-red-500" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                      </svg>
+                    ) : (
+                      <span className={`text-xs font-bold ${isCurrent ? 'text-[#F5A523]' : 'text-gray-300'}`}>{i + 1}</span>
+                    )}
+                  </div>
+                  {!isLast && (
+                    <div className={`mt-0.5 mb-0.5 w-0.5 flex-1 min-h-[16px] ${isDone ? 'bg-green-200' : 'bg-gray-100'}`} />
+                  )}
+                </div>
+                <div className={isLast ? 'pb-0' : 'pb-4'}>
+                  <p className={`text-sm font-semibold ${
+                    isDone ? 'text-green-700' : isCurrent ? 'text-[#E08B00]' : isDeclinedStep ? 'text-red-600' : 'text-gray-400'
+                  }`}>
+                    {isDeclinedStep ? 'Application Declined' : step.label}
+                  </p>
+                  <p className={`text-xs mt-0.5 leading-relaxed ${
+                    isDone || isCurrent ? 'text-gray-500' : isDeclinedStep ? 'text-red-400' : 'text-gray-300'
+                  }`}>
+                    {isDeclinedStep ? 'Your application was not approved at this time.' : step.description}
+                  </p>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      </div>
 
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
@@ -138,6 +241,7 @@ export default async function ApplicationDetailPage({
       {/* Status Banner */}
       <div className={`rounded-xl border p-4 text-sm font-medium ${banner.bg} ${banner.text}`}>
         {banner.message}
+        {status === 'approved' && <AcceptOfferButton applicationId={id} />}
       </div>
 
       {/* Document Request Banner */}
@@ -290,7 +394,7 @@ export default async function ApplicationDetailPage({
 
       {/* Draft Actions */}
       {status === 'draft' && (
-        <div className="flex gap-3 mt-2">
+        <div className="flex gap-3">
           <Link
             href={`/applicant/apply`}
             className="px-4 py-2 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
@@ -300,6 +404,14 @@ export default async function ApplicationDetailPage({
           <SubmitButton id={id} />
         </div>
       )}
+
+      {/* Back to Dashboard */}
+      <Link
+        href="/applicant/dashboard"
+        className="block w-full py-3 px-4 border border-gray-200 text-gray-700 text-sm font-medium rounded-xl text-center hover:bg-gray-50 transition-colors"
+      >
+        ← Back to Dashboard
+      </Link>
     </div>
   );
 }
