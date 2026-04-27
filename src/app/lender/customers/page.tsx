@@ -17,7 +17,8 @@ export type MergedCustomer = {
   isExistingCustomer: boolean;
   /** Offline only */
   linkStatus?: 'linked' | 'unlinked';
-  createdAt?: { toDate?: () => Date };
+  /** ISO 8601 string or null — serializable across server/client boundary */
+  createdAt?: string | null;
 };
 
 export default async function LenderCustomersPage() {
@@ -54,7 +55,7 @@ export default async function LenderCustomersPage() {
       lastName: d.lastName ?? '',
       email: d.email ?? '',
       isExistingCustomer: d.isExistingCustomer === true,
-      createdAt: d.createdAt,
+      createdAt: d.createdAt?.toDate?.()?.toISOString() ?? null,
     });
   }
 
@@ -69,7 +70,7 @@ export default async function LenderCustomersPage() {
       email: d.email ?? '',
       isExistingCustomer: d.isExistingCustomer === true,
       linkStatus: d.status === 'linked' ? 'linked' : 'unlinked',
-      createdAt: d.createdAt,
+      createdAt: d.createdAt?.toDate?.()?.toISOString() ?? null,
     });
   }
 

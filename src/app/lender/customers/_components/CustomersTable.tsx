@@ -10,9 +10,9 @@ import type { MergedCustomer } from '../page';
 type SortColumn = 'name' | 'createdAt' | 'customerId';
 type SortDir = 'asc' | 'desc';
 
-const fmtDate = (ts?: { toDate?: () => Date } | null) => {
-  if (!ts?.toDate) return '—';
-  return new Intl.DateTimeFormat('en-NZ', { dateStyle: 'medium' }).format(ts.toDate());
+const fmtDate = (ts?: string | null) => {
+  if (!ts) return '—';
+  return new Intl.DateTimeFormat('en-NZ', { dateStyle: 'medium' }).format(new Date(ts));
 };
 
 function SortIcon({ column, active, dir }: { column: string; active: boolean; dir: SortDir }) {
@@ -112,8 +112,8 @@ export default function CustomersTable({ initialCustomers }: { initialCustomers:
           .toLowerCase()
           .localeCompare(`${b.firstName} ${b.lastName}`.toLowerCase());
       } else if (sortColumn === 'createdAt') {
-        const aTime = a.createdAt?.toDate?.()?.getTime() ?? 0;
-        const bTime = b.createdAt?.toDate?.()?.getTime() ?? 0;
+        const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
         cmp = aTime - bTime;
       } else if (sortColumn === 'customerId') {
         cmp = (a.customerId ?? a.id).localeCompare(b.customerId ?? b.id);
