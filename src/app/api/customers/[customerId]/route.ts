@@ -106,10 +106,11 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (err instanceof AppError) return errorResponse(err);
     if (err instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'VALIDATION_ERROR', message: err.errors[0].message },
+        { error: 'VALIDATION_ERROR', message: err.issues[0]?.message ?? 'Validation error' },
         { status: 400 },
       );
     }
-    return internalError(err);
+    console.error('[PATCH /api/customers]', err);
+    return internalError();
   }
 }
