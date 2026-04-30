@@ -136,6 +136,11 @@ export const patchProfileSchema = z.object({
 
 export type PatchProfileInput = z.infer<typeof patchProfileSchema>;
 
+export const updateEmailSchema = z.object({
+  newEmail: z.string().email('Invalid email address'),
+});
+
+export type UpdateEmailInput = z.infer<typeof updateEmailSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type SignupInput = z.infer<typeof signupSchema>;
 export type SendOtpInput = z.infer<typeof sendOtpSchema>;

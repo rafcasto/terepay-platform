@@ -44,26 +44,42 @@ export default function KycProfilePage() {
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState('');
 
-  // Skip this step if profile details are already saved; also hydrate read-only fields
+  // Hydrate user info and pre-populate any previously saved profile data
   useEffect(() => {
     fetch('/api/users/profile')
       .then((r) => r.json())
       .then((d) => {
-        if (d?.data?.immigrationStatus) {
-          router.replace('/applicant/onboarding/identity');
-          return;
-        }
         if (d?.data) {
           setUser({
             firstName: d.data.firstName,
             lastName: d.data.lastName,
             email: d.data.email,
           });
+          // Pre-populate form if profile was previously saved
+          if (d.data.immigrationStatus) {
+            setForm((prev) => ({
+              ...prev,
+              dateOfBirth: d.data.dateOfBirth ?? '',
+              immigrationStatus: d.data.immigrationStatus ?? '',
+              visaExpiryDate: d.data.visaExpiryDate ?? '',
+              housingStatus: d.data.housingStatus ?? '',
+              timeAtAddress: d.data.timeAtAddress ?? '',
+              addressValue: {
+                address: d.data.address ?? '',
+                suburb: d.data.suburb ?? '',
+                city: d.data.city ?? '',
+                postCode: d.data.postCode ?? '',
+                country: d.data.country ?? 'New Zealand',
+              },
+              // isExistingClient and customerId are intentionally not pre-populated
+            }));
+          }
         }
         setChecking(false);
       })
       .catch(() => setChecking(false));
-  }, [router]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const set = <K extends keyof ProfileForm>(key: K, value: ProfileForm[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));

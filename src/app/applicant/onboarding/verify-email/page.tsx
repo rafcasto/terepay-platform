@@ -7,11 +7,15 @@ import { clientAuth } from '@/lib/firebase/client';
 
 export default function VerifyEmailPage() {
   const router = useRouter();
-  const [user, setUser]         = useState<User | null>(null);
-  const [sent, setSent]         = useState(false);
-  const [error, setError]       = useState('');
-  const [cooldown, setCooldown] = useState(0);
-  const [verified, setVerified] = useState(false);
+  const [user, setUser]             = useState<User | null>(null);
+  const [sent, setSent]             = useState(false);
+  const [error, setError]           = useState('');
+  const [cooldown, setCooldown]     = useState(0);
+  const [verified, setVerified]     = useState(false);
+  const [showEmailForm, setShowEmailForm]     = useState(false);
+  const [newEmailInput, setNewEmailInput]     = useState('');
+  const [emailUpdateError, setEmailUpdateError] = useState('');
+  const [emailUpdateLoading, setEmailUpdateLoading] = useState(false);
 
   const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollRef     = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -124,6 +128,41 @@ export default function VerifyEmailPage() {
     await sendVerification(user);
   };
 
+  // ── Update email address ────────────────────────────────────────────────
+  const handleEmailUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newEmailInput.trim() || !user) return;
+    setEmailUpdateError('');
+    setEmailUpdateLoading(true);
+    try {
+      const res = await fetch('/api/users/email', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newEmail: newEmailInput.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setEmailUpdateError(data?.error?.message ?? 'Failed to update email. Please try again.');
+        return;
+      }
+      // Reload Firebase Auth client state to pick up new email
+      await user.reload();
+      const refreshed = clientAuth.currentUser;
+      if (!refreshed) return;
+      setUser(refreshed);
+      // Reset verification state and send to new address
+      setSent(false);
+      setError('');
+      setShowEmailForm(false);
+      setNewEmailInput('');
+      await sendVerification(refreshed);
+    } catch {
+      setEmailUpdateError('Network error. Please check your connection.');
+    } finally {
+      setEmailUpdateLoading(false);
+    }
+  };
+
   return (
     <div className="flex items-center justify-center min-h-full py-10 px-4">
       <div className="w-full max-w-md text-center">
@@ -187,6 +226,55 @@ export default function VerifyEmailPage() {
             <p className="text-xs text-gray-400 mt-4">
               Can&apos;t find it? Check your spam or junk folder.
             </p>
+
+            {/* ── Wrong email? update form ─────────────────────────── */}
+            <div className="mt-6 border-t border-gray-100 pt-5">
+              {!showEmailForm ? (
+                <button
+                  onClick={() => { setShowEmailForm(true); setEmailUpdateError(''); }}
+                  className="text-xs text-gray-400 hover:text-gray-600 transition-colors underline underline-offset-2"
+                >
+                  Wrong email address?
+                </button>
+              ) : (
+                <form onSubmit={handleEmailUpdate} className="text-left space-y-3">
+                  <p className="text-sm font-medium text-[#0D1B2A]">Update your email address</p>
+                  <p className="text-xs text-gray-500">
+                    Enter the correct email address. We&apos;ll send a new verification link there, and it will also become your login email.
+                  </p>
+                  <input
+                    type="email"
+                    value={newEmailInput}
+                    onChange={(e) => { setNewEmailInput(e.target.value); setEmailUpdateError(''); }}
+                    placeholder="new@example.com"
+                    autoComplete="email"
+                    required
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#F5A523] focus:border-[#F5A523] focus:outline-none transition-colors bg-white"
+                  />
+                  {emailUpdateError && (
+                    <p className="text-xs text-red-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                      {emailUpdateError}
+                    </p>
+                  )}
+                  <div className="flex gap-2">
+                    <button
+                      type="submit"
+                      disabled={emailUpdateLoading || !newEmailInput.trim()}
+                      className="flex-1 bg-[#F5A523] hover:bg-[#E08B00] disabled:opacity-60 text-white text-sm font-semibold rounded-full py-2.5 transition-colors"
+                    >
+                      {emailUpdateLoading ? 'Updating…' : 'Update email'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setShowEmailForm(false); setNewEmailInput(''); setEmailUpdateError(''); }}
+                      className="flex-1 border border-gray-200 text-gray-600 text-sm font-medium rounded-full py-2.5 hover:bg-gray-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
           </>
         )}
       </div>
