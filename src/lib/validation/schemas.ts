@@ -168,6 +168,7 @@ export const kycProfileSchema = z.object({
   immigrationStatus: z.enum(['student', 'work_visa', 'resident', 'permanent_resident', 'citizen'], {
     message: 'Immigration status is required',
   }),
+  visaExpiryDate: z.string().optional(),
   housingStatus: z.enum(['rent', 'own', 'flatmates'], {
     message: 'Housing status is required',
   }),

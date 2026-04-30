@@ -34,6 +34,7 @@ export async function PATCH(request: NextRequest) {
       {
         dateOfBirth: encryptedDob,
         immigrationStatus: data.immigrationStatus,
+        visaExpiryDate: data.visaExpiryDate ?? null,
         housingStatus: data.housingStatus,
         timeAtAddress: data.timeAtAddress,
         address: data.address,
