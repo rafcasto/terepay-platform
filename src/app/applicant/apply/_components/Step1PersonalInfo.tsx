@@ -25,6 +25,8 @@ export default function Step1PersonalInfo() {
   } = useFormContext<TerepayApplicationInput>();
 
   const e = errors.personalInfo;
+  const visaStatus = watch('personalInfo.visaStatus');
+  const isVisaExpiryHidden = visaStatus === 'citizen';
 
   const [prefilled, setPrefilled] = useState<PrefilledFields>(new Set());
   const [displayAddress, setDisplayAddress] = useState('');
@@ -208,10 +210,12 @@ export default function Step1PersonalInfo() {
           </select>
           {e?.visaStatus && <p className={errorCls}>{e.visaStatus.message}</p>}
         </div>
-        <div>
-          <label className={labelCls}>Visa Expiry Date</label>
-          <input type="date" {...register('personalInfo.visaExpiryDate')} className={cls('visaExpiryDate')} />
-        </div>
+        {!isVisaExpiryHidden && (
+          <div>
+            <label className={labelCls}>Visa Expiry Date</label>
+            <input type="date" {...register('personalInfo.visaExpiryDate')} className={cls('visaExpiryDate')} />
+          </div>
+        )}
       </div>
 
       {/* Household Type */}
