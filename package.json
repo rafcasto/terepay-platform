@@ -12,7 +12,8 @@
     "firebase:export": "firebase emulators:export ./emulator-data",
     "seed:lender": "FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 ts-node --project tsconfig.scripts.json scripts/seed-lender.ts",
     "seed:lender:prod": "FIREBASE_AUTH_EMULATOR_HOST= FIRESTORE_EMULATOR_HOST= ts-node --project tsconfig.scripts.json scripts/seed-lender.ts",
-    "verify:gdrive": "ts-node --project tsconfig.scripts.json scripts/verify-gdrive.ts"
+    "verify:gdrive": "ts-node --project tsconfig.scripts.json scripts/verify-gdrive.ts",
+    "reset:counter:prod": "FIREBASE_AUTH_EMULATOR_HOST= FIRESTORE_EMULATOR_HOST= ts-node --project tsconfig.scripts.json scripts/reset-customer-counter.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

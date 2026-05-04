@@ -7,6 +7,7 @@ import KycAddressAutocomplete, { type AddressValue } from '../_components/KycAdd
 interface ProfileForm {
   dateOfBirth: string;
   immigrationStatus: string;
+  visaExpiryDate: string;
   housingStatus: string;
   timeAtAddress: string;
   addressValue: AddressValue;
@@ -32,6 +33,7 @@ export default function KycProfilePage() {
   const [form, setForm] = useState<ProfileForm>({
     dateOfBirth: '',
     immigrationStatus: '',
+    visaExpiryDate: '',
     housingStatus: '',
     timeAtAddress: '',
     addressValue: { address: '', suburb: '', city: '', postCode: '', country: 'New Zealand' },
@@ -42,26 +44,42 @@ export default function KycProfilePage() {
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState('');
 
-  // Skip this step if profile details are already saved; also hydrate read-only fields
+  // Hydrate user info and pre-populate any previously saved profile data
   useEffect(() => {
     fetch('/api/users/profile')
       .then((r) => r.json())
       .then((d) => {
-        if (d?.data?.immigrationStatus) {
-          router.replace('/applicant/onboarding/identity');
-          return;
-        }
         if (d?.data) {
           setUser({
             firstName: d.data.firstName,
             lastName: d.data.lastName,
             email: d.data.email,
           });
+          // Pre-populate form if profile was previously saved
+          if (d.data.immigrationStatus) {
+            setForm((prev) => ({
+              ...prev,
+              dateOfBirth: d.data.dateOfBirth ?? '',
+              immigrationStatus: d.data.immigrationStatus ?? '',
+              visaExpiryDate: d.data.visaExpiryDate ?? '',
+              housingStatus: d.data.housingStatus ?? '',
+              timeAtAddress: d.data.timeAtAddress ?? '',
+              addressValue: {
+                address: d.data.address ?? '',
+                suburb: d.data.suburb ?? '',
+                city: d.data.city ?? '',
+                postCode: d.data.postCode ?? '',
+                country: d.data.country ?? 'New Zealand',
+              },
+              // isExistingClient and customerId are intentionally not pre-populated
+            }));
+          }
         }
         setChecking(false);
       })
       .catch(() => setChecking(false));
-  }, [router]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const set = <K extends keyof ProfileForm>(key: K, value: ProfileForm[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -72,6 +90,8 @@ export default function KycProfilePage() {
     const errs: FieldErrors = {};
     if (!form.dateOfBirth) errs.dateOfBirth = 'Date of birth is required';
     if (!form.immigrationStatus) errs.immigrationStatus = 'Immigration status is required';
+    const needsExpiry = form.immigrationStatus && form.immigrationStatus !== 'citizen' && form.immigrationStatus !== 'permanent_resident';
+    if (needsExpiry && !form.visaExpiryDate) errs.visaExpiryDate = 'Visa expiry date is required';
     if (!form.housingStatus) errs.housingStatus = 'Housing status is required';
     if (!form.timeAtAddress) errs.timeAtAddress = 'Please select how long you have lived here';
     if (!form.addressValue.address) errs.address = 'Address is required';
@@ -123,6 +143,7 @@ export default function KycProfilePage() {
         body: JSON.stringify({
           dateOfBirth: form.dateOfBirth,
           immigrationStatus: form.immigrationStatus,
+          visaExpiryDate: form.visaExpiryDate || undefined,
           housingStatus: form.housingStatus,
           timeAtAddress: form.timeAtAddress,
           address: form.addressValue.address,
@@ -277,6 +298,24 @@ export default function KycProfilePage() {
             </div>
             {errors.immigrationStatus && <p className={errorCls}>{errors.immigrationStatus}</p>}
           </div>
+
+          {/* ── Visa Expiry Date (hidden for citizen / permanent resident) ── */}
+          {form.immigrationStatus !== '' &&
+            form.immigrationStatus !== 'citizen' &&
+            form.immigrationStatus !== 'permanent_resident' && (
+            <div>
+              <label className={labelCls}>
+                Visa Expiry Date <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                value={form.visaExpiryDate}
+                onChange={(e) => set('visaExpiryDate', e.target.value)}
+                className={inputCls}
+              />
+              {errors.visaExpiryDate && <p className={errorCls}>{errors.visaExpiryDate}</p>}
+            </div>
+          )}
 
           {/* ── Address autocomplete ────────────────────────────────────── */}
           <KycAddressAutocomplete

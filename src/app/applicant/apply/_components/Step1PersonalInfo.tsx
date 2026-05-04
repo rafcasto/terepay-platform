@@ -25,6 +25,8 @@ export default function Step1PersonalInfo() {
   } = useFormContext<TerepayApplicationInput>();
 
   const e = errors.personalInfo;
+  const visaStatus = watch('personalInfo.visaStatus');
+  const isVisaExpiryHidden = visaStatus === 'citizen';
 
   const [prefilled, setPrefilled] = useState<PrefilledFields>(new Set());
   const [displayAddress, setDisplayAddress] = useState('');
@@ -58,7 +60,19 @@ export default function Step1PersonalInfo() {
         fill('postCode', data.postCode);
         fill('housingStatus', data.housingStatus);
         fill('timeAtAddress', data.timeAtAddress);
-        fill('visaStatus', data.visaStatus);
+
+        // Map immigrationStatus (onboarding) → visaStatus (loan form enum)
+        const immigrationToVisa: Record<string, string> = {
+          citizen: 'citizen',
+          permanent_resident: 'citizen',
+          resident: 'resident_visa',
+          work_visa: 'work_visa',
+          student: 'student_visa',
+        };
+        const resolvedVisa =
+          data.visaStatus ??
+          (data.immigrationStatus ? (immigrationToVisa[data.immigrationStatus] ?? 'other') : undefined);
+        fill('visaStatus', resolvedVisa);
         fill('visaExpiryDate', data.visaExpiryDate);
         fill('householdType', data.householdType);
         if (data.numberOfChildren != null) fill('numberOfChildren', data.numberOfChildren);
@@ -208,10 +222,12 @@ export default function Step1PersonalInfo() {
           </select>
           {e?.visaStatus && <p className={errorCls}>{e.visaStatus.message}</p>}
         </div>
-        <div>
-          <label className={labelCls}>Visa Expiry Date</label>
-          <input type="date" {...register('personalInfo.visaExpiryDate')} className={cls('visaExpiryDate')} />
-        </div>
+        {!isVisaExpiryHidden && (
+          <div>
+            <label className={labelCls}>Visa Expiry Date</label>
+            <input type="date" {...register('personalInfo.visaExpiryDate')} className={cls('visaExpiryDate')} />
+          </div>
+        )}
       </div>
 
       {/* Household Type */}

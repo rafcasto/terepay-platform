@@ -136,6 +136,11 @@ export const patchProfileSchema = z.object({
 
 export type PatchProfileInput = z.infer<typeof patchProfileSchema>;
 
+export const updateEmailSchema = z.object({
+  newEmail: z.string().email('Invalid email address'),
+});
+
+export type UpdateEmailInput = z.infer<typeof updateEmailSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type SignupInput = z.infer<typeof signupSchema>;
 export type SendOtpInput = z.infer<typeof sendOtpSchema>;
@@ -168,6 +173,7 @@ export const kycProfileSchema = z.object({
   immigrationStatus: z.enum(['student', 'work_visa', 'resident', 'permanent_resident', 'citizen'], {
     message: 'Immigration status is required',
   }),
+  visaExpiryDate: z.string().optional(),
   housingStatus: z.enum(['rent', 'own', 'flatmates'], {
     message: 'Housing status is required',
   }),
