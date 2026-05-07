@@ -21,7 +21,7 @@ export default function AddNoteForm({ applicationId }: { applicationId: string }
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.message ?? 'Failed to add note');
+        throw new Error(data.error?.message ?? 'Failed to add note');
       }
       setText('');
       router.refresh();

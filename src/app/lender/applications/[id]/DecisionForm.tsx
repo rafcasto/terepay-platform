@@ -56,7 +56,7 @@ export default function DecisionForm({
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.message ?? 'Decision failed');
+        throw new Error(data.error?.message ?? 'Decision failed');
       }
       router.refresh();
     } catch (e) {

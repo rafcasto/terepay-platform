@@ -26,7 +26,7 @@ export default function ApplicationActions({ applicationId, status, assignedLend
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.message ?? 'Request failed');
+        throw new Error(data.error?.message ?? 'Request failed');
       }
       router.refresh();
     } catch (e) {
