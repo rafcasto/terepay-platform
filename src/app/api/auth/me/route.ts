@@ -53,6 +53,7 @@ export async function GET(request: NextRequest) {
         kycStatus: data.kycStatus ?? 'not_started',
         phoneVerified: data.phoneVerified ?? false,
         emailVerified: liveEmailVerified,
+        isExistingCustomer: data.isExistingCustomer === true,
       },
     });
   } catch {

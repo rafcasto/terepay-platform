@@ -17,6 +17,7 @@ type AppUser = {
   role: 'applicant' | 'lender';
   profileComplete: boolean;
   emailVerified: boolean;
+  isExistingCustomer?: boolean;
 };
 
 type AuthState = {

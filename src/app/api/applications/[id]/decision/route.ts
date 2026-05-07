@@ -8,12 +8,9 @@ import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { auditLog, getClientIp } from '@/lib/utils/audit';
 import { FieldValue } from 'firebase-admin/firestore';
 import { ZodError } from 'zod';
+import { LOAN_INTEREST_RATE, computeApplicationFee } from '@/lib/constants/fees';
 
 type RouteParams = { params: Promise<{ id: string }> };
-
-const LOAN_INTEREST_RATE = 0.047; // 4.7% for 8 weeks
-const APPLICATION_FEE_NEW = 50;
-const APPLICATION_FEE_EXISTING = 30;
 
 /**
  * POST /api/applications/[id]/decision
@@ -103,7 +100,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       applicantUserData?.isExistingCustomer === true ||
       previousLoansSnap.size > 0;
 
-    const applicationFee = isExistingCustomer ? APPLICATION_FEE_EXISTING : APPLICATION_FEE_NEW;
+    const applicationFee = computeApplicationFee(isExistingCustomer);
 
     const fortnightlyPayment = approvedAmount
       ? Math.round(((approvedAmount * (1 + LOAN_INTEREST_RATE)) / 4) * 100) / 100
