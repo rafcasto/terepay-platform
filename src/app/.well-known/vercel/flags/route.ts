@@ -19,5 +19,5 @@ export async function GET(request: NextRequest) {
     autoUnderwriting,
     disableSmsOtp,
   });
-  return NextResponse.json(data); 
+  return NextResponse.json(data);
 }
