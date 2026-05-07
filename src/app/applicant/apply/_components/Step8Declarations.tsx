@@ -1,7 +1,9 @@
 'use client';
 
-import { useFormContext } from 'react-hook-form';
+import { useFormContext, useWatch } from 'react-hook-form';
 import type { TerepayApplicationInput } from '@/lib/validation/schemas';
+import { useAuth } from '@/hooks/useAuth';
+import { LOAN_INTEREST_RATE, computeApplicationFee } from '@/lib/constants/fees';
 
 const errorCls = 'mt-1 text-xs text-red-600';
 
@@ -50,10 +52,21 @@ const PRIVACY_DECLARATIONS = [
 export default function Step8Declarations() {
   const {
     register,
+    control,
     formState: { errors },
   } = useFormContext<TerepayApplicationInput>();
+  const { user } = useAuth();
 
   const e = errors.declarations;
+
+  const requestedAmount = useWatch({ control, name: 'loanRequest.requestedAmount' }) ?? 0;
+  const principal = Number(requestedAmount) || 0;
+  const interest = principal * LOAN_INTEREST_RATE;
+  const isExisting = user?.isExistingCustomer === true;
+  const applicationFee = computeApplicationFee(isExisting);
+  const totalRepayable = principal + interest + applicationFee;
+  const fortnightlyPayment = totalRepayable / 4;
+  const customerLabel = isExisting ? 'existing customer' : 'new customer';
 
   return (
     <div className="space-y-6">
@@ -62,6 +75,43 @@ export default function Step8Declarations() {
         <p className="text-sm text-gray-500 mt-1">
           Please read and confirm each declaration before submitting your application.{' '}
           For legal compliance, your consent must be confirmed fresh each time you submit.
+        </p>
+      </div>
+
+      {/* Fees & Repayment Summary */}
+      <div className="bg-[#FEF7E9] border border-[#F5A523]/30 rounded-xl p-4 space-y-3">
+        <h3 className="text-xs font-bold text-[#E08B00] uppercase tracking-wide">
+          Fees &amp; Repayment Summary
+        </h3>
+        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-sm text-[#1C2740]">
+          <div className="flex justify-between sm:block">
+            <dt className="text-gray-600">Requested amount</dt>
+            <dd className="font-semibold sm:mt-0.5">${principal.toFixed(2)}</dd>
+          </div>
+          <div className="flex justify-between sm:block">
+            <dt className="text-gray-600">Interest (4.7%)</dt>
+            <dd className="font-semibold sm:mt-0.5">${interest.toFixed(2)}</dd>
+          </div>
+          <div className="flex justify-between sm:block">
+            <dt className="text-gray-600">Application fee</dt>
+            <dd className="font-semibold sm:mt-0.5">
+              ${applicationFee} <span className="text-xs font-normal text-gray-500">({customerLabel})</span>
+            </dd>
+          </div>
+          <div className="flex justify-between sm:block">
+            <dt className="text-gray-600">Total repayable</dt>
+            <dd className="font-bold sm:mt-0.5">${totalRepayable.toFixed(2)}</dd>
+          </div>
+          <div className="flex justify-between sm:block sm:col-span-2 pt-2 border-t border-[#F5A523]/30">
+            <dt className="text-gray-700 font-medium">Fortnightly payment</dt>
+            <dd className="font-bold sm:mt-0.5">
+              4 × ${fortnightlyPayment.toFixed(2)}
+            </dd>
+          </div>
+        </dl>
+        <p className="text-[11px] text-gray-500 leading-snug">
+          Estimate based on your customer status at the time of submission. The application fee will be
+          confirmed at approval.
         </p>
       </div>
 
