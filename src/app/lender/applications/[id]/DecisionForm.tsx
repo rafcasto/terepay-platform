@@ -21,15 +21,21 @@ const STANDARD_DECLINE_REASONS = [
 export default function DecisionForm({
   applicationId,
   affordabilityStatus,
+  requestedAmount,
+  assessedAmount,
 }: {
   applicationId: string;
   affordabilityStatus: string;
+  requestedAmount: number;
+  assessedAmount?: number;
 }) {
   const router = useRouter();
   const affordabilityComplete = affordabilityStatus === 'complete';
+  const defaultApprovedAmount = assessedAmount ?? requestedAmount;
   const [action, setAction] = useState<'approve' | 'decline' | null>(null);
   const [rationale, setRationale] = useState('');
   const [selectedReasons, setSelectedReasons] = useState<string[]>([]);
+  const [approvedAmount, setApprovedAmount] = useState<number>(defaultApprovedAmount);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,8 +45,11 @@ export default function DecisionForm({
     );
   };
 
+  const approvedOutOfRange = approvedAmount < 200 || approvedAmount > 2000;
+
   const submit = async () => {
     if (!action || !rationale.trim()) return;
+    if (action === 'approve' && approvedOutOfRange) return;
     setLoading(true);
     setError(null);
     try {
@@ -51,7 +60,7 @@ export default function DecisionForm({
           action,
           rationale,
           declineReasons: action === 'decline' ? selectedReasons : undefined,
-          approvedAmount: undefined,
+          approvedAmount: action === 'approve' ? approvedAmount : undefined,
         }),
       });
       if (!res.ok) {
@@ -101,6 +110,35 @@ export default function DecisionForm({
         </button>
       </div>
 
+      {action === 'approve' && (
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1 uppercase tracking-wide">
+            Approved Amount <span className="text-red-500">*</span>
+          </label>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600">$</span>
+            <input
+              type="number"
+              min={200}
+              max={2000}
+              step={1}
+              value={Number.isFinite(approvedAmount) ? approvedAmount : ''}
+              onChange={(e) => setApprovedAmount(Number(e.target.value))}
+              className="w-40 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
+            <span className="text-xs text-gray-500">
+              Requested {new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(requestedAmount)}
+              {typeof assessedAmount === 'number' && assessedAmount !== requestedAmount && (
+                <> · Assessed {new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(assessedAmount)}</>
+              )}
+            </span>
+          </div>
+          {approvedOutOfRange && (
+            <p className="mt-1 text-xs text-red-600">Amount must be between $200 and $2,000.</p>
+          )}
+        </div>
+      )}
+
       {action === 'decline' && (
         <div>
           <p className="text-xs font-medium text-gray-600 mb-2 uppercase tracking-wide">Decline Reasons (select all that apply)</p>
@@ -137,7 +175,13 @@ export default function DecisionForm({
 
           <button
             onClick={submit}
-            disabled={loading || !rationale.trim() || !affordabilityComplete || (action === 'decline' && selectedReasons.length === 0)}
+            disabled={
+              loading ||
+              !rationale.trim() ||
+              !affordabilityComplete ||
+              (action === 'decline' && selectedReasons.length === 0) ||
+              (action === 'approve' && approvedOutOfRange)
+            }
             className={`w-full py-2 px-4 rounded-lg text-sm font-semibold text-white transition-colors disabled:opacity-50 ${
               action === 'approve' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'
             }`}

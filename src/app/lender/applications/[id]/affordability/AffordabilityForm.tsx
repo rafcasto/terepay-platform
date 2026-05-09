@@ -143,6 +143,9 @@ export default function AffordabilityForm({
   const [recommendation, setRecommendation] = useState<'proceed' | 'decline'>(
     initialDraft?.recommendation ?? 'proceed',
   );
+  const [assessedAmount, setAssessedAmount] = useState<number>(
+    initialDraft?.assessedAmount ?? loanAmount,
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stepErrors, setStepErrors] = useState<string[]>([]);
@@ -190,7 +193,7 @@ export default function AffordabilityForm({
   const totalIncome = incomeRows.reduce((s, r) => s + r.finalAmount, 0);
   const totalExpenses = expenseRows.reduce((s, r) => s + r.finalAmount, 0);
   const netDisposable = totalIncome - totalExpenses;
-  const loanPayment = (loanAmount * 1.047) / 4;
+  const loanPayment = (assessedAmount * 1.047) / 4;
   const surplus = netDisposable - loanPayment;
 
   const daysOfData = checklist.firstTransactionDate
@@ -227,6 +230,7 @@ export default function AffordabilityForm({
           catalogVersionId,
           redFlagsAcknowledged: {},
           recommendation: hardDeclines.length > 0 ? 'decline' : recommendation,
+          assessedAmount,
         }),
       });
       if (!res.ok) {
@@ -270,6 +274,7 @@ export default function AffordabilityForm({
         incomeRows,
         expenseRows,
         recommendation,
+        assessedAmount,
       }),
     }).catch(() => undefined);
   };
@@ -374,7 +379,9 @@ export default function AffordabilityForm({
             )}
             {currentStep === 4 && (
               <Step5ResultsDecision
-                loanAmount={loanAmount}
+                requestedAmount={loanAmount}
+                assessedAmount={assessedAmount}
+                onAssessedAmountChange={setAssessedAmount}
                 totalIncome={totalIncome}
                 totalExpenses={totalExpenses}
                 netDisposable={netDisposable}
