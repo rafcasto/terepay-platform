@@ -1,4 +1,5 @@
 import type { Timestamp } from 'firebase-admin/firestore';
+import type { LoanPurposeValue } from '@/lib/constants/loan-purposes';
 
 // ---------------------------------------------------------------------------
 // LMS Application Statuses (CCCFA-aligned workflow)
@@ -233,7 +234,7 @@ export interface LoanApplication {
   loanDetails: {
     requestedAmount: number;
     currency: string;
-    loanPurpose: string;
+    loanPurpose: LoanPurposeValue | string;
     purposeDescription: string;
     // Filled on approval
     approvedAmount?: number;
@@ -272,7 +273,7 @@ export interface LoanApplication {
   affordabilityStatus: 'not_started' | 'in_progress' | 'complete';
   /** Persisted step-by-step draft while the lender is filling the assessment */
   affordabilityDraft?: AffordabilityDraftData;
-  /** True when the applicant is flagged as an existing customer ($30 fee) */
+  /** True when the applicant is flagged as an existing customer ($20 fee vs $50 for new) */
   isExistingCustomer?: boolean;
   creditCheck?: {
     reportNumber: string;
@@ -290,6 +291,7 @@ export interface LoanApplication {
     claimedAt?: Timestamp;
     assessmentStartedAt?: Timestamp;
     approvedAt?: Timestamp;
+    acceptedAt?: Timestamp;
     disbursedAt?: Timestamp;
     closedAt?: Timestamp;
     declinedAt?: Timestamp;
@@ -383,7 +385,7 @@ export interface TerePayExistingDebts {
 
 export interface TerePayLoanRequest {
   requestedAmount: number;
-  purpose: string;
+  purpose: LoanPurposeValue | string;
   purposeDescription: string;
   primaryIncomeSource: string;
   isPEP: boolean;

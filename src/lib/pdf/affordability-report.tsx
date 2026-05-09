@@ -9,6 +9,7 @@ import {
   renderToBuffer,
 } from '@react-pdf/renderer';
 import type { AffordabilityAssessment, LoanApplication } from '@/types/application';
+import { loanPurposeLabel } from '@/lib/constants/loan-purposes';
 
 // ---------------------------------------------------------------------------
 // Styles
@@ -280,7 +281,7 @@ const AffordabilityReportDocument = ({ assessment, application }: Props) => {
           <OverviewRow label="Occupation" value={emp?.occupation ?? '-'} />
           <OverviewRow label="Employment Status" value={`${empStatus} - ${emp?.timeAtEmployer ?? '-'} at current employer`} />
           <OverviewRow label="Visa Status" value={visaFull} />
-          <OverviewRow label="Loan Purpose" value={loanReq?.purposeDescription ?? application.loanDetails?.loanPurpose ?? '-'} />
+          <OverviewRow label="Loan Purpose" value={loanReq?.purposeDescription ?? loanPurposeLabel(application.loanDetails?.loanPurpose)} />
           <OverviewRow label="Amount Requested" value={`${fmt(loanPrincipal, 0)} - ${application.status === 'approved' ? 'APPROVED' : application.status === 'declined' ? 'DECLINED' : 'PENDING'}`} />
           <OverviewRow label="AML/ID Verified" value={assessment.checklist.employmentVerificationMethod ?? '-'} />
           <OverviewRow label="PEP Status" value={loanReq?.isPEP ? 'Yes' : 'No'} />

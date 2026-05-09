@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import Link from 'next/link';
 import { getAdminDb, verifySessionOrIdToken } from '@/lib/firebase/admin';
+import { loanPurposeLabel } from '@/lib/constants/loan-purposes';
 
 export const dynamic = 'force-dynamic';
 
@@ -198,7 +199,7 @@ export default async function LenderDashboardPage() {
                       {(app.referenceNumber as string) ?? (app.id as string)}
                     </p>
                     <p className="text-xs text-gray-400 mt-0.5 truncate">
-                      {fmt(ld?.requestedAmount ?? 0)} · {ld?.loanPurpose ?? '—'}
+                      {fmt(ld?.requestedAmount ?? 0)} · {loanPurposeLabel(ld?.loanPurpose)}
                     </p>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">

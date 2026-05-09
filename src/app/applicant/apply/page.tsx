@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { terepayApplicationSchema, type TerepayApplicationInput } from '@/lib/validation/schemas';
 import { useAuth } from '@/hooks/useAuth';
+import { normalizeLoanPurpose } from '@/lib/constants/loan-purposes';
 import Step1PersonalInfo from './_components/Step1PersonalInfo';
 import Step2Employment from './_components/Step2Employment';
 import Step3LivingExpenses from './_components/Step3LivingExpenses';
@@ -164,13 +165,23 @@ function ApplyPageInner() {
         if (typeof d.lastCompletedStep === 'number') {
           setCurrentStep(Math.min(d.lastCompletedStep + 1, STEPS.length - 1));
         }
+        // Map any legacy purpose values (e.g. debt_consolidation, car) to the
+        // current enum so the dropdown doesn't end up with an invalid selection.
+        const migratedLoanRequest = d.loanRequest
+          ? {
+              ...d.loanRequest,
+              ...(d.loanRequest.purpose && {
+                purpose: normalizeLoanPurpose(d.loanRequest.purpose) ?? '',
+              }),
+            }
+          : undefined;
         reset({
           ...FORM_DEFAULT_VALUES,
           ...(d.personalInfo   && { personalInfo:   d.personalInfo }),
           ...(d.employment     && { employment:     d.employment }),
           ...(d.livingExpenses && { livingExpenses: d.livingExpenses }),
           ...(d.existingDebts  && { existingDebts:  d.existingDebts }),
-          ...(d.loanRequest    && { loanRequest:    d.loanRequest }),
+          ...(migratedLoanRequest && { loanRequest:  migratedLoanRequest }),
           ...(d.bankDetails    && { bankDetails:    d.bankDetails }),
           ...(d.references     && { references:     d.references }),
           // declarations intentionally not pre-filled - user must re-confirm consent

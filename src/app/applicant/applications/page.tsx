@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 import { getAdminDb, verifySessionOrIdToken } from '@/lib/firebase/admin';
 import Link from 'next/link';
 import Badge from '@/components/shared/Badge';
+import { loanPurposeLabel } from '@/lib/constants/loan-purposes';
 
 export const dynamic = 'force-dynamic';
 
@@ -142,8 +143,8 @@ export default async function ApplicantApplicationsPage() {
                     <td className="px-6 py-4 font-medium text-gray-900">
                       ${(loanDetails?.requestedAmount as number)?.toLocaleString() ?? '—'}
                     </td>
-                    <td className="px-6 py-4 text-gray-600 capitalize">
-                      {(loanDetails?.loanPurpose as string)?.replace(/_/g, ' ') ?? '—'}
+                    <td className="px-6 py-4 text-gray-600">
+                      {loanPurposeLabel(loanDetails?.loanPurpose as string | undefined)}
                     </td>
                     <td className="px-6 py-4">
                       <Badge variant={STATUS_VARIANT[status] ?? 'default'}>
