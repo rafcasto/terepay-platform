@@ -44,8 +44,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     let assignedCustomerId: string | null = null;
 
     await adminDb.runTransaction(async (tx) => {
+      // ALL READS FIRST (Firestore requires reads-before-writes within a tx)
       const userSnap = await tx.get(userRef);
       const userData = userSnap.data() ?? {};
+      const needsCustomerId = !userData.customerId;
+      const counterSnap = needsCustomerId ? await tx.get(counterRef) : null;
 
       const now = FieldValue.serverTimestamp();
 
@@ -57,9 +60,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       });
 
       // Assign customer ID if not already set (first-time applicant)
-      if (!userData.customerId) {
-        const counterSnap = await tx.get(counterRef);
-        const last: number = counterSnap.exists ? (counterSnap.data()?.lastSequence ?? 0) : 0;
+      if (needsCustomerId) {
+        const last: number = counterSnap!.exists ? (counterSnap!.data()?.lastSequence ?? 0) : 0;
         const next = last + 1;
         const customerId = `TERE${String(next).padStart(3, '0')}`;
         assignedCustomerId = customerId;

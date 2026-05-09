@@ -69,7 +69,7 @@ export default function CustomerEditPanel({ customer, onClose, onSuccess }: Prop
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.message ?? 'Failed to update customer');
+        throw new Error(data.error?.message ?? 'Failed to update customer');
       }
 
       const updated: Partial<MergedCustomer> = { firstName, lastName };

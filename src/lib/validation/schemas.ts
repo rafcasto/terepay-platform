@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { LOAN_PURPOSE_VALUES } from '@/lib/constants/loan-purposes';
 
 // ---------------------------------------------------------------------------
 // Auth schemas
@@ -313,7 +314,7 @@ export const terepayApplicationSchema = z.object({
       .number({ message: 'Enter an amount' })
       .min(100, 'Minimum loan amount is $100')
       .max(50000, 'Maximum loan amount is $50,000'),
-    purpose: z.string().min(1, 'Please select a purpose'),
+    purpose: z.enum(LOAN_PURPOSE_VALUES, { message: 'Please select a purpose' }),
     purposeDescription: z.string().min(10, 'Please provide at least 10 characters').max(1000),
     primaryIncomeSource: z.string().min(1, 'Required'),
     isPEP: z.boolean().default(false),

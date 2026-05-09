@@ -2,25 +2,20 @@
 
 import { useFormContext, useWatch } from 'react-hook-form';
 import type { TerepayApplicationInput } from '@/lib/validation/schemas';
+import { LOAN_PURPOSES } from '@/lib/constants/loan-purposes';
+import {
+  APPLICATION_FEE_NEW,
+  APPLICATION_FEE_EXISTING,
+  LOAN_INTEREST_RATE,
+  computeApplicationFee,
+} from '@/lib/constants/fees';
+import { useAuth } from '@/hooks/useAuth';
 
 const inputCls =
   'w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#F5A523] focus:border-[#F5A523] focus:outline-none transition-colors bg-white';
 const selectCls = inputCls + ' appearance-none';
 const labelCls = 'block text-sm font-medium text-gray-700 mb-1';
 const errorCls = 'mt-1 text-xs text-red-600';
-
-const LOAN_PURPOSES = [
-  { value: 'emergency', label: 'Emergency / Unexpected expense' },
-  { value: 'medical', label: 'Medical / Dental' },
-  { value: 'car', label: 'Car repair / purchase' },
-  { value: 'household', label: 'Household bills / Utilities' },
-  { value: 'education', label: 'Education / Training' },
-  { value: 'family', label: 'Family occasion / Event' },
-  { value: 'travel', label: 'Travel' },
-  { value: 'debt_consolidation', label: 'Debt consolidation' },
-  { value: 'home_improvement', label: 'Home improvement' },
-  { value: 'other', label: 'Other' },
-];
 
 const REMITTANCE_PURPOSES = [
   'Family support',
@@ -39,16 +34,17 @@ export default function Step5LoanRequest() {
     control,
     formState: { errors },
   } = useFormContext<TerepayApplicationInput>();
+  const { user } = useAuth();
 
   const e = errors.loanRequest;
   const isPEP = useWatch({ control, name: 'loanRequest.isPEP' });
   const remittanceFreq = useWatch({ control, name: 'loanRequest.remittance.frequency' });
   const amount = useWatch({ control, name: 'loanRequest.requestedAmount' }) ?? 0;
 
-  // Estimate repayments (4 fortnightly payments, 4.7% interest, $50 establishment fee)
+  // Estimate repayments (4 fortnightly payments, 4.7% interest, application fee)
   const principal = Number(amount) || 0;
-  const interest = principal * 0.047;
-  const estFee = 50;
+  const interest = principal * LOAN_INTEREST_RATE;
+  const estFee = computeApplicationFee(user?.isExistingCustomer);
   const totalRepayable = principal + interest + estFee;
   const fortnightlyPayment = totalRepayable / 4;
 
@@ -67,8 +63,8 @@ export default function Step5LoanRequest() {
           <div><span className="font-semibold">Payments:</span> 4 × fortnightly</div>
           <div><span className="font-semibold">APR:</span> 49%</div>
           <div><span className="font-semibold">Interest:</span> 4.7% for 8 weeks</div>
-          <div><span className="font-semibold">New customer fee:</span> $50</div>
-          <div><span className="font-semibold">Existing customer fee:</span> $20</div>
+          <div><span className="font-semibold">New customer fee:</span> ${APPLICATION_FEE_NEW}</div>
+          <div><span className="font-semibold">Existing customer fee:</span> ${APPLICATION_FEE_EXISTING}</div>
         </div>
       </div>
 
@@ -101,7 +97,7 @@ export default function Step5LoanRequest() {
             <span className="font-bold">${fortnightlyPayment.toFixed(2)}</span>
           </p>
           <p className="text-xs text-green-600">
-            Total repayable: ${totalRepayable.toFixed(2)} (incl. $50 application fee &amp; 4.7% interest)
+            Total repayable: ${totalRepayable.toFixed(2)} (incl. ${estFee} application fee &amp; 4.7% interest)
           </p>
         </div>
       )}

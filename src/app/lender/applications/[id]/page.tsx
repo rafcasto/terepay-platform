@@ -7,6 +7,8 @@ import ApplicationActions from './ApplicationActions';
 import AddNoteForm from './AddNoteForm';
 import DecisionForm from './DecisionForm';
 import ExistingCustomerToggle from './ExistingCustomerToggle';
+import { loanPurposeLabel } from '@/lib/constants/loan-purposes';
+import { computeApplicationFee } from '@/lib/constants/fees';
 
 export const dynamic = 'force-dynamic';
 
@@ -134,7 +136,7 @@ export default async function LenderApplicationDetailPage({
         {/* Loan Summary */}
         <section className="bg-white rounded-xl border border-gray-200 p-5">
           <h2 className="font-semibold text-gray-900 mb-4">Loan Details</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center mb-4 bg-indigo-50 rounded-xl p-4">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 text-center mb-4 bg-indigo-50 rounded-xl p-4">
             <div>
               <p className="text-xs text-indigo-500 font-medium">Requested</p>
               <p className="font-bold text-indigo-900">{fmt(ld?.requestedAmount)}</p>
@@ -148,8 +150,23 @@ export default async function LenderApplicationDetailPage({
               <p className="font-bold text-indigo-900">4 × fortnightly</p>
             </div>
             <div>
+              <p className="text-xs text-indigo-500 font-medium">Application Fee</p>
+              {ld?.applicationFee !== undefined ? (
+                <p className="font-bold text-indigo-900">{fmt(ld.applicationFee)}</p>
+              ) : (
+                <>
+                  <p className="font-bold text-indigo-900">
+                    {fmt(computeApplicationFee(app.isExistingCustomer))}
+                  </p>
+                  <p className="text-[10px] text-indigo-500 font-medium uppercase tracking-wide">
+                    Estimated
+                  </p>
+                </>
+              )}
+            </div>
+            <div>
               <p className="text-xs text-indigo-500 font-medium">Purpose</p>
-              <p className="font-bold text-indigo-900 capitalize text-sm">{ld?.loanPurpose?.replace(/_/g, ' ') ?? '—'}</p>
+              <p className="font-bold text-indigo-900 text-sm">{loanPurposeLabel(ld?.loanPurpose)}</p>
             </div>
           </div>
           {ld?.purposeDescription && (

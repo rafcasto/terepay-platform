@@ -5,6 +5,7 @@ import { getAdminDb, verifySessionOrIdToken } from '@/lib/firebase/admin';
 import type { LoanApplication, AnyApplicationStatus } from '@/types/application';
 import SubmitButton from './SubmitButton';
 import AcceptOfferButton from './_components/AcceptOfferButton';
+import { loanPurposeLabel } from '@/lib/constants/loan-purposes';
 
 export const dynamic = 'force-dynamic';
 
@@ -265,7 +266,7 @@ export default async function ApplicationDetailPage({
         <h2 className="font-semibold text-gray-900 mb-4">Loan Details</h2>
         <dl className="grid grid-cols-2 gap-4">
           <Field label="Requested Amount" value={fmt(ld?.requestedAmount)} />
-          <Field label="Purpose" value={ld?.loanPurpose?.replace(/_/g, ' ')} />
+          <Field label="Purpose" value={loanPurposeLabel(ld?.loanPurpose)} />
           <Field label="Interest Rate" value="4.7% (8 weeks)" />
           <Field label="Repayments" value="4 × fortnightly" />
           {ld?.approvedAmount && <Field label="Approved Amount" value={fmt(ld.approvedAmount)} />}
