@@ -290,6 +290,7 @@ export interface LoanApplication {
     claimedAt?: Timestamp;
     assessmentStartedAt?: Timestamp;
     approvedAt?: Timestamp;
+    acceptedAt?: Timestamp;
     disbursedAt?: Timestamp;
     closedAt?: Timestamp;
     declinedAt?: Timestamp;
