@@ -66,7 +66,7 @@ export default function ExistingCustomerToggle({ applicationId, initialValue }: 
           ].join(' ')}
         >
           {isExisting
-            ? 'Yes — Application fee: $30'
+            ? 'Yes — Application fee: $20'
             : 'No — Application fee: $50'}
         </span>
         {loading && <span className="text-xs text-gray-400">Saving…</span>}
