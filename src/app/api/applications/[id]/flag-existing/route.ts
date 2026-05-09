@@ -16,7 +16,7 @@ const flagSchema = z.object({
 /**
  * POST /api/applications/[id]/flag-existing
  * Lender only. Flags (or unflags) an applicant as an existing customer.
- * This affects the application fee ($30 existing vs $50 new) and permanently
+ * This affects the application fee ($20 existing vs $50 new) and permanently
  * updates the applicant's user profile so future applications inherit the flag.
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {

@@ -242,6 +242,7 @@ export interface LoanApplication {
     fortnightlyPayment?: number;
     totalRepayment?: number;
     disbursementDate?: string;
+    disbursedAmount?: number;
   };
 
   // Legacy financial summary (computed from 8-section form)
