@@ -270,6 +270,7 @@ export default async function ApplicationDetailPage({
           <Field label="Repayments" value="4 × fortnightly" />
           {ld?.approvedAmount && <Field label="Approved Amount" value={fmt(ld.approvedAmount)} />}
           {(ld as Record<string, unknown>)?.applicationFee != null && <Field label="Application Fee" value={fmt((ld as Record<string, unknown>).applicationFee as number)} />}
+          {(ld as Record<string, unknown>)?.disbursedAmount != null && <Field label="Disbursed Amount" value={fmt((ld as Record<string, unknown>).disbursedAmount as number)} />}
           {ld?.fortnightlyPayment && <Field label="Fortnightly Payment" value={fmt(ld.fortnightlyPayment)} />}
           {ld?.totalRepayment && <Field label="Total Repayment" value={fmt(ld.totalRepayment)} />}
         </dl>

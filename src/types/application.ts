@@ -241,6 +241,7 @@ export interface LoanApplication {
     fortnightlyPayment?: number;
     totalRepayment?: number;
     disbursementDate?: string;
+    disbursedAmount?: number;
   };
 
   // Legacy financial summary (computed from 8-section form)
@@ -272,7 +273,7 @@ export interface LoanApplication {
   affordabilityStatus: 'not_started' | 'in_progress' | 'complete';
   /** Persisted step-by-step draft while the lender is filling the assessment */
   affordabilityDraft?: AffordabilityDraftData;
-  /** True when the applicant is flagged as an existing customer ($30 fee) */
+  /** True when the applicant is flagged as an existing customer ($20 fee) */
   isExistingCustomer?: boolean;
   creditCheck?: {
     reportNumber: string;

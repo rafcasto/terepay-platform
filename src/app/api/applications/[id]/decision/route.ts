@@ -13,7 +13,7 @@ type RouteParams = { params: Promise<{ id: string }> };
 
 const LOAN_INTEREST_RATE = 0.047; // 4.7% for 8 weeks
 const APPLICATION_FEE_NEW = 50;
-const APPLICATION_FEE_EXISTING = 30;
+const APPLICATION_FEE_EXISTING = 20;
 
 /**
  * POST /api/applications/[id]/decision

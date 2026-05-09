@@ -68,7 +68,7 @@ export default function Step5LoanRequest() {
           <div><span className="font-semibold">APR:</span> 49%</div>
           <div><span className="font-semibold">Interest:</span> 4.7% for 8 weeks</div>
           <div><span className="font-semibold">New customer fee:</span> $50</div>
-          <div><span className="font-semibold">Existing customer fee:</span> $30</div>
+          <div><span className="font-semibold">Existing customer fee:</span> $20</div>
         </div>
       </div>
 

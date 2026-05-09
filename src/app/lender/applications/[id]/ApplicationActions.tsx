@@ -51,6 +51,16 @@ export default function ApplicationActions({ applicationId, status, assignedLend
           {loading ? 'Claiming…' : 'Claim Application'}
         </button>
       )}
+
+      {status === 'loan_accepted' && (
+        <button
+          onClick={() => post('disburse')}
+          disabled={loading}
+          className="w-full px-4 py-2 bg-emerald-600 text-white rounded-lg font-medium text-sm hover:bg-emerald-700 disabled:opacity-50"
+        >
+          {loading ? 'Disbursing…' : 'Mark as Disbursed'}
+        </button>
+      )}
     </div>
   );
 }
