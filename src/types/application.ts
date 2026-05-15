@@ -12,6 +12,7 @@ export type ApplicationStatus =
   | 'credit_check'
   | 'approved'
   | 'loan_accepted'
+  | 'offer_declined'
   | 'disbursed'
   | 'active'
   | 'closed_repaid'
@@ -267,6 +268,10 @@ export interface LoanApplication {
 
   internalNotes: InternalNote[];
   decision?: LenderDecision;
+  applicantRejection?: {
+    rejectedAt: Timestamp;
+    reason?: string | null;
+  };
   repaymentSchedule?: RepaymentSchedule;
 
   // Affordability assessment IDs (most recent first)
@@ -293,6 +298,7 @@ export interface LoanApplication {
     assessmentStartedAt?: Timestamp;
     approvedAt?: Timestamp;
     acceptedAt?: Timestamp;
+    offerDeclinedAt?: Timestamp;
     disbursedAt?: Timestamp;
     closedAt?: Timestamp;
     declinedAt?: Timestamp;

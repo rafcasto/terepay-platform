@@ -18,20 +18,34 @@ const STANDARD_DECLINE_REASONS = [
   'Other',
 ];
 
+const MIN_APPROVED_AMOUNT = 200;
+
+const fmtNzd = (n: number) =>
+  new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD', maximumFractionDigits: 0 }).format(n);
+
 export default function DecisionForm({
   applicationId,
   affordabilityStatus,
+  requestedAmount,
 }: {
   applicationId: string;
   affordabilityStatus: string;
+  requestedAmount: number;
 }) {
   const router = useRouter();
   const affordabilityComplete = affordabilityStatus === 'complete';
   const [action, setAction] = useState<'approve' | 'decline' | null>(null);
   const [rationale, setRationale] = useState('');
   const [selectedReasons, setSelectedReasons] = useState<string[]>([]);
+  const [approvedAmount, setApprovedAmount] = useState<number>(requestedAmount);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const approvedAmountInvalid =
+    action === 'approve' &&
+    (!Number.isFinite(approvedAmount) ||
+      approvedAmount < MIN_APPROVED_AMOUNT ||
+      approvedAmount > requestedAmount);
 
   const toggleReason = (r: string) => {
     setSelectedReasons((prev) =>
@@ -41,6 +55,7 @@ export default function DecisionForm({
 
   const submit = async () => {
     if (!action || !rationale.trim()) return;
+    if (approvedAmountInvalid) return;
     setLoading(true);
     setError(null);
     try {
@@ -51,7 +66,7 @@ export default function DecisionForm({
           action,
           rationale,
           declineReasons: action === 'decline' ? selectedReasons : undefined,
-          approvedAmount: undefined,
+          approvedAmount: action === 'approve' ? approvedAmount : undefined,
         }),
       });
       if (!res.ok) {
@@ -101,6 +116,36 @@ export default function DecisionForm({
         </button>
       </div>
 
+      {action === 'approve' && (
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1 uppercase tracking-wide">
+            Approved amount (NZD) <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="number"
+            value={Number.isFinite(approvedAmount) ? approvedAmount : ''}
+            onChange={(e) => setApprovedAmount(e.target.valueAsNumber)}
+            min={MIN_APPROVED_AMOUNT}
+            max={requestedAmount}
+            step={50}
+            className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            Requested: {fmtNzd(requestedAmount)} · Allowed range: {fmtNzd(MIN_APPROVED_AMOUNT)} – {fmtNzd(requestedAmount)}
+          </p>
+          {Number.isFinite(approvedAmount) && approvedAmount < requestedAmount && approvedAmount >= MIN_APPROVED_AMOUNT && (
+            <p className="mt-1 text-xs text-amber-700">
+              Approving {fmtNzd(approvedAmount)} of {fmtNzd(requestedAmount)} requested — the applicant will need to accept the revised offer.
+            </p>
+          )}
+          {approvedAmountInvalid && (
+            <p className="mt-1 text-xs text-red-600">
+              Amount must be between {fmtNzd(MIN_APPROVED_AMOUNT)} and {fmtNzd(requestedAmount)}.
+            </p>
+          )}
+        </div>
+      )}
+
       {action === 'decline' && (
         <div>
           <p className="text-xs font-medium text-gray-600 mb-2 uppercase tracking-wide">Decline Reasons (select all that apply)</p>
@@ -137,7 +182,7 @@ export default function DecisionForm({
 
           <button
             onClick={submit}
-            disabled={loading || !rationale.trim() || !affordabilityComplete || (action === 'decline' && selectedReasons.length === 0)}
+            disabled={loading || !rationale.trim() || !affordabilityComplete || approvedAmountInvalid || (action === 'decline' && selectedReasons.length === 0)}
             className={`w-full py-2 px-4 rounded-lg text-sm font-semibold text-white transition-colors disabled:opacity-50 ${
               action === 'approve' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'
             }`}

@@ -5,6 +5,7 @@ import { getAdminDb, verifySessionOrIdToken } from '@/lib/firebase/admin';
 import type { LoanApplication, AnyApplicationStatus } from '@/types/application';
 import SubmitButton from './SubmitButton';
 import AcceptOfferButton from './_components/AcceptOfferButton';
+import RejectOfferButton from './_components/RejectOfferButton';
 import { loanPurposeLabel } from '@/lib/constants/loan-purposes';
 
 export const dynamic = 'force-dynamic';
@@ -18,6 +19,7 @@ const STATUS_BANNERS: Record<string, { bg: string; text: string; message: string
   credit_check: { bg: 'bg-purple-50 border-purple-200', text: 'text-purple-800', message: 'Your application is undergoing a credit check. This may take 1–2 business days.' },
   approved: { bg: 'bg-green-50 border-green-300', text: 'text-green-800', message: '🎉 Congratulations! Your loan application has been approved. Please review the terms below and accept your loan offer.' },
   loan_accepted: { bg: 'bg-emerald-50 border-emerald-300', text: 'text-emerald-800', message: '✅ You have accepted your loan offer. Funds will be disbursed shortly.' },
+  offer_declined: { bg: 'bg-gray-100 border-gray-300', text: 'text-gray-700', message: 'You declined this loan offer. To apply again, submit a new application.' },
   disbursed: { bg: 'bg-emerald-50 border-emerald-200', text: 'text-emerald-800', message: 'Your loan has been disbursed. Please check your bank account.' },
   active: { bg: 'bg-teal-50 border-teal-200', text: 'text-teal-800', message: 'Your loan is active. Repayments are scheduled fortnightly.' },
   closed_repaid: { bg: 'bg-gray-50 border-gray-200', text: 'text-gray-700', message: 'Your loan has been fully repaid. Thank you!' },
@@ -34,6 +36,7 @@ const STATUS_LABELS: Record<string, string> = {
   credit_check: 'Credit Check',
   approved: 'Approved',
   loan_accepted: 'Loan Accepted',
+  offer_declined: 'Offer Declined',
   disbursed: 'Disbursed',
   active: 'Active',
   closed_repaid: 'Repaid',
@@ -60,7 +63,7 @@ const PROGRESS_STEPS = [
 // The step at index `completedCount` is the current active one.
 const STATUS_COMPLETED_COUNT: Record<string, number> = {
   draft: 0, pending_review: 1, under_assessment: 1, waiting_for_docs: 1,
-  credit_check: 2, approved: 4, loan_accepted: 4,
+  credit_check: 2, approved: 4, loan_accepted: 4, offer_declined: 4,
   disbursed: 5, active: 5, closed_repaid: 5, declined: 3, withdrawn: 1, expired: 1,
   submitted: 1, under_review: 1, funded: 5, completed: 5, rejected: 3,
 };
@@ -136,7 +139,8 @@ export default async function ApplicationDetailPage({
   const timeline = app.timeline as Record<string, { _seconds?: number; toDate?: () => Date }> | undefined;
 
   const completedCount = STATUS_COMPLETED_COUNT[status as string] ?? 1;
-  const isDeclined = status === 'declined' || status === 'rejected';
+  const isDeclined = status === 'declined' || status === 'rejected' || status === 'offer_declined';
+  const isOfferDeclined = status === 'offer_declined';
   const isAllDone = completedCount >= PROGRESS_STEPS.length;
 
   return (
@@ -207,12 +211,16 @@ export default async function ApplicationDetailPage({
                   <p className={`text-sm font-semibold ${
                     isDone ? 'text-green-700' : isCurrent ? 'text-[#E08B00]' : isDeclinedStep ? 'text-red-600' : 'text-gray-400'
                   }`}>
-                    {isDeclinedStep ? 'Application Declined' : step.label}
+                    {isDeclinedStep ? (isOfferDeclined ? 'Offer Declined' : 'Application Declined') : step.label}
                   </p>
                   <p className={`text-xs mt-0.5 leading-relaxed ${
                     isDone || isCurrent ? 'text-gray-500' : isDeclinedStep ? 'text-red-400' : 'text-gray-300'
                   }`}>
-                    {isDeclinedStep ? 'Your application was not approved at this time.' : step.description}
+                    {isDeclinedStep
+                      ? isOfferDeclined
+                        ? 'You declined this loan offer.'
+                        : 'Your application was not approved at this time.'
+                      : step.description}
                   </p>
                 </div>
               </li>
@@ -242,7 +250,12 @@ export default async function ApplicationDetailPage({
       {/* Status Banner */}
       <div className={`rounded-xl border p-4 text-sm font-medium ${banner.bg} ${banner.text}`}>
         {banner.message}
-        {status === 'approved' && <AcceptOfferButton applicationId={id} />}
+        {status === 'approved' && (
+          <div className="mt-4 flex flex-wrap gap-3">
+            <AcceptOfferButton applicationId={id} />
+            <RejectOfferButton applicationId={id} />
+          </div>
+        )}
       </div>
 
       {/* Document Request Banner */}
@@ -269,7 +282,16 @@ export default async function ApplicationDetailPage({
           <Field label="Purpose" value={loanPurposeLabel(ld?.loanPurpose)} />
           <Field label="Interest Rate" value="4.7% (8 weeks)" />
           <Field label="Repayments" value="4 × fortnightly" />
-          {ld?.approvedAmount && <Field label="Approved Amount" value={fmt(ld.approvedAmount)} />}
+          {ld?.approvedAmount && (
+            <Field
+              label="Approved Amount"
+              value={
+                ld.approvedAmount < (ld.requestedAmount ?? 0)
+                  ? `${fmt(ld.approvedAmount)} (less than requested)`
+                  : fmt(ld.approvedAmount)
+              }
+            />
+          )}
           {(ld as Record<string, unknown>)?.applicationFee != null && <Field label="Application Fee" value={fmt((ld as Record<string, unknown>).applicationFee as number)} />}
           {(ld as Record<string, unknown>)?.disbursedAmount != null && <Field label="Disbursed Amount" value={fmt((ld as Record<string, unknown>).disbursedAmount as number)} />}
           {ld?.fortnightlyPayment && <Field label="Fortnightly Payment" value={fmt(ld.fortnightlyPayment)} />}
