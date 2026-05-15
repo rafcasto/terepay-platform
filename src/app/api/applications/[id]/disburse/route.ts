@@ -1,9 +1,11 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { withAuth } from '@/lib/auth/middleware';
+import { disburseSchema } from '@/lib/validation/schemas';
 import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { auditLog, getClientIp } from '@/lib/utils/audit';
 import { FieldValue } from 'firebase-admin/firestore';
+import { ZodError } from 'zod';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,6 +26,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const auth = await withAuth(request, ['lender']);
     const { id } = await params;
     applicationId = id;
+
+    const rawBody = await request.json().catch(() => ({}));
+    const parsed = disburseSchema.parse(rawBody);
 
     const appRef = adminDb.collection('loanApplications').doc(id);
 
@@ -70,7 +75,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         );
       }
 
-      const disbursedAmount = approvedAmount - applicationFee;
+      const defaultDisbursedAmount = approvedAmount - applicationFee;
+      const overrideAmount = parsed.disbursedAmount;
+      const isOverride = typeof overrideAmount === 'number';
+
+      if (isOverride && overrideAmount > approvedAmount) {
+        throw new AppError(
+          'BAD_REQUEST',
+          400,
+          `Disbursed amount (${overrideAmount}) cannot exceed approved amount (${approvedAmount})`,
+        );
+      }
+
+      const disbursedAmount = isOverride ? overrideAmount : defaultDisbursedAmount;
       const disbursementDate = new Date().toISOString().slice(0, 10);
       const now = FieldValue.serverTimestamp();
 
@@ -92,6 +109,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         disbursedAmount,
         alreadyDisbursed: false,
         applicationFee,
+        isOverride,
       };
     });
 
@@ -105,6 +123,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         changes: {
           disbursedAmount: result.disbursedAmount,
           applicationFee: result.applicationFee,
+          override: result.isOverride,
         },
         ipAddress: ip,
       });
@@ -115,6 +134,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       disbursedAmount: result.disbursedAmount,
     });
   } catch (err) {
+    if (err instanceof ZodError) {
+      return errorResponse(
+        new AppError('VALIDATION_ERROR', 422, 'Invalid request', err.flatten().fieldErrors),
+      );
+    }
     if (err instanceof AppError) return errorResponse(err);
 
     await auditLog({

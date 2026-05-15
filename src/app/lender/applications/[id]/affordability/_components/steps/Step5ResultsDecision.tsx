@@ -3,7 +3,9 @@
 import { fmt } from '../types';
 
 interface Props {
-  loanAmount: number;
+  requestedAmount: number;
+  assessedAmount: number;
+  onAssessedAmountChange: (n: number) => void;
   totalIncome: number;
   totalExpenses: number;
   netDisposable: number;
@@ -19,7 +21,9 @@ interface Props {
 }
 
 export default function Step5ResultsDecision({
-  loanAmount,
+  requestedAmount,
+  assessedAmount,
+  onAssessedAmountChange,
   totalIncome,
   totalExpenses,
   netDisposable,
@@ -33,6 +37,8 @@ export default function Step5ResultsDecision({
   error,
   onBack,
 }: Props) {
+  const isAdjusted = assessedAmount !== requestedAmount;
+  const outOfRange = assessedAmount < 200 || assessedAmount > 2000;
   const forced = hardDeclines.length > 0;
 
   const surplusRating =
@@ -77,6 +83,37 @@ export default function Step5ResultsDecision({
         </div>
       )}
 
+      {/* Loan amount under assessment — lender may adjust below the requested amount */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+          Loan Amount Under Assessment
+        </h3>
+        <p className="text-xs text-gray-500 mb-3">
+          Adjust the loan amount used in the affordability calculation. The applicant requested{' '}
+          <span className="font-semibold text-gray-700">{fmt(requestedAmount)}</span>.
+        </p>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-gray-600">$</span>
+          <input
+            type="number"
+            min={200}
+            max={2000}
+            step={1}
+            value={Number.isFinite(assessedAmount) ? assessedAmount : ''}
+            onChange={(e) => onAssessedAmountChange(Number(e.target.value))}
+            className="w-40 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+          {isAdjusted && !outOfRange && (
+            <span className="text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-1">
+              Adjusted from requested amount
+            </span>
+          )}
+        </div>
+        {outOfRange && (
+          <p className="mt-2 text-xs text-red-600">Amount must be between $200 and $2,000.</p>
+        )}
+      </div>
+
       {/* Affordability summary */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">
@@ -95,7 +132,7 @@ export default function Step5ResultsDecision({
             />
           </div>
           <SummaryRow
-            label={`Loan Fortnightly Payment (${fmt(loanAmount)} × 1.047 ÷ 4)`}
+            label={`Loan Fortnightly Payment (${fmt(assessedAmount)} × 1.047 ÷ 4)`}
             value={fmt(loanPayment)}
             color="text-gray-600"
           />
@@ -165,7 +202,7 @@ export default function Step5ResultsDecision({
         <button
           type="button"
           onClick={onSubmit}
-          disabled={loading}
+          disabled={loading || outOfRange}
           className={[
             'px-7 py-2.5 rounded-lg text-sm font-semibold transition-colors',
             effectiveRecommendation === 'decline'

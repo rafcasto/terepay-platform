@@ -124,7 +124,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const netDisposableIncome = totalVerifiedIncome - totalExpenses;
 
     const requestedAmount = appData.loanDetails?.requestedAmount ?? 0;
-    const loanFortnightlyPayment = (requestedAmount * 1.047) / 4;
+    const assessedAmount = parsed.assessedAmount ?? requestedAmount;
+    const loanFortnightlyPayment = (assessedAmount * 1.047) / 4;
     const finalAvailableSurplus = netDisposableIncome - loanFortnightlyPayment;
 
     // Days of transaction data
@@ -187,6 +188,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       expenseRows,
       householdMultiplier: parsed.householdMultiplier,
       catalogVersionId: parsed.catalogVersionId,
+      assessedAmount,
       totalVerifiedIncome,
       totalExpenses,
       netDisposableIncome,
@@ -203,6 +205,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const statusUpdate: Record<string, unknown> = {
       affordabilityStatus: 'complete',
       affordabilityAssessmentIds: FieldValue.arrayUnion(assessmentId),
+      'loanDetails.assessedAmount': assessedAmount,
       'timeline.updatedAt': now,
     };
     if (appData.status === 'under_assessment') {
@@ -235,6 +238,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
               expenseRows,
               householdMultiplier: parsed.householdMultiplier,
               catalogVersionId: parsed.catalogVersionId,
+              assessedAmount,
               totalVerifiedIncome,
               totalExpenses,
               netDisposableIncome,
@@ -307,7 +311,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const appDoc = await appRef.get();
     if (!appDoc.exists) throw new AppError('NOT_FOUND', 404, 'Application not found');
 
-    const { currentStep, checklist, incomeRows, expenseRows, recommendation } =
+    const { currentStep, checklist, incomeRows, expenseRows, recommendation, assessedAmount } =
       await request.json();
 
     await appRef.update({
@@ -317,6 +321,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         incomeRows: incomeRows ?? [],
         expenseRows: expenseRows ?? [],
         recommendation: recommendation ?? 'proceed',
+        ...(typeof assessedAmount === 'number' ? { assessedAmount } : {}),
         savedAt: FieldValue.serverTimestamp(),
       },
     });

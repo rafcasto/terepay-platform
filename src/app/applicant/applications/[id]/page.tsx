@@ -6,6 +6,7 @@ import type { LoanApplication, AnyApplicationStatus } from '@/types/application'
 import SubmitButton from './SubmitButton';
 import AcceptOfferButton from './_components/AcceptOfferButton';
 import { loanPurposeLabel } from '@/lib/constants/loan-purposes';
+import { computeApplicationFee } from '@/lib/constants/fees';
 
 export const dynamic = 'force-dynamic';
 
@@ -262,20 +263,88 @@ export default async function ApplicationDetailPage({
       )}
 
       {/* Loan Summary */}
-      <section className="bg-white rounded-xl border border-gray-200 p-5">
-        <h2 className="font-semibold text-gray-900 mb-4">Loan Details</h2>
-        <dl className="grid grid-cols-2 gap-4">
-          <Field label="Requested Amount" value={fmt(ld?.requestedAmount)} />
-          <Field label="Purpose" value={loanPurposeLabel(ld?.loanPurpose)} />
-          <Field label="Interest Rate" value="4.7% (8 weeks)" />
-          <Field label="Repayments" value="4 × fortnightly" />
-          {ld?.approvedAmount && <Field label="Approved Amount" value={fmt(ld.approvedAmount)} />}
-          {(ld as Record<string, unknown>)?.applicationFee != null && <Field label="Application Fee" value={fmt((ld as Record<string, unknown>).applicationFee as number)} />}
-          {(ld as Record<string, unknown>)?.disbursedAmount != null && <Field label="Disbursed Amount" value={fmt((ld as Record<string, unknown>).disbursedAmount as number)} />}
-          {ld?.fortnightlyPayment && <Field label="Fortnightly Payment" value={fmt(ld.fortnightlyPayment)} />}
-          {ld?.totalRepayment && <Field label="Total Repayment" value={fmt(ld.totalRepayment)} />}
-        </dl>
-      </section>
+      {(() => {
+        const PRE_APPROVAL_STATUSES = new Set([
+          'draft',
+          'pending_review',
+          'under_assessment',
+          'waiting_for_docs',
+          'credit_check',
+          'submitted',
+          'under_review',
+        ]);
+        const APPROVED_STATUSES = new Set(['approved', 'loan_accepted']);
+        const DISBURSED_STATUSES = new Set([
+          'disbursed',
+          'active',
+          'closed_repaid',
+          'funded',
+          'completed',
+        ]);
+        const HIDE_STATUSES = new Set(['declined', 'withdrawn', 'expired', 'rejected']);
+
+        const isExistingCustomer =
+          (app as Record<string, unknown>).isExistingCustomer === true ||
+          userDoc.data()?.isExistingCustomer === true;
+        const estimatedFee = computeApplicationFee(isExistingCustomer);
+        const requested = ld?.requestedAmount ?? 0;
+        const approved = ld?.approvedAmount;
+        const fee =
+          (ld as Record<string, unknown>)?.applicationFee != null
+            ? ((ld as Record<string, unknown>).applicationFee as number)
+            : estimatedFee;
+        const disbursed = (ld as Record<string, unknown>)?.disbursedAmount as number | undefined;
+
+        let estimateRow: { label: string; value: string; caption?: string } | null = null;
+        if (DISBURSED_STATUSES.has(status as string) && disbursed != null) {
+          estimateRow = { label: 'Loan Disbursement Amount', value: fmt(disbursed) };
+        } else if (APPROVED_STATUSES.has(status as string) && typeof approved === 'number') {
+          estimateRow = {
+            label: 'Estimated Loan Disbursement',
+            value: fmt(approved - fee),
+            caption: `Approved ${fmt(approved)} less ${fmt(fee)} application fee.`,
+          };
+        } else if (PRE_APPROVAL_STATUSES.has(status as string)) {
+          estimateRow = {
+            label: 'Estimated Loan Disbursement',
+            value: fmt(requested - estimatedFee),
+            caption: `Final amount may differ. A ${fmt(estimatedFee)} application fee is deducted from the requested amount at disbursement.`,
+          };
+        } else if (HIDE_STATUSES.has(status as string)) {
+          estimateRow = null;
+        }
+
+        return (
+          <section className="bg-white rounded-xl border border-gray-200 p-5">
+            <h2 className="font-semibold text-gray-900 mb-4">Loan Details</h2>
+            <dl className="grid grid-cols-2 gap-4">
+              <Field label="Requested Amount" value={fmt(ld?.requestedAmount)} />
+              <Field label="Purpose" value={loanPurposeLabel(ld?.loanPurpose)} />
+              <Field label="Interest Rate" value="4.7% (8 weeks)" />
+              <Field label="Repayments" value="4 × fortnightly" />
+              {ld?.approvedAmount && <Field label="Approved Amount" value={fmt(ld.approvedAmount)} />}
+              {(ld as Record<string, unknown>)?.applicationFee != null && (
+                <Field label="Application Fee" value={fmt((ld as Record<string, unknown>).applicationFee as number)} />
+              )}
+              {ld?.fortnightlyPayment && <Field label="Fortnightly Payment" value={fmt(ld.fortnightlyPayment)} />}
+              {ld?.totalRepayment && <Field label="Total Repayment" value={fmt(ld.totalRepayment)} />}
+            </dl>
+            {estimateRow && (
+              <div className="mt-4 pt-4 border-t border-gray-100">
+                <div className="flex items-baseline justify-between gap-4">
+                  <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                    {estimateRow.label}
+                  </dt>
+                  <dd className="text-base font-semibold text-gray-900">{estimateRow.value}</dd>
+                </div>
+                {estimateRow.caption && (
+                  <p className="mt-1 text-xs text-gray-500">{estimateRow.caption}</p>
+                )}
+              </div>
+            )}
+          </section>
+        );
+      })()}
 
       {/* Approval / Decline Decision */}
       {decision && (

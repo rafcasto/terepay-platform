@@ -2,15 +2,23 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import DisburseForm from './DisburseForm';
 
 type Props = {
   applicationId: string;
   status: string;
   assignedLenderId?: string;
   currentUserId?: string;
+  approvedAmount?: number;
+  applicationFee?: number;
 };
 
-export default function ApplicationActions({ applicationId, status, assignedLenderId, currentUserId }: Props) {
+export default function ApplicationActions({
+  applicationId,
+  status,
+  approvedAmount,
+  applicationFee,
+}: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,14 +60,12 @@ export default function ApplicationActions({ applicationId, status, assignedLend
         </button>
       )}
 
-      {status === 'loan_accepted' && (
-        <button
-          onClick={() => post('disburse')}
-          disabled={loading}
-          className="w-full px-4 py-2 bg-emerald-600 text-white rounded-lg font-medium text-sm hover:bg-emerald-700 disabled:opacity-50"
-        >
-          {loading ? 'Disbursing…' : 'Mark as Disbursed'}
-        </button>
+      {status === 'loan_accepted' && typeof approvedAmount === 'number' && (
+        <DisburseForm
+          applicationId={applicationId}
+          approvedAmount={approvedAmount}
+          applicationFee={applicationFee ?? 0}
+        />
       )}
     </div>
   );
