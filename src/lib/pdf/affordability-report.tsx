@@ -188,6 +188,16 @@ const AffordabilityReportDocument = ({ assessment, application }: Props) => {
   const estFee = application.loanDetails?.applicationFee ?? 0;
   const totalRepayable = application.loanDetails?.totalRepayment ?? (approvedAmount + estFee);
 
+  // Lender's decision label. `offer_declined` means the lender approved and the
+  // applicant subsequently rejected — still reflect the lender's APPROVED decision.
+  const approvedLenderStatuses = ['approved', 'loan_accepted', 'offer_declined', 'disbursed', 'active', 'closed_repaid'];
+  const declinedLenderStatuses = ['declined', 'rejected'];
+  const decisionLabel = approvedLenderStatuses.includes(application.status as string)
+    ? 'APPROVED'
+    : declinedLenderStatuses.includes(application.status as string)
+      ? 'DECLINED'
+      : 'PENDING';
+
   // Existing debts rows
   const debtRows: Array<{ type: string; total: number; fn: number }> = [];
   if (debts) {
@@ -282,7 +292,7 @@ const AffordabilityReportDocument = ({ assessment, application }: Props) => {
           <OverviewRow label="Employment Status" value={`${empStatus} - ${emp?.timeAtEmployer ?? '-'} at current employer`} />
           <OverviewRow label="Visa Status" value={visaFull} />
           <OverviewRow label="Loan Purpose" value={loanReq?.purposeDescription ?? loanPurposeLabel(application.loanDetails?.loanPurpose)} />
-          <OverviewRow label="Amount Requested" value={`${fmt(loanPrincipal, 0)} - ${application.status === 'approved' ? 'APPROVED' : application.status === 'declined' ? 'DECLINED' : 'PENDING'}`} />
+          <OverviewRow label="Amount Requested" value={`${fmt(loanPrincipal, 0)} - ${decisionLabel}`} />
           <OverviewRow label="AML/ID Verified" value={assessment.checklist.employmentVerificationMethod ?? '-'} />
           <OverviewRow label="PEP Status" value={loanReq?.isPEP ? 'Yes' : 'No'} />
         </View>
@@ -418,7 +428,7 @@ const AffordabilityReportDocument = ({ assessment, application }: Props) => {
         {/* Section 7 – Assessment Decision */}
         <SectionTitle title="7. ASSESSMENT DECISION" />
         <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 10, marginBottom: 6 }}>
-          {`${(application.status === 'approved' || application.status === 'disbursed' || application.status === 'active') ? 'APPROVED' : application.status === 'declined' ? 'DECLINED' : 'PENDING'} - ${fmt(approvedAmount, 0)} Loan`}
+          {`${decisionLabel} - ${fmt(approvedAmount, 0)} Loan`}
         </Text>
         <Text style={{ fontSize: 8, marginBottom: 8 }}>
           {application.decision?.rationale ?? 'Assessment completed. Refer to full application file for decision rationale.'}
@@ -469,7 +479,7 @@ const AffordabilityReportDocument = ({ assessment, application }: Props) => {
           <OverviewRow label="Centrix Enquiry Ref" value={assessment.checklist.centrixReportNumber ?? '-'} />
           <OverviewRow label="TerePay Subscriber Ref" value={refFromAssessment(assessment)} />
           <OverviewRow label="Loan Amount Approved" value={fmt(approvedAmount)} />
-          <OverviewRow label="Decision" value={(application.status === 'approved' || application.status === 'disbursed' || application.status === 'active') ? 'APPROVED' : application.status === 'declined' ? 'DECLINED' : 'PENDING'} />
+          <OverviewRow label="Decision" value={decisionLabel} />
         </View>
 
         <Text style={styles.subHeading}>Approving Officer Signature</Text>

@@ -4,6 +4,7 @@ import { adminDb } from '@/lib/firebase/admin';
 import { withAuth } from '@/lib/auth/middleware';
 import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { checkRateLimit, defaultLimiter } from '@/lib/rate-limit/limiter';
+import { auditLog, getClientIp } from '@/lib/utils/audit';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,9 +18,14 @@ type RouteParams = { params: Promise<{ id: string }> };
  *   and marks isExistingCustomer: true on the user document.
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
+  const ip = getClientIp(request);
   try {
     const auth = await withAuth(request, ['applicant']);
-    await checkRateLimit(defaultLimiter, auth.uid);
+
+    const allowed = await checkRateLimit(defaultLimiter, auth.uid);
+    if (!allowed) {
+      throw new AppError('RATE_LIMITED', 429, 'Too many requests');
+    }
 
     const { id } = await params;
 
@@ -79,6 +85,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           updatedAt: now,
         });
       }
+    });
+
+    await auditLog({
+      userId: auth.uid,
+      action: 'offer_accepted_by_applicant',
+      targetId: id,
+      targetType: 'application',
+      outcome: 'success',
+      ipAddress: ip,
+      changes: { assignedCustomerId },
     });
 
     return NextResponse.json(

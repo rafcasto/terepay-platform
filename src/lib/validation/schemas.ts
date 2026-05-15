@@ -71,18 +71,6 @@ export const updateApplicationSchema = z.object({
   financialInformation: createApplicationSchema.shape.financialInformation.partial().optional(),
 });
 
-export const approveApplicationSchema = z.object({
-  approvedAmount: z.number().min(100),
-  approvedRate: z.number().min(0).max(100),
-  approvedTerm: z.number().min(1).max(60),
-  comments: z.string().max(1000).optional(),
-  conditions: z.array(z.string()).optional(),
-});
-
-export const rejectApplicationSchema = z.object({
-  comments: z.string().min(10, 'Please provide a reason for rejection').max(1000),
-});
-
 // ---------------------------------------------------------------------------
 // User profile schemas
 // ---------------------------------------------------------------------------
@@ -149,8 +137,6 @@ export type VerifyOtpInput = z.infer<typeof verifyOtpSchema>;
 export type SessionInput = z.infer<typeof sessionSchema>;
 export type CreateApplicationInput = z.infer<typeof createApplicationSchema>;
 export type UpdateApplicationInput = z.infer<typeof updateApplicationSchema>;
-export type ApproveApplicationInput = z.infer<typeof approveApplicationSchema>;
-export type RejectApplicationInput = z.infer<typeof rejectApplicationSchema>;
 
 // ---------------------------------------------------------------------------
 // KYC schemas

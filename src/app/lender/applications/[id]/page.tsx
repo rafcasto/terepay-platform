@@ -19,6 +19,8 @@ const STATUS_LABELS: Record<string, string> = {
   waiting_for_docs: 'Waiting for Docs',
   credit_check: 'Credit Check',
   approved: 'Approved',
+  loan_accepted: 'Loan Accepted',
+  offer_declined: 'Offer Declined',
   disbursed: 'Disbursed',
   active: 'Active',
   closed_repaid: 'Repaid',
@@ -34,6 +36,8 @@ const STATUS_COLOR: Record<string, string> = {
   waiting_for_docs: 'bg-orange-100 text-orange-800',
   credit_check: 'bg-purple-100 text-purple-800',
   approved: 'bg-green-100 text-green-700',
+  loan_accepted: 'bg-emerald-100 text-emerald-700',
+  offer_declined: 'bg-amber-100 text-amber-800',
   disbursed: 'bg-emerald-100 text-emerald-700',
   active: 'bg-teal-100 text-teal-700',
   closed_repaid: 'bg-gray-100 text-gray-600',
@@ -326,6 +330,22 @@ export default async function LenderApplicationDetailPage({
             ) : (
               <p className="text-sm text-gray-400">No documents uploaded yet.</p>
             )}
+          </section>
+        )}
+
+        {/* Applicant declined the offer */}
+        {status === 'offer_declined' && app.applicantRejection && (
+          <section className="rounded-xl border bg-amber-50 border-amber-200 p-5">
+            <h2 className="font-semibold mb-3 text-amber-900">⚠ Applicant Declined Offer</h2>
+            <dl className="grid grid-cols-2 gap-4 text-sm">
+              <Field
+                label="Declined At"
+                value={fmtTs(app.applicantRejection.rejectedAt as Parameters<typeof fmtTs>[0])}
+              />
+              <div className="col-span-2">
+                <Field label="Reason" value={app.applicantRejection.reason || 'No reason provided'} />
+              </div>
+            </dl>
           </section>
         )}
 
