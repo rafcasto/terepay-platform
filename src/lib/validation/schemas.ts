@@ -432,6 +432,7 @@ export const affordabilityAssessmentSchema = z.object({
   catalogVersionId: z.string(),
   redFlagsAcknowledged: z.record(z.string(), z.string()).optional().default({}),
   recommendation: z.enum(['proceed', 'decline']),
+  assessedAmount: z.number().min(200).max(2000).optional(),
 });
 
 export const lenderDecisionSchema = z.object({
@@ -439,6 +440,10 @@ export const lenderDecisionSchema = z.object({
   rationale: z.string().min(10, 'Rationale must be at least 10 characters'),
   declineReasons: z.array(z.string()).optional(),
   approvedAmount: z.number().min(200).max(2000).optional(),
+});
+
+export const disburseSchema = z.object({
+  disbursedAmount: z.number().positive().optional(),
 });
 
 export const benchmarkEntrySchema = z.object({

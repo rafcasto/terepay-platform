@@ -139,6 +139,9 @@ export interface AffordabilityAssessment {
   householdMultiplier: number;
   catalogVersionId: string;  // snapshot at time of assessment
 
+  // Loan amount under assessment (defaults to requestedAmount if lender didn't override)
+  assessedAmount?: number;
+
   // Calculations (all auto)
   totalVerifiedIncome: number;
   totalExpenses: number;
@@ -217,6 +220,7 @@ export interface AffordabilityDraftData {
     finalAmount: number;
   }>;
   recommendation: 'proceed' | 'decline';
+  assessedAmount?: number;
   savedAt: string;
 }
 
@@ -237,6 +241,9 @@ export interface LoanApplication {
     currency: string;
     loanPurpose: LoanPurposeValue | string;
     purposeDescription: string;
+    // Lender's working figure during the affordability assessment.
+    // Pre-fills the decision form's approvedAmount.
+    assessedAmount?: number;
     // Filled on approval
     approvedAmount?: number;
     applicationFee?: number;

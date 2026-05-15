@@ -134,8 +134,13 @@ export default async function LenderApplicationDetailPage({
           </div>
         </div>
 
-        {/* Claim action */}
-        <ApplicationActions applicationId={id} status={status} />
+        {/* Claim / disburse actions */}
+        <ApplicationActions
+          applicationId={id}
+          status={status}
+          approvedAmount={ld?.approvedAmount}
+          applicationFee={ld?.applicationFee}
+        />
 
         {/* Loan Summary */}
         <section className="bg-white rounded-xl border border-gray-200 p-5">
@@ -370,7 +375,8 @@ export default async function LenderApplicationDetailPage({
             <DecisionForm
               applicationId={id}
               affordabilityStatus={app.affordabilityStatus}
-              requestedAmount={app.loanDetails?.requestedAmount ?? 0}
+              requestedAmount={ld?.requestedAmount ?? 0}
+              assessedAmount={ld?.assessedAmount}
             />
           </section>
         ) : null}

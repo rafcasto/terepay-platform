@@ -27,17 +27,22 @@ export default function DecisionForm({
   applicationId,
   affordabilityStatus,
   requestedAmount,
+  assessedAmount,
 }: {
   applicationId: string;
   affordabilityStatus: string;
   requestedAmount: number;
+  assessedAmount?: number;
 }) {
   const router = useRouter();
   const affordabilityComplete = affordabilityStatus === 'complete';
+  // Prefill from the lender's assessed amount (from affordability), but never
+  // above the requested amount — approving more than requested is not allowed.
+  const defaultApprovedAmount = Math.min(assessedAmount ?? requestedAmount, requestedAmount);
   const [action, setAction] = useState<'approve' | 'decline' | null>(null);
   const [rationale, setRationale] = useState('');
   const [selectedReasons, setSelectedReasons] = useState<string[]>([]);
-  const [approvedAmount, setApprovedAmount] = useState<number>(requestedAmount);
+  const [approvedAmount, setApprovedAmount] = useState<number>(defaultApprovedAmount);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -131,7 +136,11 @@ export default function DecisionForm({
             className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
           <p className="mt-1 text-xs text-gray-500">
-            Requested: {fmtNzd(requestedAmount)} · Allowed range: {fmtNzd(MIN_APPROVED_AMOUNT)} – {fmtNzd(requestedAmount)}
+            Requested: {fmtNzd(requestedAmount)}
+            {typeof assessedAmount === 'number' && assessedAmount !== requestedAmount && (
+              <> · Assessed: {fmtNzd(assessedAmount)}</>
+            )}
+            {' '}· Allowed range: {fmtNzd(MIN_APPROVED_AMOUNT)} – {fmtNzd(requestedAmount)}
           </p>
           {Number.isFinite(approvedAmount) && approvedAmount < requestedAmount && approvedAmount >= MIN_APPROVED_AMOUNT && (
             <p className="mt-1 text-xs text-amber-700">
