@@ -95,6 +95,7 @@ Don't duplicate these — point at them.
 - **reCAPTCHA v3 fails open** — server-side verify at `MIN_SCORE = 0.5`; if the secret is unset, requests pass with a warning log.
 - **PDF generation** lives at [src/lib/pdf/affordability-report.tsx](src/lib/pdf/affordability-report.tsx) and uses `@react-pdf/renderer`.
 - **KYC documents** upload to Google Drive via `googleapis` — not Firebase Storage.
+- **Qippay SetPay consent gate** sits between `loan_accepted` and `disbursed`. The accept route now advances applications to `awaiting_payment_consent`; the applicant must complete a SetPay mandate (status → `active`) before the lender's disburse route will release funds. The SetPay client at [src/lib/qippay/setpay-client.ts](src/lib/qippay/setpay-client.ts) defaults to `QIPPAY_MODE=stub` (deterministic happy path, no upstream calls). Flip to `live` once Qippay developer docs are wired up. Status reconciliation: [src/lib/qippay/reconcile-consent.ts](src/lib/qippay/reconcile-consent.ts).
 
 ## Don't
 

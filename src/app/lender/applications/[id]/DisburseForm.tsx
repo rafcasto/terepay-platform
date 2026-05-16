@@ -10,15 +10,46 @@ type Props = {
   applicationId: string;
   approvedAmount: number;
   applicationFee: number;
+  /** Status of the Qippay SetPay mandate. Undefined for legacy `loan_accepted` applications that pre-date the consent gate. */
+  consentStatus?: string;
+  consentActivatedAt?: string;
 };
 
-export default function DisburseForm({ applicationId, approvedAmount, applicationFee }: Props) {
+export default function DisburseForm({
+  applicationId,
+  approvedAmount,
+  applicationFee,
+  consentStatus,
+  consentActivatedAt,
+}: Props) {
   const router = useRouter();
   const defaultAmount = Math.max(0, approvedAmount - applicationFee);
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState<number>(defaultAmount);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Lender disburse is blocked until consent is active (legacy
+  // `loan_accepted` applications have undefined consentStatus and skip the gate).
+  const consentGated = consentStatus !== undefined && consentStatus !== 'active';
+
+  const refreshConsent = async () => {
+    setRefreshing(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/applications/${applicationId}/consent/status`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error?.message ?? 'Failed to refresh consent status');
+      }
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Something went wrong');
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const overCap = amount > approvedAmount;
   const tooLow = !(amount > 0);
@@ -47,13 +78,62 @@ export default function DisburseForm({ applicationId, approvedAmount, applicatio
   };
 
   if (!open) {
+    if (consentGated) {
+      const failedConsent =
+        consentStatus === 'failed' ||
+        consentStatus === 'expired' ||
+        consentStatus === 'cancelled';
+      return (
+        <div className="space-y-3">
+          <div className="bg-amber-50 border border-amber-300 rounded-lg p-4 text-sm text-amber-800">
+            <p className="font-semibold mb-1">Bank authorisation required</p>
+            <p>
+              The applicant has not completed their Qippay SetPay mandate.
+              Disbursement is locked until the mandate is active.
+            </p>
+            <p className="mt-2 text-xs text-amber-700">
+              Mandate status: <span className="font-mono">{consentStatus ?? 'not_started'}</span>
+            </p>
+          </div>
+          <button
+            onClick={refreshConsent}
+            disabled={refreshing}
+            className="w-full px-4 py-2 bg-white border border-amber-400 text-amber-800 rounded-lg font-medium text-sm hover:bg-amber-50 disabled:opacity-50"
+          >
+            {refreshing ? 'Refreshing…' : 'Refresh status'}
+          </button>
+          {error && (
+            <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              {error}
+            </div>
+          )}
+          {failedConsent && (
+            <p className="text-xs text-gray-500">
+              The applicant can retry from their application page.
+            </p>
+          )}
+        </div>
+      );
+    }
     return (
-      <button
-        onClick={() => setOpen(true)}
-        className="w-full px-4 py-2 bg-emerald-600 text-white rounded-lg font-medium text-sm hover:bg-emerald-700"
-      >
-        Mark as Disbursed
-      </button>
+      <div className="space-y-3">
+        {consentStatus === 'active' && (
+          <div className="flex items-center justify-between gap-3 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 text-xs">
+            <span className="font-medium text-emerald-800">
+              ✓ Bank authorisation complete
+            </span>
+            {consentActivatedAt && consentActivatedAt !== '—' && (
+              <span className="text-emerald-700">{consentActivatedAt}</span>
+            )}
+          </div>
+        )}
+        <button
+          onClick={() => setOpen(true)}
+          className="w-full px-4 py-2 bg-emerald-600 text-white rounded-lg font-medium text-sm hover:bg-emerald-700"
+        >
+          Mark as Disbursed
+        </button>
+      </div>
     );
   }
 

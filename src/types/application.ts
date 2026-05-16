@@ -12,6 +12,7 @@ export type ApplicationStatus =
   | 'credit_check'
   | 'approved'
   | 'loan_accepted'
+  | 'awaiting_payment_consent'
   | 'offer_declined'
   | 'disbursed'
   | 'active'
@@ -19,6 +20,53 @@ export type ApplicationStatus =
   | 'declined'
   | 'withdrawn'
   | 'expired';
+
+// ---------------------------------------------------------------------------
+// Payment Consent (Qippay SetPay mandate — open-banking direct-debit replacement)
+// ---------------------------------------------------------------------------
+export type PaymentConsentStatus =
+  | 'not_started'
+  | 'initiated'
+  | 'redirected'
+  | 'active'
+  | 'failed'
+  | 'expired'
+  | 'cancelled';
+
+export interface PaymentConsentAttempt {
+  mandateId: string;
+  initiatedAt: Timestamp;
+  finalStatus: string;
+  failureReason?: string;
+}
+
+export interface PaymentConsentVerifiedBank {
+  accountNumber: string; // stored encrypted via @/lib/encryption/crypto
+  accountName?: string;
+  bankName?: string;
+}
+
+export interface PaymentConsent {
+  provider: 'qippay_setpay';
+  status: PaymentConsentStatus;
+  mandateId: string;
+  hostedUrl: string;
+  beneficiaryId: string;
+  scheduleSummary: {
+    currency: 'NZD';
+    totalAmountCents: number;
+    installments: Array<{ dueDate: string; amountCents: number }>;
+  };
+  verifiedBankAccount?: PaymentConsentVerifiedBank;
+  initiatedAt: Timestamp;
+  initiatedBy: string;
+  activatedAt?: Timestamp;
+  lastStatusCheckedAt?: Timestamp;
+  lastStatusFromProvider?: string;
+  expiresAt?: Timestamp;
+  failureReason?: string;
+  attempts: PaymentConsentAttempt[];
+}
 
 // Legacy statuses retained for backward-compat during migration
 export type LegacyApplicationStatus =
@@ -310,6 +358,9 @@ export interface LoanApplication {
     closedAt?: Timestamp;
     declinedAt?: Timestamp;
   };
+
+  /** Qippay SetPay mandate gating disbursement. Created post-accept; mandate must be `active` before lender can disburse. */
+  paymentConsent?: PaymentConsent;
 
   // TerePay 8-section form data
   personalInfo?: TerePayPersonalInfo;

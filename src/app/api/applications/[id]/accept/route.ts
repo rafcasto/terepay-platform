@@ -58,9 +58,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
       const now = FieldValue.serverTimestamp();
 
-      // Update application status
+      // Update application status. We skip the legacy `loan_accepted` stop
+      // and go straight to `awaiting_payment_consent` so the applicant is
+      // prompted to set up the Qippay SetPay mandate before disbursement.
       tx.update(appRef, {
-        status: 'loan_accepted',
+        status: 'awaiting_payment_consent',
         'timeline.acceptedAt': now,
         'timeline.updatedAt': now,
       });
@@ -98,7 +100,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     });
 
     return NextResponse.json(
-      { data: { status: 'loan_accepted', ...(assignedCustomerId ? { customerId: assignedCustomerId } : {}) } },
+      {
+        data: {
+          status: 'awaiting_payment_consent',
+          ...(assignedCustomerId ? { customerId: assignedCustomerId } : {}),
+        },
+      },
       { status: 200 },
     );
   } catch (err) {
