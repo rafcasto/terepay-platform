@@ -48,11 +48,32 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         };
       }
 
-      if (appData.status !== 'loan_accepted') {
+      // Accept either the new `awaiting_payment_consent` state (post Qippay
+      // integration) or the legacy `loan_accepted` state (applications
+      // accepted before the consent gate existed).
+      if (
+        appData.status !== 'awaiting_payment_consent' &&
+        appData.status !== 'loan_accepted'
+      ) {
         throw new AppError(
           'BAD_REQUEST',
           400,
           `Cannot disburse application with status: ${appData.status}`,
+        );
+      }
+
+      // Consent gate: new flow requires an active Qippay SetPay mandate
+      // before disbursement. Legacy `loan_accepted` applications (created
+      // before this feature) are exempt — their `paymentConsent` will be
+      // absent, not stale.
+      if (
+        appData.status === 'awaiting_payment_consent' &&
+        appData.paymentConsent?.status !== 'active'
+      ) {
+        throw new AppError(
+          'CONSENT_REQUIRED',
+          409,
+          'Cannot disburse: applicant has not completed their bank authorization (Qippay SetPay mandate)',
         );
       }
 
@@ -110,6 +131,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         alreadyDisbursed: false,
         applicationFee,
         isOverride,
+        consentMandateId: appData.paymentConsent?.mandateId,
       };
     });
 
@@ -124,6 +146,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           disbursedAmount: result.disbursedAmount,
           applicationFee: result.applicationFee,
           override: result.isOverride,
+          consentMandateId: result.consentMandateId,
         },
         ipAddress: ip,
       });

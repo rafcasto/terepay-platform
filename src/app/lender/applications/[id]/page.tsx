@@ -20,6 +20,7 @@ const STATUS_LABELS: Record<string, string> = {
   credit_check: 'Credit Check',
   approved: 'Approved',
   loan_accepted: 'Loan Accepted',
+  awaiting_payment_consent: 'Awaiting Bank Authorisation',
   offer_declined: 'Offer Declined',
   disbursed: 'Disbursed',
   active: 'Active',
@@ -37,6 +38,7 @@ const STATUS_COLOR: Record<string, string> = {
   credit_check: 'bg-purple-100 text-purple-800',
   approved: 'bg-green-100 text-green-700',
   loan_accepted: 'bg-emerald-100 text-emerald-700',
+  awaiting_payment_consent: 'bg-amber-100 text-amber-800',
   offer_declined: 'bg-amber-100 text-amber-800',
   disbursed: 'bg-emerald-100 text-emerald-700',
   active: 'bg-teal-100 text-teal-700',
@@ -140,6 +142,20 @@ export default async function LenderApplicationDetailPage({
           status={status}
           approvedAmount={ld?.approvedAmount}
           applicationFee={ld?.applicationFee}
+          paymentConsent={
+            app.paymentConsent
+              ? {
+                  status: app.paymentConsent.status,
+                  mandateId: app.paymentConsent.mandateId,
+                  activatedAt: fmtTs(
+                    app.paymentConsent.activatedAt as unknown as {
+                      _seconds?: number;
+                      toDate?: () => Date;
+                    } | null,
+                  ),
+                }
+              : undefined
+          }
         />
 
         {/* Loan Summary */}

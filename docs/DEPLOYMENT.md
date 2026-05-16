@@ -41,6 +41,13 @@ NEXT_PUBLIC_ENABLE_MOCK_DATA=true
 
 # Firebase Emulator
 FIREBASE_EMULATOR_HOST=localhost:8080
+
+# Qippay SetPay (pre-disbursement payment consent gate)
+QIPPAY_BASE_URL=https://api.uat.qippay.com
+QIPPAY_CLIENT_SECRET=<server-only bearer>
+QIPPAY_BENEFICIARY_ID=<TerePay beneficiary>
+QIPPAY_MODE=stub                              # 'stub' for local dev; 'live' once SetPay docs arrive
+QIPPAY_RETURN_BASE_URL=http://localhost:3000
 ```
 
 **Production (set in Vercel Dashboard → Environment Variables):**
@@ -71,7 +78,20 @@ SENTRY_AUTH_TOKEN=<prod-token>
 # Security
 SECURE_AUTH_COOKIE=true
 AUTH_COOKIE_SECURE=true
+
+# Qippay SetPay
+QIPPAY_BASE_URL=https://api.qippay.com
+QIPPAY_CLIENT_SECRET=<server-only bearer>
+QIPPAY_BENEFICIARY_ID=<TerePay beneficiary>
+QIPPAY_MODE=live                              # MUST be 'live' in production — 'stub' is rejected at runtime
+QIPPAY_RETURN_BASE_URL=https://terepay.com
 ```
+
+**Qippay SetPay notes:**
+- `QIPPAY_MODE=stub` is hard-blocked when `NEXT_PUBLIC_ENVIRONMENT=production`. Setting `stub` in production raises an error at first call from `src/lib/qippay/setpay-client.ts`.
+- The success/failure URLs registered with Qippay must match `${QIPPAY_RETURN_BASE_URL}/applicant/applications/<id>/consent/return`. Vercel preview deploys use ephemeral hostnames — only test against live Qippay UAT from a stable host; preview QA should use `stub`.
+- `QIPPAY_BENEFICIARY_ID` resolves to TerePay's platform-wide Qippay merchant account (single beneficiary across all lenders).
+- The SetPay developer spec is not yet wired in; until it lands, the `live` branch returns 501 and the integration is exercised through `QIPPAY_MODE=stub`.
 
 ---
 
