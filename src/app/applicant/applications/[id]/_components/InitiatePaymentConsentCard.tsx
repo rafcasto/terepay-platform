@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { PaymentConsentStatus } from '@/types/application';
+import { Button, Card, CardHeader, FormField, SelectField, Pill, Icons } from '@/components/ui';
 
 export type PaymentConsentCardProps = {
   status: PaymentConsentStatus;
@@ -15,11 +16,7 @@ type Props = {
   paymentConsent?: PaymentConsentCardProps;
 };
 
-type Provider = {
-  id: string;
-  name: string;
-  logoUrl?: string;
-};
+type Provider = { id: string; name: string; logoUrl?: string };
 
 type InitiateResponse = {
   data: {
@@ -34,38 +31,29 @@ type InitiateResponse = {
   };
 };
 
-type ApproveResponse = {
-  data: { method: 'CIBA' | 'redirect'; redirectUri?: string };
-};
+type ApproveResponse = { data: { method: 'CIBA' | 'redirect'; redirectUri?: string } };
 
 const fmtNzd = (cents?: number) =>
   typeof cents === 'number'
     ? new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(cents / 100)
     : '—';
 
-export default function InitiatePaymentConsentCard({
-  applicationId,
-  paymentConsent,
-}: Props) {
+export default function InitiatePaymentConsentCard({ applicationId, paymentConsent }: Props) {
   const router = useRouter();
-  const [stage, setStage] = useState<'idle' | 'picking' | 'approving' | 'waiting_ciba'>(
-    'idle',
-  );
+  const [stage, setStage] = useState<'idle' | 'picking' | 'approving' | 'waiting_ciba'>('idle');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [providerId, setProviderId] = useState<string>('');
   const [phone, setPhone] = useState<string>('');
-  const [installments, setInstallments] = useState<
-    Array<{ dueDate: string; amountCents: number }>
-  >(paymentConsent?.installments ?? []);
+  const [installments, setInstallments] = useState<Array<{ dueDate: string; amountCents: number }>>(
+    paymentConsent?.installments ?? [],
+  );
 
   const status = paymentConsent?.status;
-  const isRetry =
-    status === 'failed' || status === 'expired' || status === 'cancelled';
+  const isRetry = status === 'failed' || status === 'expired' || status === 'cancelled';
   const isActive = status === 'active';
 
-  // Resume an in-flight CIBA approval by polling the status endpoint.
   useEffect(() => {
     if (stage !== 'waiting_ciba') return;
     const interval = window.setInterval(async () => {
@@ -78,7 +66,7 @@ export default function InitiatePaymentConsentCard({
           router.refresh();
         }
       } catch {
-        // ignore — next tick will retry
+        // retry next tick
       }
     }, 3000);
     return () => window.clearInterval(interval);
@@ -88,15 +76,12 @@ export default function InitiatePaymentConsentCard({
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(
-        `/api/applications/${applicationId}/consent/initiate`,
-        { method: 'POST' },
-      );
+      const res = await fetch(`/api/applications/${applicationId}/consent/initiate`, {
+        method: 'POST',
+      });
       const body = (await res.json()) as InitiateResponse | { error?: { message?: string } };
       if (!res.ok) {
-        setError(
-          ('error' in body && body.error?.message) || 'Could not start verification.',
-        );
+        setError(('error' in body && body.error?.message) || 'Could not start verification.');
         return;
       }
       const data = (body as InitiateResponse).data;
@@ -121,21 +106,14 @@ export default function InitiatePaymentConsentCard({
     setError(null);
     setStage('approving');
     try {
-      // Don't force a `method` — let Qippay pick what the chosen bank supports
-      // (CIBA push for Purple, redirect for Orange, etc).
-      const res = await fetch(
-        `/api/applications/${applicationId}/consent/approve`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ providerId, phone }),
-        },
-      );
+      const res = await fetch(`/api/applications/${applicationId}/consent/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ providerId, phone }),
+      });
       const body = (await res.json()) as ApproveResponse | { error?: { message?: string } };
       if (!res.ok) {
-        setError(
-          ('error' in body && body.error?.message) || 'Could not start bank approval.',
-        );
+        setError(('error' in body && body.error?.message) || 'Could not start bank approval.');
         setStage('picking');
         return;
       }
@@ -148,7 +126,6 @@ export default function InitiatePaymentConsentCard({
         window.location.assign(data.redirectUri);
         return;
       }
-      // No redirect URL and not CIBA — defensive: fall back to status refresh.
       router.refresh();
     } catch {
       setError('Network error. Please try again.');
@@ -160,144 +137,113 @@ export default function InitiatePaymentConsentCard({
 
   if (isActive) {
     return (
-      <div className="mt-4 bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-sm text-emerald-800">
-        Bank authorisation complete ✓
-      </div>
+      <Card>
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-full bg-success-soft text-success flex items-center justify-center shrink-0">
+            <Icons.CheckCircle size={22} />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-success">Bank authorisation complete</p>
+            <p className="text-xs text-muted">Your lender will release the funds shortly.</p>
+          </div>
+        </div>
+      </Card>
     );
   }
 
   return (
-    <div className="mt-4 bg-white border border-amber-300 rounded-xl p-5 space-y-4">
-      <div>
-        <h3 className="text-sm font-semibold text-gray-900">
-          Authorise your repayments
-        </h3>
-        <p className="mt-1 text-sm text-gray-600">
-          Before funds can be released, we need your bank&apos;s authorisation
-          for the fortnightly repayments. You&apos;ll be sent to your bank&apos;s
-          secure page to approve — no money moves at this step.
-        </p>
-      </div>
+    <Card className="border-accent/40">
+      <CardHeader
+        eyebrow="One more step"
+        title="Authorise your repayments"
+        action={
+          <Pill tone="amber" pulse>
+            Action needed
+          </Pill>
+        }
+      />
+      <p className="mt-3 text-sm text-muted">
+        Before funds can be released, your bank needs to authorise the fortnightly repayments.
+        You&apos;ll be sent to your bank&apos;s secure page — no money moves at this step.
+      </p>
 
       {installments.length > 0 && stage !== 'waiting_ciba' && (
-        <div className="bg-gray-50 rounded-lg p-3 text-xs">
-          <p className="font-semibold text-gray-700 mb-2">
-            Repayments to be authorised
+        <div className="mt-4 rounded-xl bg-surface-2 p-3.5">
+          <p className="text-[11.5px] font-semibold tracking-[0.08em] uppercase text-muted mb-2">
+            Repayments to authorise
           </p>
-          <ul className="space-y-1">
+          <ul className="space-y-1.5">
             {installments.map((i) => (
-              <li key={i.dueDate} className="flex justify-between text-gray-600">
-                <span>{i.dueDate}</span>
-                <span className="font-medium text-gray-900">
-                  {fmtNzd(i.amountCents)}
-                </span>
+              <li key={i.dueDate} className="flex justify-between text-sm">
+                <span className="text-muted">{i.dueDate}</span>
+                <span className="font-semibold text-text tabular-nums">{fmtNzd(i.amountCents)}</span>
               </li>
             ))}
           </ul>
         </div>
       )}
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="mt-3 text-sm text-danger font-medium">{error}</p>}
 
       {stage === 'idle' && (
-        <button
-          onClick={handleStart}
-          disabled={loading}
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-        >
-          {loading ? (
-            <>
-              <span className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-              Starting…
-            </>
-          ) : isRetry ? (
-            'Retry bank authorisation'
-          ) : (
-            'Start bank authorisation'
-          )}
-        </button>
+        <div className="mt-5">
+          <Button onClick={handleStart} disabled={loading} fullWidth>
+            {loading ? 'Starting…' : isRetry ? 'Retry bank authorisation' : 'Start bank authorisation'}
+          </Button>
+        </div>
       )}
 
       {stage === 'picking' && (
-        <div className="space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1 uppercase tracking-wide">
-              Your bank
-            </label>
-            <select
-              value={providerId}
-              onChange={(e) => setProviderId(e.target.value)}
-              disabled={loading}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            >
-              {providers.length === 0 && <option value="">(no banks available)</option>}
-              {providers.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1 uppercase tracking-wide">
-              Phone number registered with your bank
-            </label>
-            <input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              disabled={loading}
-              placeholder="+64 21 123 4567"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            />
-            <p className="mt-1 text-xs text-gray-500">
-              Your bank may use this to send a push notification to their app.
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleApprove}
-              disabled={loading || !providerId || !phone.trim()}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-            >
-              {loading ? (
-                <>
-                  <span className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                  Contacting bank…
-                </>
-              ) : (
-                'Continue to my bank'
-              )}
-            </button>
-            <button
-              onClick={() => setStage('idle')}
-              disabled={loading}
-              className="text-sm text-gray-500 hover:underline disabled:opacity-50"
-            >
+        <div className="mt-5 space-y-4">
+          <SelectField
+            label="Your bank"
+            value={providerId}
+            onChange={(e) => setProviderId(e.target.value)}
+            disabled={loading}
+          >
+            {providers.length === 0 && <option value="">(no banks available)</option>}
+            {providers.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </SelectField>
+          <FormField
+            type="tel"
+            label="Phone registered with your bank"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            disabled={loading}
+            placeholder="+64 21 123 4567"
+            hint="May be used for a push notification"
+          />
+          <div className="flex gap-2">
+            <Button onClick={handleApprove} disabled={loading || !providerId || !phone.trim()} fullWidth>
+              {loading ? 'Contacting bank…' : 'Continue to my bank'}
+            </Button>
+            <Button variant="secondary" onClick={() => setStage('idle')} disabled={loading}>
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       )}
 
       {stage === 'waiting_ciba' && (
-        <div className="space-y-3">
-          <div className="flex items-center gap-3 bg-indigo-50 border border-indigo-200 rounded-lg p-3 text-sm">
-            <span className="h-5 w-5 shrink-0 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
-            <p className="text-indigo-800">
-              We&apos;ve sent an approval request to your bank&apos;s app. Open
-              the app and approve to continue — this page will refresh
-              automatically.
+        <div className="mt-5 space-y-3">
+          <div className="flex items-center gap-3 rounded-xl border border-info/40 bg-info-soft p-3.5">
+            <span className="h-5 w-5 shrink-0 rounded-full border-2 border-info border-t-transparent animate-spin" />
+            <p className="text-sm text-[#1e40af]">
+              We&apos;ve sent an approval request to your bank&apos;s app. Approve it there to continue — this page will refresh automatically.
             </p>
           </div>
           <button
             onClick={() => router.refresh()}
-            className="text-sm text-indigo-600 hover:underline"
+            className="text-sm font-semibold text-info hover:underline"
           >
             I&apos;ve approved — check now
           </button>
         </div>
       )}
-    </div>
+    </Card>
   );
 }

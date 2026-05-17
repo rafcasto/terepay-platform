@@ -1,54 +1,21 @@
 import { cookies } from 'next/headers';
 import { getAdminDb, verifySessionOrIdToken } from '@/lib/firebase/admin';
 import Link from 'next/link';
-import Badge from '@/components/shared/Badge';
 import { loanPurposeLabel } from '@/lib/constants/loan-purposes';
+import { Card, Pill, ButtonLink, Icons } from '@/components/ui';
+import { fmtNZD, fmtDate, toDate } from '@/lib/loan/format';
+import { toDisplayState, STATUS_LABELS } from '@/lib/loan/status-display';
+import type { LoanDisplayState } from '@/lib/loan/status-display';
 
 export const dynamic = 'force-dynamic';
 
-const STATUS_VARIANT: Record<string, 'default' | 'success' | 'warning' | 'error' | 'info'> = {
-  draft: 'default',
-  pending_review: 'info',
-  under_assessment: 'warning',
-  waiting_for_docs: 'warning',
-  credit_check: 'info',
+const DISPLAY_TONE: Record<LoanDisplayState, Parameters<typeof Pill>[0]['tone']> = {
+  new: 'muted',
+  review: 'amber',
   approved: 'success',
-  loan_accepted: 'success',
-  offer_declined: 'default',
-  disbursed: 'success',
-  active: 'success',
-  closed_repaid: 'default',
-  declined: 'error',
-  withdrawn: 'default',
-  expired: 'default',
-  // legacy
-  submitted: 'info',
-  under_review: 'warning',
-  rejected: 'error',
-  funded: 'success',
-  completed: 'success',
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  draft: 'Draft',
-  pending_review: 'Pending Review',
-  under_assessment: 'Under Assessment',
-  waiting_for_docs: 'Documents Requested',
-  credit_check: 'Credit Check',
-  approved: 'Approved',
-  loan_accepted: 'Loan Accepted',
-  offer_declined: 'Offer Declined',
-  disbursed: 'Disbursed',
-  active: 'Active',
-  closed_repaid: 'Repaid',
-  declined: 'Declined',
-  withdrawn: 'Withdrawn',
-  expired: 'Expired',
-  submitted: 'Submitted',
-  under_review: 'Under Review',
-  rejected: 'Declined',
-  funded: 'Funded',
-  completed: 'Completed',
+  rejected: 'danger',
+  active: 'info',
+  paid: 'success',
 };
 
 export default async function ApplicantApplicationsPage() {
@@ -61,11 +28,9 @@ export default async function ApplicantApplicationsPage() {
 
   const db = getAdminDb();
 
-  // Fetch the user document to check for an offline customer link
   const userSnap = await db.collection('users').doc(decoded.uid).get();
   const customerId: string | undefined = userSnap.data()?.customerId;
 
-  // Run both queries in parallel: own applications + offline-customer applications
   const [ownSnap, offlineSnap] = await Promise.all([
     db
       .collection('loanApplications')
@@ -81,7 +46,6 @@ export default async function ApplicantApplicationsPage() {
       : Promise.resolve(null),
   ]);
 
-  // Merge and deduplicate by document ID, preserving most-recent-first order
   const seen = new Set<string>();
   const merged: Array<{ id: string } & Record<string, unknown>> = [];
 
@@ -95,7 +59,6 @@ export default async function ApplicantApplicationsPage() {
     }
   }
 
-  // Sort by createdAt descending (Firestore timestamps)
   merged.sort((a, b) => {
     const ta = (a.timeline as Record<string, unknown>)?.createdAt as { _seconds?: number } | undefined;
     const tb = (b.timeline as Record<string, unknown>)?.createdAt as { _seconds?: number } | undefined;
@@ -105,69 +68,58 @@ export default async function ApplicantApplicationsPage() {
   const applications = merged;
 
   return (
-    <div className="p-8">
-      <div className="mb-8 flex justify-between items-center">
+    <div className="max-w-[640px] mx-auto px-4 sm:px-5 pt-6 pb-20 space-y-5 screen-in">
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">My Applications</h1>
-          <p className="text-gray-500 mt-1">Track the status of all your loan applications.</p>
+          <h1 className="text-[26px] font-bold tracking-tight text-text">Your applications</h1>
+          <p className="mt-1 text-sm text-muted">Track every application you&apos;ve started or submitted.</p>
         </div>
-        <Link
-          href="/applicant/apply"
-          className="bg-[#F5A523] text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-[#E08B00] transition-colors"
-        >
-          New Application
-        </Link>
+        <ButtonLink href="/applicant/apply" size="sm">
+          New
+        </ButtonLink>
       </div>
 
       {applications.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200 px-6 py-16 text-center">
-          <p className="text-gray-500 mb-3">No applications yet.</p>
-          <Link href="/applicant/apply" className="text-[#F5A523] font-medium hover:text-[#E08B00]">
-            Apply for your first loan →
-          </Link>
-        </div>
+        <Card className="text-center py-12">
+          <p className="text-muted mb-3">No applications yet.</p>
+          <ButtonLink href="/applicant/apply">Apply for your first loan</ButtonLink>
+        </Card>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Purpose</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {applications.map((app) => {
-                const a = app as Record<string, unknown>;
-                const loanDetails = a.loanDetails as Record<string, unknown>;
-                const status = a.status as string;
-                return (
-                  <tr key={app.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 font-medium text-gray-900">
-                      ${(loanDetails?.requestedAmount as number)?.toLocaleString() ?? '—'}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {loanPurposeLabel(loanDetails?.loanPurpose as string | undefined)}
-                    </td>
-                    <td className="px-6 py-4">
-                      <Badge variant={STATUS_VARIANT[status] ?? 'default'}>
-                        {STATUS_LABELS[status] ?? status?.replace(/_/g, ' ')}
-                      </Badge>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <Link
-                        href={`/applicant/applications/${app.id}`}
-                        className="text-[#F5A523] hover:text-[#E08B00] font-medium"
-                      >
-                        View
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div className="space-y-2.5">
+          {applications.map((appDoc) => {
+            const a = appDoc as Record<string, unknown>;
+            const loanDetails = a.loanDetails as Record<string, unknown> | undefined;
+            const status = a.status as string;
+            const display = toDisplayState(status);
+            const tone = DISPLAY_TONE[display];
+            const ref = (a.referenceNumber as string | undefined) ?? `#${(appDoc.id as string).slice(0, 8)}`;
+            const createdAt = (a.timeline as Record<string, unknown>)?.createdAt as Parameters<typeof toDate>[0];
+            return (
+              <Link
+                key={appDoc.id}
+                href={`/applicant/applications/${appDoc.id}`}
+                className="group block bg-surface rounded-2xl border border-border hover:border-accent/60 hover:shadow-soft transition-all hover:-translate-y-0.5 p-5"
+              >
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div className="min-w-0">
+                    <p className="text-xs font-mono text-accent-2">{ref}</p>
+                    <p className="mt-1 text-lg font-bold tabular-nums">
+                      {fmtNZD(loanDetails?.requestedAmount as number | undefined, { cents: false })}
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted">
+                      {loanPurposeLabel(loanDetails?.loanPurpose as string | undefined)} · {fmtDate(createdAt)}
+                    </p>
+                  </div>
+                  <Pill tone={tone} pulse={display === 'review' || display === 'active'}>
+                    {STATUS_LABELS[status] ?? status?.replace(/_/g, ' ')}
+                  </Pill>
+                </div>
+                <div className="flex items-center justify-end gap-1 text-sm font-semibold text-accent-2 group-hover:gap-2 transition-all">
+                  View details <Icons.ChevronRight size={16} />
+                </div>
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>

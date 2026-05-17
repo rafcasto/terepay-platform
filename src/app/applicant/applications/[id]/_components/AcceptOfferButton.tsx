@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Button } from '@/components/ui';
 
 export default function AcceptOfferButton({ applicationId }: { applicationId: string }) {
   const router = useRouter();
@@ -29,22 +30,18 @@ export default function AcceptOfferButton({ applicationId }: { applicationId: st
   };
 
   return (
-    <div className="mt-4 space-y-2">
-      <button
-        onClick={handleAccept}
-        disabled={loading}
-        className="inline-flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-      >
+    <div className="space-y-2">
+      <Button onClick={handleAccept} disabled={loading}>
         {loading ? (
           <>
             <span className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
             Processing…
           </>
         ) : (
-          'Accept Loan Offer'
+          'Accept loan offer'
         )}
-      </button>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      </Button>
+      {error && <p className="text-sm text-danger font-medium">{error}</p>}
     </div>
   );
 }

@@ -4,8 +4,10 @@ import { withAuth } from '@/lib/auth/middleware';
 import { disburseSchema } from '@/lib/validation/schemas';
 import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { auditLog, getClientIp } from '@/lib/utils/audit';
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { ZodError } from 'zod';
+import { getBeneficiaryId, schedulePayment } from '@/lib/qippay/setpay-client';
+import type { PaymentConsent, RepaymentInstallment, Loan } from '@/types/application';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,10 +15,18 @@ type RouteParams = { params: Promise<{ id: string }> };
 
 /**
  * POST /api/applications/[id]/disburse
- * Lender (assigned) marks an accepted loan as disbursed. Computes the disbursed
- * amount as approvedAmount − applicationFee using values already on the
- * application. Idempotent: re-running on an already-disbursed application
- * returns the existing values.
+ *
+ * Lender flips an accepted loan to `disbursed`. In one atomic Firestore
+ * write this also (1) creates a `loans/{loanId}` doc that becomes the
+ * source of truth for repayment state, and (2) records the four Qippay
+ * SetPay `payment.id`s that were scheduled prior to the transaction.
+ *
+ * Sequencing intentionally splits Qippay scheduling out of the transaction
+ * — Firestore transactions can't make external HTTP calls. If any of the
+ * four `POST /v1/setpay` calls fails, we surface the error and leave the
+ * application untouched (the lender retries). The transaction itself is
+ * idempotent: re-running after a successful disburse returns the existing
+ * loan id and amount.
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   const ip = getClientIp(request);
@@ -32,110 +42,230 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const appRef = adminDb.collection('loanApplications').doc(id);
 
-    const result = await adminDb.runTransaction(async (tx) => {
-      const appDoc = await tx.get(appRef);
-      if (!appDoc.exists) {
+    // --- Pre-flight (outside transaction) -------------------------------
+    // Read the app once to validate before doing the expensive Qippay
+    // scheduling. The transaction below re-reads and re-validates so a
+    // concurrent change can't slip past.
+    const preSnap = await appRef.get();
+    if (!preSnap.exists) {
+      throw new AppError('NOT_FOUND', 404, 'Application not found');
+    }
+    const preData = preSnap.data()!;
+
+    // Already disbursed: short-circuit, no-op.
+    if (preData.status === 'disbursed') {
+      return NextResponse.json({
+        status: 'disbursed',
+        disbursedAmount: preData.loanDetails?.disbursedAmount ?? 0,
+        alreadyDisbursed: true,
+      });
+    }
+
+    if (
+      preData.status !== 'awaiting_payment_consent' &&
+      preData.status !== 'loan_accepted'
+    ) {
+      throw new AppError(
+        'BAD_REQUEST',
+        400,
+        `Cannot disburse application with status: ${preData.status}`,
+      );
+    }
+
+    const consent = preData.paymentConsent as PaymentConsent | undefined;
+    if (
+      preData.status === 'awaiting_payment_consent' &&
+      consent?.status !== 'active'
+    ) {
+      throw new AppError(
+        'CONSENT_REQUIRED',
+        409,
+        'Cannot disburse: applicant has not completed their bank authorization (Qippay SetPay mandate)',
+      );
+    }
+
+    if (preData.assignedLenderId && preData.assignedLenderId !== auth.uid) {
+      throw new AppError(
+        'FORBIDDEN',
+        403,
+        'Only the assigned lender can disburse this loan',
+      );
+    }
+
+    const approvedAmount: number | undefined = preData.loanDetails?.approvedAmount;
+    const applicationFee: number = preData.loanDetails?.applicationFee ?? 0;
+    if (typeof approvedAmount !== 'number') {
+      throw new AppError('BAD_REQUEST', 400, 'Application is missing an approved amount');
+    }
+
+    const overrideAmount = parsed.disbursedAmount;
+    const isOverride = typeof overrideAmount === 'number';
+    if (isOverride && overrideAmount > approvedAmount) {
+      throw new AppError(
+        'BAD_REQUEST',
+        400,
+        `Disbursed amount (${overrideAmount}) cannot exceed approved amount (${approvedAmount})`,
+      );
+    }
+    const disbursedAmount = isOverride ? overrideAmount : approvedAmount - applicationFee;
+    const disbursementDate = new Date().toISOString().slice(0, 10);
+
+    // --- Schedule the four SetPay instalments (outside transaction) ------
+    const installmentsFromConsent = consent?.scheduleSummary?.installments ?? [];
+    if (
+      preData.status === 'awaiting_payment_consent' &&
+      installmentsFromConsent.length === 0
+    ) {
+      throw new AppError(
+        'BAD_REQUEST',
+        400,
+        'Payment consent has no scheduled instalments — cannot disburse',
+      );
+    }
+
+    const epcId = consent?.mandateId;
+    const referenceNumber =
+      (preData.referenceNumber as string | undefined) ?? `TP-${id.slice(0, 8)}`;
+    const applicantFirst =
+      (preData.personalInfo?.firstName as string | undefined) ?? 'TerePay';
+
+    // Schedule each instalment with Qippay. Only run when we have an active
+    // mandate — legacy `loan_accepted` applications without a consent are
+    // exempt from this step (the lender historically arranged collection
+    // out-of-band). Those legacy loans get a doc but no Qippay schedule.
+    const scheduledInstalments: RepaymentInstallment[] = [];
+    const totalRepayable = installmentsFromConsent.reduce(
+      (sum, i) => sum + i.amountCents,
+      0,
+    ) / 100;
+
+    if (epcId && consent?.status === 'active') {
+      const beneficiaryId = getBeneficiaryId();
+      for (let i = 0; i < installmentsFromConsent.length; i++) {
+        const ins = installmentsFromConsent[i];
+        // Force noon NZST (+12) so the date portion always lands on `ins.dueDate`
+        // as the Pacific/Auckland calendar date Qippay validates against (docs
+        // rev 1 p.19: "scheduled_for must be a FUTURE calendar date for
+        // Pacific/Auckland timezone").
+        const scheduledFor = `${ins.dueDate}T12:00:00+12:00`;
+        const result = await schedulePayment({
+          epcId,
+          beneficiaryId,
+          amountCents: ins.amountCents,
+          scheduledFor,
+          statementParticulars: applicantFirst,
+          statementCode: `INST${i + 1}`,
+          statementReference: referenceNumber,
+        });
+        scheduledInstalments.push({
+          installmentNumber: i + 1,
+          dueDate: ins.dueDate,
+          amount: ins.amountCents / 100,
+          status: 'scheduled',
+          paymentId: result.paymentId,
+          enduringPaymentId: result.enduringPaymentId,
+        });
+      }
+    } else {
+      // Legacy path: no Qippay schedule, but we still want a `loans` doc so
+      // the dashboard works. Mark instalments scheduled without paymentIds.
+      installmentsFromConsent.forEach((ins, i) => {
+        scheduledInstalments.push({
+          installmentNumber: i + 1,
+          dueDate: ins.dueDate,
+          amount: ins.amountCents / 100,
+          status: 'scheduled',
+        });
+      });
+    }
+
+    // --- Atomic commit: update app + create loan ------------------------
+    const loanRef = adminDb.collection('loans').doc();
+    const fortnightlyPayment =
+      installmentsFromConsent.length > 0
+        ? installmentsFromConsent[0].amountCents / 100
+        : 0;
+    const firstDueDate =
+      scheduledInstalments[0]?.dueDate ?? new Date().toISOString().slice(0, 10);
+
+    const txResult = await adminDb.runTransaction(async (tx) => {
+      const snap = await tx.get(appRef);
+      if (!snap.exists) {
         throw new AppError('NOT_FOUND', 404, 'Application not found');
       }
+      const data = snap.data()!;
 
-      const appData = appDoc.data()!;
-
-      if (appData.status === 'disbursed') {
+      // Re-validate inside the transaction; another caller may have raced us.
+      if (data.status === 'disbursed') {
         return {
-          status: 'disbursed' as const,
-          disbursedAmount: appData.loanDetails?.disbursedAmount ?? 0,
           alreadyDisbursed: true,
+          loanId: (data.loanId as string) ?? '',
+          disbursedAmount: data.loanDetails?.disbursedAmount ?? 0,
         };
       }
-
-      // Accept either the new `awaiting_payment_consent` state (post Qippay
-      // integration) or the legacy `loan_accepted` state (applications
-      // accepted before the consent gate existed).
-      if (
-        appData.status !== 'awaiting_payment_consent' &&
-        appData.status !== 'loan_accepted'
-      ) {
+      if (data.status !== 'awaiting_payment_consent' && data.status !== 'loan_accepted') {
         throw new AppError(
           'BAD_REQUEST',
           400,
-          `Cannot disburse application with status: ${appData.status}`,
+          `Cannot disburse application with status: ${data.status}`,
         );
       }
 
-      // Consent gate: new flow requires an active Qippay SetPay mandate
-      // before disbursement. Legacy `loan_accepted` applications (created
-      // before this feature) are exempt — their `paymentConsent` will be
-      // absent, not stale.
-      if (
-        appData.status === 'awaiting_payment_consent' &&
-        appData.paymentConsent?.status !== 'active'
-      ) {
-        throw new AppError(
-          'CONSENT_REQUIRED',
-          409,
-          'Cannot disburse: applicant has not completed their bank authorization (Qippay SetPay mandate)',
-        );
-      }
-
-      if (appData.assignedLenderId && appData.assignedLenderId !== auth.uid) {
-        throw new AppError(
-          'FORBIDDEN',
-          403,
-          'Only the assigned lender can disburse this loan',
-        );
-      }
-
-      const approvedAmount: number | undefined = appData.loanDetails?.approvedAmount;
-      const applicationFee: number = appData.loanDetails?.applicationFee ?? 0;
-
-      if (typeof approvedAmount !== 'number') {
-        throw new AppError(
-          'BAD_REQUEST',
-          400,
-          'Application is missing an approved amount',
-        );
-      }
-
-      const defaultDisbursedAmount = approvedAmount - applicationFee;
-      const overrideAmount = parsed.disbursedAmount;
-      const isOverride = typeof overrideAmount === 'number';
-
-      if (isOverride && overrideAmount > approvedAmount) {
-        throw new AppError(
-          'BAD_REQUEST',
-          400,
-          `Disbursed amount (${overrideAmount}) cannot exceed approved amount (${approvedAmount})`,
-        );
-      }
-
-      const disbursedAmount = isOverride ? overrideAmount : defaultDisbursedAmount;
-      const disbursementDate = new Date().toISOString().slice(0, 10);
       const now = FieldValue.serverTimestamp();
+      const dueTs = Timestamp.fromDate(new Date(`${firstDueDate}T12:00:00+12:00`));
+
+      const loanDoc: Loan = {
+        loanId: loanRef.id,
+        applicationId: id,
+        applicantId: data.applicantId,
+        assignedLenderId: data.assignedLenderId,
+        status: 'disbursed',
+        principal: disbursedAmount,
+        totalRepayable,
+        totalPaid: 0,
+        remainingBalance: totalRepayable,
+        fortnightlyPayment,
+        installments: scheduledInstalments,
+        mandateId: epcId ?? '',
+        beneficiaryId: epcId ? getBeneficiaryId() : '',
+        nextPaymentDate: dueTs,
+        timeline: {
+          // serverTimestamp() resolved by Firestore; cast satisfies the
+          // Loan type which is shaped around the read side.
+          createdAt: now as unknown as Timestamp,
+          updatedAt: now as unknown as Timestamp,
+          disbursedAt: now as unknown as Timestamp,
+        },
+      };
+
+      tx.set(loanRef, loanDoc);
 
       tx.update(appRef, {
         status: 'disbursed',
+        loanId: loanRef.id,
         'loanDetails.disbursedAmount': disbursedAmount,
         'loanDetails.disbursementDate': disbursementDate,
         'decision.disbursementDetails': {
           amount: disbursedAmount,
           date: disbursementDate,
-          reference: '',
+          reference: referenceNumber,
+        },
+        repaymentSchedule: {
+          installments: scheduledInstalments,
+          totalRepayment: totalRepayable,
         },
         'timeline.disbursedAt': now,
         'timeline.updatedAt': now,
       });
 
       return {
-        status: 'disbursed' as const,
-        disbursedAmount,
         alreadyDisbursed: false,
-        applicationFee,
-        isOverride,
-        consentMandateId: appData.paymentConsent?.mandateId,
+        loanId: loanRef.id,
+        disbursedAmount,
       };
     });
 
-    if (!result.alreadyDisbursed) {
+    if (!txResult.alreadyDisbursed) {
       await auditLog({
         userId: auth.uid,
         action: 'loan_disbursed',
@@ -143,18 +273,23 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         targetType: 'application',
         outcome: 'success',
         changes: {
-          disbursedAmount: result.disbursedAmount,
-          applicationFee: result.applicationFee,
-          override: result.isOverride,
-          consentMandateId: result.consentMandateId,
+          loanId: txResult.loanId,
+          disbursedAmount: txResult.disbursedAmount,
+          applicationFee,
+          override: isOverride,
+          consentMandateId: epcId,
+          scheduledPaymentIds: scheduledInstalments
+            .map((i) => i.paymentId)
+            .filter(Boolean),
         },
         ipAddress: ip,
       });
     }
 
     return NextResponse.json({
-      status: result.status,
-      disbursedAmount: result.disbursedAmount,
+      status: 'disbursed',
+      disbursedAmount: txResult.disbursedAmount,
+      loanId: txResult.loanId,
     });
   } catch (err) {
     if (err instanceof ZodError) {

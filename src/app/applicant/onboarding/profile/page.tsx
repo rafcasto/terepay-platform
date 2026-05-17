@@ -18,13 +18,13 @@ interface ProfileForm {
 type FieldErrors = Partial<Record<string, string>>;
 
 const selectCls =
-  'w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#F5A523] focus:border-[#F5A523] focus:outline-none transition-colors bg-white appearance-none';
+  'w-full px-3 py-2.5 border border-border rounded-xl text-sm focus:ring-2 focus:ring-accent focus:border-accent focus:outline-none transition-colors bg-white appearance-none';
 const inputCls =
-  'w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#F5A523] focus:border-[#F5A523] focus:outline-none transition-colors bg-white';
-const labelCls = 'block text-sm font-medium text-gray-700 mb-1';
-const errorCls = 'mt-1 text-xs text-red-600';
+  'w-full px-3 py-2.5 border border-border rounded-xl text-sm focus:ring-2 focus:ring-accent focus:border-accent focus:outline-none transition-colors bg-white';
+const labelCls = 'block text-sm font-medium text-text mb-1';
+const errorCls = 'mt-1 text-xs text-danger';
 const readonlyCls =
-  'w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm bg-gray-50 text-gray-500 cursor-not-allowed';
+  'w-full px-3 py-2.5 border border-border rounded-xl text-sm bg-surface-2 text-muted cursor-not-allowed';
 
 export default function KycProfilePage() {
   const router = useRouter();
@@ -170,7 +170,7 @@ export default function KycProfilePage() {
     <div className="flex items-start justify-center min-h-full py-8 px-4">
       {checking ? (
         <div className="flex justify-center w-full py-16">
-          <svg className="animate-spin h-6 w-6 text-[#F5A523]" fill="none" viewBox="0 0 24 24">
+          <svg className="animate-spin h-6 w-6 text-accent-2" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
@@ -178,8 +178,8 @@ export default function KycProfilePage() {
       ) : (
       <div className="w-full max-w-lg">
         <div className="mb-7">
-          <h2 className="text-2xl font-bold text-[#0D1B2A]">Complete your profile</h2>
-          <p className="text-gray-500 mt-1 text-sm">
+          <h2 className="text-2xl font-bold text-text">Complete your profile</h2>
+          <p className="text-muted mt-1 text-sm">
             We need a few more details to verify your identity and process your application.
           </p>
         </div>
@@ -202,10 +202,10 @@ export default function KycProfilePage() {
           </div>
 
           {/* ── Existing TerePay client? ────────────────────────────── */}
-          <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-4">
-            <p className="text-sm font-medium text-gray-700 mb-3">
+          <div className="rounded-xl border border-border bg-surface-2 px-4 py-4">
+            <p className="text-sm font-medium text-text mb-3">
               Are you an existing TerePay client?{' '}
-              <span className="text-red-500">*</span>
+              <span className="text-danger">*</span>
             </p>
             <div className="flex gap-3">
               {(['yes', 'no'] as const).map((opt) => {
@@ -215,10 +215,10 @@ export default function KycProfilePage() {
                   <label
                     key={opt}
                     className={[
-                      'flex-1 text-center py-2.5 px-4 rounded-lg border-2 text-sm font-medium cursor-pointer transition-colors capitalize',
+                      'flex-1 text-center py-2.5 px-4 rounded-xl border-2 text-sm font-medium cursor-pointer transition-colors capitalize',
                       isSelected
-                        ? 'border-[#F5A523] bg-[#FEF7E9] text-[#E08B00]'
-                        : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300',
+                        ? 'border-accent bg-[#FEF7E9] text-accent-2'
+                        : 'border-border bg-white text-muted hover:border-border',
                     ].join(' ')}
                   >
                     <input
@@ -241,7 +241,7 @@ export default function KycProfilePage() {
             {form.isExistingClient === true && (
               <div className="mt-4">
                 <label className={labelCls}>
-                  TerePay Customer ID <span className="text-red-500">*</span>
+                  TerePay Customer ID <span className="text-danger">*</span>
                 </label>
                 <input
                   type="text"
@@ -253,7 +253,7 @@ export default function KycProfilePage() {
                   placeholder="e.g. TERE001"
                   className={inputCls + ' font-mono uppercase'}
                 />
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-muted">
                   Your Customer ID was provided by TerePay. Enter it here to link your existing records.
                 </p>
                 {errors.customerId && <p className={errorCls}>{errors.customerId}</p>}
@@ -264,7 +264,7 @@ export default function KycProfilePage() {
           {/* ── Date of birth ───────────────────────────────────────────── */}
           <div>
             <label className={labelCls}>
-              Date of birth <span className="text-red-500">*</span>
+              Date of birth <span className="text-danger">*</span>
             </label>
             <input
               type="date"
@@ -279,7 +279,7 @@ export default function KycProfilePage() {
           {/* ── Immigration status ──────────────────────────────────────── */}
           <div>
             <label className={labelCls}>
-              Immigration status <span className="text-red-500">*</span>
+              Immigration status <span className="text-danger">*</span>
             </label>
             <div className="relative">
               <select
@@ -305,7 +305,7 @@ export default function KycProfilePage() {
             form.immigrationStatus !== 'permanent_resident' && (
             <div>
               <label className={labelCls}>
-                Visa Expiry Date <span className="text-red-500">*</span>
+                Visa Expiry Date <span className="text-danger">*</span>
               </label>
               <input
                 type="date"
@@ -330,7 +330,7 @@ export default function KycProfilePage() {
           {/* ── Time at address ─────────────────────────────────────────── */}
           <div>
             <label className={labelCls}>
-              How long at this address? <span className="text-red-500">*</span>
+              How long at this address? <span className="text-danger">*</span>
             </label>
             <div className="relative">
               <select
@@ -353,17 +353,17 @@ export default function KycProfilePage() {
           {/* ── Housing status ──────────────────────────────────────────── */}
           <div>
             <label className={labelCls}>
-              Housing status <span className="text-red-500">*</span>
+              Housing status <span className="text-danger">*</span>
             </label>
             <div className="flex gap-3 flex-wrap">
               {(['rent', 'own', 'flatmates'] as const).map((opt) => (
                 <label
                   key={opt}
                   className={[
-                    'flex-1 min-w-[100px] text-center py-2.5 px-4 rounded-lg border-2 text-sm font-medium cursor-pointer transition-colors capitalize',
+                    'flex-1 min-w-[100px] text-center py-2.5 px-4 rounded-xl border-2 text-sm font-medium cursor-pointer transition-colors capitalize',
                     form.housingStatus === opt
-                      ? 'border-[#F5A523] bg-[#FEF7E9] text-[#E08B00]'
-                      : 'border-gray-200 text-gray-600 hover:border-gray-300',
+                      ? 'border-accent bg-[#FEF7E9] text-accent-2'
+                      : 'border-border text-muted hover:border-border',
                   ].join(' ')}
                 >
                   <input
@@ -382,7 +382,7 @@ export default function KycProfilePage() {
           </div>
 
           {apiError && (
-            <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+            <div className="rounded-xl bg-danger-soft border border-danger/40 px-4 py-3 text-sm text-danger">
               {apiError}
             </div>
           )}
@@ -390,7 +390,7 @@ export default function KycProfilePage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-[#F5A523] hover:bg-[#E08B00] disabled:opacity-60 text-white font-semibold rounded-full py-3.5 transition-colors mt-2"
+            className="w-full bg-accent hover:bg-accent-2 disabled:opacity-60 text-white font-semibold rounded-full py-3.5 transition-colors mt-2"
           >
             {loading ? 'Saving…' : 'Continue'}
           </button>
@@ -409,7 +409,7 @@ function eighteenYearsAgo(): string {
 
 function ChevronIcon() {
   return (
-    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted/70">
       <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
       </svg>

@@ -170,39 +170,39 @@ export default function VerifyEmailPage() {
           /* ── Verified state ── */
           <div>
             <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+              <svg className="w-8 h-8 text-success" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
               </svg>
             </div>
-            <h2 className="text-xl font-bold text-[#0D1B2A] mb-1">Email verified!</h2>
-            <p className="text-sm text-gray-500">Redirecting you to the next step…</p>
+            <h2 className="text-xl font-bold text-text mb-1">Email verified!</h2>
+            <p className="text-sm text-muted">Redirecting you to the next step…</p>
           </div>
         ) : (
           /* ── Waiting state ── */
           <>
             {/* Envelope icon */}
-            <div className="w-16 h-16 rounded-full bg-[#F5A523]/10 flex items-center justify-center mx-auto mb-6">
-              <svg className="w-8 h-8 text-[#F5A523]" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <div className="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center mx-auto mb-6">
+              <svg className="w-8 h-8 text-accent-2" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
               </svg>
             </div>
 
-            <h2 className="text-2xl font-bold text-[#0D1B2A] mb-2">Check your inbox</h2>
-            <p className="text-gray-500 text-sm mb-1">
+            <h2 className="text-2xl font-bold text-text mb-2">Check your inbox</h2>
+            <p className="text-muted text-sm mb-1">
               {sent ? 'We sent a verification link to' : 'Sending a verification link to'}
             </p>
             {user?.email && (
-              <p className="font-semibold text-[#0D1B2A] text-sm mb-6">{user.email}</p>
+              <p className="font-semibold text-text text-sm mb-6">{user.email}</p>
             )}
 
-            <p className="text-gray-400 text-xs mb-8 leading-relaxed">
+            <p className="text-muted/70 text-xs mb-8 leading-relaxed">
               Click the link in the email to verify your address.
               <br />This page will automatically move forward once you do.
             </p>
 
             {/* Spinner — waiting indicator */}
-            <div className="flex items-center justify-center gap-2 text-xs text-gray-400 mb-8">
-              <svg className="animate-spin h-4 w-4 text-[#F5A523]" fill="none" viewBox="0 0 24 24">
+            <div className="flex items-center justify-center gap-2 text-xs text-muted/70 mb-8">
+              <svg className="animate-spin h-4 w-4 text-accent-2" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
@@ -210,7 +210,7 @@ export default function VerifyEmailPage() {
             </div>
 
             {error && (
-              <p className="text-xs text-red-500 bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-4">
+              <p className="text-xs text-danger bg-danger-soft border border-danger/40 rounded-xl px-4 py-3 mb-4">
                 {error}
               </p>
             )}
@@ -218,28 +218,28 @@ export default function VerifyEmailPage() {
             <button
               onClick={handleResend}
               disabled={cooldown > 0}
-              className="text-sm text-[#F5A523] hover:text-[#E08B00] disabled:text-gray-400 disabled:cursor-not-allowed font-medium transition-colors"
+              className="text-sm text-accent-2 hover:text-accent-2 disabled:text-muted/70 disabled:cursor-not-allowed font-medium transition-colors"
             >
               {cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend verification email'}
             </button>
 
-            <p className="text-xs text-gray-400 mt-4">
+            <p className="text-xs text-muted/70 mt-4">
               Can&apos;t find it? Check your spam or junk folder.
             </p>
 
             {/* ── Wrong email? update form ─────────────────────────── */}
-            <div className="mt-6 border-t border-gray-100 pt-5">
+            <div className="mt-6 border-t border-border-2 pt-5">
               {!showEmailForm ? (
                 <button
                   onClick={() => { setShowEmailForm(true); setEmailUpdateError(''); }}
-                  className="text-xs text-gray-400 hover:text-gray-600 transition-colors underline underline-offset-2"
+                  className="text-xs text-muted/70 hover:text-muted transition-colors underline underline-offset-2"
                 >
                   Wrong email address?
                 </button>
               ) : (
                 <form onSubmit={handleEmailUpdate} className="text-left space-y-3">
-                  <p className="text-sm font-medium text-[#0D1B2A]">Update your email address</p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-sm font-medium text-text">Update your email address</p>
+                  <p className="text-xs text-muted">
                     Enter the correct email address. We&apos;ll send a new verification link there, and it will also become your login email.
                   </p>
                   <input
@@ -249,10 +249,10 @@ export default function VerifyEmailPage() {
                     placeholder="new@example.com"
                     autoComplete="email"
                     required
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#F5A523] focus:border-[#F5A523] focus:outline-none transition-colors bg-white"
+                    className="w-full px-3 py-2.5 border border-border rounded-xl text-sm focus:ring-2 focus:ring-accent focus:border-accent focus:outline-none transition-colors bg-white"
                   />
                   {emailUpdateError && (
-                    <p className="text-xs text-red-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                    <p className="text-xs text-danger bg-danger-soft border border-danger/40 rounded-xl px-3 py-2">
                       {emailUpdateError}
                     </p>
                   )}
@@ -260,14 +260,14 @@ export default function VerifyEmailPage() {
                     <button
                       type="submit"
                       disabled={emailUpdateLoading || !newEmailInput.trim()}
-                      className="flex-1 bg-[#F5A523] hover:bg-[#E08B00] disabled:opacity-60 text-white text-sm font-semibold rounded-full py-2.5 transition-colors"
+                      className="flex-1 bg-accent hover:bg-accent-2 disabled:opacity-60 text-white text-sm font-semibold rounded-full py-2.5 transition-colors"
                     >
                       {emailUpdateLoading ? 'Updating…' : 'Update email'}
                     </button>
                     <button
                       type="button"
                       onClick={() => { setShowEmailForm(false); setNewEmailInput(''); setEmailUpdateError(''); }}
-                      className="flex-1 border border-gray-200 text-gray-600 text-sm font-medium rounded-full py-2.5 hover:bg-gray-50 transition-colors"
+                      className="flex-1 border border-border text-muted text-sm font-medium rounded-full py-2.5 hover:bg-surface-2 transition-colors"
                     >
                       Cancel
                     </button>

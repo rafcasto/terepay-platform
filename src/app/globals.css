@@ -1,30 +1,122 @@
 @import "tailwindcss";
 
+/* ------------------------------------------------------------------ */
+/* Design tokens — TerePay applicant design system                     */
+/* Defined as CSS variables so dark mode + palette swaps can ship later */
+/* without rework. Mirrors design_handoff_terepay_loan_app spec.        */
+/* ------------------------------------------------------------------ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-  --brand-primary: #F5A523;
-  --brand-primary-dark: #E08B00;
-  --brand-navy: #0D1B2A;
-  --brand-light: #FEF7E9;
+  /* Ink / surfaces */
+  --ink: #0c1620;
+  --ink-2: #131f2c;
+  --ink-3: #1d2a39;
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --surface-2: #f3f4f6;
+
+  /* Text */
+  --text: #0c1620;
+  --muted: #6b7280;
+  --text-on-ink: #ffffff;
+  --muted-on-ink: rgba(255, 255, 255, 0.6);
+
+  /* Accent (amber default) */
+  --accent: #f5a623;
+  --accent-2: #f59412;
+  --accent-soft: #fef4e0;
+
+  /* Semantic */
+  --success: #16a34a;
+  --success-soft: #dcfce7;
+  --danger: #dc2626;
+  --danger-soft: #fee2e2;
+  --info: #2563eb;
+  --info-soft: #dbeafe;
+  --warn: #d97706;
+  --warn-soft: #ffedd5;
+
+  /* Borders */
+  --border: #e8eaee;
+  --border-2: #eef0f3;
+
+  /* Radii */
+  --radius-sm: 10px;
+  --radius: 14px;
+  --radius-lg: 20px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 32, 0.04), 0 1px 0 rgba(15, 23, 32, 0.02);
+  --shadow: 0 1px 2px rgba(15, 23, 32, 0.04), 0 8px 24px rgba(15, 23, 32, 0.06);
+  --shadow-lg: 0 4px 12px rgba(15, 23, 32, 0.06),
+    0 24px 48px rgba(15, 23, 32, 0.12);
+
+  /* Hero gradients (state-specific) */
+  --hero-default: var(--ink);
+  --hero-approved: linear-gradient(135deg, #0c1620 0%, #15301f 100%);
+  --hero-rejected: linear-gradient(135deg, #0c1620 0%, #2a1414 100%);
+  --hero-paid: linear-gradient(135deg, #0c1620 0%, #143126 100%);
+
+  /* Legacy brand aliases (kept for backward compatibility during rollout) */
+  --brand-primary: var(--accent);
+  --brand-primary-dark: var(--accent-2);
+  --brand-navy: var(--ink);
+  --brand-light: var(--accent-soft);
+
+  --background: var(--surface);
+  --foreground: var(--text);
 }
 
+/* Tailwind 4 theme wiring — exposes tokens as utilities (bg-ink, text-muted, etc.) */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --color-brand-primary: var(--brand-primary);
-  --color-brand-dark: var(--brand-primary-dark);
-  --color-brand-navy: var(--brand-navy);
-  --color-brand-light: var(--brand-light);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-text-on-ink: var(--text-on-ink);
+  --color-muted-on-ink: var(--muted-on-ink);
+
+  --color-accent: var(--accent);
+  --color-accent-2: var(--accent-2);
+  --color-accent-soft: var(--accent-soft);
+
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+
+  --color-border: var(--border);
+  --color-border-2: var(--border-2);
+
+  --color-brand-primary: var(--accent);
+  --color-brand-dark: var(--accent-2);
+  --color-brand-navy: var(--ink);
+  --color-brand-light: var(--accent-soft);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: 12px;
+  --radius-lg: var(--radius);
+  --radius-xl: var(--radius-lg);
+
+  --shadow-soft-sm: var(--shadow-sm);
+  --shadow-soft: var(--shadow);
+  --shadow-soft-lg: var(--shadow-lg);
+
+  --font-sans: var(--font-inter), system-ui, -apple-system, "Segoe UI", Roboto,
+    Helvetica, Arial, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular,
+    "SF Mono", Menlo, Consolas, monospace;
 }
 
 html {
@@ -32,7 +124,169 @@ html {
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-inter), system-ui, -apple-system, "Segoe UI", Roboto,
+    Helvetica, Arial, sans-serif;
+  font-feature-settings: "cv11", "ss01", "ss03";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ------------------------------------------------------------------ */
+/* Component animations                                                 */
+/* ------------------------------------------------------------------ */
+
+/* Page enter — applied to <main> on route change */
+@keyframes screen-in {
+  from {
+    opacity: 0.35;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.screen-in {
+  animation: screen-in 0.25s ease-out;
+}
+
+/* Pulsing dot (used in active pill, e.g. "In review") */
+@keyframes pulse-dot {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.8);
+  }
+}
+
+.pulse-dot {
+  animation: pulse-dot 1.8s ease-in-out infinite;
+}
+
+/* Stepper active ring pulse */
+@keyframes step-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(245, 166, 35, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(245, 166, 35, 0);
+  }
+}
+
+.step-pulse {
+  animation: step-pulse 2s ease-out infinite;
+}
+
+/* Progress bar fill */
+.progress-fill {
+  transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Toast slide-up */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.toast-in {
+  animation: toast-in 0.25s cubic-bezier(0.2, 0.9, 0.3, 1.1);
+}
+
+/* Modal scrim fade + content slide */
+@keyframes scrim-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.scrim-in {
+  animation: scrim-in 0.2s ease-out;
+}
+
+.sheet-in {
+  animation: sheet-in 0.25s cubic-bezier(0.2, 0.9, 0.3, 1.1);
+}
+
+/* Confetti — celebration on `paid` state */
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(-20px) translateX(0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(240px) translateX(var(--cx, 0px)) rotate(540deg);
+    opacity: 0;
+  }
+}
+
+.confetti-piece {
+  position: absolute;
+  width: 8px;
+  height: 12px;
+  border-radius: 2px;
+  animation: confetti-fall 1.6s cubic-bezier(0.3, 0.7, 0.6, 1) forwards;
+}
+
+/* ------------------------------------------------------------------ */
+/* Hero gradient utilities                                              */
+/* ------------------------------------------------------------------ */
+.hero-default { background: var(--hero-default); }
+.hero-approved { background: var(--hero-approved); }
+.hero-rejected { background: var(--hero-rejected); }
+.hero-paid { background: var(--hero-paid); }
+
+/* ------------------------------------------------------------------ */
+/* Custom range slider — amber thumb on accent track                    */
+/* ------------------------------------------------------------------ */
+.range-amber {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--border);
+  outline: none;
+}
+
+.range-amber::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 4px solid var(--surface);
+  box-shadow: 0 2px 8px rgba(245, 166, 35, 0.35);
+  cursor: pointer;
+}
+
+.range-amber::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 4px solid var(--surface);
+  box-shadow: 0 2px 8px rgba(245, 166, 35, 0.35);
+  cursor: pointer;
 }

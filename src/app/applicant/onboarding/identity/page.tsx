@@ -257,7 +257,7 @@ export default function KycIdentityPage() {
     <div className="flex items-start justify-center min-h-full py-8 px-4">
       {checking ? (
         <div className="flex justify-center w-full py-16">
-          <svg className="animate-spin h-6 w-6 text-[#F5A523]" fill="none" viewBox="0 0 24 24">
+          <svg className="animate-spin h-6 w-6 text-accent-2" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
@@ -265,8 +265,8 @@ export default function KycIdentityPage() {
       ) : (
       <div className="w-full max-w-lg">
         <div className="mb-7">
-          <h2 className="text-2xl font-bold text-[#0D1B2A]">Verify your identity</h2>
-          <p className="text-gray-500 mt-1 text-sm">
+          <h2 className="text-2xl font-bold text-text">Verify your identity</h2>
+          <p className="text-muted mt-1 text-sm">
             Upload clear photos or scans of the required documents. Files must be JPEG, PNG, WebP,
             or PDF — max 10 MB each.
           </p>
@@ -275,18 +275,18 @@ export default function KycIdentityPage() {
         {/* Primary doc selector (permanent resident / citizen only) */}
         {isPermanent && (
           <div className="mb-5">
-            <p className="text-sm font-medium text-gray-700 mb-2">
-              Primary ID document <span className="text-red-500">*</span>
+            <p className="text-sm font-medium text-text mb-2">
+              Primary ID document <span className="text-danger">*</span>
             </p>
             <div className="flex gap-3">
               {(['nz_drivers_licence', 'nz_passport'] as const).map((opt) => (
                 <label
                   key={opt}
                   className={[
-                    'flex-1 text-center py-2.5 px-3 rounded-lg border-2 text-sm font-medium cursor-pointer transition-colors',
+                    'flex-1 text-center py-2.5 px-3 rounded-xl border-2 text-sm font-medium cursor-pointer transition-colors',
                     primaryDocType === opt
-                      ? 'border-[#F5A523] bg-[#FEF7E9] text-[#E08B00]'
-                      : 'border-gray-200 text-gray-600 hover:border-gray-300',
+                      ? 'border-accent bg-[#FEF7E9] text-accent-2'
+                      : 'border-border text-muted hover:border-border',
                   ].join(' ')}
                 >
                   <input
@@ -307,7 +307,7 @@ export default function KycIdentityPage() {
         {/* Document upload slots */}
         {slots.length === 0 ? (
           <div className="flex items-center justify-center py-10">
-            <svg className="h-6 w-6 animate-spin text-[#F5A523]" fill="none" viewBox="0 0 24 24">
+            <svg className="h-6 w-6 animate-spin text-accent-2" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
@@ -327,7 +327,7 @@ export default function KycIdentityPage() {
         )}
 
         {submitError && (
-          <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+          <div className="mb-4 rounded-xl bg-danger-soft border border-danger/40 px-4 py-3 text-sm text-danger">
             {submitError}
           </div>
         )}
@@ -335,12 +335,12 @@ export default function KycIdentityPage() {
         <button
           onClick={handleSubmit}
           disabled={submitting || slots.length === 0}
-          className="w-full bg-[#F5A523] hover:bg-[#E08B00] disabled:opacity-60 text-white font-semibold rounded-full py-3.5 transition-colors"
+          className="w-full bg-accent hover:bg-accent-2 disabled:opacity-60 text-white font-semibold rounded-full py-3.5 transition-colors"
         >
           {submitting ? 'Submitting…' : 'Submit & continue'}
         </button>
 
-        <p className="text-xs text-gray-400 mt-3 text-center">
+        <p className="text-xs text-muted/70 mt-3 text-center">
           Your documents are reviewed by our compliance team. You&apos;ll receive an update within 1–2 business days.
         </p>
       </div>
@@ -367,20 +367,20 @@ function FileUploadSlot({
     <div
       className={[
         'rounded-xl border-2 p-4 transition-colors',
-        isDone ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50',
+        isDone ? 'border-success/40 bg-success-soft' : 'border-border bg-surface-2',
       ].join(' ')}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-gray-800">
             {slot.label}
-            {slot.required && <span className="text-red-500 ml-0.5">*</span>}
+            {slot.required && <span className="text-danger ml-0.5">*</span>}
           </p>
-          <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{slot.description}</p>
+          <p className="text-xs text-muted mt-0.5 leading-relaxed">{slot.description}</p>
         </div>
         {isDone && (
           <span className="shrink-0 inline-flex items-center justify-center h-6 w-6 rounded-full bg-green-100">
-            <svg className="h-3.5 w-3.5 text-green-600" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+            <svg className="h-3.5 w-3.5 text-success" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
             </svg>
           </span>
@@ -389,34 +389,34 @@ function FileUploadSlot({
 
       <div className="mt-3">
         {isDone ? (
-          <div className="flex items-center justify-between gap-2 rounded-lg bg-white border border-green-200 px-3 py-2">
+          <div className="flex items-center justify-between gap-2 rounded-xl bg-white border border-success/40 px-3 py-2">
             <div className="flex items-center gap-2 min-w-0">
               <FileIcon />
-              <span className="text-xs text-gray-700 truncate">{slot.uploaded!.fileName}</span>
+              <span className="text-xs text-text truncate">{slot.uploaded!.fileName}</span>
             </div>
             <button
               type="button"
               onClick={() => onRemove(index)}
               disabled={slot.removing}
-              className="shrink-0 text-xs text-red-500 hover:text-red-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              className="shrink-0 text-xs text-danger hover:text-danger font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {slot.removing ? 'Removing…' : 'Remove'}
             </button>
           </div>
         ) : slot.uploading ? (
-          <div className="flex items-center gap-2 rounded-lg bg-white border border-gray-200 px-3 py-2.5">
-            <svg className="h-4 w-4 animate-spin text-[#F5A523]" fill="none" viewBox="0 0 24 24">
+          <div className="flex items-center gap-2 rounded-xl bg-white border border-border px-3 py-2.5">
+            <svg className="h-4 w-4 animate-spin text-accent-2" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
-            <span className="text-xs text-gray-500">Uploading {slot.file?.name}…</span>
+            <span className="text-xs text-muted">Uploading {slot.file?.name}…</span>
           </div>
         ) : (
           <>
             <button
               type="button"
               onClick={() => inputRef.current?.click()}
-              className="flex items-center gap-2 w-full rounded-lg border-2 border-dashed border-gray-300 hover:border-[#F5A523] px-4 py-3 text-sm text-gray-500 hover:text-[#E08B00] transition-colors"
+              className="flex items-center gap-2 w-full rounded-xl border-2 border-dashed border-border hover:border-accent px-4 py-3 text-sm text-muted hover:text-accent-2 transition-colors"
             >
               <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
@@ -432,7 +432,7 @@ function FileUploadSlot({
             />
           </>
         )}
-        {slot.error && <p className="mt-1 text-xs text-red-600">{slot.error}</p>}
+        {slot.error && <p className="mt-1 text-xs text-danger">{slot.error}</p>}
       </div>
     </div>
   );
@@ -440,7 +440,7 @@ function FileUploadSlot({
 
 function FileIcon() {
   return (
-    <svg className="h-4 w-4 shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+    <svg className="h-4 w-4 shrink-0 text-muted/70" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
     </svg>
   );
