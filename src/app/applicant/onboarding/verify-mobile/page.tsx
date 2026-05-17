@@ -135,7 +135,7 @@ export default function VerifyMobilePage() {
       <div className="w-full max-w-md">
         {checking ? (
           <div className="flex justify-center">
-            <svg className="animate-spin h-6 w-6 text-[#F5A523]" fill="none" viewBox="0 0 24 24">
+            <svg className="animate-spin h-6 w-6 text-accent-2" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
@@ -187,19 +187,19 @@ function PhoneStage({
   return (
     <>
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-[#0D1B2A]">Verify your mobile</h2>
-        <p className="text-gray-500 mt-1 text-sm">
+        <h2 className="text-2xl font-bold text-text">Verify your mobile</h2>
+        <p className="text-muted mt-1 text-sm">
           We&apos;ll send a 6-digit code to your New Zealand mobile number.
         </p>
       </div>
 
       <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">
-          Mobile number <span className="text-red-500">*</span>
+        <label className="block text-sm font-medium text-text mb-1.5">
+          Mobile number <span className="text-danger">*</span>
         </label>
-        <div className="flex rounded-lg border border-gray-300 focus-within:ring-2 focus-within:ring-[#F5A523] focus-within:border-[#F5A523] overflow-hidden transition-shadow">
+        <div className="flex rounded-xl border border-border focus-within:ring-2 focus-within:ring-[#F5A523] focus-within:border-accent overflow-hidden transition-shadow">
           {/* NZ flag + prefix */}
-          <span className="flex items-center gap-1.5 px-3 bg-gray-50 border-r border-gray-300 text-sm text-gray-700 shrink-0 select-none">
+          <span className="flex items-center gap-1.5 px-3 bg-surface-2 border-r border-border text-sm text-text shrink-0 select-none">
             🇳🇿 +64
           </span>
           <input
@@ -215,12 +215,12 @@ function PhoneStage({
         </div>
       </div>
 
-      {error && <p className="text-xs text-red-600 mb-4">{error}</p>}
+      {error && <p className="text-xs text-danger mb-4">{error}</p>}
 
       <button
         onClick={onSubmit}
         disabled={loading}
-        className="w-full bg-[#F5A523] hover:bg-[#E08B00] disabled:opacity-60 text-white font-semibold rounded-full py-3 transition-colors"
+        className="w-full bg-accent hover:bg-accent-2 disabled:opacity-60 text-white font-semibold rounded-full py-3 transition-colors"
       >
         {loading ? 'Sending…' : 'Send code'}
       </button>
@@ -260,14 +260,14 @@ function OtpStage({
   return (
     <>
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-[#0D1B2A]">Enter the code</h2>
+        <h2 className="text-2xl font-bold text-text">Enter the code</h2>
         {bypassMode ? (
           <p className="text-amber-600 mt-1 text-sm font-medium">
             SMS verification is currently disabled. Enter <strong>000000</strong> to continue.
           </p>
         ) : (
-          <p className="text-gray-500 mt-1 text-sm">
-            We sent a 6-digit code to <span className="font-medium text-gray-700">+64 {phone}</span>
+          <p className="text-muted mt-1 text-sm">
+            We sent a 6-digit code to <span className="font-medium text-text">+64 {phone}</span>
           </p>
         )}
       </div>
@@ -286,31 +286,31 @@ function OtpStage({
             value={digit}
             onChange={(e) => onOtpChange(i, e.target.value)}
             onKeyDown={(e) => onOtpKeyDown(i, e)}
-            className="w-full max-w-[52px] h-14 text-center text-xl font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#F5A523] focus:border-[#F5A523] outline-none transition-shadow"
+            className="w-full max-w-[52px] h-14 text-center text-xl font-bold border border-border rounded-xl focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-shadow"
             autoFocus={i === 0}
           />
         ))}
       </div>
 
-      {error && <p className="text-xs text-red-600 mb-4">{error}</p>}
+      {error && <p className="text-xs text-danger mb-4">{error}</p>}
 
       <button
         onClick={onVerify}
         disabled={loading}
-        className="w-full bg-[#F5A523] hover:bg-[#E08B00] disabled:opacity-60 text-white font-semibold rounded-full py-3 transition-colors mb-4"
+        className="w-full bg-accent hover:bg-accent-2 disabled:opacity-60 text-white font-semibold rounded-full py-3 transition-colors mb-4"
       >
         {loading ? 'Verifying…' : 'Verify code'}
       </button>
 
-      <p className="text-center text-sm text-gray-500">
+      <p className="text-center text-sm text-muted">
         Didn&apos;t receive a code?{' '}
         {cooldown > 0 ? (
-          <span className="text-gray-400">Resend in {cooldown}s</span>
+          <span className="text-muted/70">Resend in {cooldown}s</span>
         ) : (
           <button
             onClick={onResend}
             disabled={loading}
-            className="text-[#F5A523] hover:text-[#E08B00] font-medium underline-offset-2 hover:underline disabled:opacity-50"
+            className="text-accent-2 hover:text-accent-2 font-medium underline-offset-2 hover:underline disabled:opacity-50"
           >
             Resend
           </button>

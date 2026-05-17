@@ -4,9 +4,9 @@ import { useFormContext } from 'react-hook-form';
 import type { TerepayApplicationInput } from '@/lib/validation/schemas';
 
 const inputCls =
-  'w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#F5A523] focus:border-[#F5A523] focus:outline-none transition-colors bg-white';
-const labelCls = 'block text-sm font-medium text-gray-700 mb-1';
-const errorCls = 'mt-1 text-xs text-red-600';
+  'w-full px-3 h-11 border border-border rounded-xl text-sm focus:ring-2 focus:ring-accent focus:border-accent focus:outline-none transition-colors bg-surface text-text placeholder:text-muted/70';
+const labelCls = 'block text-sm font-semibold text-text mb-1.5';
+const errorCls = 'mt-1.5 text-xs text-danger font-medium';
 
 export default function Step6BankDetails() {
   const {
@@ -19,8 +19,8 @@ export default function Step6BankDetails() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-gray-900">Bank Account &amp; Repayment</h2>
-        <p className="text-sm text-gray-500 mt-1">
+        <h2 className="text-xl font-bold text-text">Bank Account &amp; Repayment</h2>
+        <p className="text-sm text-muted mt-1">
           Provide the account you would like loan funds deposited into and repayments deducted from.
         </p>
       </div>
@@ -38,7 +38,7 @@ export default function Step6BankDetails() {
 
       <div>
         <label className={labelCls}>
-          Bank Name <span className="text-red-500">*</span>
+          Bank Name <span className="text-danger">*</span>
         </label>
         <input
           {...register('bankDetails.bankName')}
@@ -50,7 +50,7 @@ export default function Step6BankDetails() {
 
       <div>
         <label className={labelCls}>
-          Account Holder Name <span className="text-red-500">*</span>
+          Account Holder Name <span className="text-danger">*</span>
         </label>
         <input
           {...register('bankDetails.accountHolderName')}
@@ -62,14 +62,14 @@ export default function Step6BankDetails() {
 
       <div>
         <label className={labelCls}>
-          Account Number <span className="text-red-500">*</span>
+          Account Number <span className="text-danger">*</span>
         </label>
         <input
           {...register('bankDetails.accountNumber')}
           className={inputCls}
           placeholder="XX-XXXX-XXXXXXX-XX"
         />
-        <p className="mt-1 text-xs text-gray-400">
+        <p className="mt-1 text-xs text-muted/70">
           NZ format: 02-0100-0000000-00
         </p>
         {e?.accountNumber && <p className={errorCls}>{e.accountNumber.message}</p>}
@@ -78,7 +78,7 @@ export default function Step6BankDetails() {
       {/* Payment method */}
       <div>
         <label className={labelCls}>
-          Preferred Repayment Method <span className="text-red-500">*</span>
+          Preferred Repayment Method <span className="text-danger">*</span>
         </label>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
           {[
@@ -100,11 +100,11 @@ export default function Step6BankDetails() {
                 {...register('bankDetails.paymentMethod')}
                 className="peer sr-only"
               />
-              <div className="p-4 border-2 border-gray-200 rounded-xl peer-checked:border-[#F5A523] peer-checked:bg-[#FEF7E9] transition-colors">
-                <p className="font-semibold text-sm text-gray-900">{opt.title}</p>
-                <p className="text-xs text-gray-500 mt-1">{opt.description}</p>
+              <div className="p-4 border-2 border-border rounded-xl peer-checked:border-accent peer-checked:bg-[#FEF7E9] transition-colors">
+                <p className="font-semibold text-sm text-text">{opt.title}</p>
+                <p className="text-xs text-muted mt-1">{opt.description}</p>
               </div>
-              <div className="absolute top-3 right-3 w-4 h-4 rounded-full border-2 border-gray-300 peer-checked:border-[#F5A523] peer-checked:bg-[#F5A523] transition-colors" />
+              <div className="absolute top-3 right-3 w-4 h-4 rounded-full border-2 border-border peer-checked:border-accent peer-checked:bg-accent transition-colors" />
             </label>
           ))}
         </div>

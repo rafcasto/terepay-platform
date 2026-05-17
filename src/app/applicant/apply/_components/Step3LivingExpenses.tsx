@@ -4,7 +4,7 @@ import { useFormContext, useWatch, type UseFormRegister } from 'react-hook-form'
 import type { TerepayApplicationInput } from '@/lib/validation/schemas';
 
 const inputCls =
-  'w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#F5A523] focus:border-[#F5A523] focus:outline-none transition-colors bg-white';
+  'w-full px-3 h-11 border border-border rounded-xl text-sm focus:ring-2 focus:ring-accent focus:border-accent focus:outline-none transition-colors bg-surface text-text placeholder:text-muted/70';
 const selectCls = inputCls + ' appearance-none';
 
 const FREQ_OPTIONS = [
@@ -25,10 +25,10 @@ function NzdRow({
   register: UseFormRegister<any>;
 }) {
   return (
-    <div className="flex items-center gap-3 py-2 border-b border-gray-100 last:border-0">
-      <span className="text-sm text-gray-600 flex-1">{label}</span>
+    <div className="flex items-center gap-3 py-2 border-b border-border-2 last:border-0">
+      <span className="text-sm text-muted flex-1">{label}</span>
       <div className="relative w-32 shrink-0">
-        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">$</span>
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted/70">$</span>
         <input
           type="number"
           min={0}
@@ -36,7 +36,7 @@ function NzdRow({
           defaultValue={0}
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           {...register(fieldName as any, { valueAsNumber: true })}
-          className="w-full pl-6 pr-2 py-2 border border-gray-200 rounded-md text-sm focus:ring-2 focus:ring-[#F5A523] focus:outline-none bg-white"
+          className="w-full pl-6 pr-2 py-2 border border-border rounded-md text-sm focus:ring-2 focus:ring-accent focus:outline-none bg-white"
         />
       </div>
     </div>
@@ -61,14 +61,14 @@ export default function Step3LivingExpenses() {
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-xl font-bold text-gray-900">Living Expenses</h2>
-        <p className="text-sm text-gray-500 mt-1">
+        <h2 className="text-xl font-bold text-text">Living Expenses</h2>
+        <p className="text-sm text-muted mt-1">
           Enter your regular fortnightly expenses in NZD. Leave blank (or 0) if not applicable.
         </p>
       </div>
 
       {/* Non-Discretionary */}
-      <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
+      <div className="bg-surface-2 rounded-xl border border-border p-4">
         <h3 className="text-sm font-semibold text-gray-800 mb-3">
           Non-Discretionary Expenses (Fortnightly)
         </h3>
@@ -85,16 +85,16 @@ export default function Step3LivingExpenses() {
         <NzdRow label="Education" fieldName="livingExpenses.nonDiscretionary.education" register={register} />
         <NzdRow label="Child Support" fieldName="livingExpenses.nonDiscretionary.childSupport" register={register} />
         <NzdRow label="Remittances (Overseas Family)" fieldName="livingExpenses.nonDiscretionary.remittances" register={register} />
-        <div className="flex items-center gap-3 pt-3 mt-1 border-t border-gray-200">
+        <div className="flex items-center gap-3 pt-3 mt-1 border-t border-border">
           <span className="text-sm font-semibold text-gray-800 flex-1">Total Non-Discretionary</span>
-          <span className="w-32 shrink-0 px-3 py-2 bg-[#FEF7E9] text-[#E08B00] font-bold text-sm rounded-md text-right">
+          <span className="w-32 shrink-0 px-3 py-2 bg-[#FEF7E9] text-accent-2 font-bold text-sm rounded-md text-right">
             ${sumNd.toFixed(2)}
           </span>
         </div>
       </div>
 
       {/* Discretionary */}
-      <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
+      <div className="bg-surface-2 rounded-xl border border-border p-4">
         <h3 className="text-sm font-semibold text-gray-800 mb-3">
           Discretionary Expenses (Fortnightly)
         </h3>
@@ -105,24 +105,24 @@ export default function Step3LivingExpenses() {
         <NzdRow label="Home Improvement" fieldName="livingExpenses.discretionary.homeImprovement" register={register} />
         <NzdRow label="Cash Withdrawals" fieldName="livingExpenses.discretionary.cashWithdrawals" register={register} />
         <NzdRow label="Other Discretionary" fieldName="livingExpenses.discretionary.other" register={register} />
-        <div className="flex items-center gap-3 pt-3 mt-1 border-t border-gray-200">
+        <div className="flex items-center gap-3 pt-3 mt-1 border-t border-border">
           <span className="text-sm font-semibold text-gray-800 flex-1">Total Discretionary</span>
-          <span className="w-32 shrink-0 px-3 py-2 bg-[#FEF7E9] text-[#E08B00] font-bold text-sm rounded-md text-right">
+          <span className="w-32 shrink-0 px-3 py-2 bg-[#FEF7E9] text-accent-2 font-bold text-sm rounded-md text-right">
             ${sumD.toFixed(2)}
           </span>
         </div>
       </div>
 
       {/* Subscriptions detail */}
-      <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
+      <div className="bg-surface-2 rounded-xl border border-border p-4">
         <h3 className="text-sm font-semibold text-gray-800 mb-3">Subscription Details</h3>
         <div className="space-y-3">
           {(['gym', 'netflix', 'spotify', 'sports', 'others'] as const).map((sub) => (
             <div key={sub} className="grid grid-cols-3 gap-3 items-end">
               <div className="col-span-1">
-                <label className="block text-xs font-medium text-gray-500 mb-1 capitalize">{sub}</label>
+                <label className="block text-xs font-medium text-muted mb-1 capitalize">{sub}</label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">$</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted/70">$</span>
                   <input
                     type="number"
                     min={0}
@@ -131,12 +131,12 @@ export default function Step3LivingExpenses() {
                     {...register(`livingExpenses.subscriptionDetails.${sub}.amount`, {
                       valueAsNumber: true,
                     })}
-                    className="w-full pl-6 pr-2 py-2 border border-gray-200 rounded-md text-sm focus:ring-2 focus:ring-[#F5A523] focus:outline-none bg-white"
+                    className="w-full pl-6 pr-2 py-2 border border-border rounded-md text-sm focus:ring-2 focus:ring-accent focus:outline-none bg-white"
                   />
                 </div>
               </div>
               <div className="col-span-2">
-                <label className="block text-xs font-medium text-gray-500 mb-1">Frequency</label>
+                <label className="block text-xs font-medium text-muted mb-1">Frequency</label>
                 <select
                   {...register(`livingExpenses.subscriptionDetails.${sub}.frequency`)}
                   className={selectCls + ' text-xs py-2'}
@@ -150,9 +150,9 @@ export default function Step3LivingExpenses() {
               </div>
             </div>
           ))}
-          <div className="flex items-center gap-3 pt-3 border-t border-gray-200">
+          <div className="flex items-center gap-3 pt-3 border-t border-border">
             <span className="text-sm font-semibold text-gray-800 flex-1">Total Subscriptions</span>
-            <span className="px-3 py-2 bg-[#FEF7E9] text-[#E08B00] font-bold text-sm rounded-md">
+            <span className="px-3 py-2 bg-[#FEF7E9] text-accent-2 font-bold text-sm rounded-md">
               ${sumSubs.toFixed(2)}
             </span>
           </div>
@@ -160,23 +160,23 @@ export default function Step3LivingExpenses() {
       </div>
 
       {/* BNPL */}
-      <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
+      <div className="bg-surface-2 rounded-xl border border-border p-4">
         <h3 className="text-sm font-semibold text-gray-800 mb-3">
           Buy Now Pay Later (Fortnightly Payment)
         </h3>
         <NzdRow label="Afterpay" fieldName="livingExpenses.bnpl.afterpay" register={register} />
         <NzdRow label="Klarna" fieldName="livingExpenses.bnpl.klarna" register={register} />
         <NzdRow label="ZIP" fieldName="livingExpenses.bnpl.zip" register={register} />
-        <div className="flex items-center gap-3 pt-3 mt-1 border-t border-gray-200">
+        <div className="flex items-center gap-3 pt-3 mt-1 border-t border-border">
           <span className="text-sm font-semibold text-gray-800 flex-1">Total BNPL</span>
-          <span className="w-32 shrink-0 px-3 py-2 bg-[#FEF7E9] text-[#E08B00] font-bold text-sm rounded-md text-right">
+          <span className="w-32 shrink-0 px-3 py-2 bg-[#FEF7E9] text-accent-2 font-bold text-sm rounded-md text-right">
             ${sumBnpl.toFixed(2)}
           </span>
         </div>
       </div>
 
       {/* Grand total */}
-      <div className="flex items-center justify-between bg-[#F5A523] text-white rounded-xl px-5 py-4">
+      <div className="flex items-center justify-between bg-accent text-white rounded-xl px-5 py-4">
         <span className="font-semibold text-sm">Total Fortnightly Expenses</span>
         <span className="text-xl font-bold">
           ${(sumNd + sumD + sumBnpl).toFixed(2)}
