@@ -1,0 +1,3558 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TerePay · Loan Progress</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+<style>
+  :root {
+    /* Brand — matches TerePay screenshot */
+    --ink:         #0c1620;
+    --ink-2:       #131f2c;
+    --ink-3:       #1d2a39;
+    --accent:      #f5a623;
+    --accent-2:    #f59412;
+    --accent-soft: #fef4e0;
+    --bg:          #f6f7f9;
+    --surface:     #ffffff;
+    --surface-2:   #f3f4f6;
+    --text:        #0c1620;
+    --muted:       #6b7280;
+    --muted-2:     #9aa3af;
+    --border:      #e8eaee;
+    --border-2:    #eef0f3;
+
+    --info:        #2563eb;
+    --info-soft:   #e8efff;
+    --success:     #16a34a;
+    --success-soft:#e3f6e9;
+    --danger:      #dc2626;
+    --danger-soft: #fde7e7;
+    --warn:        #d97706;
+    --warn-soft:   #fdf0d9;
+
+    --radius-sm: 10px;
+    --radius:    14px;
+    --radius-lg: 20px;
+
+    --shadow-sm: 0 1px 2px rgba(15, 23, 32, .04), 0 1px 0 rgba(15, 23, 32, .02);
+    --shadow:    0 1px 2px rgba(15, 23, 32, .04), 0 8px 24px rgba(15, 23, 32, .06);
+    --shadow-lg: 0 4px 12px rgba(15, 23, 32, .06), 0 24px 48px rgba(15, 23, 32, .12);
+  }
+  html[data-dark="true"] {
+    --ink:         #050a10;
+    --ink-2:       #0a1218;
+    --ink-3:       #131e2a;
+    --bg:          #07101a;
+    --surface:     #111c28;
+    --surface-2:   #1a2533;
+    --text:        #f1f5f9;
+    --muted:       #94a3b8;
+    --muted-2:     #64748b;
+    --border:      #1f2c3b;
+    --border-2:    #1a2532;
+    --accent-soft: #2a200d;
+    --info-soft:   #122244;
+    --success-soft:#0e2a1a;
+    --danger-soft: #3a1414;
+    --warn-soft:   #2a1d09;
+    --shadow-sm: 0 1px 0 rgba(0,0,0,.4);
+    --shadow:    0 6px 20px rgba(0, 0, 0, .35);
+    --shadow-lg: 0 12px 48px rgba(0, 0, 0, .5);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    background: var(--bg);
+    color: var(--text);
+    font-feature-settings: 'cv11', 'ss01', 'ss03';
+    overflow-x: hidden;
+  }
+  button { font-family: inherit; }
+
+  /* App shell */
+  .app  { min-height: 100vh; display: flex; flex-direction: column; }
+
+  /* Top bar */
+  .topbar {
+    background: var(--ink);
+    color: #fff;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky; top: 0; z-index: 50;
+    border-bottom: 1px solid rgba(255,255,255,.04);
+  }
+  .topbar-left { display: flex; align-items: center; gap: 10px; }
+  .back-btn {
+    appearance: none; border: 0; background: transparent; cursor: pointer;
+    color: rgba(255,255,255,.7); display: flex; align-items: center;
+    padding: 6px; margin-left: -6px; border-radius: 8px;
+    transition: background .15s, color .15s;
+  }
+  .back-btn:hover { background: rgba(255,255,255,.08); color: #fff; }
+  .logo {
+    color: var(--accent);
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    font-size: 20px;
+  }
+  .menu-btn {
+    appearance: none; border: 0; background: transparent; cursor: pointer;
+    color: var(--accent); padding: 6px; border-radius: 8px;
+    transition: background .15s;
+  }
+  .menu-btn:hover { background: rgba(245, 166, 35, .15); }
+
+  /* Centered content column */
+  .content {
+    width: 100%;
+    max-width: 540px;
+    margin: 0 auto;
+    padding: 24px 20px 80px;
+    flex: 1;
+  }
+  @media (max-width: 480px) {
+    .content { padding: 20px 16px 60px; }
+  }
+
+  /* Eyebrow */
+  .eyebrow {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 6px;
+    min-width: 0;
+    flex: 1;
+  }
+  .h1 {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    margin: 0 0 20px;
+    color: var(--text);
+  }
+
+  /* Hero status card (the dark navy card from the screenshot) */
+  .hero {
+    background: var(--ink);
+    color: #fff;
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    margin-bottom: 28px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+  .hero-bg {
+    position: absolute; inset: 0; pointer-events: none;
+    opacity: .5;
+    background: radial-gradient(ellipse at 90% 0%, color-mix(in oklch, var(--accent) 30%, transparent), transparent 55%);
+  }
+  .hero > * { position: relative; z-index: 1; }
+  .hero .eyebrow { color: rgba(255,255,255,.5); margin-bottom: 10px; }
+  .hero h2 {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 0 0 8px;
+  }
+  .hero p.hero-sub {
+    margin: 0 0 18px;
+    color: rgba(255,255,255,.7);
+    font-size: 14.5px;
+    line-height: 1.5;
+  }
+  .hero p { margin: 0; }
+
+  /* Hero variants for each state */
+  .hero[data-state="approved"]  { background: linear-gradient(135deg, #0c1620 0%, #15301f 100%); }
+  .hero[data-state="rejected"]  { background: linear-gradient(135deg, #0c1620 0%, #2a1414 100%); }
+  .hero[data-state="active"]    { background: var(--ink); }
+  .hero[data-state="paid"]      { background: linear-gradient(135deg, #0c1620 0%, #143126 100%); }
+  .hero[data-state="new"]       { background: linear-gradient(135deg, #0c1620 0%, #2a2010 100%); }
+
+  /* Status pill (inside hero) */
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px 4px 8px; border-radius: 999px;
+    font-size: 11.5px; font-weight: 600;
+    background: rgba(255,255,255,.1);
+    color: rgba(255,255,255,.9);
+    letter-spacing: .02em;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .pill::before {
+    content: ""; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 3px rgba(245,166,35,.2);
+  }
+  .pill[data-tone="success"]::before { background: #4ade80; box-shadow: 0 0 0 3px rgba(74,222,128,.2); }
+  .pill[data-tone="danger"]::before  { background: #f87171; box-shadow: 0 0 0 3px rgba(248,113,113,.2); }
+  .pill[data-tone="info"]::before    { background: #60a5fa; box-shadow: 0 0 0 3px rgba(96,165,250,.2); }
+  .pill[data-tone="muted"]::before   { background: #94a3b8; box-shadow: none; }
+  .pill[data-tone="amber"] {
+    background: color-mix(in oklch, var(--accent) 18%, transparent);
+    color: var(--accent);
+  }
+  .pill[data-tone="amber"]::before {
+    background: var(--accent); box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 25%, transparent);
+    animation: pulse 1.8s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%      { opacity: .6; transform: scale(.85); }
+  }
+
+  /* Primary button (amber) */
+  .btn {
+    appearance: none; border: 0; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 12px 18px;
+    background: var(--accent);
+    color: #0c1620;
+    font-weight: 600;
+    font-size: 14.5px;
+    border-radius: 12px;
+    transition: transform .12s ease, background .15s, box-shadow .15s;
+    box-shadow: 0 1px 0 rgba(0,0,0,.05);
+  }
+  .btn:hover { background: var(--accent-2); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(245,166,35,.35); }
+  .btn:active { transform: translateY(0); }
+  .btn[data-block="true"] { width: 100%; }
+  .btn[data-size="lg"] { padding: 14px 20px; font-size: 15px; border-radius: 14px; }
+
+  .btn-secondary {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { background: var(--surface-2); box-shadow: none; transform: none; }
+  html[data-dark="true"] .btn-secondary { color: #fff; border-color: rgba(255,255,255,.15); }
+  html[data-dark="true"] .btn-secondary:hover { background: rgba(255,255,255,.06); }
+
+  .btn-ghost-light {
+    background: rgba(255,255,255,.1);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,.12);
+  }
+  .btn-ghost-light:hover { background: rgba(255,255,255,.18); box-shadow: none; }
+
+  /* Section header */
+  .section-h {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 28px 0 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+  .section-h > span:first-child { white-space: nowrap; }
+  .section-h a { color: var(--accent); text-decoration: none; font-size: 12.5px; text-transform: none; letter-spacing: 0; font-weight: 600; white-space: nowrap; }
+  .section-h a:hover { text-decoration: underline; }
+
+  /* Card */
+  .card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--border-2);
+  }
+  .card-pad { padding: 18px 20px; }
+  html[data-dark="true"] .card { border-color: var(--border); }
+
+  /* Stat grid in hero */
+  .stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: rgba(255,255,255,.06);
+    border-radius: 12px;
+    overflow: hidden;
+    margin: 18px 0 0;
+  }
+  .stat {
+    background: rgba(255,255,255,.02);
+    padding: 14px 16px;
+  }
+  .stat-label {
+    font-size: 11.5px;
+    color: rgba(255,255,255,.55);
+    margin: 0 0 4px;
+    letter-spacing: .02em;
+  }
+  .stat-val {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat-val small { font-size: 12px; font-weight: 500; color: rgba(255,255,255,.5); margin-left: 3px; letter-spacing: 0; }
+
+  /* Big balance */
+  .balance {
+    text-align: left;
+  }
+  .balance-label {
+    font-size: 12.5px;
+    color: rgba(255,255,255,.55);
+    margin: 0 0 4px;
+    letter-spacing: .02em;
+  }
+  .balance-amount {
+    font-size: 40px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: #fff;
+    line-height: 1.05;
+    font-variant-numeric: tabular-nums;
+  }
+  .balance-amount .currency {
+    font-size: 18px;
+    font-weight: 600;
+    color: rgba(255,255,255,.6);
+    margin-right: 4px;
+    vertical-align: 6px;
+    letter-spacing: 0;
+  }
+  .balance-meta {
+    font-size: 13px;
+    color: rgba(255,255,255,.55);
+    margin-top: 8px;
+  }
+  .balance-meta b { color: rgba(255,255,255,.9); font-weight: 600; }
+
+  /* Progress bar (within hero) */
+  .progress {
+    margin-top: 18px;
+  }
+  .progress-track {
+    height: 6px; border-radius: 999px;
+    background: rgba(255,255,255,.1);
+    overflow: hidden;
+    position: relative;
+  }
+  .progress-fill {
+    height: 100%; border-radius: 999px;
+    background: linear-gradient(90deg, var(--accent), #ffc864);
+    transition: width 1s cubic-bezier(.4,0,.2,1);
+  }
+  .progress-meta {
+    display: flex; justify-content: space-between;
+    font-size: 12px; color: rgba(255,255,255,.6);
+    margin-top: 10px;
+  }
+  .progress-meta > span { white-space: nowrap; }
+  .progress-meta b { color: #fff; font-weight: 600; }
+
+  /* Stepper (for In Review state) */
+  .stepper {
+    position: relative;
+    padding: 4px 0;
+  }
+  .step {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 14px 0;
+    position: relative;
+  }
+  .step:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    left: 13px; top: 36px; bottom: -10px;
+    width: 2px;
+    background: var(--border);
+  }
+  .step[data-status="done"]:not(:last-child)::after { background: var(--success); }
+  .step[data-status="active"]:not(:last-child)::after {
+    background: linear-gradient(to bottom, var(--accent) 0%, var(--accent) 50%, var(--border) 50%, var(--border) 100%);
+  }
+  .step-dot {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--surface);
+    border: 2px solid var(--border);
+    color: var(--muted-2);
+    font-size: 13px; font-weight: 600;
+    flex-shrink: 0;
+    z-index: 1;
+    transition: background .3s, border-color .3s, color .3s;
+  }
+  .step[data-status="done"] .step-dot {
+    background: var(--success); border-color: var(--success); color: #fff;
+  }
+  .step[data-status="active"] .step-dot {
+    background: var(--accent); border-color: var(--accent); color: #0c1620;
+    box-shadow: 0 0 0 4px color-mix(in oklch, var(--accent) 20%, transparent);
+    animation: stepPulse 2s infinite;
+  }
+  @keyframes stepPulse {
+    0%, 100% { box-shadow: 0 0 0 4px color-mix(in oklch, var(--accent) 20%, transparent); }
+    50%      { box-shadow: 0 0 0 8px color-mix(in oklch, var(--accent) 10%, transparent); }
+  }
+  .step-body { flex: 1; padding-top: 2px; }
+  .step-title {
+    font-weight: 600;
+    font-size: 14.5px;
+    color: var(--text);
+    margin: 0 0 2px;
+  }
+  .step-meta {
+    font-size: 13px;
+    color: var(--muted);
+    margin: 0;
+    line-height: 1.4;
+  }
+  .step[data-status="pending"] .step-title { color: var(--muted); font-weight: 500; }
+  .step-time {
+    font-size: 12px;
+    color: var(--muted-2);
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+    padding-top: 4px;
+  }
+
+  /* Schedule list (Active state) */
+  .schedule-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border-2);
+  }
+  .schedule-row:last-child { border-bottom: 0; }
+  .schedule-date {
+    width: 44px; height: 44px;
+    border-radius: 10px;
+    background: var(--surface-2);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    line-height: 1;
+  }
+  .schedule-date .m { font-size: 10px; font-weight: 600; color: var(--muted); letter-spacing: .05em; text-transform: uppercase; }
+  .schedule-date .d { font-size: 16px; font-weight: 700; color: var(--text); margin-top: 2px; }
+  .schedule-row[data-status="paid"] .schedule-date { background: var(--success-soft); }
+  .schedule-row[data-status="paid"] .schedule-date .m { color: var(--success); }
+  .schedule-row[data-status="paid"] .schedule-date .d { color: var(--success); }
+  .schedule-row[data-status="next"] .schedule-date { background: var(--accent-soft); }
+  .schedule-row[data-status="next"] .schedule-date .m { color: var(--accent-2); }
+  .schedule-row[data-status="next"] .schedule-date .d { color: var(--accent-2); }
+  .schedule-row[data-status="overdue"] .schedule-date { background: var(--danger-soft); }
+  .schedule-row[data-status="overdue"] .schedule-date .m { color: var(--danger); }
+  .schedule-row[data-status="overdue"] .schedule-date .d { color: var(--danger); }
+  .schedule-body { flex: 1; min-width: 0; }
+  .schedule-title { font-weight: 600; font-size: 14.5px; margin: 0; color: var(--text); }
+  .schedule-sub { margin: 2px 0 0; font-size: 12.5px; color: var(--muted); }
+  .schedule-amt { font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; }
+  .schedule-row[data-status="paid"] .schedule-amt { color: var(--muted-2); text-decoration: line-through; }
+
+  /* Offer detail row (used in approved + active) */
+  .row {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 11px 0;
+    border-bottom: 1px dashed var(--border-2);
+  }
+  .row:last-child { border-bottom: 0; }
+  .row-l { font-size: 13.5px; color: var(--muted); }
+  .row-r { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .row.total .row-l { color: var(--text); font-weight: 600; font-size: 14px; }
+  .row.total .row-r { font-size: 17px; }
+
+  /* Info banners */
+  .banner {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    margin: 8px 0 0;
+    font-size: 13.5px;
+    line-height: 1.5;
+  }
+  .banner[data-tone="info"]    { background: var(--info-soft); color: color-mix(in oklch, var(--info) 80%, var(--text)); }
+  .banner[data-tone="warn"]    { background: var(--warn-soft); color: color-mix(in oklch, var(--warn) 70%, var(--text)); }
+  .banner[data-tone="danger"]  { background: var(--danger-soft); color: color-mix(in oklch, var(--danger) 70%, var(--text)); }
+  .banner[data-tone="success"] { background: var(--success-soft); color: color-mix(in oklch, var(--success) 70%, var(--text)); }
+  .banner svg { flex-shrink: 0; margin-top: 1px; }
+  .banner b { font-weight: 600; }
+
+  /* Action grid */
+  .actions {
+    display: grid; gap: 10px;
+    margin-top: 20px;
+  }
+  .actions[data-cols="2"] { grid-template-columns: 1fr 1fr; }
+
+  /* Modal */
+  .modal-scrim {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(12, 22, 32, .55);
+    backdrop-filter: blur(4px);
+    display: flex; align-items: flex-end; justify-content: center;
+    animation: fadeIn .2s ease-out;
+  }
+  @media (min-width: 600px) {
+    .modal-scrim { align-items: center; }
+  }
+  .modal {
+    background: var(--surface);
+    border-radius: 20px 20px 0 0;
+    width: 100%;
+    max-width: 540px;
+    max-height: 92vh;
+    overflow-y: auto;
+    box-shadow: var(--shadow-lg);
+    animation: slideUp .25s cubic-bezier(.2, .9, .3, 1.1);
+  }
+  @media (min-width: 600px) {
+    .modal { border-radius: 20px; max-height: 88vh; margin: 16px; }
+  }
+  .modal-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 20px 8px;
+  }
+  .modal-head h3 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.01em; margin: 0;
+  }
+  .modal-body { padding: 4px 20px 20px; }
+  .modal-close {
+    appearance: none; border: 0; background: var(--surface-2); cursor: pointer;
+    width: 32px; height: 32px; border-radius: 50%;
+    color: var(--muted);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .modal-close:hover { background: var(--border); color: var(--text); }
+
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes slideUp { from { transform: translateY(40px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+  /* Form bits */
+  .field-grid { display: grid; gap: 14px; }
+  .field-label { font-size: 12.5px; font-weight: 600; color: var(--text); margin: 0 0 6px; display: block; }
+  .field-input {
+    appearance: none; width: 100%; box-sizing: border-box;
+    padding: 12px 14px;
+    font-size: 15px;
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+    color: var(--text);
+    transition: border-color .15s, background .15s;
+    font-family: inherit;
+  }
+  .field-input:focus { outline: 0; border-color: var(--accent); background: var(--surface); }
+  .field-prefix-wrap { position: relative; }
+  .field-prefix {
+    position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+    font-size: 15px; font-weight: 600; color: var(--muted);
+  }
+  .field-prefix-wrap .field-input { padding-left: 38px; font-weight: 600; font-size: 17px; font-variant-numeric: tabular-nums; }
+
+  .quick-amounts {
+    display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap;
+  }
+  .quick-amount {
+    appearance: none; cursor: pointer;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: var(--surface-2);
+    border: 1px solid var(--border-2);
+    color: var(--text);
+    font-size: 13px; font-weight: 500;
+    font-family: inherit;
+  }
+  .quick-amount:hover { background: var(--border-2); }
+  .quick-amount[data-selected="true"] {
+    background: var(--accent-soft); border-color: var(--accent); color: var(--accent-2);
+    font-weight: 600;
+  }
+  html[data-dark="true"] .quick-amount[data-selected="true"] { color: var(--accent); }
+
+  /* Toast */
+  .toast {
+    position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
+    z-index: 200;
+    background: var(--ink);
+    color: #fff;
+    padding: 12px 18px;
+    border-radius: 999px;
+    font-size: 14px; font-weight: 500;
+    box-shadow: var(--shadow-lg);
+    display: flex; align-items: center; gap: 8px;
+    animation: toastIn .25s cubic-bezier(.2,.9,.3,1.1);
+  }
+  @keyframes toastIn { from { transform: translate(-50%, 20px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+
+  /* Confetti for paid-off + approved */
+  .confetti-layer {
+    position: absolute; inset: 0; pointer-events: none; overflow: hidden;
+    border-radius: inherit;
+  }
+  .confetti {
+    position: absolute;
+    width: 8px; height: 14px; border-radius: 1px;
+    opacity: 0;
+  }
+  .confetti.go {
+    animation: confettiFall 1.6s cubic-bezier(.3, .7, .6, 1) forwards;
+  }
+  @keyframes confettiFall {
+    0%   { transform: translate(0, -20px) rotate(0deg); opacity: 1; }
+    100% { transform: translate(var(--tx, 30px), 240px) rotate(var(--r, 360deg)); opacity: 0; }
+  }
+
+  /* Hide list defaults */
+  ul.bare { list-style: none; padding: 0; margin: 0; }
+
+  /* Loan summary minicard inside hero */
+  .hero-meta {
+    margin-top: 12px;
+    font-size: 13px;
+    color: rgba(255,255,255,.55);
+    line-height: 1.5;
+  }
+  .hero-meta b { color: #fff; font-weight: 600; }
+  .hero-meta .sep { color: rgba(255,255,255,.25); margin: 0 6px; }
+
+  /* Fade transition between states — gentle, doesn't start fully hidden */
+  .fade-in { animation: contentFade .25s ease-out; }
+  @keyframes contentFade {
+    from { opacity: .35; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Big illustration icon (rejected/paid) */
+  .big-icon {
+    width: 64px; height: 64px; border-radius: 18px;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 14px;
+  }
+  .big-icon[data-tone="danger"] { background: rgba(248,113,113,.18); color: #f87171; }
+  .big-icon[data-tone="success"] { background: rgba(74,222,128,.18); color: #4ade80; }
+  .big-icon[data-tone="info"]   { background: rgba(96,165,250,.18); color: #60a5fa; }
+
+  /* Skeleton shimmer */
+  .shimmer {
+    background: linear-gradient(90deg, var(--surface-2) 25%, var(--border-2) 50%, var(--surface-2) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.6s infinite linear;
+  }
+  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+  /* Helpful link */
+  .ilink {
+    color: var(--accent-2); text-decoration: none; font-weight: 600;
+  }
+  html[data-dark="true"] .ilink { color: var(--accent); }
+  .ilink:hover { text-decoration: underline; }
+
+  /* Action card (upload documents) */
+  .action-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1.5px solid var(--accent);
+    padding: 20px;
+    margin-top: 28px;
+    box-shadow: 0 8px 24px color-mix(in oklch, var(--accent) 12%, transparent);
+    position: relative;
+    overflow: hidden;
+  }
+  .action-card::before {
+    content: "";
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 80px;
+    background: linear-gradient(180deg, var(--accent-soft) 0%, transparent 100%);
+    opacity: .5;
+    pointer-events: none;
+  }
+  .action-card[data-active="false"] { border-color: var(--success); box-shadow: 0 8px 24px color-mix(in oklch, var(--success) 12%, transparent); }
+  .action-card[data-active="false"]::before { background: linear-gradient(180deg, var(--success-soft) 0%, transparent 100%); }
+  .action-card > * { position: relative; }
+
+  .action-card-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .action-card-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px 4px 8px;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent-2);
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: .02em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  html[data-dark="true"] .action-card-badge { color: var(--accent); }
+  .action-card[data-active="false"] .action-card-badge {
+    background: var(--success-soft);
+    color: var(--success);
+  }
+  .action-card-meta {
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .action-card-title {
+    margin: 0 0 6px;
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--text);
+  }
+  .action-card-sub {
+    margin: 0 0 16px;
+    font-size: 13.5px;
+    line-height: 1.5;
+    color: var(--muted);
+  }
+
+  /* Dropzone */
+  .dropzone {
+    border: 1.5px dashed var(--border);
+    border-radius: 12px;
+    padding: 24px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+    background: var(--surface-2);
+  }
+  .dropzone:hover { border-color: var(--accent); background: var(--accent-soft); }
+  .dropzone[data-over="true"] { border-color: var(--accent); background: var(--accent-soft); }
+  .dropzone-icon {
+    width: 40px; height: 40px;
+    border-radius: 12px;
+    background: var(--surface);
+    color: var(--accent-2);
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 10px;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--border-2);
+  }
+  html[data-dark="true"] .dropzone-icon { color: var(--accent); }
+  .dropzone-title {
+    margin: 0 0 4px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .dropzone-sub {
+    margin: 0;
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+
+  /* Doc list */
+  .doc-list {
+    list-style: none; padding: 0; margin: 14px 0 0;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .doc-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 14px;
+    background: var(--surface-2);
+    border-radius: 10px;
+    border: 1px solid var(--border-2);
+  }
+  .doc-item[data-status="done"] { background: var(--success-soft); border-color: color-mix(in oklch, var(--success) 30%, var(--border)); }
+  .doc-icon {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--muted);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    border: 1px solid var(--border-2);
+  }
+  .doc-item[data-status="done"] .doc-icon { color: var(--success); border-color: color-mix(in oklch, var(--success) 20%, var(--border)); }
+  .doc-body { flex: 1; min-width: 0; }
+  .doc-name {
+    margin: 0;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .doc-meta {
+    margin: 2px 0 0;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .doc-item[data-status="done"] .doc-meta { color: var(--success); font-weight: 500; }
+  .doc-progress {
+    height: 3px;
+    border-radius: 999px;
+    background: var(--border);
+    overflow: hidden;
+    margin: 6px 0 4px;
+  }
+  .doc-progress-fill {
+    height: 100%;
+    background: var(--accent);
+    transition: width .25s ease-out;
+  }
+  .doc-remove {
+    appearance: none; border: 0; background: transparent;
+    width: 28px; height: 28px; border-radius: 50%;
+    cursor: pointer;
+    color: var(--muted);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .doc-remove:hover { background: var(--border); color: var(--text); }
+
+  /* Apply screen — slider + chips */
+  .loan-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(255,255,255,.1);
+    margin: 18px 0 8px;
+    outline: none;
+    cursor: pointer;
+  }
+  .loan-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 4px solid #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,.25);
+    cursor: pointer;
+  }
+  .loan-slider::-moz-range-thumb {
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 4px solid #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,.25);
+    cursor: pointer;
+  }
+  .loan-slider-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: rgba(255,255,255,.5);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .term-picker {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+    gap: 8px;
+  }
+  .term-chip {
+    appearance: none;
+    padding: 12px 10px;
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background .15s, border-color .15s;
+  }
+  .term-chip:hover { background: var(--surface-2); }
+  .term-chip[data-selected="true"] {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--accent-2);
+  }
+  html[data-dark="true"] .term-chip[data-selected="true"] { color: var(--accent); }
+
+  .purpose-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .purpose-chip {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--text);
+    font-size: 13.5px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background .15s, border-color .15s;
+  }
+  .purpose-chip svg { color: var(--muted); }
+  .purpose-chip:hover { background: var(--surface-2); }
+  .purpose-chip[data-selected="true"] {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--accent-2);
+    font-weight: 600;
+  }
+  .purpose-chip[data-selected="true"] svg { color: var(--accent-2); }
+  html[data-dark="true"] .purpose-chip[data-selected="true"] { color: var(--accent); }
+  html[data-dark="true"] .purpose-chip[data-selected="true"] svg { color: var(--accent); }
+
+  /* Dashboard hero — new user trust strip */
+  .new-trust-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px 18px;
+    margin-top: 16px;
+    padding: 14px 0 4px;
+    border-top: 1px solid rgba(255,255,255,.08);
+  }
+  .new-trust-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    color: rgba(255,255,255,.7);
+  }
+  .new-trust-item svg { color: var(--accent); flex-shrink: 0; }
+
+  /* Dashboard quick actions */
+  .dash-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .dash-action {
+    appearance: none;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    padding: 16px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border-2);
+    border-radius: 14px;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    color: var(--text);
+    transition: transform .12s ease, border-color .15s, box-shadow .15s;
+  }
+  html[data-dark="true"] .dash-action { border-color: var(--border); }
+  .dash-action:hover {
+    border-color: var(--accent);
+    box-shadow: 0 4px 16px color-mix(in oklch, var(--accent) 10%, transparent);
+    transform: translateY(-1px);
+  }
+  .dash-action[data-tone="amber"] {
+    background: var(--surface);
+    border-color: color-mix(in oklch, var(--accent) 40%, var(--border));
+  }
+  .dash-action[data-tone="amber"]:hover {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .dash-action-icon {
+    width: 44px; height: 44px;
+    border-radius: 12px;
+    background: var(--surface-2);
+    color: var(--muted);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .dash-action[data-tone="amber"] .dash-action-icon {
+    background: var(--accent-soft);
+    color: var(--accent-2);
+  }
+  html[data-dark="true"] .dash-action[data-tone="amber"] .dash-action-icon {
+    color: var(--accent);
+  }
+  .dash-action-body { flex: 1; min-width: 0; }
+  .dash-action-title-row {
+    display: flex; align-items: center; gap: 8px;
+    margin: 0 0 2px;
+    flex-wrap: wrap;
+  }
+  .dash-action-title {
+    margin: 0;
+    font-weight: 600;
+    font-size: 14.5px;
+    color: var(--text);
+  }
+  .dash-action-sub {
+    margin: 0;
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.4;
+  }
+  .dash-action-badge {
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: var(--accent);
+    color: #0c1620;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .dash-action > svg:last-child {
+    color: var(--muted-2);
+    flex-shrink: 0;
+  }
+  .dash-action:hover > svg:last-child { color: var(--accent); }
+
+  /* Dashboard hero mini progress */
+  .dash-mini-progress {
+    height: 4px;
+    background: rgba(255,255,255,.1);
+    border-radius: 999px;
+    overflow: hidden;
+    margin-top: 18px;
+  }
+  .dash-mini-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), #ffc864);
+    border-radius: 999px;
+  }
+  .dash-mini-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 10px;
+    font-size: 12.5px;
+    color: rgba(255,255,255,.6);
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  /* Dashboard footer note */
+  .dash-footer-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-top: 32px;
+    padding: 0 4px;
+    font-size: 12.5px;
+    color: var(--muted-2);
+    line-height: 1.5;
+  }
+  .dash-footer-note svg { flex-shrink: 0; margin-top: 1px; opacity: .7; }
+
+  /* Approved — amount delta (requested vs approved) */
+  .amount-delta {
+    margin-top: 16px;
+    padding: 12px 14px;
+    background: rgba(255,255,255,.06);
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,.08);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .amount-delta-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+  }
+  .amount-delta-label {
+    font-size: 12.5px;
+    color: rgba(255,255,255,.55);
+    letter-spacing: .01em;
+  }
+  .amount-delta-orig {
+    font-size: 15px;
+    color: rgba(255,255,255,.5);
+    text-decoration: line-through;
+    text-decoration-thickness: 1.5px;
+    font-variant-numeric: tabular-nums;
+  }
+  .amount-delta-new {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
+  }
+  .amount-delta-row[data-emph="true"] .amount-delta-label {
+    color: #fff;
+    font-weight: 600;
+  }
+
+  /* Direct-debit setup modal steps */
+  .dd-steps {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 18px;
+    padding: 12px 14px;
+    background: var(--surface-2);
+    border-radius: 10px;
+  }
+  .dd-step {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    font-size: 12.5px;
+    color: var(--muted);
+    font-weight: 500;
+  }
+  .dd-step:not(:last-child) {
+    position: relative;
+  }
+  .dd-step:not(:last-child)::after {
+    content: "";
+    flex: 1;
+    height: 1.5px;
+    background: var(--border);
+    margin-left: 4px;
+    border-radius: 999px;
+  }
+  .dd-step[data-status="done"]:not(:last-child)::after {
+    background: var(--accent);
+  }
+  .dd-step[data-status="active"] { color: var(--text); font-weight: 600; }
+  .dd-step[data-status="done"] { color: var(--accent-2); }
+  html[data-dark="true"] .dd-step[data-status="done"] { color: var(--accent); }
+  .dd-step-num {
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: var(--border);
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .dd-step[data-status="active"] .dd-step-num {
+    background: var(--accent);
+    color: #0c1620;
+  }
+  .dd-step[data-status="done"] .dd-step-num {
+    background: var(--accent);
+    color: #0c1620;
+  }
+
+  .dd-summary {
+    background: var(--surface-2);
+    border-radius: 12px;
+    padding: 14px 16px;
+    border: 1px solid var(--border-2);
+  }
+  .dd-summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 6px 0;
+    gap: 12px;
+    font-size: 13.5px;
+  }
+  .dd-summary-row + .dd-summary-row { border-top: 1px dashed var(--border-2); }
+  .dd-summary-row span { color: var(--muted); }
+  .dd-summary-row b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+
+  /* Toggle row + autopay */
+  .toggle-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 20px; gap: 12px;
+  }
+  .toggle-row + .toggle-row { border-top: 1px solid var(--border-2); }
+  .toggle-row p { margin: 0; font-size: 13px; color: var(--muted); }
+  .toggle-row h4 { margin: 0 0 2px; font-size: 14px; font-weight: 600; color: var(--text); }
+  .toggle {
+    width: 40px; height: 24px; border-radius: 999px;
+    background: var(--border);
+    position: relative; cursor: pointer; transition: background .15s;
+    appearance: none; border: 0; flex-shrink: 0;
+  }
+  .toggle::after {
+    content: ""; position: absolute; top: 2px; left: 2px;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.2);
+    transition: left .18s cubic-bezier(.3,.6,.4,1);
+  }
+  .toggle[data-on="true"] { background: var(--accent); }
+  .toggle[data-on="true"]::after { left: 18px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" data-presets="react">
+
+// tweaks-panel.jsx
+// Reusable Tweaks shell + form-control helpers.
+//
+// Owns the host protocol (listens for __activate_edit_mode / __deactivate_edit_mode,
+// posts __edit_mode_available / __edit_mode_set_keys / __edit_mode_dismissed) so
+// individual prototypes don't re-roll it. Ships a consistent set of controls so you
+// don't hand-draw <input type="range">, segmented radios, steppers, etc.
+//
+// Usage (in an HTML file that loads React + Babel):
+//
+//   const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+//     "primaryColor": "#D97757",
+//     "palette": ["#D97757", "#29261b", "#f6f4ef"],
+//     "fontSize": 16,
+//     "density": "regular",
+//     "dark": false
+//   }/*EDITMODE-END*/;
+//
+//   function App() {
+//     const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+//     return (
+//       <div style={{ fontSize: t.fontSize, color: t.primaryColor }}>
+//         Hello
+//         <TweaksPanel>
+//           <TweakSection label="Typography" />
+//           <TweakSlider label="Font size" value={t.fontSize} min={10} max={32} unit="px"
+//                        onChange={(v) => setTweak('fontSize', v)} />
+//           <TweakRadio  label="Density" value={t.density}
+//                        options={['compact', 'regular', 'comfy']}
+//                        onChange={(v) => setTweak('density', v)} />
+//           <TweakSection label="Theme" />
+//           <TweakColor  label="Primary" value={t.primaryColor}
+//                        options={['#D97757', '#2A6FDB', '#1F8A5B', '#7A5AE0']}
+//                        onChange={(v) => setTweak('primaryColor', v)} />
+//           <TweakColor  label="Palette" value={t.palette}
+//                        options={[['#D97757', '#29261b', '#f6f4ef'],
+//                                  ['#475569', '#0f172a', '#f1f5f9']]}
+//                        onChange={(v) => setTweak('palette', v)} />
+//           <TweakToggle label="Dark mode" value={t.dark}
+//                        onChange={(v) => setTweak('dark', v)} />
+//         </TweaksPanel>
+//       </div>
+//     );
+//   }
+//
+// ─────────────────────────────────────────────────────────────────────────────
+
+const __TWEAKS_STYLE = `
+  .twk-panel{position:fixed;right:16px;bottom:16px;z-index:2147483646;width:280px;
+    max-height:calc(100vh - 32px);display:flex;flex-direction:column;
+    transform:scale(var(--dc-inv-zoom,1));transform-origin:bottom right;
+    background:rgba(250,249,247,.78);color:#29261b;
+    -webkit-backdrop-filter:blur(24px) saturate(160%);backdrop-filter:blur(24px) saturate(160%);
+    border:.5px solid rgba(255,255,255,.6);border-radius:14px;
+    box-shadow:0 1px 0 rgba(255,255,255,.5) inset,0 12px 40px rgba(0,0,0,.18);
+    font:11.5px/1.4 ui-sans-serif,system-ui,-apple-system,sans-serif;overflow:hidden}
+  .twk-hd{display:flex;align-items:center;justify-content:space-between;
+    padding:10px 8px 10px 14px;cursor:move;user-select:none}
+  .twk-hd b{font-size:12px;font-weight:600;letter-spacing:.01em}
+  .twk-x{appearance:none;border:0;background:transparent;color:rgba(41,38,27,.55);
+    width:22px;height:22px;border-radius:6px;cursor:default;font-size:13px;line-height:1}
+  .twk-x:hover{background:rgba(0,0,0,.06);color:#29261b}
+  .twk-body{padding:2px 14px 14px;display:flex;flex-direction:column;gap:10px;
+    overflow-y:auto;overflow-x:hidden;min-height:0;
+    scrollbar-width:thin;scrollbar-color:rgba(0,0,0,.15) transparent}
+  .twk-body::-webkit-scrollbar{width:8px}
+  .twk-body::-webkit-scrollbar-track{background:transparent;margin:2px}
+  .twk-body::-webkit-scrollbar-thumb{background:rgba(0,0,0,.15);border-radius:4px;
+    border:2px solid transparent;background-clip:content-box}
+  .twk-body::-webkit-scrollbar-thumb:hover{background:rgba(0,0,0,.25);
+    border:2px solid transparent;background-clip:content-box}
+  .twk-row{display:flex;flex-direction:column;gap:5px}
+  .twk-row-h{flex-direction:row;align-items:center;justify-content:space-between;gap:10px}
+  .twk-lbl{display:flex;justify-content:space-between;align-items:baseline;
+    color:rgba(41,38,27,.72)}
+  .twk-lbl>span:first-child{font-weight:500}
+  .twk-val{color:rgba(41,38,27,.5);font-variant-numeric:tabular-nums}
+
+  .twk-sect{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+    color:rgba(41,38,27,.45);padding:10px 0 0}
+  .twk-sect:first-child{padding-top:0}
+
+  .twk-field{appearance:none;box-sizing:border-box;width:100%;min-width:0;height:26px;padding:0 8px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:7px;
+    background:rgba(255,255,255,.6);color:inherit;font:inherit;outline:none}
+  .twk-field:focus{border-color:rgba(0,0,0,.25);background:rgba(255,255,255,.85)}
+  select.twk-field{padding-right:22px;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='rgba(0,0,0,.5)' d='M0 0h10L5 6z'/></svg>");
+    background-repeat:no-repeat;background-position:right 8px center}
+
+  .twk-slider{appearance:none;-webkit-appearance:none;width:100%;height:4px;margin:6px 0;
+    border-radius:999px;background:rgba(0,0,0,.12);outline:none}
+  .twk-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
+    width:14px;height:14px;border-radius:50%;background:#fff;
+    border:.5px solid rgba(0,0,0,.12);box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:default}
+  .twk-slider::-moz-range-thumb{width:14px;height:14px;border-radius:50%;
+    background:#fff;border:.5px solid rgba(0,0,0,.12);box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:default}
+
+  .twk-seg{position:relative;display:flex;padding:2px;border-radius:8px;
+    background:rgba(0,0,0,.06);user-select:none}
+  .twk-seg-thumb{position:absolute;top:2px;bottom:2px;border-radius:6px;
+    background:rgba(255,255,255,.9);box-shadow:0 1px 2px rgba(0,0,0,.12);
+    transition:left .15s cubic-bezier(.3,.7,.4,1),width .15s}
+  .twk-seg.dragging .twk-seg-thumb{transition:none}
+  .twk-seg button{appearance:none;position:relative;z-index:1;flex:1;border:0;
+    background:transparent;color:inherit;font:inherit;font-weight:500;min-height:22px;
+    border-radius:6px;cursor:default;padding:4px 6px;line-height:1.2;
+    overflow-wrap:anywhere}
+
+  .twk-toggle{position:relative;width:32px;height:18px;border:0;border-radius:999px;
+    background:rgba(0,0,0,.15);transition:background .15s;cursor:default;padding:0}
+  .twk-toggle[data-on="1"]{background:#34c759}
+  .twk-toggle i{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;
+    background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .15s}
+  .twk-toggle[data-on="1"] i{transform:translateX(14px)}
+
+  .twk-num{display:flex;align-items:center;box-sizing:border-box;min-width:0;height:26px;padding:0 0 0 8px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:7px;background:rgba(255,255,255,.6)}
+  .twk-num-lbl{font-weight:500;color:rgba(41,38,27,.6);cursor:ew-resize;
+    user-select:none;padding-right:8px}
+  .twk-num input{flex:1;min-width:0;height:100%;border:0;background:transparent;
+    font:inherit;font-variant-numeric:tabular-nums;text-align:right;padding:0 8px 0 0;
+    outline:none;color:inherit;-moz-appearance:textfield}
+  .twk-num input::-webkit-inner-spin-button,.twk-num input::-webkit-outer-spin-button{
+    -webkit-appearance:none;margin:0}
+  .twk-num-unit{padding-right:8px;color:rgba(41,38,27,.45)}
+
+  .twk-btn{appearance:none;height:26px;padding:0 12px;border:0;border-radius:7px;
+    background:rgba(0,0,0,.78);color:#fff;font:inherit;font-weight:500;cursor:default}
+  .twk-btn:hover{background:rgba(0,0,0,.88)}
+  .twk-btn.secondary{background:rgba(0,0,0,.06);color:inherit}
+  .twk-btn.secondary:hover{background:rgba(0,0,0,.1)}
+
+  .twk-swatch{appearance:none;-webkit-appearance:none;width:56px;height:22px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:6px;padding:0;cursor:default;
+    background:transparent;flex-shrink:0}
+  .twk-swatch::-webkit-color-swatch-wrapper{padding:0}
+  .twk-swatch::-webkit-color-swatch{border:0;border-radius:5.5px}
+  .twk-swatch::-moz-color-swatch{border:0;border-radius:5.5px}
+
+  .twk-chips{display:flex;gap:6px}
+  .twk-chip{position:relative;appearance:none;flex:1;min-width:0;height:46px;
+    padding:0;border:0;border-radius:6px;overflow:hidden;cursor:default;
+    box-shadow:0 0 0 .5px rgba(0,0,0,.12),0 1px 2px rgba(0,0,0,.06);
+    transition:transform .12s cubic-bezier(.3,.7,.4,1),box-shadow .12s}
+  .twk-chip:hover{transform:translateY(-1px);
+    box-shadow:0 0 0 .5px rgba(0,0,0,.18),0 4px 10px rgba(0,0,0,.12)}
+  .twk-chip[data-on="1"]{box-shadow:0 0 0 1.5px rgba(0,0,0,.85),
+    0 2px 6px rgba(0,0,0,.15)}
+  .twk-chip>span{position:absolute;top:0;bottom:0;right:0;width:34%;
+    display:flex;flex-direction:column;box-shadow:-1px 0 0 rgba(0,0,0,.1)}
+  .twk-chip>span>i{flex:1;box-shadow:0 -1px 0 rgba(0,0,0,.1)}
+  .twk-chip>span>i:first-child{box-shadow:none}
+  .twk-chip svg{position:absolute;top:6px;left:6px;width:13px;height:13px;
+    filter:drop-shadow(0 1px 1px rgba(0,0,0,.3))}
+`;
+
+// ── useTweaks ───────────────────────────────────────────────────────────────
+// Single source of truth for tweak values. setTweak persists via the host
+// (__edit_mode_set_keys → host rewrites the EDITMODE block on disk).
+function useTweaks(defaults) {
+  const [values, setValues] = React.useState(defaults);
+  // Accepts either setTweak('key', value) or setTweak({ key: value, ... }) so a
+  // useState-style call doesn't write a "[object Object]" key into the persisted
+  // JSON block.
+  const setTweak = React.useCallback((keyOrEdits, val) => {
+    const edits = typeof keyOrEdits === 'object' && keyOrEdits !== null
+      ? keyOrEdits : { [keyOrEdits]: val };
+    setValues((prev) => ({ ...prev, ...edits }));
+    window.parent.postMessage({ type: '__edit_mode_set_keys', edits }, '*');
+    // Same-window signal so in-page listeners (deck-stage rail thumbnails)
+    // can react — the parent message only reaches the host, not peers.
+    window.dispatchEvent(new CustomEvent('tweakchange', { detail: edits }));
+  }, []);
+  return [values, setTweak];
+}
+
+// ── TweaksPanel ─────────────────────────────────────────────────────────────
+// Floating shell. Registers the protocol listener BEFORE announcing
+// availability — if the announce ran first, the host's activate could land
+// before our handler exists and the toolbar toggle would silently no-op.
+// The close button posts __edit_mode_dismissed so the host's toolbar toggle
+// flips off in lockstep; the host echoes __deactivate_edit_mode back which
+// is what actually hides the panel.
+function TweaksPanel({ title = 'Tweaks', noDeckControls = false, children }) {
+  const [open, setOpen] = React.useState(false);
+  const dragRef = React.useRef(null);
+  // Auto-inject a rail toggle when a <deck-stage> is on the page. The
+  // toggle drives the deck's per-viewer _railVisible via window message;
+  // state is mirrored from the same localStorage key the deck reads so
+  // the control reflects reality across reloads. The mechanism is the
+  // message — authors who want custom placement can post it directly
+  // and pass noDeckControls to suppress this one.
+  const hasDeckStage = React.useMemo(
+    () => typeof document !== 'undefined' && !!document.querySelector('deck-stage'),
+    [],
+  );
+  // deck-stage enables its rail in connectedCallback, but this panel can
+  // mount before that element has upgraded. The initial read catches the
+  // common case; the listener covers mounting first. (Older deck-stage.js
+  // copies still wait for the host's __omelette_rail_enabled postMessage —
+  // same listener handles those.)
+  const [railEnabled, setRailEnabled] = React.useState(
+    () => hasDeckStage && !!document.querySelector('deck-stage')?._railEnabled,
+  );
+  React.useEffect(() => {
+    if (!hasDeckStage || railEnabled) return undefined;
+    const onMsg = (e) => {
+      if (e.data && e.data.type === '__omelette_rail_enabled') setRailEnabled(true);
+    };
+    window.addEventListener('message', onMsg);
+    return () => window.removeEventListener('message', onMsg);
+  }, [hasDeckStage, railEnabled]);
+  const [railVisible, setRailVisible] = React.useState(() => {
+    try { return localStorage.getItem('deck-stage.railVisible') !== '0'; } catch (e) { return true; }
+  });
+  const toggleRail = (on) => {
+    setRailVisible(on);
+    window.postMessage({ type: '__deck_rail_visible', on }, '*');
+  };
+  const offsetRef = React.useRef({ x: 16, y: 16 });
+  const PAD = 16;
+
+  const clampToViewport = React.useCallback(() => {
+    const panel = dragRef.current;
+    if (!panel) return;
+    const w = panel.offsetWidth, h = panel.offsetHeight;
+    const maxRight = Math.max(PAD, window.innerWidth - w - PAD);
+    const maxBottom = Math.max(PAD, window.innerHeight - h - PAD);
+    offsetRef.current = {
+      x: Math.min(maxRight, Math.max(PAD, offsetRef.current.x)),
+      y: Math.min(maxBottom, Math.max(PAD, offsetRef.current.y)),
+    };
+    panel.style.right = offsetRef.current.x + 'px';
+    panel.style.bottom = offsetRef.current.y + 'px';
+  }, []);
+
+  React.useEffect(() => {
+    if (!open) return;
+    clampToViewport();
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', clampToViewport);
+      return () => window.removeEventListener('resize', clampToViewport);
+    }
+    const ro = new ResizeObserver(clampToViewport);
+    ro.observe(document.documentElement);
+    return () => ro.disconnect();
+  }, [open, clampToViewport]);
+
+  React.useEffect(() => {
+    const onMsg = (e) => {
+      const t = e?.data?.type;
+      if (t === '__activate_edit_mode') setOpen(true);
+      else if (t === '__deactivate_edit_mode') setOpen(false);
+    };
+    window.addEventListener('message', onMsg);
+    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+    return () => window.removeEventListener('message', onMsg);
+  }, []);
+
+  const dismiss = () => {
+    setOpen(false);
+    window.parent.postMessage({ type: '__edit_mode_dismissed' }, '*');
+  };
+
+  const onDragStart = (e) => {
+    const panel = dragRef.current;
+    if (!panel) return;
+    const r = panel.getBoundingClientRect();
+    const sx = e.clientX, sy = e.clientY;
+    const startRight = window.innerWidth - r.right;
+    const startBottom = window.innerHeight - r.bottom;
+    const move = (ev) => {
+      offsetRef.current = {
+        x: startRight - (ev.clientX - sx),
+        y: startBottom - (ev.clientY - sy),
+      };
+      clampToViewport();
+    };
+    const up = () => {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+  };
+
+  if (!open) return null;
+  return (
+    <>
+      <style>{__TWEAKS_STYLE}</style>
+      <div ref={dragRef} className="twk-panel" data-noncommentable=""
+           style={{ right: offsetRef.current.x, bottom: offsetRef.current.y }}>
+        <div className="twk-hd" onMouseDown={onDragStart}>
+          <b>{title}</b>
+          <button className="twk-x" aria-label="Close tweaks"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={dismiss}>✕</button>
+        </div>
+        <div className="twk-body">
+          {children}
+          {hasDeckStage && railEnabled && !noDeckControls && (
+            <TweakSection label="Deck">
+              <TweakToggle label="Thumbnail rail" value={railVisible} onChange={toggleRail} />
+            </TweakSection>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Layout helpers ──────────────────────────────────────────────────────────
+
+function TweakSection({ label, children }) {
+  return (
+    <>
+      <div className="twk-sect">{label}</div>
+      {children}
+    </>
+  );
+}
+
+function TweakRow({ label, value, children, inline = false }) {
+  return (
+    <div className={inline ? 'twk-row twk-row-h' : 'twk-row'}>
+      <div className="twk-lbl">
+        <span>{label}</span>
+        {value != null && <span className="twk-val">{value}</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// ── Controls ────────────────────────────────────────────────────────────────
+
+function TweakSlider({ label, value, min = 0, max = 100, step = 1, unit = '', onChange }) {
+  return (
+    <TweakRow label={label} value={`${value}${unit}`}>
+      <input type="range" className="twk-slider" min={min} max={max} step={step}
+             value={value} onChange={(e) => onChange(Number(e.target.value))} />
+    </TweakRow>
+  );
+}
+
+function TweakToggle({ label, value, onChange }) {
+  return (
+    <div className="twk-row twk-row-h">
+      <div className="twk-lbl"><span>{label}</span></div>
+      <button type="button" className="twk-toggle" data-on={value ? '1' : '0'}
+              role="switch" aria-checked={!!value}
+              onClick={() => onChange(!value)}><i /></button>
+    </div>
+  );
+}
+
+function TweakRadio({ label, value, options, onChange }) {
+  const trackRef = React.useRef(null);
+  const [dragging, setDragging] = React.useState(false);
+  // The active value is read by pointer-move handlers attached for the lifetime
+  // of a drag — ref it so a stale closure doesn't fire onChange for every move.
+  const valueRef = React.useRef(value);
+  valueRef.current = value;
+
+  // Segments wrap mid-word once per-segment width runs out. The track is
+  // ~248px (280 panel − 28 body pad − 4 seg pad), each button loses 12px
+  // to its own padding, and 11.5px system-ui averages ~6.3px/char — so 2
+  // options fit ~16 chars each, 3 fit ~10. Past that (or >3 options), fall
+  // back to a dropdown rather than wrap.
+  const labelLen = (o) => String(typeof o === 'object' ? o.label : o).length;
+  const maxLen = options.reduce((m, o) => Math.max(m, labelLen(o)), 0);
+  const fitsAsSegments = maxLen <= ({ 2: 16, 3: 10 }[options.length] ?? 0);
+  if (!fitsAsSegments) {
+    // <select> emits strings — map back to the original option value so the
+    // fallback stays type-preserving (numbers, booleans) like the segment path.
+    const resolve = (s) => {
+      const m = options.find((o) => String(typeof o === 'object' ? o.value : o) === s);
+      return m === undefined ? s : typeof m === 'object' ? m.value : m;
+    };
+    return <TweakSelect label={label} value={value} options={options}
+                        onChange={(s) => onChange(resolve(s))} />;
+  }
+  const opts = options.map((o) => (typeof o === 'object' ? o : { value: o, label: o }));
+  const idx = Math.max(0, opts.findIndex((o) => o.value === value));
+  const n = opts.length;
+
+  const segAt = (clientX) => {
+    const r = trackRef.current.getBoundingClientRect();
+    const inner = r.width - 4;
+    const i = Math.floor(((clientX - r.left - 2) / inner) * n);
+    return opts[Math.max(0, Math.min(n - 1, i))].value;
+  };
+
+  const onPointerDown = (e) => {
+    setDragging(true);
+    const v0 = segAt(e.clientX);
+    if (v0 !== valueRef.current) onChange(v0);
+    const move = (ev) => {
+      if (!trackRef.current) return;
+      const v = segAt(ev.clientX);
+      if (v !== valueRef.current) onChange(v);
+    };
+    const up = () => {
+      setDragging(false);
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+
+  return (
+    <TweakRow label={label}>
+      <div ref={trackRef} role="radiogroup" onPointerDown={onPointerDown}
+           className={dragging ? 'twk-seg dragging' : 'twk-seg'}>
+        <div className="twk-seg-thumb"
+             style={{ left: `calc(2px + ${idx} * (100% - 4px) / ${n})`,
+                      width: `calc((100% - 4px) / ${n})` }} />
+        {opts.map((o) => (
+          <button key={o.value} type="button" role="radio" aria-checked={o.value === value}>
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </TweakRow>
+  );
+}
+
+function TweakSelect({ label, value, options, onChange }) {
+  return (
+    <TweakRow label={label}>
+      <select className="twk-field" value={value} onChange={(e) => onChange(e.target.value)}>
+        {options.map((o) => {
+          const v = typeof o === 'object' ? o.value : o;
+          const l = typeof o === 'object' ? o.label : o;
+          return <option key={v} value={v}>{l}</option>;
+        })}
+      </select>
+    </TweakRow>
+  );
+}
+
+function TweakText({ label, value, placeholder, onChange }) {
+  return (
+    <TweakRow label={label}>
+      <input className="twk-field" type="text" value={value} placeholder={placeholder}
+             onChange={(e) => onChange(e.target.value)} />
+    </TweakRow>
+  );
+}
+
+function TweakNumber({ label, value, min, max, step = 1, unit = '', onChange }) {
+  const clamp = (n) => {
+    if (min != null && n < min) return min;
+    if (max != null && n > max) return max;
+    return n;
+  };
+  const startRef = React.useRef({ x: 0, val: 0 });
+  const onScrubStart = (e) => {
+    e.preventDefault();
+    startRef.current = { x: e.clientX, val: value };
+    const decimals = (String(step).split('.')[1] || '').length;
+    const move = (ev) => {
+      const dx = ev.clientX - startRef.current.x;
+      const raw = startRef.current.val + dx * step;
+      const snapped = Math.round(raw / step) * step;
+      onChange(clamp(Number(snapped.toFixed(decimals))));
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+  return (
+    <div className="twk-num">
+      <span className="twk-num-lbl" onPointerDown={onScrubStart}>{label}</span>
+      <input type="number" value={value} min={min} max={max} step={step}
+             onChange={(e) => onChange(clamp(Number(e.target.value)))} />
+      {unit && <span className="twk-num-unit">{unit}</span>}
+    </div>
+  );
+}
+
+// Relative-luminance contrast pick — checkmarks drawn over a swatch need to
+// read on both #111 and #fafafa without per-option configuration. Hex input
+// only (#rgb / #rrggbb); named or rgb()/hsl() colors fall through to "light".
+function __twkIsLight(hex) {
+  const h = String(hex).replace('#', '');
+  const x = h.length === 3 ? h.replace(/./g, (c) => c + c) : h.padEnd(6, '0');
+  const n = parseInt(x.slice(0, 6), 16);
+  if (Number.isNaN(n)) return true;
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  return r * 299 + g * 587 + b * 114 > 148000;
+}
+
+const __TwkCheck = ({ light }) => (
+  <svg viewBox="0 0 14 14" aria-hidden="true">
+    <path d="M3 7.2 5.8 10 11 4.2" fill="none" strokeWidth="2.2"
+          strokeLinecap="round" strokeLinejoin="round"
+          stroke={light ? 'rgba(0,0,0,.78)' : '#fff'} />
+  </svg>
+);
+
+// TweakColor — curated color/palette picker. Each option is either a single
+// hex string or an array of 1-5 hex strings; the card adapts — a lone color
+// renders solid, a palette renders colors[0] as the hero (left ~2/3) with the
+// rest stacked in a sharp column on the right. onChange emits the
+// option in the shape it was passed (string stays string, array stays array).
+// Without options it falls back to the native color input for back-compat.
+function TweakColor({ label, value, options, onChange }) {
+  if (!options || !options.length) {
+    return (
+      <div className="twk-row twk-row-h">
+        <div className="twk-lbl"><span>{label}</span></div>
+        <input type="color" className="twk-swatch" value={value}
+               onChange={(e) => onChange(e.target.value)} />
+      </div>
+    );
+  }
+  // Native <input type=color> emits lowercase hex per the HTML spec, so
+  // compare case-insensitively. String() guards JSON.stringify(undefined),
+  // which returns the primitive undefined (no .toLowerCase).
+  const key = (o) => String(JSON.stringify(o)).toLowerCase();
+  const cur = key(value);
+  return (
+    <TweakRow label={label}>
+      <div className="twk-chips" role="radiogroup">
+        {options.map((o, i) => {
+          const colors = Array.isArray(o) ? o : [o];
+          const [hero, ...rest] = colors;
+          const sup = rest.slice(0, 4);
+          const on = key(o) === cur;
+          return (
+            <button key={i} type="button" className="twk-chip" role="radio"
+                    aria-checked={on} data-on={on ? '1' : '0'}
+                    aria-label={colors.join(', ')} title={colors.join(' · ')}
+                    style={{ background: hero }}
+                    onClick={() => onChange(o)}>
+              {sup.length > 0 && (
+                <span>
+                  {sup.map((c, j) => <i key={j} style={{ background: c }} />)}
+                </span>
+              )}
+              {on && <__TwkCheck light={__twkIsLight(hero)} />}
+            </button>
+          );
+        })}
+      </div>
+    </TweakRow>
+  );
+}
+
+function TweakButton({ label, onClick, secondary = false }) {
+  return (
+    <button type="button" className={secondary ? 'twk-btn secondary' : 'twk-btn'}
+            onClick={onClick}>{label}</button>
+  );
+}
+
+Object.assign(window, {
+  useTweaks, TweaksPanel, TweakSection, TweakRow,
+  TweakSlider, TweakToggle, TweakRadio, TweakSelect,
+  TweakText, TweakNumber, TweakColor, TweakButton,
+});
+
+
+// ════════════════════════════════════════════════════
+
+// icons.jsx — minimal stroke icon set for TerePay
+// Using Lucide-style strokes at 1.75 stroke-width
+
+const Icon = ({ d, size = 20, stroke = "currentColor", fill = "none", strokeWidth = 1.75, children, ...rest }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill={fill} stroke={stroke} strokeWidth={strokeWidth}
+       strokeLinecap="round" strokeLinejoin="round" {...rest}>
+    {d ? <path d={d} /> : children}
+  </svg>
+);
+
+const IconArrowLeft  = (p) => <Icon {...p} d="M19 12H5M12 19l-7-7 7-7" />;
+const IconArrowRight = (p) => <Icon {...p} d="M5 12h14M12 5l7 7-7 7" />;
+const IconMenu       = (p) => <Icon {...p}><line x1="4" y1="7"  x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></Icon>;
+const IconX          = (p) => <Icon {...p} d="M18 6 6 18M6 6l12 12" />;
+const IconCheck      = (p) => <Icon {...p} d="M5 12.5l4.5 4.5L19 7.5" />;
+const IconClose      = IconX;
+
+const IconInfo = (p) => <Icon {...p}><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16.5"/><circle cx="12" cy="8" r=".5" fill="currentColor" stroke="none"/></Icon>;
+const IconWarning = (p) => <Icon {...p}><path d="M10.3 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13.5"/><circle cx="12" cy="17" r=".5" fill="currentColor" stroke="none"/></Icon>;
+const IconShield = (p) => <Icon {...p}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></Icon>;
+const IconCheckCircle = (p) => <Icon {...p}><circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.5 2.5L16 9.5"/></Icon>;
+const IconHelpCircle  = (p) => <Icon {...p}><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 0 1 5 0c0 1.5-2.5 2-2.5 4"/><circle cx="12" cy="17" r=".5" fill="currentColor" stroke="none"/></Icon>;
+
+// Finance
+const IconCard     = (p) => <Icon {...p}><rect x="2" y="5" width="20" height="14" rx="2.5"/><line x1="2" y1="10" x2="22" y2="10"/></Icon>;
+const IconBank     = (p) => <Icon {...p}><path d="M3 10h18M5 10v8M19 10v8M9 10v8M15 10v8M3 21h18M12 3 3 7.5h18z"/></Icon>;
+const IconWallet   = (p) => <Icon {...p}><path d="M3 7v11a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H5a2 2 0 0 1 0-4h13"/><circle cx="17" cy="14" r="1.25" fill="currentColor" stroke="none"/></Icon>;
+const IconReceipt  = (p) => <Icon {...p}><path d="M5 21V4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v17l-2.5-1.5-2.5 1.5-2.5-1.5-2.5 1.5-2.5-1.5z"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></Icon>;
+const IconCalendar = (p) => <Icon {...p}><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/></Icon>;
+
+const IconHistory  = (p) => <Icon {...p}><path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 4 3 9 8 9"/><path d="M12 8v5l3 2"/></Icon>;
+const IconClock    = (p) => <Icon {...p}><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></Icon>;
+const IconSparkle  = (p) => <Icon {...p}><path d="M12 4l1.5 4.5L18 10l-4.5 1.5L12 16l-1.5-4.5L6 10l4.5-1.5L12 4z"/><path d="M19 17l.7 2.1L22 20l-2.3.7L19 23l-.7-2.3L16 20l2.3-.9z"/></Icon>;
+const IconChevR    = (p) => <Icon {...p} d="M9 6l6 6-6 6" />;
+const IconChevD    = (p) => <Icon {...p} d="M6 9l6 6 6-6" />;
+const IconDownload = (p) => <Icon {...p}><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M5 17v3a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3"/></Icon>;
+const IconRefresh  = (p) => <Icon {...p}><path d="M21 12a9 9 0 1 1-3-6.7"/><polyline points="21 4 21 9 16 9"/></Icon>;
+const IconBell     = (p) => <Icon {...p}><path d="M6 8a6 6 0 0 1 12 0c0 7 3 7 3 9H3c0-2 3-2 3-9z"/><path d="M10 21a2 2 0 0 0 4 0"/></Icon>;
+const IconUser     = (p) => <Icon {...p}><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></Icon>;
+const IconChat     = (p) => <Icon {...p}><path d="M21 12a8 8 0 1 1-3-6.2L21 4l-1.2 3a8 8 0 0 1 1.2 5z"/></Icon>;
+const IconShare    = (p) => <Icon {...p}><path d="M12 3v13"/><path d="M7 8l5-5 5 5"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></Icon>;
+const IconHand     = (p) => <Icon {...p}><path d="M5 11V6.5a1.5 1.5 0 0 1 3 0V11"/><path d="M8 11V4.5a1.5 1.5 0 0 1 3 0V11"/><path d="M11 11V3.5a1.5 1.5 0 0 1 3 0V11"/><path d="M14 11V5.5a1.5 1.5 0 0 1 3 0V14a7 7 0 0 1-7 7H8c-3 0-4-4-5-7l-.5-1.5a1.4 1.4 0 0 1 2.5-1.3L7 14"/></Icon>;
+
+
+
+// ─────────────────────────────────────────────────────
+
+// components.jsx — shared components for TerePay
+
+// ---------- Format helpers ----------
+const fmtNZD = (n, opts = {}) => {
+  const v = Number(n) || 0;
+  const showCents = opts.cents !== false && (v % 1 !== 0 || opts.cents === true);
+  return new Intl.NumberFormat('en-NZ', {
+    minimumFractionDigits: showCents ? 2 : 0,
+    maximumFractionDigits: 2
+  }).format(v);
+};
+const fmtBytes = (n) => {
+  if (n < 1024) return n + ' B';
+  if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+  return (n / (1024 * 1024)).toFixed(1) + ' MB';
+};
+const fmtDate = (d) => new Intl.DateTimeFormat('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' }).format(d);
+const fmtDateShort = (d) => new Intl.DateTimeFormat('en-NZ', { day: 'numeric', month: 'short' }).format(d);
+const daysUntil = (d) => Math.ceil((d.getTime() - Date.now()) / 86400000);
+
+// ---------- TopBar ----------
+function TopBar({ onBack, showBack = true, title }) {
+  return (
+    <div className="topbar">
+      <div className="topbar-left">
+        {showBack ? (
+          <button className="back-btn" aria-label="Back" onClick={onBack}>
+            <IconArrowLeft size={22} />
+          </button>
+        ) : null}
+        <div className="logo">TerePay</div>
+      </div>
+      <button className="menu-btn" aria-label="Menu">
+        <IconMenu size={22} />
+      </button>
+    </div>
+  );
+}
+
+// ---------- Card ----------
+function Card({ children, pad = false, style }) {
+  return (
+    <div className={"card" + (pad ? " card-pad" : "")} style={style}>{children}</div>
+  );
+}
+
+// ---------- Hero (dark status header) ----------
+function Hero({ state, eyebrow, title, subtitle, pillLabel, pillTone, children, accent }) {
+  return (
+    <div className="hero" data-state={state} style={accent ? { ['--accent']: accent } : null}>
+      <div className="hero-bg"></div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 14 }}>
+        <div className="eyebrow">{eyebrow}</div>
+        {pillLabel ? <div className="pill" data-tone={pillTone}>{pillLabel}</div> : null}
+      </div>
+      <h2>{title}</h2>
+      {subtitle ? <p className="hero-sub">{subtitle}</p> : null}
+      {children}
+    </div>
+  );
+}
+
+// ---------- Stepper ----------
+function Stepper({ steps }) {
+  return (
+    <div className="stepper">
+      {steps.map((s, i) => (
+        <div key={i} className="step" data-status={s.status}>
+          <div className="step-dot">
+            {s.status === 'done' ? <IconCheck size={14} /> : s.status === 'active' ? <span style={{ width: 8, height: 8, background: '#0c1620', borderRadius: '50%' }}></span> : (i + 1)}
+          </div>
+          <div className="step-body">
+            <p className="step-title">{s.title}</p>
+            <p className="step-meta">{s.meta}</p>
+          </div>
+          {s.time ? <div className="step-time">{s.time}</div> : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ---------- Schedule row ----------
+function ScheduleRow({ date, status, amount, label, sub }) {
+  return (
+    <div className="schedule-row" data-status={status}>
+      <div className="schedule-date">
+        <div className="m">{new Intl.DateTimeFormat('en-NZ', { month: 'short' }).format(date)}</div>
+        <div className="d">{date.getDate()}</div>
+      </div>
+      <div className="schedule-body">
+        <p className="schedule-title">{label}</p>
+        <p className="schedule-sub">{sub}</p>
+      </div>
+      <div className="schedule-amt">${fmtNZD(amount)}</div>
+    </div>
+  );
+}
+
+// ---------- Modal ----------
+function Modal({ open, onClose, title, children }) {
+  React.useEffect(() => {
+    if (!open) return;
+    const handler = (e) => e.key === 'Escape' && onClose();
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [open, onClose]);
+  if (!open) return null;
+  return (
+    <div className="modal-scrim" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h3>{title}</h3>
+          <button className="modal-close" onClick={onClose} aria-label="Close"><IconX size={16} /></button>
+        </div>
+        <div className="modal-body">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Toast ----------
+function Toast({ message, onDone, icon }) {
+  React.useEffect(() => {
+    if (!message) return;
+    const t = setTimeout(onDone, 2400);
+    return () => clearTimeout(t);
+  }, [message, onDone]);
+  if (!message) return null;
+  return (
+    <div className="toast">
+      {icon || <IconCheck size={16} />}
+      {message}
+    </div>
+  );
+}
+
+// ---------- Confetti ----------
+function Confetti({ count = 24, colors = ['#f5a623', '#4ade80', '#60a5fa', '#f87171', '#ffffff'] }) {
+  const [ready, setReady] = React.useState(false);
+  React.useEffect(() => {
+    // Delay long enough that html-to-image's first snapshot (typical 200-500ms)
+    // can complete before confetti starts. Users see this as instant.
+    const t = setTimeout(() => setReady(true), 700);
+    return () => clearTimeout(t);
+  }, []);
+  const pieces = React.useMemo(() => Array.from({ length: count }, (_, i) => {
+    const left = Math.random() * 100;
+    const tx = (Math.random() - 0.5) * 240;
+    const r = (Math.random() * 720 - 360);
+    const delay = Math.random() * 400;
+    const color = colors[i % colors.length];
+    return { left, tx, r, delay, color };
+  }), [count, colors]);
+  if (!ready) return null;
+  return (
+    <div className="confetti-layer">
+      {pieces.map((p, i) => (
+        <div key={i} className="confetti go" style={{
+          left: p.left + '%',
+          top: -10,
+          background: p.color,
+          ['--tx']: p.tx + 'px',
+          ['--r']: p.r + 'deg',
+          animationDelay: p.delay + 'ms'
+        }}></div>
+      ))}
+    </div>
+  );
+}
+
+
+
+// ─────────────────────────────────────────────────────
+
+// screens.jsx — One screen per loan application state
+
+// ---------- Shared loan summary mock ----------
+const LOAN = {
+  requested: 2000,           // What the applicant asked for (max)
+  amount: 1500,              // What the lender approved (often lower)
+  fee: 125,
+  interestPercent: 49,       // APR
+  termWeeks: 8,              // Fixed 8-week term
+  instalmentEveryWeeks: 2,   // Fortnightly
+  weeklyPayment: 434.52,     // Per-instalment amount (kept var name for compatibility)
+  applied: new Date(2026, 4, 14, 9, 32),
+  firstPayment: new Date(2026, 4, 28),
+  // For active state:
+  totalRepayable: 1738.08,
+  paidSoFar: 869.04,         // 2 of 4 instalments
+  nextPaymentDate: new Date(2026, 4, 26),
+  paidPayments: 2,
+  totalPayments: 4,
+  // For paid:
+  paidOnDate: new Date(2026, 6, 9),
+  // For rejected:
+  rejectionReason: 'Credit profile below current threshold',
+  rejectionRef: 'TP-2509-RX',
+};
+
+// ─────────────────────────────────────────────────────────────
+// 0. NEW USER — apply for a loan (calculator + amount picker)
+// ─────────────────────────────────────────────────────────────
+function ScreenApply({ onSubmit }) {
+  const [amount, setAmount] = React.useState(1000);
+  const [purpose, setPurpose] = React.useState('bills');
+
+  // Fixed terms — 4 instalments over 8 weeks (fortnightly)
+  const term = 8;
+  const instalments = 4;
+  const fee = amount < 500 ? 65 : amount < 1000 ? 95 : 125;
+  const apr = 49;
+  const interest = amount * (apr / 100) * (term / 52);
+  const totalRepayable = amount + fee + interest;
+  const instalmentAmount = totalRepayable / instalments;
+
+  const purposes = [
+    { id: 'bills',    label: 'Bills',      icon: <IconReceipt size={16} /> },
+    { id: 'car',      label: 'Car',        icon: <IconCard size={16} /> },
+    { id: 'medical',  label: 'Medical',    icon: <IconShield size={16} /> },
+    { id: 'travel',   label: 'Travel',     icon: <IconSparkle size={16} /> },
+    { id: 'other',    label: 'Something else', icon: <IconHelpCircle size={16} /> },
+  ];
+
+  const minAmt = 200, maxAmt = 2000, stepAmt = 50;
+
+  return (
+    <div className="fade-in" data-screen-label="Apply">
+      <p className="eyebrow">New application</p>
+      <h1 className="h1">How much do you need?</h1>
+
+      <Hero
+        state="new"
+        eyebrow="Loan calculator"
+        title=""
+        subtitle=""
+      >
+        <p className="balance-label" style={{ marginBottom: 0 }}>You'd like to borrow</p>
+        <p className="balance-amount" style={{ marginTop: 6 }}>
+          <span className="currency">NZ$</span>{amount.toLocaleString('en-NZ')}
+        </p>
+
+        <input
+          type="range"
+          min={minAmt}
+          max={maxAmt}
+          step={stepAmt}
+          value={amount}
+          onChange={(e) => setAmount(Number(e.target.value))}
+          className="loan-slider"
+        />
+        <div className="loan-slider-meta">
+          <span>${minAmt}</span>
+          <span>${maxAmt.toLocaleString('en-NZ')}</span>
+        </div>
+
+        <div className="stat-grid" style={{ marginTop: 18 }}>
+          <div className="stat">
+            <p className="stat-label">Per instalment</p>
+            <p className="stat-val">${fmtNZD(instalmentAmount)}</p>
+          </div>
+          <div className="stat">
+            <p className="stat-label">Total repayable</p>
+            <p className="stat-val">${fmtNZD(totalRepayable)}</p>
+          </div>
+        </div>
+      </Hero>
+
+      <div className="section-h">Repayment plan</div>
+      <Card pad>
+        <div className="row">
+          <span className="row-l">Instalments</span>
+          <span className="row-r">{instalments} fortnightly payments</span>
+        </div>
+        <div className="row">
+          <span className="row-l">Term</span>
+          <span className="row-r">{term} weeks</span>
+        </div>
+        <div className="row">
+          <span className="row-l">Per instalment</span>
+          <span className="row-r">${fmtNZD(instalmentAmount)}</span>
+        </div>
+        <div className="row">
+          <span className="row-l">First payment</span>
+          <span className="row-r">In 2 weeks</span>
+        </div>
+      </Card>
+
+      <div className="section-h">What's it for?</div>
+      <div className="purpose-grid">
+        {purposes.map(p => (
+          <button
+            key={p.id}
+            className="purpose-chip"
+            data-selected={purpose === p.id}
+            onClick={() => setPurpose(p.id)}
+          >
+            {p.icon}
+            <span>{p.label}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="section-h">Your offer summary</div>
+      <Card pad>
+        <div className="row">
+          <span className="row-l">Loan principal</span>
+          <span className="row-r">${fmtNZD(amount, { cents: false })}</span>
+        </div>
+        <div className="row">
+          <span className="row-l">Establishment fee</span>
+          <span className="row-r">${fmtNZD(fee, { cents: false })}</span>
+        </div>
+        <div className="row">
+          <span className="row-l">Interest ({apr}% APR)</span>
+          <span className="row-r">${fmtNZD(interest)}</span>
+        </div>
+        <div className="row total">
+          <span className="row-l">Total repayable</span>
+          <span className="row-r">${fmtNZD(totalRepayable)}</span>
+        </div>
+      </Card>
+
+      <div className="banner" data-tone="info">
+        <IconInfo size={18} />
+        <div>
+          This is an estimate. Your final offer depends on a credit assessment and may be lower than requested.
+        </div>
+      </div>
+
+      <div className="actions">
+        <button className="btn" data-block="true" data-size="lg" onClick={onSubmit}>
+          Continue application <IconArrowRight size={16} />
+        </button>
+        <p style={{ textAlign: 'center', fontSize: 12.5, color: 'var(--muted)', margin: '8px 0 0' }}>
+          Soft credit check only — applying won't hurt your score.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// 1. IN REVIEW
+// ─────────────────────────────────────────────────────────────
+function ScreenInReview({ onAdvance }) {
+  const [uploadedDocs, setUploadedDocs] = React.useState([]);
+  const [uploadingDocs, setUploadingDocs] = React.useState([]);
+  const fileInputRef = React.useRef(null);
+
+  const handleFiles = (files) => {
+    const arr = Array.from(files);
+    const newUploads = arr.map((f, i) => ({
+      id: Date.now() + '-' + i,
+      name: f.name,
+      size: f.size,
+      progress: 0,
+    }));
+    setUploadingDocs(prev => [...prev, ...newUploads]);
+    // Simulate upload progress
+    newUploads.forEach(doc => {
+      const interval = setInterval(() => {
+        setUploadingDocs(prev => prev.map(d => d.id === doc.id ? { ...d, progress: Math.min(100, d.progress + 8 + Math.random() * 12) } : d));
+      }, 120);
+      setTimeout(() => {
+        clearInterval(interval);
+        setUploadingDocs(prev => prev.filter(d => d.id !== doc.id));
+        setUploadedDocs(prev => [...prev, { id: doc.id, name: doc.name, size: doc.size }]);
+      }, 1400 + Math.random() * 600);
+    });
+  };
+
+  const removeDoc = (id) => setUploadedDocs(prev => prev.filter(d => d.id !== id));
+
+  const onDrop = (e) => {
+    e.preventDefault();
+    if (e.dataTransfer.files?.length) handleFiles(e.dataTransfer.files);
+  };
+
+  const totalDocs = uploadedDocs.length + uploadingDocs.length;
+
+  const steps = [
+    { status: 'done', title: 'Application submitted', meta: 'You requested $' + fmtNZD(LOAN.amount, { cents: false }) + ' over ' + LOAN.termWeeks + ' weeks', time: '9:32 AM' },
+    { status: 'active', title: 'Credit check in progress', meta: totalDocs > 0 ? 'Verifying your documents — usually takes a few minutes.' : 'Your lender needs more info to complete the check.', time: 'Now' },
+    { status: 'pending', title: 'Final decision', meta: 'Most decisions come through in under an hour.' },
+    { status: 'pending', title: 'Funds disbursed', meta: 'Goes to your linked Westpac account ending •• 4421' },
+  ];
+
+  return (
+    <div className="fade-in" data-screen-label="In review">
+      <p className="eyebrow">Loan progress</p>
+      <h1 className="h1">We're reviewing your application</h1>
+
+      <Hero
+        state="review"
+        eyebrow="Application TP-29481"
+        pillLabel="In review"
+        pillTone="amber"
+        title={'$' + fmtNZD(LOAN.amount, { cents: false }) + ' personal loan'}
+        subtitle={'Submitted ' + fmtDate(LOAN.applied) + '. We\'ll let you know as soon as there\'s an update — usually within an hour.'}
+      >
+        <div className="hero-meta">
+          <b>{LOAN.totalPayments} instalments</b> · fortnightly<span className="sep">·</span><b>${fmtNZD(LOAN.weeklyPayment)}</b>/payment<span className="sep">·</span><b>{LOAN.interestPercent}%</b> APR
+        </div>
+      </Hero>
+
+      {/* Document upload — action required */}
+      <div className="action-card" data-active={uploadedDocs.length === 0 && uploadingDocs.length === 0}>
+        <div className="action-card-head">
+          <div className="action-card-badge">
+            <IconWarning size={16} />
+            Action needed
+          </div>
+          <span className="action-card-meta">{uploadedDocs.length === 0 ? 'Required to continue' : uploadedDocs.length + ' uploaded'}</span>
+        </div>
+        <h3 className="action-card-title">Upload your last 3 months of bank statements</h3>
+        <p className="action-card-sub">
+          We need to verify your recent income and outgoings. Statements should be PDF or CSV from your main transaction account. <a href="#" className="ilink">Why is this needed?</a>
+        </p>
+
+        <div
+          className="dropzone"
+          onDragOver={(e) => { e.preventDefault(); e.currentTarget.dataset.over = 'true'; }}
+          onDragLeave={(e) => { e.currentTarget.dataset.over = 'false'; }}
+          onDrop={(e) => { onDrop(e); e.currentTarget.dataset.over = 'false'; }}
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <div className="dropzone-icon">
+            <IconDownload size={22} style={{ transform: 'rotate(180deg)' }} />
+          </div>
+          <p className="dropzone-title">Drop files here or click to upload</p>
+          <p className="dropzone-sub">PDF, CSV, or images · up to 10 MB each</p>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept=".pdf,.csv,image/*"
+            style={{ display: 'none' }}
+            onChange={(e) => handleFiles(e.target.files)}
+          />
+        </div>
+
+        {(uploadingDocs.length > 0 || uploadedDocs.length > 0) ? (
+          <ul className="doc-list">
+            {uploadedDocs.map(doc => (
+              <li key={doc.id} className="doc-item" data-status="done">
+                <div className="doc-icon"><IconReceipt size={16} /></div>
+                <div className="doc-body">
+                  <p className="doc-name">{doc.name}</p>
+                  <p className="doc-meta">{fmtBytes(doc.size)} · Uploaded</p>
+                </div>
+                <button className="doc-remove" onClick={() => removeDoc(doc.id)} aria-label="Remove">
+                  <IconX size={14} />
+                </button>
+              </li>
+            ))}
+            {uploadingDocs.map(doc => (
+              <li key={doc.id} className="doc-item" data-status="uploading">
+                <div className="doc-icon"><IconReceipt size={16} /></div>
+                <div className="doc-body">
+                  <p className="doc-name">{doc.name}</p>
+                  <div className="doc-progress">
+                    <div className="doc-progress-fill" style={{ width: doc.progress + '%' }}></div>
+                  </div>
+                  <p className="doc-meta">Uploading… {Math.round(doc.progress)}%</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+
+        {uploadedDocs.length > 0 ? (
+          <button className="btn" data-block="true" style={{ marginTop: 14 }}>
+            Submit {uploadedDocs.length} document{uploadedDocs.length === 1 ? '' : 's'} <IconArrowRight size={16} />
+          </button>
+        ) : null}
+      </div>
+
+      <div className="section-h">Progress</div>
+      <Card pad>
+        <Stepper steps={steps} />
+      </Card>
+
+      <div className="section-h">What's next</div>
+      <div className="banner" data-tone="info" style={{ marginTop: 0 }}>
+        <IconInfo size={18} />
+        <div>
+          <b>We'll text you the decision.</b> No need to wait around — we'll send an SMS to •• 0291 the moment your application is decided. You can close this tab and come back later.
+        </div>
+      </div>
+
+      <div className="actions">
+        <button className="btn btn-secondary" data-block="true" onClick={() => alert('Opening live chat…')}>
+          <IconChat size={16} /> Chat with support
+        </button>
+      </div>
+
+      <div style={{ marginTop: 28, textAlign: 'center', fontSize: 13, color: 'var(--muted)' }}>
+        Need to withdraw your application? <a href="#" className="ilink">Cancel request</a>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// 2. APPROVED
+// ─────────────────────────────────────────────────────────────
+function ScreenApproved({ onAccept }) {
+  const [agreed, setAgreed] = React.useState(false);
+  const [debitOpen, setDebitOpen] = React.useState(false);
+  const adjusted = LOAN.amount < LOAN.requested;
+
+  const handleAccept = () => {
+    if (!agreed) return;
+    setDebitOpen(true);
+  };
+
+  const handleDirectDebitConfirmed = () => {
+    setDebitOpen(false);
+    setTimeout(() => onAccept && onAccept(), 300);
+  };
+
+  return (
+    <div className="fade-in" data-screen-label="Approved">
+      <p className="eyebrow">Great news</p>
+      <h1 className="h1">You're approved 🎉</h1>
+
+      <Hero
+        state="approved"
+        eyebrow="Application TP-29481"
+        pillLabel="Approved"
+        pillTone="success"
+        title={'$' + fmtNZD(LOAN.amount, { cents: false }) + ' is ready for you'}
+        subtitle={
+          adjusted
+            ? 'We could only approve $' + fmtNZD(LOAN.amount, { cents: false }) + ' of your $' + fmtNZD(LOAN.requested, { cents: false }) + ' request based on your repayment capacity. The terms are below.'
+            : 'Approved at ' + fmtDate(new Date(2026, 4, 14)) + '. Accept your offer below and funds will land in your account within hours.'
+        }
+      >
+        <Confetti count={28} />
+
+        {adjusted ? (
+          <div className="amount-delta">
+            <div className="amount-delta-row">
+              <span className="amount-delta-label">You requested</span>
+              <span className="amount-delta-orig">${fmtNZD(LOAN.requested, { cents: false })}</span>
+            </div>
+            <div className="amount-delta-row" data-emph="true">
+              <span className="amount-delta-label">We approved</span>
+              <span className="amount-delta-new">${fmtNZD(LOAN.amount, { cents: false })}</span>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="stat-grid">
+          <div className="stat">
+            <p className="stat-label">Per instalment</p>
+            <p className="stat-val">${fmtNZD(LOAN.weeklyPayment)}<small>× {LOAN.totalPayments}</small></p>
+          </div>
+          <div className="stat">
+            <p className="stat-label">Total repayable</p>
+            <p className="stat-val">${fmtNZD(LOAN.totalRepayable)}</p>
+          </div>
+        </div>
+      </Hero>
+
+      <div className="section-h">Your offer</div>
+      <Card pad>
+        <div className="row">
+          <span className="row-l">Loan principal</span>
+          <span className="row-r">${fmtNZD(LOAN.amount, { cents: false })}</span>
+        </div>
+        <div className="row">
+          <span className="row-l">Establishment fee</span>
+          <span className="row-r">${fmtNZD(LOAN.fee, { cents: false })}</span>
+        </div>
+        <div className="row">
+          <span className="row-l">Interest ({LOAN.interestPercent}% APR)</span>
+          <span className="row-r">${fmtNZD(LOAN.totalRepayable - LOAN.amount - LOAN.fee)}</span>
+        </div>
+        <div className="row">
+          <span className="row-l">Term</span>
+          <span className="row-r">{LOAN.totalPayments} instalments · fortnightly</span>
+        </div>
+        <div className="row">
+          <span className="row-l">First payment</span>
+          <span className="row-r">{fmtDate(LOAN.firstPayment)}</span>
+        </div>
+        <div className="row total">
+          <span className="row-l">Total repayable</span>
+          <span className="row-r">${fmtNZD(LOAN.totalRepayable)}</span>
+        </div>
+      </Card>
+
+      <div className="section-h">What happens next</div>
+      <Card>
+        {[
+          { n: 1, t: 'You accept the offer', s: 'Review and tick the disclosure below.' },
+          { n: 2, t: 'Set up your fortnightly direct debit', s: 'Required before funds release — takes about a minute.' },
+          { n: 3, t: 'Funds land in your account', s: 'Usually within 2 hours, often faster.' },
+        ].map((step, i, arr) => (
+          <div key={step.n} style={{
+            display: 'flex', alignItems: 'flex-start', gap: 14,
+            padding: '14px 20px',
+            borderBottom: i < arr.length - 1 ? '1px solid var(--border-2)' : 0,
+          }}>
+            <div style={{
+              width: 26, height: 26, borderRadius: '50%',
+              background: 'var(--accent-soft)', color: 'var(--accent-2)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 13, fontWeight: 700, flexShrink: 0,
+            }}>{step.n}</div>
+            <div style={{ flex: 1, paddingTop: 1 }}>
+              <p style={{ margin: 0, fontWeight: 600, fontSize: 14.5 }}>{step.t}</p>
+              <p style={{ margin: '2px 0 0', fontSize: 13, color: 'var(--muted)' }}>{step.s}</p>
+            </div>
+          </div>
+        ))}
+      </Card>
+
+      <div className="banner" data-tone="info">
+        <IconShield size={18} />
+        <div>
+          By accepting you agree to the <a href="#" className="ilink">Loan agreement</a> and the <a href="#" className="ilink">Credit disclosure</a>.
+        </div>
+      </div>
+
+      <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginTop: 16, cursor: 'pointer', fontSize: 14, lineHeight: 1.4 }}>
+        <input
+          type="checkbox"
+          checked={agreed}
+          onChange={(e) => setAgreed(e.target.checked)}
+          style={{ width: 18, height: 18, accentColor: 'var(--accent)', cursor: 'pointer', flexShrink: 0, marginTop: 1 }}
+        />
+        <span>I have read and accept the loan agreement and credit disclosure.</span>
+      </label>
+
+      <div className="actions">
+        <button
+          className="btn"
+          data-block="true"
+          data-size="lg"
+          disabled={!agreed}
+          style={!agreed ? { opacity: 0.4, cursor: 'not-allowed' } : null}
+          onClick={handleAccept}
+        >
+          Accept &amp; set up direct debit <IconArrowRight size={16} />
+        </button>
+        <button className="btn btn-secondary" data-block="true" onClick={() => alert('Are you sure? Your offer is valid for 7 days.')}>
+          Decline offer
+        </button>
+      </div>
+
+      <p style={{ marginTop: 16, fontSize: 12.5, color: 'var(--muted)', textAlign: 'center', lineHeight: 1.5 }}>
+        Offer valid until {fmtDate(new Date(2026, 4, 21))}. You may pay off your loan early at any time without penalty.
+      </p>
+
+      <DirectDebitModal
+        open={debitOpen}
+        onClose={() => setDebitOpen(false)}
+        onConfirmed={handleDirectDebitConfirmed}
+      />
+    </div>
+  );
+}
+
+// ---------- Direct Debit setup ----------
+function DirectDebitModal({ open, onClose, onConfirmed }) {
+  const [step, setStep] = React.useState(0);     // 0 = choose account, 1 = details, 2 = authorize
+  const [accountChoice, setAccountChoice] = React.useState('westpac');
+  const [bankName, setBankName] = React.useState('');
+  const [bsb, setBsb] = React.useState('');
+  const [acctNo, setAcctNo] = React.useState('');
+  const [acctName, setAcctName] = React.useState('Rafael Tere');
+  const [authPrivacy, setAuthPrivacy] = React.useState(false);
+  const [authDebit, setAuthDebit] = React.useState(false);
+  const [submitting, setSubmitting] = React.useState(false);
+  const [done, setDone] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!open) {
+      // Reset when closed (after small delay so we don't see flash)
+      const t = setTimeout(() => {
+        setStep(0); setDone(false); setSubmitting(false);
+        setAuthPrivacy(false); setAuthDebit(false);
+      }, 300);
+      return () => clearTimeout(t);
+    }
+  }, [open]);
+
+  const usingLinked = accountChoice === 'westpac';
+  const detailsValid = usingLinked
+    ? acctName.trim().length > 1
+    : (bankName.trim().length > 1 && /^\d{2}-?\d{4}$/.test(bsb.trim()) && acctNo.replace(/\D/g, '').length >= 6 && acctName.trim().length > 1);
+
+  const goNext = () => {
+    if (step === 0) {
+      // Pre-fill if Westpac
+      if (usingLinked) {
+        setBankName('Westpac NZ'); setBsb('03-0518'); setAcctNo('•••• 4421');
+      } else {
+        setBankName(''); setBsb(''); setAcctNo('');
+      }
+      setStep(1);
+    } else if (step === 1) {
+      setStep(2);
+    } else if (step === 2) {
+      if (!authPrivacy || !authDebit) return;
+      setSubmitting(true);
+      setTimeout(() => {
+        setSubmitting(false);
+        setDone(true);
+        setTimeout(onConfirmed, 1100);
+      }, 1100);
+    }
+  };
+
+  const back = () => {
+    if (step === 0) onClose();
+    else setStep(step - 1);
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} title={done ? 'Direct debit set up' : 'Set up your direct debit'}>
+      {done ? (
+        <div style={{ padding: '20px 0 8px', textAlign: 'center' }}>
+          <div style={{
+            width: 64, height: 64, borderRadius: '50%',
+            background: 'var(--success-soft)', color: 'var(--success)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            margin: '0 auto 14px',
+          }}>
+            <IconCheck size={32} />
+          </div>
+          <h3 style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 700 }}>You're all set.</h3>
+          <p style={{ margin: 0, fontSize: 14, color: 'var(--muted)' }}>
+            Your direct debit is active. Releasing funds to your account now…
+          </p>
+        </div>
+      ) : (
+        <>
+          {/* Step indicator */}
+          <div className="dd-steps">
+            {['Account', 'Details', 'Authorise'].map((label, i) => (
+              <div key={i} className="dd-step" data-status={i < step ? 'done' : i === step ? 'active' : 'pending'}>
+                <div className="dd-step-num">{i < step ? <IconCheck size={12} /> : i + 1}</div>
+                <span>{label}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Step content */}
+          {step === 0 ? (
+            <div className="field-grid">
+              <p style={{ margin: 0, fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.5 }}>
+                We'll debit <b style={{ color: 'var(--text)' }}>${fmtNZD(LOAN.weeklyPayment)}</b> every 2 weeks for <b style={{ color: 'var(--text)' }}>{LOAN.totalPayments} instalments</b>, starting <b style={{ color: 'var(--text)' }}>{fmtDate(LOAN.firstPayment)}</b>. Choose which account to debit from:
+              </p>
+
+              {[
+                { id: 'westpac', icon: <IconBank size={18} />, t: 'Westpac •• 4421', s: 'Linked during application · recommended' },
+                { id: 'other',   icon: <IconCard size={18} />, t: 'Use a different account', s: 'Enter another NZ bank account' },
+              ].map(opt => (
+                <label key={opt.id} style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '14px 16px',
+                  border: '1.5px solid ' + (accountChoice === opt.id ? 'var(--accent)' : 'var(--border)'),
+                  borderRadius: 12, cursor: 'pointer',
+                  background: accountChoice === opt.id ? 'var(--accent-soft)' : 'var(--surface)',
+                }}>
+                  <input
+                    type="radio"
+                    name="dd-acct"
+                    checked={accountChoice === opt.id}
+                    onChange={() => setAccountChoice(opt.id)}
+                    style={{ accentColor: 'var(--accent)' }}
+                  />
+                  <div style={{ color: 'var(--muted)' }}>{opt.icon}</div>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ margin: 0, fontWeight: 600, fontSize: 14.5 }}>{opt.t}</p>
+                    <p style={{ margin: '2px 0 0', fontSize: 12.5, color: 'var(--muted)' }}>{opt.s}</p>
+                  </div>
+                </label>
+              ))}
+            </div>
+          ) : null}
+
+          {step === 1 ? (
+            <div className="field-grid">
+              <div>
+                <label className="field-label">Account holder name</label>
+                <input
+                  className="field-input"
+                  type="text"
+                  value={acctName}
+                  onChange={(e) => setAcctName(e.target.value)}
+                  placeholder="Full name on the account"
+                />
+              </div>
+              <div>
+                <label className="field-label">Bank</label>
+                <input
+                  className="field-input"
+                  type="text"
+                  value={bankName}
+                  onChange={(e) => setBankName(e.target.value)}
+                  placeholder="e.g. ANZ, Westpac, BNZ"
+                  disabled={usingLinked}
+                  style={usingLinked ? { background: 'var(--surface-2)', color: 'var(--muted)' } : null}
+                />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 10 }}>
+                <div>
+                  <label className="field-label">Branch (BSB)</label>
+                  <input
+                    className="field-input"
+                    type="text"
+                    value={bsb}
+                    onChange={(e) => setBsb(e.target.value)}
+                    placeholder="02-0500"
+                    disabled={usingLinked}
+                    style={usingLinked ? { background: 'var(--surface-2)', color: 'var(--muted)' } : null}
+                  />
+                </div>
+                <div>
+                  <label className="field-label">Account number</label>
+                  <input
+                    className="field-input"
+                    type="text"
+                    value={acctNo}
+                    onChange={(e) => setAcctNo(e.target.value)}
+                    placeholder="0123456-00"
+                    disabled={usingLinked}
+                    style={usingLinked ? { background: 'var(--surface-2)', color: 'var(--muted)' } : null}
+                  />
+                </div>
+              </div>
+              {usingLinked ? (
+                <p style={{ margin: 0, fontSize: 12.5, color: 'var(--muted)' }}>
+                  Using the account you linked during your application. <a href="#" className="ilink" onClick={(e) => { e.preventDefault(); setAccountChoice('other'); setBankName(''); setBsb(''); setAcctNo(''); }}>Use a different account</a>
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
+          {step === 2 ? (
+            <div className="field-grid">
+              <div className="dd-summary">
+                <div className="dd-summary-row">
+                  <span>Amount</span>
+                  <b>${fmtNZD(LOAN.weeklyPayment)} per fortnight</b>
+                </div>
+                <div className="dd-summary-row">
+                  <span>Total payments</span>
+                  <b>{LOAN.totalPayments} (over {LOAN.termWeeks} weeks)</b>
+                </div>
+                <div className="dd-summary-row">
+                  <span>Starts</span>
+                  <b>{fmtDate(LOAN.firstPayment)}</b>
+                </div>
+                <div className="dd-summary-row">
+                  <span>From</span>
+                  <b>{bankName || 'Westpac NZ'} · {acctNo || '•••• 4421'}</b>
+                </div>
+                <div className="dd-summary-row">
+                  <span>Account name</span>
+                  <b>{acctName}</b>
+                </div>
+              </div>
+
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 13.5, cursor: 'pointer', lineHeight: 1.45 }}>
+                <input
+                  type="checkbox"
+                  checked={authDebit}
+                  onChange={(e) => setAuthDebit(e.target.checked)}
+                  style={{ width: 17, height: 17, accentColor: 'var(--accent)', cursor: 'pointer', flexShrink: 0, marginTop: 2 }}
+                />
+                <span>
+                  I authorise TerePay (NZBN <b>9429051234567</b>) to debit my account by the amounts and on the dates above, as per the <a href="#" className="ilink">Direct Debit Service Agreement</a>.
+                </span>
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 13.5, cursor: 'pointer', lineHeight: 1.45 }}>
+                <input
+                  type="checkbox"
+                  checked={authPrivacy}
+                  onChange={(e) => setAuthPrivacy(e.target.checked)}
+                  style={{ width: 17, height: 17, accentColor: 'var(--accent)', cursor: 'pointer', flexShrink: 0, marginTop: 2 }}
+                />
+                <span>
+                  I confirm I'm authorised to operate this account and I've read the <a href="#" className="ilink">Privacy notice</a>.
+                </span>
+              </label>
+
+              <div className="banner" data-tone="info" style={{ marginTop: 0 }}>
+                <IconShield size={18} />
+                <div>
+                  You can pause, change, or cancel this direct debit any time from your dashboard.
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+            <button className="btn btn-secondary" style={{ flex: '0 0 auto', minWidth: 100 }} onClick={back}>
+              {step === 0 ? 'Cancel' : 'Back'}
+            </button>
+            <button
+              className="btn"
+              style={{ flex: 1, ...(step === 1 && !detailsValid ? { opacity: 0.4, cursor: 'not-allowed' } : {}), ...(step === 2 && (!authDebit || !authPrivacy) ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }}
+              disabled={submitting || (step === 1 && !detailsValid) || (step === 2 && (!authDebit || !authPrivacy))}
+              onClick={goNext}
+            >
+              {submitting
+                ? 'Setting up…'
+                : step === 0 ? <>Continue <IconArrowRight size={16} /></>
+                : step === 1 ? <>Review &amp; authorise <IconArrowRight size={16} /></>
+                : <>Authorise &amp; release funds <IconArrowRight size={16} /></>}
+            </button>
+          </div>
+        </>
+      )}
+    </Modal>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// 3. REJECTED
+// ─────────────────────────────────────────────────────────────
+function ScreenRejected() {
+  return (
+    <div className="fade-in" data-screen-label="Rejected">
+      <p className="eyebrow">Decision received</p>
+      <h1 className="h1">We can't offer you a loan right now</h1>
+
+      <Hero
+        state="rejected"
+        eyebrow={'Reference ' + LOAN.rejectionRef}
+        pillLabel="Declined"
+        pillTone="danger"
+        title="Application unsuccessful"
+        subtitle={'We weren\'t able to approve your $' + fmtNZD(LOAN.amount, { cents: false }) + ' request. This doesn\'t affect your credit score, and you can try again in 30 days.'}
+      >
+        <div style={{ background: 'rgba(255,255,255,.06)', borderRadius: 12, padding: '14px 16px', marginTop: 16 }}>
+          <p style={{ margin: 0, fontSize: 11.5, letterSpacing: '.04em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)', fontWeight: 600 }}>Reason</p>
+          <p style={{ margin: '4px 0 0', fontSize: 14.5, color: '#fff' }}>{LOAN.rejectionReason}</p>
+        </div>
+      </Hero>
+
+      <div className="section-h">What you can do</div>
+      <Card>
+        {[
+          { i: <IconWallet size={18} />, t: 'Try a smaller amount', s: 'You may qualify for a loan of up to $1,200 today.', cta: 'See offer' },
+          { i: <IconShield size={18} />, t: 'Build your credit', s: 'Use our free credit monitoring to improve your score over time.', cta: 'Learn more' },
+          { i: <IconRefresh size={18} />, t: 'Reapply on 14 Jun', s: 'You can submit a new application after 30 days.', cta: 'Set reminder' },
+        ].map((row, i) => (
+          <div key={i} style={{
+            display: 'flex', alignItems: 'center', gap: 14, padding: '16px 20px',
+            borderBottom: i < 2 ? '1px solid var(--border-2)' : 0
+          }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--accent-soft)', color: 'var(--accent-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              {row.i}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ margin: 0, fontWeight: 600, fontSize: 14.5 }}>{row.t}</p>
+              <p style={{ margin: '2px 0 0', fontSize: 13, color: 'var(--muted)' }}>{row.s}</p>
+            </div>
+            <a href="#" className="ilink" style={{ fontSize: 13, whiteSpace: 'nowrap' }}>{row.cta} <IconChevR size={12} /></a>
+          </div>
+        ))}
+      </Card>
+
+      <div className="banner" data-tone="info">
+        <IconHelpCircle size={18} />
+        <div>
+          <b>Want a detailed reason?</b> You have the right to request the data we used to make this decision. <a href="#" className="ilink">Request reasons</a>
+        </div>
+      </div>
+
+      <div className="actions">
+        <button className="btn" data-block="true" data-size="lg">
+          See your $1,200 offer <IconArrowRight size={16} />
+        </button>
+        <button className="btn btn-secondary" data-block="true">
+          Talk to support
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// 4. ACTIVE LOAN
+// ─────────────────────────────────────────────────────────────
+function ScreenActive({ onPay }) {
+  const remaining = LOAN.totalRepayable - LOAN.paidSoFar;
+  const progress = (LOAN.paidSoFar / LOAN.totalRepayable) * 100;
+  const days = daysUntil(LOAN.nextPaymentDate);
+  const [autoPay, setAutoPay] = React.useState(true);
+  const [reminders, setReminders] = React.useState(true);
+
+  // Build schedule (fortnightly)
+  const schedule = Array.from({ length: LOAN.totalPayments }, (_, i) => {
+    const d = new Date(LOAN.firstPayment);
+    d.setDate(d.getDate() + i * 14);
+    const status = i < LOAN.paidPayments ? 'paid' : i === LOAN.paidPayments ? 'next' : 'upcoming';
+    return { date: d, status, amount: LOAN.weeklyPayment };
+  });
+
+  return (
+    <div className="fade-in" data-screen-label="Active loan">
+      <p className="eyebrow">Loan progress</p>
+      <h1 className="h1">Your loan, right on track</h1>
+
+      <Hero
+        state="active"
+        eyebrow="Personal loan · TP-29481"
+        pillLabel="Active"
+        pillTone="info"
+        title=""
+        subtitle=""
+      >
+        <div className="balance">
+          <p className="balance-label">Outstanding balance</p>
+          <p className="balance-amount"><span className="currency">NZ$</span>{fmtNZD(remaining)}</p>
+          <p className="balance-meta">of <b>${fmtNZD(LOAN.totalRepayable)}</b> total · <b>{LOAN.paidPayments}</b> of <b>{LOAN.totalPayments}</b> payments made</p>
+        </div>
+
+        <div className="progress">
+          <div className="progress-track">
+            <div className="progress-fill" style={{ width: progress + '%' }}></div>
+          </div>
+          <div className="progress-meta">
+            <span><b>${fmtNZD(LOAN.paidSoFar)}</b> paid</span>
+            <span><b>${fmtNZD(remaining)}</b> remaining</span>
+          </div>
+        </div>
+
+        <div style={{
+          marginTop: 18, padding: '14px 16px',
+          background: 'rgba(255,255,255,.06)',
+          borderRadius: 12,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12
+        }}>
+          <div>
+            <p style={{ margin: 0, fontSize: 11.5, letterSpacing: '.04em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)', fontWeight: 600 }}>Next payment</p>
+            <p style={{ margin: '4px 0 0', fontSize: 18, fontWeight: 700, color: '#fff' }}>
+              ${fmtNZD(LOAN.weeklyPayment)} · {fmtDateShort(LOAN.nextPaymentDate)}
+            </p>
+            <p style={{ margin: '2px 0 0', fontSize: 12, color: 'rgba(255,255,255,.6)' }}>
+              {days <= 0 ? 'Due today' : days === 1 ? 'Due tomorrow' : 'In ' + days + ' days'}{autoPay ? ' · auto-pay on' : ''}
+            </p>
+          </div>
+          <button className="btn" onClick={onPay}>
+            Pay now
+          </button>
+        </div>
+      </Hero>
+
+      <div className="section-h">
+        <span>Repayment schedule</span>
+        <a href="#" onClick={(e) => e.preventDefault()}>View full schedule</a>
+      </div>
+      <Card>
+        {schedule.map((s, i) => (
+          <ScheduleRow
+            key={i}
+            date={s.date}
+            status={s.status}
+            amount={s.amount}
+            label={s.status === 'paid' ? 'Payment ' + (i + 1) + ' of ' + LOAN.totalPayments : s.status === 'next' ? 'Next payment' : 'Scheduled'}
+            sub={s.status === 'paid' ? 'Paid via direct debit' : s.status === 'next' ? 'Auto-pay scheduled' : 'Will be auto-debited'}
+          />
+        ))}
+      </Card>
+
+      <div className="section-h">Settings</div>
+      <Card>
+        <div className="toggle-row">
+          <div>
+            <h4>Auto-pay</h4>
+            <p>Direct debit your fortnightly payment automatically</p>
+          </div>
+          <button className="toggle" data-on={autoPay} onClick={() => setAutoPay(v => !v)} aria-label="Toggle auto-pay"></button>
+        </div>
+        <div className="toggle-row">
+          <div>
+            <h4>Payment reminders</h4>
+            <p>SMS 2 days before each payment</p>
+          </div>
+          <button className="toggle" data-on={reminders} onClick={() => setReminders(v => !v)} aria-label="Toggle reminders"></button>
+        </div>
+      </Card>
+
+      <div className="actions" data-cols="2">
+        <button className="btn btn-secondary">
+          <IconDownload size={16} /> Statement
+        </button>
+        <button className="btn btn-secondary">
+          <IconReceipt size={16} /> Pay off early
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// 5. PAID OFF
+// ─────────────────────────────────────────────────────────────
+function ScreenPaid() {
+  const daysEarly = 7;
+  return (
+    <div className="fade-in" data-screen-label="Paid off">
+      <p className="eyebrow">All done</p>
+      <h1 className="h1">You paid off your loan 🎊</h1>
+
+      <Hero
+        state="paid"
+        eyebrow="Personal loan · TP-29481"
+        pillLabel="Paid in full"
+        pillTone="success"
+        title="Nicely done, Rafael."
+        subtitle={'You paid back $' + fmtNZD(LOAN.totalRepayable) + ' across ' + LOAN.totalPayments + ' instalments — and you finished ' + daysEarly + ' days ahead of schedule.'}
+      >
+        <Confetti count={36} />
+        <div className="stat-grid">
+          <div className="stat">
+            <p className="stat-label">Repaid</p>
+            <p className="stat-val">${fmtNZD(LOAN.totalRepayable)}</p>
+          </div>
+          <div className="stat">
+            <p className="stat-label">On-time payments</p>
+            <p className="stat-val">{LOAN.totalPayments} <small>/ {LOAN.totalPayments}</small></p>
+          </div>
+          <div className="stat">
+            <p className="stat-label">Finished</p>
+            <p className="stat-val" style={{ fontSize: 15 }}>{fmtDate(LOAN.paidOnDate)}</p>
+          </div>
+          <div className="stat">
+            <p className="stat-label">Days early</p>
+            <p className="stat-val">{daysEarly}</p>
+          </div>
+        </div>
+      </Hero>
+
+      <div className="banner" data-tone="success" style={{ marginTop: 0 }}>
+        <IconSparkle size={18} />
+        <div>
+          <b>You've unlocked Tier 2.</b> Next time, you'll qualify for a lower rate and instant approval — no extra paperwork needed.
+        </div>
+      </div>
+
+      <div className="section-h">Summary</div>
+      <Card pad>
+        <div className="row">
+          <span className="row-l">Principal</span>
+          <span className="row-r">${fmtNZD(LOAN.amount, { cents: false })}</span>
+        </div>
+        <div className="row">
+          <span className="row-l">Fees</span>
+          <span className="row-r">${fmtNZD(LOAN.fee, { cents: false })}</span>
+        </div>
+        <div className="row">
+          <span className="row-l">Interest paid</span>
+          <span className="row-r">${fmtNZD(LOAN.totalRepayable - LOAN.amount - LOAN.fee)}</span>
+        </div>
+        <div className="row">
+          <span className="row-l">Opened · Closed</span>
+          <span className="row-r" style={{ fontSize: 13 }}>{fmtDateShort(LOAN.applied)} – {fmtDateShort(LOAN.paidOnDate)}</span>
+        </div>
+        <div className="row total">
+          <span className="row-l">Total repaid</span>
+          <span className="row-r">${fmtNZD(LOAN.totalRepayable)}</span>
+        </div>
+      </Card>
+
+      <div className="actions">
+        <button className="btn" data-block="true" data-size="lg">
+          Apply for next loan <IconArrowRight size={16} />
+        </button>
+        <div className="actions" data-cols="2" style={{ marginTop: 0 }}>
+          <button className="btn btn-secondary">
+            <IconDownload size={16} /> Closure letter
+          </button>
+          <button className="btn btn-secondary">
+            <IconShare size={16} /> Refer a friend
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+
+// ─────────────────────────────────────────────────────
+
+// app.jsx — root with state machine + tweaks
+
+// ─────────────────────────────────────────────────────────────
+// DASHBOARD — state-aware home screen (what user lands on)
+// ─────────────────────────────────────────────────────────────
+function ScreenDashboard({ status, onNavigate, onPay }) {
+  const greetings = {
+    new:      { eyebrow: 'Welcome to TerePay 👋', title: 'Hi Rafael, let\'s get started' },
+    review:   { eyebrow: 'Good morning 👋',     title: 'Welcome back, Rafael' },
+    approved: { eyebrow: 'Big news 🎉',          title: 'Welcome back, Rafael' },
+    rejected: { eyebrow: 'Hello again',         title: 'Welcome back, Rafael' },
+    active:   { eyebrow: 'Good morning 👋',     title: 'Welcome back, Rafael' },
+    paid:     { eyebrow: 'Nicely done 🎊',       title: 'Welcome back, Rafael' },
+  };
+  const g = greetings[status] || greetings.active;
+
+  return (
+    <div className="fade-in" data-screen-label={`Dashboard · ${status}`}>
+      <p className="eyebrow" style={{ textTransform: 'none', letterSpacing: 0, fontSize: 14, fontWeight: 500, color: 'var(--muted)' }}>
+        {g.eyebrow}
+      </p>
+      <h1 className="h1" style={{ marginBottom: 24 }}>{g.title}</h1>
+
+      <DashboardHero status={status} onNavigate={onNavigate} onPay={onPay} />
+
+      <DashboardQuickActions status={status} onNavigate={onNavigate} onPay={onPay} />
+
+      <DashboardFooterNote status={status} />
+    </div>
+  );
+}
+
+function DashboardHero({ status, onNavigate, onPay }) {
+  if (status === 'new') {
+    return (
+      <div className="hero" data-state="new">
+        <div className="hero-bg"></div>
+        <div className="eyebrow" style={{ color: 'rgba(255,255,255,.5)' }}>Personal loans · NZ</div>
+        <h2>Borrow up to $2,000, fast.</h2>
+        <p className="hero-sub">
+          Short-term personal loans for everyday cash crunches — $200 to $2,000, repaid in 4 fortnightly instalments. Apply in 5 minutes and get a decision the same day.
+        </p>
+        <div className="new-trust-row">
+          <div className="new-trust-item">
+            <IconShield size={14} />
+            <span>FMA-licensed</span>
+          </div>
+          <div className="new-trust-item">
+            <IconClock size={14} />
+            <span>5-min application</span>
+          </div>
+          <div className="new-trust-item">
+            <IconBank size={14} />
+            <span>Funds same day</span>
+          </div>
+        </div>
+        <div className="actions" style={{ marginTop: 18 }}>
+          <button className="btn" data-block="true" onClick={() => onNavigate('tracking')}>
+            Apply for a loan <IconArrowRight size={16} />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (status === 'review') {
+    return (
+      <div className="hero" data-state="review">
+        <div className="hero-bg"></div>
+        <div className="eyebrow" style={{ color: 'rgba(255,255,255,.5)' }}>Loan application</div>
+        <h2>Application in review</h2>
+        <p className="hero-sub">We're processing your application. We'll text you the moment there's an update — usually within an hour.</p>
+        <div className="dash-mini-progress">
+          <div className="dash-mini-progress-fill" style={{ width: '40%' }}></div>
+        </div>
+        <div className="dash-mini-meta">
+          <span>Step 2 of 4 · Credit check</span>
+          <span className="pill" data-tone="amber" style={{ background: 'rgba(245,166,35,.18)', color: 'var(--accent)' }}>Action needed</span>
+        </div>
+        <div className="actions" style={{ marginTop: 18 }}>
+          <button className="btn" data-block="true" onClick={() => onNavigate('tracking')}>
+            Track loan progress <IconArrowRight size={16} />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (status === 'approved') {
+    return (
+      <div className="hero" data-state="approved">
+        <div className="hero-bg"></div>
+        <Confetti count={22} />
+        <div className="eyebrow" style={{ color: 'rgba(255,255,255,.5)' }}>You're approved</div>
+        <h2>${fmtNZD(LOAN.amount, { cents: false })} is ready for you</h2>
+        <p className="hero-sub">
+          We approved <b style={{ color: '#fff', fontWeight: 600 }}>${fmtNZD(LOAN.amount, { cents: false })}</b> of your <b style={{ color: '#fff', fontWeight: 600 }}>${fmtNZD(LOAN.requested, { cents: false })}</b> request. Accept the offer to receive funds today.
+        </p>
+        <div className="dash-mini-meta" style={{ marginTop: 4, marginBottom: 16 }}>
+          <span>${fmtNZD(LOAN.weeklyPayment)} × {LOAN.totalPayments} instalments · {LOAN.interestPercent}% APR</span>
+          <span style={{ color: 'rgba(255,255,255,.6)' }}>Expires 21 May</span>
+        </div>
+        <div className="actions" style={{ marginTop: 0 }}>
+          <button className="btn" data-block="true" onClick={() => onNavigate('tracking')}>
+            Accept your offer <IconArrowRight size={16} />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (status === 'rejected') {
+    return (
+      <div className="hero" data-state="rejected">
+        <div className="hero-bg"></div>
+        <div className="eyebrow" style={{ color: 'rgba(255,255,255,.5)' }}>Application update</div>
+        <h2>We can't offer you a loan right now</h2>
+        <p className="hero-sub">
+          Your ${fmtNZD(LOAN.requested, { cents: false })} request wasn't approved. You may still qualify for a smaller amount — and you can try again in 30 days.
+        </p>
+        <div className="actions" style={{ marginTop: 16 }}>
+          <button className="btn" data-block="true" onClick={() => onNavigate('tracking')}>
+            See what you can do <IconArrowRight size={16} />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (status === 'active') {
+    const remaining = LOAN.totalRepayable - LOAN.paidSoFar;
+    const progress = (LOAN.paidSoFar / LOAN.totalRepayable) * 100;
+    const days = daysUntil(LOAN.nextPaymentDate);
+    return (
+      <div className="hero" data-state="active">
+        <div className="hero-bg"></div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 14 }}>
+          <div className="eyebrow" style={{ color: 'rgba(255,255,255,.5)' }}>Active loan · TP-29481</div>
+          <div className="pill" data-tone="info">Active</div>
+        </div>
+        <div className="balance">
+          <p className="balance-label">Outstanding balance</p>
+          <p className="balance-amount"><span className="currency">NZ$</span>{fmtNZD(remaining)}</p>
+        </div>
+        <div className="progress">
+          <div className="progress-track">
+            <div className="progress-fill" style={{ width: progress + '%' }}></div>
+          </div>
+          <div className="progress-meta">
+            <span><b>{LOAN.paidPayments}</b> of <b>{LOAN.totalPayments}</b> payments</span>
+            <span><b>${fmtNZD(remaining)}</b> remaining</span>
+          </div>
+        </div>
+        <div style={{
+          marginTop: 18, padding: '14px 16px',
+          background: 'rgba(255,255,255,.06)',
+          borderRadius: 12,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12
+        }}>
+          <div>
+            <p style={{ margin: 0, fontSize: 11.5, letterSpacing: '.04em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)', fontWeight: 600 }}>Next payment</p>
+            <p style={{ margin: '4px 0 0', fontSize: 17, fontWeight: 700, color: '#fff' }}>
+              ${fmtNZD(LOAN.weeklyPayment)} · {fmtDateShort(LOAN.nextPaymentDate)}
+            </p>
+            <p style={{ margin: '2px 0 0', fontSize: 12, color: 'rgba(255,255,255,.6)' }}>
+              {days <= 0 ? 'Due today' : days === 1 ? 'Due tomorrow' : 'In ' + days + ' days'} · auto-pay on
+            </p>
+          </div>
+          <button className="btn" onClick={onPay}>
+            Pay now
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (status === 'paid') {
+    return (
+      <div className="hero" data-state="paid">
+        <div className="hero-bg"></div>
+        <Confetti count={28} />
+        <div className="eyebrow" style={{ color: 'rgba(255,255,255,.5)' }}>Loan paid in full</div>
+        <h2>You're loan-free 🎊</h2>
+        <p className="hero-sub">
+          You paid back ${fmtNZD(LOAN.totalRepayable)} across {LOAN.totalPayments} instalments — and finished 7 days early. You've unlocked <b style={{ color: '#fff', fontWeight: 600 }}>Tier 2</b>: lower rate, instant approval next time.
+        </p>
+        <div className="actions" style={{ marginTop: 16 }}>
+          <button className="btn" data-block="true" onClick={() => onNavigate('tracking')}>
+            Apply for next loan <IconArrowRight size={16} />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
+
+function DashboardQuickActions({ status, onNavigate, onPay }) {
+  const sets = {
+    new: [
+      { id: 'apply',     icon: <IconCard size={20} />,    tone: 'amber',   t: 'Apply for a loan',         s: '$200 – $2,000 · 4 instalments over 8 weeks', onClick: () => onNavigate('tracking') },
+      { id: 'calc',      icon: <IconReceipt size={20} />, tone: 'neutral', t: 'Loan calculator',          s: 'See your fortnightly repayment before you apply' },
+      { id: 'eligible',  icon: <IconCheckCircle size={20} />, tone: 'neutral', t: 'Check your eligibility', s: 'Soft check — no impact to your credit score' },
+      { id: 'how',       icon: <IconHelpCircle size={20} />, tone: 'neutral', t: 'How it works',           s: 'See the steps from application to funds' },
+    ],
+    review: [
+      { id: 'track', icon: <IconClock size={20} />, tone: 'amber', t: 'Track application',     s: 'See where your loan is in the queue',     onClick: () => onNavigate('tracking') },
+      { id: 'docs',  icon: <IconReceipt size={20} />, tone: 'amber', t: 'Upload documents',    s: 'Bank statements requested by your lender', badge: 'Action needed', onClick: () => onNavigate('tracking') },
+      { id: 'chat',  icon: <IconChat size={20} />, tone: 'neutral', t: 'Talk to support',     s: 'Available 7am – 10pm NZT' },
+    ],
+    approved: [
+      { id: 'accept',  icon: <IconCheckCircle size={20} />, tone: 'amber', t: 'Accept your offer',      s: '$' + fmtNZD(LOAN.amount, { cents: false }) + ' · ' + LOAN.termWeeks + ' weeks · ' + LOAN.interestPercent + '% APR', onClick: () => onNavigate('tracking') },
+      { id: 'compare', icon: <IconReceipt size={20} />, tone: 'neutral', t: 'Compare to your request', s: 'You asked for $' + fmtNZD(LOAN.requested, { cents: false }) + ', we offered $' + fmtNZD(LOAN.amount, { cents: false }), onClick: () => onNavigate('tracking') },
+      { id: 'agreement', icon: <IconShield size={20} />, tone: 'neutral', t: 'Read the agreement',     s: 'Loan agreement and credit disclosure' },
+      { id: 'chat',    icon: <IconChat size={20} />, tone: 'neutral', t: 'Talk to support',         s: 'Questions about your offer?' },
+    ],
+    rejected: [
+      { id: 'smaller', icon: <IconWallet size={20} />, tone: 'amber',   t: 'See your $1,200 offer',    s: 'You may still qualify for a smaller amount',  onClick: () => onNavigate('tracking') },
+      { id: 'credit',  icon: <IconSparkle size={20} />, tone: 'neutral', t: 'Improve your credit',     s: 'Free credit monitoring and tips' },
+      { id: 'remind',  icon: <IconClock size={20} />, tone: 'neutral', t: 'Reapply on 14 Jun',         s: 'Set a reminder for 30 days from now' },
+      { id: 'chat',    icon: <IconChat size={20} />, tone: 'neutral', t: 'Talk to support',           s: 'Understand your decision' },
+    ],
+    active: [
+      { id: 'pay',     icon: <IconCard size={20} />, tone: 'amber',   t: 'Make a payment',           s: 'Pay off your balance or schedule a payment', onClick: onPay },
+      { id: 'progress', icon: <IconClock size={20} />, tone: 'neutral', t: 'Track repayment',         s: LOAN.paidPayments + ' of ' + LOAN.totalPayments + ' payments made', onClick: () => onNavigate('tracking') },
+      { id: 'history', icon: <IconReceipt size={20} />, tone: 'neutral', t: 'Loan history',            s: 'View all past and active loans' },
+      { id: 'autopay', icon: <IconRefresh size={20} />, tone: 'neutral', t: 'Manage auto-pay',         s: 'Direct debit on, Westpac •• 4421' },
+    ],
+    paid: [
+      { id: 'apply',   icon: <IconCard size={20} />, tone: 'amber',   t: 'Apply for a loan',         s: 'Up to $2,000 with Tier 2 rates' },
+      { id: 'history', icon: <IconReceipt size={20} />, tone: 'neutral', t: 'Loan history',           s: 'View all past and active loans',     onClick: () => onNavigate('tracking') },
+      { id: 'statement', icon: <IconDownload size={20} />, tone: 'neutral', t: 'Closure letter',     s: 'Download your loan completion letter' },
+      { id: 'refer',   icon: <IconShare size={20} />, tone: 'neutral', t: 'Refer a friend',          s: 'You and they each get $25' },
+    ],
+  };
+
+  const headlines = {
+    new:      'Get started',
+    review:   'Quick actions',
+    approved: 'Next steps',
+    rejected: 'What you can do',
+    active:   'Quick actions',
+    paid:     "What's next",
+  };
+
+  const items = sets[status] || sets.active;
+
+  return (
+    <>
+      <div className="section-h">{headlines[status]}</div>
+      <div className="dash-actions">
+        {items.map((item) => (
+          <button
+            key={item.id}
+            className="dash-action"
+            data-tone={item.tone}
+            onClick={item.onClick || (() => {})}
+          >
+            <div className="dash-action-icon">{item.icon}</div>
+            <div className="dash-action-body">
+              <div className="dash-action-title-row">
+                <p className="dash-action-title">{item.t}</p>
+                {item.badge ? <span className="dash-action-badge">{item.badge}</span> : null}
+              </div>
+              <p className="dash-action-sub">{item.s}</p>
+            </div>
+            <IconChevR size={16} />
+          </button>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function DashboardFooterNote({ status }) {
+  const notes = {
+    new:      { icon: <IconShield size={16} />, t: 'TerePay is FMA-licensed. Soft credit checks only — applying won\'t hurt your score.' },
+    review:   { icon: <IconShield size={16} />, t: 'TerePay is FMA-licensed. Your data is encrypted and never sold.' },
+    approved: { icon: <IconShield size={16} />, t: 'No fees if you pay off early. Offer expires in 6 days.' },
+    rejected: { icon: <IconHelpCircle size={16} />, t: 'You can request the data behind this decision at any time.' },
+    active:   { icon: <IconShield size={16} />, t: 'Need help? Live chat is available 7am – 10pm NZT.' },
+    paid:     { icon: <IconSparkle size={16} />, t: 'Thanks for borrowing responsibly. See you next time!' },
+  };
+  const n = notes[status] || notes.active;
+  return (
+    <div className="dash-footer-note">
+      {n.icon}
+      <span>{n.t}</span>
+    </div>
+  );
+}
+
+const STATES = [
+  { id: 'new',      label: 'New user (no loan)' },
+  { id: 'review',   label: 'In review' },
+  { id: 'approved', label: 'Approved' },
+  { id: 'rejected', label: 'Rejected' },
+  { id: 'active',   label: 'Active loan' },
+  { id: 'paid',     label: 'Paid off' },
+];
+
+const PALETTES = {
+  amber:   { accent: '#f5a623', accent2: '#f59412', accentSoft: '#fef4e0', accentSoftDark: '#2a200d' },
+  indigo:  { accent: '#7c8bff', accent2: '#5b6bff', accentSoft: '#eef0ff', accentSoftDark: '#171c3a' },
+  emerald: { accent: '#22c581', accent2: '#16a36a', accentSoft: '#e2f7ec', accentSoftDark: '#0e2a1a' },
+  magenta: { accent: '#ec4899', accent2: '#db2777', accentSoft: '#fde6f0', accentSoftDark: '#3a1024' },
+};
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "status": "active",
+  "palette": "amber",
+  "dark": false,
+  "view": "dashboard"
+}/*EDITMODE-END*/;
+
+function App() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const [toast, setToast] = React.useState(null);
+  const [payOpen, setPayOpen] = React.useState(false);
+
+  // Apply palette tokens
+  React.useEffect(() => {
+    const root = document.documentElement;
+    const p = PALETTES[t.palette] || PALETTES.amber;
+    root.style.setProperty('--accent', p.accent);
+    root.style.setProperty('--accent-2', p.accent2);
+    root.style.setProperty('--accent-soft', t.dark ? p.accentSoftDark : p.accentSoft);
+    // Logo color matches accent
+    root.setAttribute('data-dark', t.dark ? 'true' : 'false');
+  }, [t.palette, t.dark]);
+
+  const handleAccept = () => {
+    setTweak({ status: 'active', view: 'dashboard' });
+    setToast({ msg: 'Loan accepted! Funds on the way.' });
+  };
+  const handlePay = (amt) => {
+    setPayOpen(false);
+    setToast({ msg: 'Payment of $' + fmtNZD(amt) + ' scheduled' });
+  };
+  const navigate = (view) => setTweak('view', view);
+
+  let screen;
+  if (t.view === 'dashboard') {
+    screen = <ScreenDashboard status={t.status} onNavigate={navigate} onPay={() => setPayOpen(true)} />;
+  } else {
+    switch (t.status) {
+      case 'new':      screen = <ScreenApply onSubmit={() => { setTweak({ status: 'review', view: 'dashboard' }); setToast({ msg: 'Application submitted! We\'re reviewing it now.' }); }} />; break;
+      case 'review':   screen = <ScreenInReview />; break;
+      case 'approved': screen = <ScreenApproved onAccept={handleAccept} />; break;
+      case 'rejected': screen = <ScreenRejected />; break;
+      case 'active':   screen = <ScreenActive onPay={() => setPayOpen(true)} />; break;
+      case 'paid':     screen = <ScreenPaid />; break;
+      default:         screen = <ScreenActive onPay={() => setPayOpen(true)} />;
+    }
+  }
+
+  return (
+    <div className="app" key={t.status + '-' + t.view}>
+      <TopBar
+        showBack={t.view !== 'dashboard'}
+        onBack={() => navigate('dashboard')}
+      />
+      <main className="content">
+        {screen}
+      </main>
+
+      <PaymentModal
+        open={payOpen}
+        onClose={() => setPayOpen(false)}
+        onPay={handlePay}
+        balance={LOAN.totalRepayable - LOAN.paidSoFar}
+        weekly={LOAN.weeklyPayment}
+      />
+
+      <Toast message={toast?.msg} onDone={() => setToast(null)} />
+
+      <TweaksPanel>
+        <TweakSection label="View" />
+        <TweakRadio
+          label="Screen"
+          value={t.view}
+          options={['dashboard', 'tracking']}
+          onChange={(v) => setTweak('view', v)}
+        />
+
+        <TweakSection label="Application status" />
+        <TweakSelect
+          label="State"
+          value={t.status}
+          options={STATES.map(s => ({ value: s.id, label: s.label }))}
+          onChange={(v) => setTweak('status', v)}
+        />
+
+        <TweakSection label="Theme" />
+        <TweakColor
+          label="Brand"
+          value={PALETTES[t.palette].accent}
+          options={Object.values(PALETTES).map(p => p.accent)}
+          onChange={(v) => {
+            const key = Object.keys(PALETTES).find(k => PALETTES[k].accent === v);
+            if (key) setTweak('palette', key);
+          }}
+        />
+        <TweakToggle
+          label="Dark mode"
+          value={t.dark}
+          onChange={(v) => setTweak('dark', v)}
+        />
+      </TweaksPanel>
+    </div>
+  );
+}
+
+// ---------- Payment Modal ----------
+function PaymentModal({ open, onClose, onPay, balance, weekly }) {
+  const presets = React.useMemo(() => [
+    { label: '1 instalment', amount: weekly },
+    { label: '2 instalments', amount: weekly * 2 },
+    { label: 'Pay off', amount: balance },
+  ], [balance, weekly]);
+  const [amount, setAmount] = React.useState(weekly.toFixed(2));
+  const [selected, setSelected] = React.useState(0);
+  const [method, setMethod] = React.useState('debit');
+
+  React.useEffect(() => { if (open) { setAmount(weekly.toFixed(2)); setSelected(0); } }, [open, weekly]);
+
+  const amt = Number(amount) || 0;
+  const valid = amt > 0 && amt <= balance + 0.01;
+
+  const pickPreset = (i) => {
+    setSelected(i);
+    setAmount(presets[i].amount.toFixed(2));
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} title="Make a payment">
+      <div className="field-grid">
+        <div>
+          <label className="field-label">Amount</label>
+          <div className="field-prefix-wrap">
+            <span className="field-prefix">NZ$</span>
+            <input
+              className="field-input"
+              type="text"
+              inputMode="decimal"
+              value={amount}
+              onChange={(e) => { setAmount(e.target.value.replace(/[^\d.]/g, '')); setSelected(-1); }}
+            />
+          </div>
+          <div className="quick-amounts">
+            {presets.map((p, i) => (
+              <button
+                key={i}
+                className="quick-amount"
+                data-selected={selected === i}
+                onClick={() => pickPreset(i)}
+              >
+                {p.label} · ${fmtNZD(p.amount)}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="field-label">Pay from</label>
+          <div style={{ display: 'grid', gap: 8 }}>
+            {[
+              { id: 'debit', icon: <IconBank size={18} />, t: 'Westpac •• 4421', s: 'Direct debit · free' },
+              { id: 'card',  icon: <IconCard size={18} />, t: 'Visa •• 8821', s: 'Card payment · $1.50 fee' },
+            ].map(opt => (
+              <label key={opt.id} style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '12px 14px',
+                border: '1.5px solid ' + (method === opt.id ? 'var(--accent)' : 'var(--border)'),
+                borderRadius: 12, cursor: 'pointer',
+                background: method === opt.id ? 'var(--accent-soft)' : 'var(--surface)'
+              }}>
+                <input
+                  type="radio"
+                  name="method"
+                  checked={method === opt.id}
+                  onChange={() => setMethod(opt.id)}
+                  style={{ accentColor: 'var(--accent)' }}
+                />
+                <div style={{ color: 'var(--muted)' }}>{opt.icon}</div>
+                <div style={{ flex: 1 }}>
+                  <p style={{ margin: 0, fontWeight: 600, fontSize: 14 }}>{opt.t}</p>
+                  <p style={{ margin: 0, fontSize: 12, color: 'var(--muted)' }}>{opt.s}</p>
+                </div>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div style={{
+          background: 'var(--surface-2)',
+          borderRadius: 12,
+          padding: 14,
+          display: 'flex', flexDirection: 'column', gap: 8
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+            <span style={{ color: 'var(--muted)' }}>Payment</span>
+            <span style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>${fmtNZD(amt)}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+            <span style={{ color: 'var(--muted)' }}>Remaining balance after</span>
+            <span style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>${fmtNZD(Math.max(0, balance - amt))}</span>
+          </div>
+        </div>
+
+        <button
+          className="btn"
+          data-block="true"
+          data-size="lg"
+          disabled={!valid}
+          style={!valid ? { opacity: 0.4, cursor: 'not-allowed' } : null}
+          onClick={() => valid && onPay(amt)}
+        >
+          Pay ${fmtNZD(amt)} now
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+
+</script>
+</body>
+</html>
