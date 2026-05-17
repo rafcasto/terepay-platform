@@ -334,3 +334,120 @@ export function normaliseStatus(
   if (s === 'failed' || s === 'declined') return 'failed';
   return 'initiated';
 }
+
+// --- Embedded flow primitives ---------------------------------------------
+
+export type SetPayProvider = {
+  id: string;
+  name: string;
+  logoUrl?: string;
+  website?: string;
+};
+
+type PaymentProviderResponseItem = {
+  id: string;
+  name: string;
+  logo_url?: string;
+  website?: string;
+};
+
+export async function listProviders(): Promise<SetPayProvider[]> {
+  const env = readEnv();
+
+  if (env.mode === 'stub') {
+    return [
+      { id: 'pp_orange', name: 'The Orange Bank' },
+      { id: 'pp_purple', name: 'The Purple Bank' },
+      { id: 'pp_grey', name: 'The Grey Bank' },
+    ];
+  }
+
+  const data = await qippayFetch<PaymentProviderResponseItem[]>(
+    '/v1/payment_providers',
+    { method: 'GET' },
+  );
+  return data.map((d) => ({
+    id: d.id,
+    name: d.name,
+    logoUrl: d.logo_url,
+    website: d.website,
+  }));
+}
+
+export type SetPayApproveMethod = 'redirect' | 'phone' | 'login_hint_token' | 'username';
+
+export type SetPayApproveInput = {
+  epcId: string;
+  providerId: string;
+  phone: string; // +64-XXXXXXXXX format
+  method?: SetPayApproveMethod;
+  username?: string;
+};
+
+export type SetPayApproveResponse = {
+  paymentId?: string;
+  method: 'CIBA' | 'redirect' | string;
+  redirectUri?: string;
+  message?: string;
+};
+
+type ApproveEnduringResponse = {
+  paymentId?: string;
+  method?: string;
+  redirect_uri?: string;
+  message?: string;
+};
+
+export async function approveEnduring(
+  input: SetPayApproveInput,
+): Promise<SetPayApproveResponse> {
+  const env = readEnv();
+
+  if (env.mode === 'stub') {
+    // In stub mode we simulate a redirect-style approval that points back
+    // to our return page with stub=success so the existing reconciliation
+    // path still works end-to-end without internet.
+    return {
+      method: 'redirect',
+      redirectUri: '', // route handler fills this with our success_url+stub=success
+      message: 'stubbed redirect',
+    };
+  }
+
+  const body: Record<string, unknown> = {
+    epcId: input.epcId,
+    provider_id: input.providerId,
+    phone: input.phone,
+  };
+  if (input.method) body.method = input.method;
+  if (input.username) body.username = input.username;
+
+  const data = await qippayFetch<ApproveEnduringResponse>('/v1/approve_enduring', {
+    method: 'POST',
+    body,
+  });
+
+  return {
+    paymentId: data.paymentId,
+    method: (data.method ?? '').toUpperCase() === 'CIBA' ? 'CIBA' : 'redirect',
+    redirectUri: data.redirect_uri || undefined,
+    message: data.message,
+  };
+}
+
+// Normalise an NZ phone string into Qippay's required +[cc]-[digits] format.
+// Accepts common shapes ("021 123 4567", "+64 21 123 4567", "+64-21-123-4567").
+export function normaliseNzPhoneForQippay(input: string): string {
+  const raw = input.replace(/[^\d+]/g, '');
+  if (raw.startsWith('+64')) return `+64-${raw.slice(3)}`;
+  if (raw.startsWith('64')) return `+64-${raw.slice(2)}`;
+  if (raw.startsWith('+')) {
+    // Already in +cc form for another country — split at the country code length.
+    // For simplicity, treat first 1-3 digits after + as the country code.
+    const m = raw.match(/^\+(\d{1,3})(.*)$/);
+    if (m) return `+${m[1]}-${m[2]}`;
+    return raw;
+  }
+  if (raw.startsWith('0')) return `+64-${raw.slice(1)}`;
+  return `+64-${raw}`;
+}

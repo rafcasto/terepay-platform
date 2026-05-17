@@ -9,6 +9,7 @@ import {
   createMandate,
   getBeneficiaryId,
   getReturnBaseUrl,
+  listProviders,
 } from '@/lib/qippay/setpay-client';
 import type { PaymentConsent, PaymentConsentAttempt } from '@/types/application';
 
@@ -68,29 +69,34 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         );
       }
 
+      const phoneHint: string | undefined = app.personalInfo?.phone;
       const existing = app.paymentConsent as PaymentConsent | undefined;
 
       // Already-active mandate: nothing to do, return what we have.
       if (existing?.status === 'active') {
         return {
-          hostedUrl: existing.hostedUrl,
           mandateId: existing.mandateId,
           alreadyActive: true as const,
+          phoneHint,
+          totalAmountCents: existing.scheduleSummary?.totalAmountCents,
+          installments: existing.scheduleSummary?.installments ?? [],
         };
       }
 
-      // In-flight (non-terminal) mandate: return its hostedUrl to keep
-      // duplicate clicks idempotent.
+      // In-flight (non-terminal) mandate: reuse rather than create a duplicate
+      // SetPay consent. Caller will collect bank + phone and call /consent/approve.
       if (
         existing &&
         existing.status !== 'not_started' &&
         !REINITIABLE.has(existing.status)
       ) {
         return {
-          hostedUrl: existing.hostedUrl,
           mandateId: existing.mandateId,
           alreadyActive: false as const,
           reused: true as const,
+          phoneHint,
+          totalAmountCents: existing.scheduleSummary?.totalAmountCents,
+          installments: existing.scheduleSummary?.installments ?? [],
         };
       }
 
@@ -195,11 +201,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       });
 
       return {
-        hostedUrl: mandate.hostedUrl,
         mandateId: mandate.id,
         alreadyActive: false as const,
         reused: false as const,
-        scheduleTotalCents: totalAmountCents,
+        phoneHint,
+        totalAmountCents,
+        installments,
       };
     });
 
@@ -214,16 +221,25 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         changes: {
           mandateId: result.mandateId,
           reused: 'reused' in result ? result.reused : false,
-          scheduleTotalCents:
-            'scheduleTotalCents' in result ? result.scheduleTotalCents : undefined,
+          scheduleTotalCents: result.totalAmountCents,
         },
       });
     }
 
+    // Fetch available banks for the applicant's bank-picker UI. Cheap & idempotent
+    // so we just call it here rather than introducing a separate endpoint.
+    const providers = await listProviders().catch(() => []);
+
     return NextResponse.json({
       data: {
-        hostedUrl: result.hostedUrl,
         mandateId: result.mandateId,
+        providers,
+        phoneHint: result.phoneHint,
+        scheduleSummary: {
+          currency: 'NZD' as const,
+          totalAmountCents: result.totalAmountCents,
+          installments: result.installments,
+        },
       },
     });
   } catch (err) {
