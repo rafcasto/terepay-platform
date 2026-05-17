@@ -9,6 +9,7 @@ import DecisionForm from './DecisionForm';
 import ExistingCustomerToggle from './ExistingCustomerToggle';
 import { loanPurposeLabel } from '@/lib/constants/loan-purposes';
 import { computeApplicationFee } from '@/lib/constants/fees';
+import { reconcileConsent } from '@/lib/qippay/reconcile-consent';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,6 +20,9 @@ const STATUS_LABELS: Record<string, string> = {
   waiting_for_docs: 'Waiting for Docs',
   credit_check: 'Credit Check',
   approved: 'Approved',
+  loan_accepted: 'Loan Accepted',
+  awaiting_payment_consent: 'Awaiting Bank Authorisation',
+  offer_declined: 'Offer Declined',
   disbursed: 'Disbursed',
   active: 'Active',
   closed_repaid: 'Repaid',
@@ -34,6 +38,9 @@ const STATUS_COLOR: Record<string, string> = {
   waiting_for_docs: 'bg-orange-100 text-orange-800',
   credit_check: 'bg-purple-100 text-purple-800',
   approved: 'bg-green-100 text-green-700',
+  loan_accepted: 'bg-emerald-100 text-emerald-700',
+  awaiting_payment_consent: 'bg-amber-100 text-amber-800',
+  offer_declined: 'bg-amber-100 text-amber-800',
   disbursed: 'bg-emerald-100 text-emerald-700',
   active: 'bg-teal-100 text-teal-700',
   closed_repaid: 'bg-gray-100 text-gray-600',
@@ -79,10 +86,31 @@ export default async function LenderApplicationDetailPage({
   if (!decoded || decoded.role !== 'lender') redirect('/auth/login');
 
   const db = getAdminDb();
-  const snap = await db.collection('loanApplications').doc(id).get();
+  let snap = await db.collection('loanApplications').doc(id).get();
   if (!snap.exists) notFound();
 
-  const app = { applicationId: snap.id, ...snap.data() } as LoanApplication;
+  let app = { applicationId: snap.id, ...snap.data() } as LoanApplication;
+
+  // If a SetPay mandate is in flight, reconcile against Qippay before
+  // rendering so the lender sees the up-to-date authorisation state.
+  if (app.status === 'awaiting_payment_consent') {
+    const pc = app.paymentConsent;
+    const nonTerminal =
+      pc && pc.status !== 'active' && pc.status !== 'failed' &&
+      pc.status !== 'expired' && pc.status !== 'cancelled';
+    if (nonTerminal) {
+      const reconciled = await reconcileConsent({
+        applicationId: id,
+        caller: 'lender',
+        callerUid: decoded.uid,
+      }).catch(() => null);
+      if (reconciled?.status === 'active') {
+        snap = await db.collection('loanApplications').doc(id).get();
+        app = { applicationId: snap.id, ...snap.data() } as LoanApplication;
+      }
+    }
+  }
+
   const status = app.status;
   const pi = app.personalInfo;
   const emp = app.employment;
@@ -136,6 +164,20 @@ export default async function LenderApplicationDetailPage({
           status={status}
           approvedAmount={ld?.approvedAmount}
           applicationFee={ld?.applicationFee}
+          paymentConsent={
+            app.paymentConsent
+              ? {
+                  status: app.paymentConsent.status,
+                  mandateId: app.paymentConsent.mandateId,
+                  activatedAt: fmtTs(
+                    app.paymentConsent.activatedAt as unknown as {
+                      _seconds?: number;
+                      toDate?: () => Date;
+                    } | null,
+                  ),
+                }
+              : undefined
+          }
         />
 
         {/* Loan Summary */}
@@ -326,6 +368,22 @@ export default async function LenderApplicationDetailPage({
             ) : (
               <p className="text-sm text-gray-400">No documents uploaded yet.</p>
             )}
+          </section>
+        )}
+
+        {/* Applicant declined the offer */}
+        {status === 'offer_declined' && app.applicantRejection && (
+          <section className="rounded-xl border bg-amber-50 border-amber-200 p-5">
+            <h2 className="font-semibold mb-3 text-amber-900">⚠ Applicant Declined Offer</h2>
+            <dl className="grid grid-cols-2 gap-4 text-sm">
+              <Field
+                label="Declined At"
+                value={fmtTs(app.applicantRejection.rejectedAt as Parameters<typeof fmtTs>[0])}
+              />
+              <div className="col-span-2">
+                <Field label="Reason" value={app.applicantRejection.reason || 'No reason provided'} />
+              </div>
+            </dl>
           </section>
         )}
 

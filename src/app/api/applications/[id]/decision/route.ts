@@ -77,6 +77,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           'Affordability assessment recommends decline. Cannot approve.',
         );
       }
+
+      const requestedAmount = appData.loanDetails?.requestedAmount;
+      if (
+        parsed.approvedAmount !== undefined &&
+        typeof requestedAmount === 'number' &&
+        parsed.approvedAmount > requestedAmount
+      ) {
+        throw new AppError(
+          'BAD_REQUEST',
+          400,
+          'Approved amount cannot exceed requested amount',
+        );
+      }
     }
 
     const now = FieldValue.serverTimestamp();
@@ -92,7 +105,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const previousLoansSnap = await adminDb
       .collection('loanApplications')
       .where('applicantId', '==', appData.applicantId)
-      .where('status', 'in', ['approved', 'disbursed', 'active', 'closed_repaid'])
+      .where('status', 'in', ['approved', 'loan_accepted', 'awaiting_payment_consent', 'disbursed', 'active', 'closed_repaid'])
       .get();
 
     const isExistingCustomer =

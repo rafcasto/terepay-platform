@@ -19,7 +19,8 @@ async function getDashboardData(lenderUid: string) {
   // All active applications (explicit in query avoids not-in index requirements)
   const ACTIVE_STATUSES = [
     'pending_review', 'under_assessment', 'waiting_for_docs', 'credit_check',
-    'approved', 'declined', 'disbursed', 'active', 'closed_repaid',
+    'approved', 'loan_accepted', 'awaiting_payment_consent',
+    'declined', 'disbursed', 'active', 'closed_repaid',
   ];
   const snap = await db
     .collection('loanApplications')
@@ -70,7 +71,7 @@ async function getDashboardData(lenderUid: string) {
 
   // My active applications
   const myApps = apps
-    .filter((a) => a.assignedLenderId === lenderUid && ['under_assessment', 'waiting_for_docs', 'credit_check'].includes(a.status as string))
+    .filter((a) => a.assignedLenderId === lenderUid && ['under_assessment', 'waiting_for_docs', 'credit_check', 'awaiting_payment_consent'].includes(a.status as string))
     .slice(0, 8);
 
   return { counts, totalDisbursed, avgDecisionDays, approvalRate, decisionCount, pending, myApps };
@@ -82,6 +83,9 @@ const STATUS_LABELS: Record<string, string> = {
   waiting_for_docs: 'Waiting for Docs',
   credit_check: 'Credit Check',
   approved: 'Approved',
+  loan_accepted: 'Loan Accepted',
+  awaiting_payment_consent: 'Awaiting Bank Authorisation',
+  offer_declined: 'Offer Declined',
   disbursed: 'Disbursed',
   active: 'Active',
   closed_repaid: 'Closed — Repaid',
@@ -94,6 +98,9 @@ const STATUS_COLOR: Record<string, string> = {
   waiting_for_docs: 'bg-orange-100 text-orange-800',
   credit_check: 'bg-purple-100 text-purple-800',
   approved: 'bg-green-100 text-green-800',
+  loan_accepted: 'bg-emerald-100 text-emerald-700',
+  awaiting_payment_consent: 'bg-amber-100 text-amber-800',
+  offer_declined: 'bg-amber-100 text-amber-800',
   disbursed: 'bg-emerald-100 text-emerald-800',
   active: 'bg-teal-100 text-teal-800',
   closed_repaid: 'bg-gray-100 text-gray-600',

@@ -4,6 +4,12 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import DisburseForm from './DisburseForm';
 
+type PaymentConsentSummary = {
+  status: string;
+  mandateId?: string;
+  activatedAt?: string;
+};
+
 type Props = {
   applicationId: string;
   status: string;
@@ -11,6 +17,7 @@ type Props = {
   currentUserId?: string;
   approvedAmount?: number;
   applicationFee?: number;
+  paymentConsent?: PaymentConsentSummary;
 };
 
 export default function ApplicationActions({
@@ -18,6 +25,7 @@ export default function ApplicationActions({
   status,
   approvedAmount,
   applicationFee,
+  paymentConsent,
 }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -60,13 +68,20 @@ export default function ApplicationActions({
         </button>
       )}
 
-      {status === 'loan_accepted' && typeof approvedAmount === 'number' && (
-        <DisburseForm
-          applicationId={applicationId}
-          approvedAmount={approvedAmount}
-          applicationFee={applicationFee ?? 0}
-        />
-      )}
+      {(status === 'loan_accepted' || status === 'awaiting_payment_consent') &&
+        typeof approvedAmount === 'number' && (
+          <DisburseForm
+            applicationId={applicationId}
+            approvedAmount={approvedAmount}
+            applicationFee={applicationFee ?? 0}
+            consentStatus={
+              status === 'awaiting_payment_consent'
+                ? (paymentConsent?.status ?? 'not_started')
+                : undefined
+            }
+            consentActivatedAt={paymentConsent?.activatedAt}
+          />
+        )}
     </div>
   );
 }

@@ -12,6 +12,7 @@ const PENDING_STATUSES = new Set([
   'credit_check',
   'approved',
   'loan_accepted',
+  'awaiting_payment_consent',
   'disbursed',
 ]);
 

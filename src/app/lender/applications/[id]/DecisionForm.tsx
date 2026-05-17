@@ -18,6 +18,11 @@ const STANDARD_DECLINE_REASONS = [
   'Other',
 ];
 
+const MIN_APPROVED_AMOUNT = 200;
+
+const fmtNzd = (n: number) =>
+  new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD', maximumFractionDigits: 0 }).format(n);
+
 export default function DecisionForm({
   applicationId,
   affordabilityStatus,
@@ -31,7 +36,9 @@ export default function DecisionForm({
 }) {
   const router = useRouter();
   const affordabilityComplete = affordabilityStatus === 'complete';
-  const defaultApprovedAmount = assessedAmount ?? requestedAmount;
+  // Prefill from the lender's assessed amount (from affordability), but never
+  // above the requested amount — approving more than requested is not allowed.
+  const defaultApprovedAmount = Math.min(assessedAmount ?? requestedAmount, requestedAmount);
   const [action, setAction] = useState<'approve' | 'decline' | null>(null);
   const [rationale, setRationale] = useState('');
   const [selectedReasons, setSelectedReasons] = useState<string[]>([]);
@@ -39,17 +46,21 @@ export default function DecisionForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const approvedAmountInvalid =
+    action === 'approve' &&
+    (!Number.isFinite(approvedAmount) ||
+      approvedAmount < MIN_APPROVED_AMOUNT ||
+      approvedAmount > requestedAmount);
+
   const toggleReason = (r: string) => {
     setSelectedReasons((prev) =>
       prev.includes(r) ? prev.filter((x) => x !== r) : [...prev, r],
     );
   };
 
-  const approvedOutOfRange = approvedAmount < 200 || approvedAmount > 2000;
-
   const submit = async () => {
     if (!action || !rationale.trim()) return;
-    if (action === 'approve' && approvedOutOfRange) return;
+    if (approvedAmountInvalid) return;
     setLoading(true);
     setError(null);
     try {
@@ -113,28 +124,33 @@ export default function DecisionForm({
       {action === 'approve' && (
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1 uppercase tracking-wide">
-            Approved Amount <span className="text-red-500">*</span>
+            Approved amount (NZD) <span className="text-red-500">*</span>
           </label>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600">$</span>
-            <input
-              type="number"
-              min={200}
-              max={2000}
-              step={1}
-              value={Number.isFinite(approvedAmount) ? approvedAmount : ''}
-              onChange={(e) => setApprovedAmount(Number(e.target.value))}
-              className="w-40 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-            />
-            <span className="text-xs text-gray-500">
-              Requested {new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(requestedAmount)}
-              {typeof assessedAmount === 'number' && assessedAmount !== requestedAmount && (
-                <> · Assessed {new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(assessedAmount)}</>
-              )}
-            </span>
-          </div>
-          {approvedOutOfRange && (
-            <p className="mt-1 text-xs text-red-600">Amount must be between $200 and $2,000.</p>
+          <input
+            type="number"
+            value={Number.isFinite(approvedAmount) ? approvedAmount : ''}
+            onChange={(e) => setApprovedAmount(e.target.valueAsNumber)}
+            min={MIN_APPROVED_AMOUNT}
+            max={requestedAmount}
+            step={50}
+            className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            Requested: {fmtNzd(requestedAmount)}
+            {typeof assessedAmount === 'number' && assessedAmount !== requestedAmount && (
+              <> · Assessed: {fmtNzd(assessedAmount)}</>
+            )}
+            {' '}· Allowed range: {fmtNzd(MIN_APPROVED_AMOUNT)} – {fmtNzd(requestedAmount)}
+          </p>
+          {Number.isFinite(approvedAmount) && approvedAmount < requestedAmount && approvedAmount >= MIN_APPROVED_AMOUNT && (
+            <p className="mt-1 text-xs text-amber-700">
+              Approving {fmtNzd(approvedAmount)} of {fmtNzd(requestedAmount)} requested — the applicant will need to accept the revised offer.
+            </p>
+          )}
+          {approvedAmountInvalid && (
+            <p className="mt-1 text-xs text-red-600">
+              Amount must be between {fmtNzd(MIN_APPROVED_AMOUNT)} and {fmtNzd(requestedAmount)}.
+            </p>
           )}
         </div>
       )}
@@ -175,13 +191,7 @@ export default function DecisionForm({
 
           <button
             onClick={submit}
-            disabled={
-              loading ||
-              !rationale.trim() ||
-              !affordabilityComplete ||
-              (action === 'decline' && selectedReasons.length === 0) ||
-              (action === 'approve' && approvedOutOfRange)
-            }
+            disabled={loading || !rationale.trim() || !affordabilityComplete || approvedAmountInvalid || (action === 'decline' && selectedReasons.length === 0)}
             className={`w-full py-2 px-4 rounded-lg text-sm font-semibold text-white transition-colors disabled:opacity-50 ${
               action === 'approve' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'
             }`}

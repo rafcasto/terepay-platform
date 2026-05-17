@@ -41,12 +41,14 @@ export default function Step5LoanRequest() {
   const remittanceFreq = useWatch({ control, name: 'loanRequest.remittance.frequency' });
   const amount = useWatch({ control, name: 'loanRequest.requestedAmount' }) ?? 0;
 
-  // Estimate repayments (4 fortnightly payments, 4.7% interest, application fee)
+  // Estimate repayments: 4 fortnightly payments of (principal + 4.7% interest).
+  // The application fee is deducted from the disbursement, NOT added to repayments.
   const principal = Number(amount) || 0;
   const interest = principal * LOAN_INTEREST_RATE;
   const estFee = computeApplicationFee(user?.isExistingCustomer);
-  const totalRepayable = principal + interest + estFee;
+  const totalRepayable = principal + interest;
   const fortnightlyPayment = totalRepayable / 4;
+  const amountReceived = Math.max(principal - estFee, 0);
 
   return (
     <div className="space-y-6">
@@ -97,7 +99,12 @@ export default function Step5LoanRequest() {
             <span className="font-bold">${fortnightlyPayment.toFixed(2)}</span>
           </p>
           <p className="text-xs text-green-600">
-            Total repayable: ${totalRepayable.toFixed(2)} (incl. ${estFee} application fee &amp; 4.7% interest)
+            Total repayable: ${totalRepayable.toFixed(2)} (principal + 4.7% interest)
+          </p>
+          <p className="text-xs text-green-600">
+            You&apos;ll receive:{' '}
+            <span className="font-semibold">${amountReceived.toFixed(2)}</span>{' '}
+            (${estFee} application fee deducted from disbursement)
           </p>
         </div>
       )}

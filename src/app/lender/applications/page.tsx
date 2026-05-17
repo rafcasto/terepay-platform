@@ -13,6 +13,8 @@ const STATUS_VARIANT: Record<string, BadgeVariant> = {
   credit_check: 'info',
   approved: 'success',
   loan_accepted: 'success',
+  awaiting_payment_consent: 'warning',
+  offer_declined: 'default',
   disbursed: 'success',
   active: 'success',
   closed_repaid: 'default',
@@ -34,6 +36,8 @@ const STATUS_LABEL: Record<string, string> = {
   credit_check: 'Credit Check',
   approved: 'Approved',
   loan_accepted: 'Loan Accepted',
+  awaiting_payment_consent: 'Awaiting Bank Authorisation',
+  offer_declined: 'Offer Declined',
   disbursed: 'Disbursed',
   active: 'Active',
   closed_repaid: 'Closed — Repaid',
@@ -49,8 +53,9 @@ const STATUS_LABEL: Record<string, string> = {
 
 const ALL_STATUSES = [
   'pending_review', 'under_assessment', 'waiting_for_docs', 'credit_check',
-  'approved', 'loan_accepted', 'disbursed', 'active', 'closed_repaid', 'declined', 'withdrawn',
-  // Note: 'expired', legacy statuses fetched via a second query if needed (Firestore 'in' limit = 10)
+  'approved', 'loan_accepted', 'awaiting_payment_consent',
+  'disbursed', 'active', 'closed_repaid', 'declined', 'withdrawn',
+  // Firestore admin SDK supports up to 30 'in' values.
 ];
 
 const fmt = (n: number) =>
@@ -77,7 +82,7 @@ export default async function LenderApplicationsPage() {
 
   const snap = await adminDb
     .collection('loanApplications')
-    .where('status', 'in', ALL_STATUSES.slice(0, 10)) // Firestore limit: 10 'in' values
+    .where('status', 'in', ALL_STATUSES)
     .orderBy('timeline.submittedAt', 'asc') // oldest first per requirements
     .get();
 
@@ -89,7 +94,7 @@ export default async function LenderApplicationsPage() {
   });
   const inProgress = applications.filter((a) => {
     const s = (a as Record<string, unknown>).status as string;
-    return ['under_assessment', 'waiting_for_docs', 'credit_check', 'loan_accepted'].includes(s);
+    return ['under_assessment', 'waiting_for_docs', 'credit_check', 'loan_accepted', 'awaiting_payment_consent'].includes(s);
   });
   const decided = applications.filter((a) => {
     const s = (a as Record<string, unknown>).status as string;

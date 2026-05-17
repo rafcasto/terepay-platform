@@ -7,7 +7,7 @@ import LoanStepTracker from './_components/LoanStepTracker';
 
 // Statuses that are terminal — user may start a fresh application after these
 const TERMINAL_STATUSES = new Set([
-  'declined', 'withdrawn', 'expired', 'closed_repaid',
+  'declined', 'withdrawn', 'expired', 'closed_repaid', 'offer_declined',
   // legacy
   'rejected', 'completed',
 ]);
