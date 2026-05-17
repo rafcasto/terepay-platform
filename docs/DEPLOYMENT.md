@@ -91,7 +91,8 @@ QIPPAY_RETURN_BASE_URL=https://terepay.com
 - `QIPPAY_MODE=stub` is hard-blocked when `NEXT_PUBLIC_ENVIRONMENT=production`. Setting `stub` in production raises an error at first call from `src/lib/qippay/setpay-client.ts`.
 - The success/failure URLs registered with Qippay must match `${QIPPAY_RETURN_BASE_URL}/applicant/applications/<id>/consent/return`. Vercel preview deploys use ephemeral hostnames — only test against live Qippay UAT from a stable host; preview QA should use `stub`.
 - `QIPPAY_BENEFICIARY_ID` resolves to TerePay's platform-wide Qippay merchant account (single beneficiary across all lenders).
-- The SetPay developer spec is not yet wired in; until it lands, the `live` branch returns 501 and the integration is exercised through `QIPPAY_MODE=stub`.
+- `live` mode hits `POST /v1/enduring_initiation` and `GET /v1/enduring_initiation/{epcId}`. Per the SetPay Integrated v1.0 (rev 1) spec, we use the Hosted-style entry point — a single POST returns a `url` for the applicant's redirect, bypassing the explicit bank-selector / `/v1/approve_enduring` flow.
+- UAT test creds for the hosted page: `user01` / `password`. Three fictitious banks (Orange/Purple/Grey) each test a different approval flow.
 
 ---
 

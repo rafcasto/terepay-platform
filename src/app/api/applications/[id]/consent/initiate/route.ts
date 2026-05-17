@@ -116,6 +116,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         typeof fortnightlyPayment === 'number'
           ? fortnightlyPayment
           : ((approvedAmount + approvedAmount * 0.047) / installmentCount);
+      const perInstallmentCents = Math.round(perInstallmentNzd * 100);
 
       const today = new Date();
       const installments = Array.from({ length: installmentCount }, (_, i) => {
@@ -123,7 +124,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         due.setDate(today.getDate() + 14 * (i + 1));
         return {
           dueDate: due.toISOString().slice(0, 10),
-          amountCents: Math.round(perInstallmentNzd * 100),
+          amountCents: perInstallmentCents,
         };
       });
       const totalAmountCents =
@@ -131,15 +132,28 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           ? Math.round(totalRepayment * 100)
           : installments.reduce((acc, i) => acc + i.amountCents, 0);
 
+      // SetPay consent window covers the full repayment schedule with a
+      // small safety buffer past the last installment in case of retries.
+      const fromDateTime = today.toISOString();
+      const lastDue = new Date(today);
+      lastDue.setDate(today.getDate() + 14 * installmentCount + 7);
+      const toDateTime = lastDue.toISOString();
+
       const mandate = await createMandate({
         beneficiaryId,
         successUrl,
         failureUrl,
-        schedule: { currency: 'NZD', installments },
         customerIp: ip,
         customerUserAgent: userAgent,
         merchantCustomerIdentification: auth.uid,
         metadata: { applicationId: id },
+        frequencyPeriod: 'Fortnightly',
+        frequencyTotalAmountCents: perInstallmentCents,
+        totalAmountCents,
+        totalCount: installmentCount,
+        fromDateTime,
+        toDateTime,
+        installments,
       });
 
       const now = FieldValue.serverTimestamp();
