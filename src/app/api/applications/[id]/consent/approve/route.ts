@@ -78,7 +78,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       epcId: consent.mandateId,
       providerId: body.providerId,
       phone: phoneForQippay,
-      method: body.method ?? 'redirect',
+      // Only forward `method` if the caller explicitly asked for one;
+      // otherwise let Qippay pick the best for the chosen bank (CIBA push
+      // where supported, redirect otherwise).
+      ...(body.method ? { method: body.method } : {}),
     });
 
     // In stub mode the client returns no redirect_uri — build a synthetic

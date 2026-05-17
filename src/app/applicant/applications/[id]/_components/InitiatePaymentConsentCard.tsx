@@ -121,12 +121,14 @@ export default function InitiatePaymentConsentCard({
     setError(null);
     setStage('approving');
     try {
+      // Don't force a `method` — let Qippay pick what the chosen bank supports
+      // (CIBA push for Purple, redirect for Orange, etc).
       const res = await fetch(
         `/api/applications/${applicationId}/consent/approve`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ providerId, phone, method: 'redirect' }),
+          body: JSON.stringify({ providerId, phone }),
         },
       );
       const body = (await res.json()) as ApproveResponse | { error?: { message?: string } };
