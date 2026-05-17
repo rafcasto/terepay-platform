@@ -9,6 +9,7 @@ import DecisionForm from './DecisionForm';
 import ExistingCustomerToggle from './ExistingCustomerToggle';
 import { loanPurposeLabel } from '@/lib/constants/loan-purposes';
 import { computeApplicationFee } from '@/lib/constants/fees';
+import { reconcileConsent } from '@/lib/qippay/reconcile-consent';
 
 export const dynamic = 'force-dynamic';
 
@@ -85,10 +86,31 @@ export default async function LenderApplicationDetailPage({
   if (!decoded || decoded.role !== 'lender') redirect('/auth/login');
 
   const db = getAdminDb();
-  const snap = await db.collection('loanApplications').doc(id).get();
+  let snap = await db.collection('loanApplications').doc(id).get();
   if (!snap.exists) notFound();
 
-  const app = { applicationId: snap.id, ...snap.data() } as LoanApplication;
+  let app = { applicationId: snap.id, ...snap.data() } as LoanApplication;
+
+  // If a SetPay mandate is in flight, reconcile against Qippay before
+  // rendering so the lender sees the up-to-date authorisation state.
+  if (app.status === 'awaiting_payment_consent') {
+    const pc = app.paymentConsent;
+    const nonTerminal =
+      pc && pc.status !== 'active' && pc.status !== 'failed' &&
+      pc.status !== 'expired' && pc.status !== 'cancelled';
+    if (nonTerminal) {
+      const reconciled = await reconcileConsent({
+        applicationId: id,
+        caller: 'lender',
+        callerUid: decoded.uid,
+      }).catch(() => null);
+      if (reconciled?.status === 'active') {
+        snap = await db.collection('loanApplications').doc(id).get();
+        app = { applicationId: snap.id, ...snap.data() } as LoanApplication;
+      }
+    }
+  }
+
   const status = app.status;
   const pi = app.personalInfo;
   const emp = app.employment;

@@ -9,6 +9,8 @@ import RejectOfferButton from './_components/RejectOfferButton';
 import InitiatePaymentConsentCard from './_components/InitiatePaymentConsentCard';
 import { loanPurposeLabel } from '@/lib/constants/loan-purposes';
 import { computeApplicationFee } from '@/lib/constants/fees';
+import { reconcileConsent } from '@/lib/qippay/reconcile-consent';
+import type { PaymentConsent } from '@/types/application';
 
 export const dynamic = 'force-dynamic';
 
@@ -132,7 +134,45 @@ export default async function ApplicationDetailPage({
 
   if (!isOwner) notFound();
 
-  const banner = STATUS_BANNERS[status] ?? STATUS_BANNERS.pending_review;
+  // If a SetPay mandate is in flight, reconcile against Qippay before
+  // rendering — the user may have approved at their bank in another tab or
+  // closed the page mid-CIBA poll. The reconciler is internally rate-limited
+  // to one upstream call per 10s so this is cheap.
+  if (status === 'awaiting_payment_consent') {
+    const pc = app.paymentConsent as PaymentConsent | undefined;
+    const nonTerminal =
+      pc && pc.status !== 'active' && pc.status !== 'failed' &&
+      pc.status !== 'expired' && pc.status !== 'cancelled';
+    if (nonTerminal) {
+      const reconciled = await reconcileConsent({
+        applicationId: id,
+        caller: 'applicant',
+        callerUid: decoded.uid,
+      }).catch(() => null);
+      if (reconciled?.status === 'active') {
+        // Re-read the application doc so the rest of the render reflects
+        // the post-reconcile state (paymentConsent.status, verified bank, etc).
+        snap = await db.collection('loanApplications').doc(id).get();
+        Object.assign(app, snap.data() ?? {});
+      }
+    }
+  }
+
+  // If the applicant has finished bank authorisation but the lender hasn't
+  // yet disbursed, override the banner so the page reflects that they've
+  // done their part. The application status stays `awaiting_payment_consent`
+  // until the lender calls disburse — that's a separate handoff.
+  const consentActive =
+    (app.paymentConsent as PaymentConsent | undefined)?.status === 'active';
+  const banner =
+    status === 'awaiting_payment_consent' && consentActive
+      ? {
+          bg: 'bg-emerald-50 border-emerald-200',
+          text: 'text-emerald-800',
+          message:
+            '✅ Bank authorisation complete. Your lender will release the funds shortly.',
+        }
+      : STATUS_BANNERS[status] ?? STATUS_BANNERS.pending_review;
   const ld = app.loanDetails;
   const pi = app.personalInfo;
   const emp = app.employment;
