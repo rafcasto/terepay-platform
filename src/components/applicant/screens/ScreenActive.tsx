@@ -1,4 +1,4 @@
-import { Hero, HeroBalance, Pill, ProgressBar, ScheduleRow, StatGrid } from '@/components/ui';
+import { Hero, HeroBalance, Pill, ProgressBar, ScheduleRow, StatGrid, Icons } from '@/components/ui';
 import { fmtNZD, fmtDate } from '@/lib/loan/format';
 import type { LoanApplication, AnyApplicationStatus } from '@/types/application';
 import { SectionCard, Field } from './shared';
@@ -14,6 +14,7 @@ export default function ScreenActive({ app, status, applicationId }: Props) {
   const repayment = app.repaymentSchedule;
   const refNum = (app.referenceNumber as string | undefined) ?? `#${applicationId.slice(0, 8)}`;
   const isDisbursed = status === 'disbursed';
+  const loanId = (app as Record<string, unknown>).loanId as string | undefined;
 
   const total = repayment?.totalRepayment ?? 0;
   const installments = repayment?.installments ?? [];
@@ -72,6 +73,9 @@ export default function ScreenActive({ app, status, applicationId }: Props) {
 
       {installments.length > 0 && (
         <SectionCard eyebrow="Schedule" title="Repayments">
+          <p className="text-xs text-muted mb-3">
+            Each instalment is auto-debited from your bank on its due date — no action needed.
+          </p>
           <div className="divide-y divide-border-2">
             {installments.map((i) => {
               const tone = i.status === 'paid' ? 'paid' : i.status === 'overdue' ? 'overdue' : i === next ? 'next' : 'upcoming';
@@ -92,6 +96,23 @@ export default function ScreenActive({ app, status, applicationId }: Props) {
             </span>
             <span className="text-base font-bold tabular-nums">{fmtNZD(total)}</span>
           </div>
+        </SectionCard>
+      )}
+
+      {loanId && (
+        <SectionCard eyebrow="Documents" title="Statement">
+          <p className="text-sm text-muted mb-3">
+            Download a statement showing all instalments and their current status.
+          </p>
+          <a
+            href={`/api/loans/${loanId}/statement`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-4 h-11 rounded-xl border border-border bg-surface text-sm font-semibold text-text hover:border-accent/60 hover:bg-accent-soft/40 transition-colors"
+          >
+            <Icons.Download size={16} />
+            Download statement (PDF)
+          </a>
         </SectionCard>
       )}
 

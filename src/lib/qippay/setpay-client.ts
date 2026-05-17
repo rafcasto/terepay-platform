@@ -435,6 +435,93 @@ export async function approveEnduring(
   };
 }
 
+// --- Scheduled-payment primitives ----------------------------------------
+// SetPay requires each individual instalment to be scheduled via POST
+// /v1/setpay (docs rev 1, p.19). The enduring consent only authorises
+// limits — Qippay does not auto-fire payments on its own.
+
+export type SetPaySchedulePaymentInput = {
+  epcId: string;
+  beneficiaryId: string;
+  amountCents: number;
+  scheduledFor: string; // ISO 8601 with TZ. Must be a future date (Pacific/Auckland).
+  statementParticulars: string; // max 12 chars, alphanumeric + space/-/'/?
+  statementCode: string;
+  statementReference: string;
+  maxRetry?: number; // optional Qippay-side retry on failure
+};
+
+export type SetPayScheduledPayment = {
+  paymentId: string; // `pmU_...` — what webhook events reference
+  enduringPaymentId: string; // `epU_...` — the schedule instance id
+  scheduledDate: string; // ISO 8601
+  status: string; // upstream raw status (e.g. "Scheduled")
+};
+
+type SchedulePaymentResponse = {
+  id: string; // epU_...
+  scheduled_date: string;
+  scheduled_desc?: string;
+  payment: {
+    id: string; // pmU_...
+    status: string;
+    [k: string]: unknown;
+  };
+  consent_overall_status?: unknown;
+  scheduled_period_status?: unknown;
+};
+
+// Qippay-permitted chars for statement_* fields: alphanumeric, space, -, ', ?
+// Trim/strip anything else and clamp to 12 chars to avoid 422 from Qippay.
+function sanitiseStatementField(input: string, fallback: string): string {
+  const cleaned = input.replace(/[^a-zA-Z0-9 \-'?]/g, '').trim().slice(0, 12);
+  return cleaned || fallback.slice(0, 12);
+}
+
+export async function schedulePayment(
+  input: SetPaySchedulePaymentInput,
+): Promise<SetPayScheduledPayment> {
+  const env = readEnv();
+  const particulars = sanitiseStatementField(input.statementParticulars, 'TerePay');
+  const code = sanitiseStatementField(input.statementCode, 'LOAN');
+  const reference = sanitiseStatementField(input.statementReference, 'PMT');
+
+  if (env.mode === 'stub') {
+    // Deterministic IDs derived from the epcId + scheduled date so re-runs in
+    // tests are stable and idempotent retries don't produce new IDs.
+    const tag = `${input.epcId.slice(-8)}_${input.scheduledFor.slice(0, 10)}`;
+    return {
+      paymentId: `stub_pmt_${tag}`,
+      enduringPaymentId: `stub_ep_${tag}`,
+      scheduledDate: input.scheduledFor,
+      status: 'Scheduled',
+    };
+  }
+
+  const body: Record<string, unknown> = {
+    beneficiary_id: input.beneficiaryId,
+    epcId: input.epcId,
+    amount: { currency: 'NZD', value: input.amountCents },
+    statement_particulars: particulars,
+    statement_code: code,
+    statement_reference: reference,
+    scheduled_for: input.scheduledFor,
+  };
+  if (input.maxRetry !== undefined) body.max_retry = input.maxRetry;
+
+  const data = await qippayFetch<SchedulePaymentResponse>('/v1/setpay', {
+    method: 'POST',
+    body,
+  });
+
+  return {
+    paymentId: data.payment.id,
+    enduringPaymentId: data.id,
+    scheduledDate: data.scheduled_date,
+    status: data.payment.status,
+  };
+}
+
 // Normalise an NZ phone string into Qippay's required +[cc]-[digits] format.
 // Accepts common shapes ("021 123 4567", "+64 21 123 4567", "+64-21-123-4567").
 export function normaliseNzPhoneForQippay(input: string): string {

@@ -1,7 +1,8 @@
 import { Hero, Pill, Stepper, type Step } from '@/components/ui';
 import { fmtDate, fmtNZD } from '@/lib/loan/format';
-import type { LoanApplication, AnyApplicationStatus } from '@/types/application';
+import type { LoanApplication, AnyApplicationStatus, ApplicationDocument } from '@/types/application';
 import { PROGRESS_STEPS, SectionCard, STATUS_COMPLETED_COUNT, Field } from './shared';
+import DocumentUploadCard from './DocumentUploadCard';
 
 interface Props {
   app: LoanApplication & Record<string, unknown>;
@@ -21,7 +22,8 @@ export default function ScreenInReview({ app, status, applicationId }: Props) {
   const submitted = (app.timeline as { submittedAt?: unknown } | undefined)?.submittedAt ?? null;
   const refNum = (app.referenceNumber as string | undefined) ?? `#${applicationId.slice(0, 8)}`;
   const docRequest = app.documentRequest as { requiredDocuments?: string[]; message?: string } | undefined;
-  const showDocBanner = status === 'waiting_for_docs' && docRequest?.requiredDocuments?.length;
+  const showUpload = status === 'waiting_for_docs';
+  const existingDocuments: ApplicationDocument[] = (app.documents as ApplicationDocument[] | undefined) ?? [];
 
   return (
     <div className="space-y-5">
@@ -45,30 +47,13 @@ export default function ScreenInReview({ app, status, applicationId }: Props) {
         <Stepper steps={steps} />
       </SectionCard>
 
-      {showDocBanner && (
-        <SectionCard
-          eyebrow="Action needed"
-          title="Documents requested"
-          action={<Pill tone="warn">{docRequest.requiredDocuments?.length} required</Pill>}
-        >
-          <p className="text-sm text-muted mb-3">
-            Your lender has requested the following documents:
-          </p>
-          <ul className="space-y-1.5 text-sm text-text">
-            {docRequest.requiredDocuments!.map((d) => (
-              <li key={d} className="flex items-start gap-2">
-                <span className="mt-2 h-1 w-1 rounded-full bg-accent shrink-0" />
-                {d}
-              </li>
-            ))}
-          </ul>
-          {docRequest.message && (
-            <p className="mt-3 text-sm text-warn">{docRequest.message}</p>
-          )}
-          <p className="mt-4 text-xs text-muted">
-            Please contact your lender or upload documents through the TerePay portal.
-          </p>
-        </SectionCard>
+      {showUpload && (
+        <DocumentUploadCard
+          applicationId={applicationId}
+          requiredDocuments={docRequest?.requiredDocuments}
+          message={docRequest?.message}
+          existingDocuments={existingDocuments}
+        />
       )}
 
       <SectionCard eyebrow="Your application" title="Loan details">

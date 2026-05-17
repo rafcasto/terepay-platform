@@ -17,27 +17,12 @@ export default function QuickActions({ state, pendingAppId }: QuickActionsProps)
 
   if (state === 'active') {
     items.push(
-      pendingAppId
-        ? {
-            href: `/applicant/applications/${pendingAppId}`,
-            title: 'Make a payment',
-            subtitle: 'Pay your next instalment or pay off early',
-            icon: <Icons.Wallet size={20} />,
-            tone: 'amber',
-          }
-        : {
-            href: '/applicant/applications',
-            title: 'Make a payment',
-            subtitle: 'Pay your next instalment or pay off early',
-            icon: <Icons.Wallet size={20} />,
-            tone: 'amber',
-          },
       {
         href: pendingAppId ? `/applicant/applications/${pendingAppId}` : '/applicant/applications',
         title: 'View repayment schedule',
-        subtitle: 'See all instalments and due dates',
+        subtitle: 'Each instalment is auto-debited on its due date',
         icon: <Icons.Calendar size={20} />,
-        tone: 'info',
+        tone: 'amber',
       },
       {
         href: '/applicant/applications',

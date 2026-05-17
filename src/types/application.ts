@@ -124,14 +124,62 @@ export interface LenderDecision {
   };
 }
 
+export type InstallmentStatus = 'scheduled' | 'paid' | 'overdue' | 'retrying';
+
+export interface RepaymentInstallment {
+  installmentNumber: number;
+  dueDate: string; // YYYY-MM-DD (NZ calendar date)
+  amount: number;
+  status: InstallmentStatus;
+  /** Qippay payment id (`pmU_...`) returned from `POST /v1/setpay` — used to correlate webhook events. */
+  paymentId?: string;
+  /** Qippay enduring-payment-instance id (`epU_...`). */
+  enduringPaymentId?: string;
+  paidAt?: Timestamp;
+  failureReason?: string;
+}
+
 export interface RepaymentSchedule {
-  installments: Array<{
-    installmentNumber: number;
-    dueDate: string;
-    amount: number;
-    status: 'scheduled' | 'paid' | 'overdue';
-  }>;
+  installments: RepaymentInstallment[];
   totalRepayment: number;
+}
+
+// ---------------------------------------------------------------------------
+// Loan (lives in the `loans` collection — created at disbursement)
+// ---------------------------------------------------------------------------
+export type LoanStatus = 'disbursed' | 'active' | 'delinquent' | 'closed_repaid';
+
+export interface Loan {
+  loanId: string;
+  applicationId: string;
+  applicantId: string;
+  assignedLenderId?: string;
+  status: LoanStatus;
+
+  // Money
+  principal: number; // disbursedAmount (cash given to applicant)
+  totalRepayable: number; // sum of all instalments (principal + fee + interest)
+  totalPaid: number;
+  remainingBalance: number;
+  fortnightlyPayment: number;
+
+  // Schedule (mirrors loanApplications.repaymentSchedule but lives here for fast reads)
+  installments: RepaymentInstallment[];
+
+  // Qippay
+  mandateId: string; // epcId
+  beneficiaryId: string;
+
+  // Dates
+  nextPaymentDate?: Timestamp; // next `scheduled` instalment's due date, null when all paid
+
+  timeline: {
+    createdAt: Timestamp;
+    updatedAt: Timestamp;
+    disbursedAt?: Timestamp;
+    activatedAt?: Timestamp; // first successful payment
+    closedAt?: Timestamp;
+  };
 }
 
 // ---------------------------------------------------------------------------

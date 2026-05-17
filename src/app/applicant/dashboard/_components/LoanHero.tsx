@@ -29,7 +29,12 @@ export default function LoanHero({ data, firstName }: { data: DashboardHeroData;
     const dleft = daysUntil(nextPaymentDate);
     return (
       <Hero
-        eyebrow="Active loan balance"
+        eyebrow={isDelinquent ? 'Payment missed' : 'Active loan balance'}
+        subtitle={
+          isDelinquent
+            ? "Your last instalment didn't go through. We'll keep retrying — make sure funds are available in your account."
+            : undefined
+        }
         pill={
           isDelinquent ? (
             <Pill tone="danger" pulse onInk>
