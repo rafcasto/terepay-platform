@@ -99,7 +99,7 @@ export default async function ApplicantDashboard() {
       <ActiveLoanCard activeLoan={activeLoan} pendingAppId={pendingAppId} />
 
       {/* Quick actions */}
-      <QuickActions />
+      <QuickActions hasActiveLoan={!!activeLoan} />
     </div>
   );
 }
