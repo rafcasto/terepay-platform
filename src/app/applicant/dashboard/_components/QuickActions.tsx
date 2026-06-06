@@ -1,36 +1,20 @@
 import Link from 'next/link';
 
-const applyAction = {
-  href: '/applicant/apply',
-  label: 'Apply for a Loan',
-  description: 'Get funds in as little as 24 hours',
-  icon: (
-    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
-      <rect x="1" y="5" width="20" height="14" rx="2.5" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M1 9h20" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <rect x="4" y="13" width="5" height="2" rx="1" fill="currentColor" />
-    </svg>
-  ),
-  iconBg: 'bg-amber-50',
-  iconColor: 'text-amber-600',
-};
-
-const viewBalanceAction = {
-  href: '/applicant/applications',
-  label: 'View Account Balance',
-  description: 'Check your remaining balance and payment schedule',
-  icon: (
-    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
-      <rect x="1" y="5" width="20" height="14" rx="2.5" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M1 9h20" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <rect x="4" y="13" width="5" height="2" rx="1" fill="currentColor" />
-    </svg>
-  ),
-  iconBg: 'bg-amber-50',
-  iconColor: 'text-amber-600',
-};
-
-const STATIC_ACTIONS = [
+const ACTIONS = [
+  {
+    href: '/applicant/apply',
+    label: 'Apply for a Loan',
+    description: 'Get funds in as little as 24 hours',
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
+        <rect x="1" y="5" width="20" height="14" rx="2.5" stroke="currentColor" strokeWidth="1.5" />
+        <path d="M1 9h20" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <rect x="4" y="13" width="5" height="2" rx="1" fill="currentColor" />
+      </svg>
+    ),
+    iconBg: 'bg-amber-50',
+    iconColor: 'text-amber-600',
+  },
   {
     href: '/applicant/applications',
     label: 'Make a Payment',
@@ -59,21 +43,14 @@ const STATIC_ACTIONS = [
   },
 ];
 
-interface QuickActionsProps {
-  hasActiveLoan?: boolean;
-}
-
-export default function QuickActions({ hasActiveLoan = false }: QuickActionsProps) {
-  const primaryAction = hasActiveLoan ? viewBalanceAction : applyAction;
-  const actions = [primaryAction, ...STATIC_ACTIONS];
-
+export default function QuickActions() {
   return (
     <section>
       <p className="text-xs font-semibold tracking-widest text-gray-400 uppercase mb-3">
         Quick Actions
       </p>
       <div className="space-y-2.5">
-        {actions.map((action) => (
+        {ACTIONS.map((action) => (
           <Link
             key={action.label}
             href={action.href}
