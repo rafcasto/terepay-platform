@@ -69,6 +69,11 @@ export default function LoanHero({ data, firstName }: { data: DashboardHeroData;
             Next payment in {dleft === 0 ? 'today' : `${dleft} day${dleft === 1 ? '' : 's'}`}.
           </p>
         )}
+        <div className="mt-5">
+          <ButtonLink href="/applicant/applications" variant="ghost-light" fullWidth>
+            View account balance
+          </ButtonLink>
+        </div>
       </Hero>
     );
   }
