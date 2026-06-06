@@ -66,7 +66,7 @@ export default function ActiveLoanCard({ activeLoan, pendingAppId }: ActiveLoanC
         </div>
 
         {/* Progress bar */}
-        <div className="mb-5">
+        <div>
           <div className="flex justify-between text-xs mb-2">
             <span className="text-white/50">Repayment progress</span>
             <span className="text-[#F5A523] font-medium">{repaidPct}% repaid</span>
@@ -78,14 +78,6 @@ export default function ActiveLoanCard({ activeLoan, pendingAppId }: ActiveLoanC
             />
           </div>
         </div>
-
-        {/* CTA */}
-        <Link
-          href="/applicant/applications"
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#F5A523] text-white text-sm font-semibold hover:bg-[#E08B00] transition-colors"
-        >
-          View Account Balance →
-        </Link>
       </div>
     );
   }
