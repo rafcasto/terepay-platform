@@ -51,16 +51,21 @@ Import alias: `@/*` → `./src/*` ([tsconfig.json](tsconfig.json)).
 
 - **Forms:** React Hook Form + Zod schemas. Don't introduce a different validator.
 - **Errors:** `AppError` class + `errorResponse()` / `internalError()` helpers. Audit-log security-relevant outcomes via `auditLog()`.
-- **Styling:** Tailwind v4, utility-first.
+- **Styling:** Tailwind v4, utility-first. Brand accent: `#F5A523` (hover `#E08B00`). No inline `style={}` for colors — use Tailwind arbitrary values (`text-[#F5A523]`).
 - **Files:** kebab-case for routes/files, PascalCase for React components.
+- **`'use client'`:** Add only when required (event handlers, hooks, browser APIs). Pages and layouts are Server Components by default — keep them that way unless there's a concrete reason not to.
 
 ## API route pattern (canonical)
 
 ```
+export const dynamic = 'force-dynamic';
+
 Zod parse  →  withAuth() (role check)  →  rate limit (Upstash)
-        →  reCAPTCHA (where applicable)  →  business logic
-        →  errorResponse() | NextResponse.json()
+         →  reCAPTCHA (where applicable)  →  business logic
+         →  auditLog()  →  errorResponse() | NextResponse.json()
 ```
+
+**Full anatomy — see [docs/CODING_PATTERNS.md](docs/CODING_PATTERNS.md#api-route-anatomy).**
 
 **Never bypass `withAuth()` on state-changing routes.** Client code does not write to Firestore directly — it goes through `/api/*`.
 
@@ -70,6 +75,22 @@ Zod parse  →  withAuth() (role check)  →  rate limit (Upstash)
 - `src/middleware.ts` does an **edge fast-path** JWT decode (expiry + role only) and routes mismatched roles to their dashboard. Full verification still happens server-side in API routes — the edge check is a UX redirect, not a security boundary
 - Roles set via Firebase custom claims (`adminAuth.setCustomUserClaims({ role })`) at signup. **After setting claims, force-refresh the ID token (`user.getIdToken(true)`) before minting the session cookie** — propagation lag is otherwise ~5–15s
 - `useAuth()` ([src/hooks/useAuth.ts](src/hooks/useAuth.ts)) hydrates client state from `/api/auth/me`
+
+## Security
+
+TerePay handles financial and PII data for NZ customers. Security is non-negotiable.
+
+**Before every `git push`**, the pre-push hook runs `scripts/security-precheck.sh` automatically (after first running `bash scripts/install-git-hooks.sh` on a fresh clone). You can also run it manually at any time:
+
+```bash
+bash scripts/security-precheck.sh
+```
+
+The script checks: secrets detection · `withAuth()` coverage · rate limiting coverage · PII in logs · raw error forwarding · TypeScript `any` in API routes · direct client Firestore writes · `Math.random()` usage · audit log coverage · npm audit (critical/high) · ESLint.
+
+**Full audit reference — see [docs/SECURITY_AUDIT.md](docs/SECURITY_AUDIT.md).** This covers NZ Privacy Act 2020, CCCFA 2003, and AML/CFT Act 2009 requirements in addition to technical security checks. Read the relevant sections before writing any new API route, auth flow, or data model.
+
+**For agents:** before writing or modifying an API route, read [docs/SECURITY_AUDIT.md](docs/SECURITY_AUDIT.md) §1–9. Before touching auth or PII handling, read §1–4 in full.
 
 ## Documentation index
 
@@ -82,6 +103,8 @@ Don't duplicate these — point at them.
 - [docs/FEATURE_FLAGS.md](docs/FEATURE_FLAGS.md) — flag system (Vercel Edge Config / @vercel/flags)
 - [docs/KYC_ONBOARDING_IMPLEMENTATION.md](docs/KYC_ONBOARDING_IMPLEMENTATION.md), [docs/ONBOARDING_UX_REQUIREMENTS.md](docs/ONBOARDING_UX_REQUIREMENTS.md) — onboarding flow + UX
 - [docs/PLATFORM_PLAN.md](docs/PLATFORM_PLAN.md), [docs/TerePay_LMS_Requirements.md](docs/TerePay_LMS_Requirements.md) — product/architecture intent
+- [docs/CODING_PATTERNS.md](docs/CODING_PATTERNS.md) — **canonical code patterns with annotated examples**
+- [docs/SECURITY_AUDIT.md](docs/SECURITY_AUDIT.md) — **security checklist — NZ Privacy Act, CCCFA, AML/CFT**
 
 `.env.local` is gitignored. See QUICK_START / DEPLOYMENT for the variable list (`NEXT_PUBLIC_FIREBASE_*`, `FIREBASE_ADMIN_*`, `ENCRYPTION_KEY`, `NEXT_PUBLIC_ENVIRONMENT`, Twilio/Resend/Upstash/reCAPTCHA secrets).
 
@@ -104,6 +127,13 @@ Don't duplicate these — point at them.
 - Don't wipe `emulator-data/` (it's a shared seed snapshot — use `firebase:emulate:clear` only if intentional)
 - Don't hand-add `useMemo` / `useCallback` reflexively — React Compiler handles it
 - Don't commit `.env.local` or any service-account JSON
-- Don't bypass git hooks (`--no-verify`)
+- Don't bypass git hooks (`--no-verify`) — the pre-push security check exists for a reason
 - Don't assume custom claims are present on the token immediately after `setCustomUserClaims` — force a refresh first
 - Don't run `seed:lender:prod` / `reset:counter:prod` without explicit confirmation
+- Don't use `any` in TypeScript — use `unknown` and narrow, or define the type properly
+- Don't add `'use client'` to a file without a concrete reason (event handlers, hooks, browser APIs)
+- Don't introduce new UI libraries or form libraries — use what's already in the stack
+- Don't store PII fields in Firestore without encrypting them — mark with 🔒 in type definitions
+- Don't use inline `style={}` for brand colors — use Tailwind arbitrary values
+- Don't use `Math.random()` for any security-sensitive value — use `crypto.randomBytes()` or `randomUUID()`
+- Don't return raw Firebase errors, Zod errors, or stack traces to the client — use `errorResponse()` / `internalError()`
