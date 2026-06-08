@@ -21,8 +21,9 @@ export default function PendingPoller({ applicationId, detailHref }: Props) {
   useEffect(() => {
     if (!checking) return;
     if (attempts >= MAX_ATTEMPTS) {
-      setChecking(false);
-      return;
+      // Schedule state update in a callback to satisfy React Compiler purity rules
+      const t = window.setTimeout(() => setChecking(false), 0);
+      return () => window.clearTimeout(t);
     }
     const id = window.setTimeout(async () => {
       try {

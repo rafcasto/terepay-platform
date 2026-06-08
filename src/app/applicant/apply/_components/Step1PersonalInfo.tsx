@@ -5,6 +5,9 @@ import { useFormContext } from 'react-hook-form';
 import type { TerepayApplicationInput } from '@/lib/validation/schemas';
 import AddressAutocomplete from './AddressAutocomplete';
 
+// Computed at module load time — acceptable for DOB age gate (changes at most once daily)
+const MAX_DOB_DATE = new Date(Date.now() - 18 * 365.25 * 86400000).toISOString().split('T')[0];
+
 const inputCls =
   'w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#F5A523] focus:border-[#F5A523] focus:outline-none transition-colors bg-white';
 const inputPrefilledCls =
@@ -143,7 +146,7 @@ export default function Step1PersonalInfo() {
             type="date"
             {...register('personalInfo.dateOfBirth')}
             className={cls('dateOfBirth')}
-            max={new Date(Date.now() - 18 * 365.25 * 86400000).toISOString().split('T')[0]}
+            max={MAX_DOB_DATE}
           />
           {e?.dateOfBirth && <p className={errorCls}>{e.dateOfBirth.message}</p>}
         </div>
