@@ -90,8 +90,9 @@ section "2. Auth & Authorisation"
 # All other mutation endpoints must call withAuth().
 missing_auth=()
 while IFS= read -r -d '' file; do
-  # Skip the auth bootstrapping routes (these cannot require a session)
-  if [[ "$file" == */api/auth/* ]]; then
+  # Skip auth bootstrapping and inbound webhook routes.
+  # Webhooks authenticate via HMAC/bearer signature, not session cookies.
+  if [[ "$file" == */api/auth/* ]] || [[ "$file" == */api/webhooks/* ]]; then
     continue
   fi
   if grep -qE "export async function (POST|PUT|PATCH|DELETE)" "$file"; then
