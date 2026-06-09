@@ -3,10 +3,12 @@ import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
 import { getAdminDb, verifySessionOrIdToken } from '@/lib/firebase/admin';
 import type { LoanApplication } from '@/types/application';
+import type { ScheduledPayment } from '@/types/application';
 import ApplicationActions from './ApplicationActions';
 import AddNoteForm from './AddNoteForm';
 import DecisionForm from './DecisionForm';
 import ExistingCustomerToggle from './ExistingCustomerToggle';
+import ScheduledPaymentsPanel from './ScheduledPaymentsPanel';
 import { loanPurposeLabel } from '@/lib/constants/loan-purposes';
 import { computeApplicationFee } from '@/lib/constants/fees';
 import { reconcileConsent } from '@/lib/qippay/reconcile-consent';
@@ -72,6 +74,8 @@ const fmtTs = (ts?: { _seconds?: number; toDate?: () => Date } | null) => {
   return new Intl.DateTimeFormat('en-NZ', { dateStyle: 'medium', timeStyle: 'short' }).format(d);
 };
 
+const PAYMENT_STATUSES = new Set(['disbursed', 'active', 'closed_repaid']);
+
 export default async function LenderApplicationDetailPage({
   params,
 }: {
@@ -122,6 +126,9 @@ export default async function LenderApplicationDetailPage({
   const decision = app.decision;
   const timeline = app.timeline as Record<string, unknown>;
   const docRequest = app.documentRequest as { requiredDocuments?: string[]; message?: string; requestedAt?: unknown } | undefined;
+
+  // Scheduled payments for repayment tracking (populated at disbursement)
+  const scheduledPayments = (app.scheduledPayments ?? []) as ScheduledPayment[];
 
   const isAssigned = app.assignedLenderId === decoded.uid;
 
@@ -220,6 +227,14 @@ export default async function LenderApplicationDetailPage({
             <p className="text-sm text-gray-600 mt-2">{ld.purposeDescription}</p>
           )}
         </section>
+
+        {/* Scheduled Repayments — visible once loan is disbursed */}
+        {PAYMENT_STATUSES.has(status) && (
+          <ScheduledPaymentsPanel
+            applicationId={id}
+            scheduledPayments={scheduledPayments}
+          />
+        )}
 
         {/* Personal Info */}
         {pi && (

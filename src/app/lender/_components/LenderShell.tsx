@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { href: '/lender/applications', label: 'Applications' },
   { href: '/lender/customers', label: 'Customers' },
   { href: '/lender/portfolio', label: 'Portfolio' },
+  { href: '/lender/settings', label: 'Settings' },
   { href: '/lender/profile', label: 'Profile' },
 ];
 
@@ -45,15 +46,22 @@ export default function LenderShell({ children }: { children: ReactNode }) {
           </div>
 
           <nav className="flex-1 px-3 py-4 space-y-1">
-            {NAV_ITEMS.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="block px-3 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-[#FEF7E9] hover:text-[#E08B00] transition-colors"
-              >
-                {item.label}
-              </Link>
-            ))}
+            {NAV_ITEMS.map((item) => {
+              const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`block px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                    isActive
+                      ? 'bg-[#FEF7E9] text-[#E08B00]'
+                      : 'text-gray-700 hover:bg-[#FEF7E9] hover:text-[#E08B00]'
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
           </nav>
 
           <div className="px-3 py-4 border-t border-gray-100">

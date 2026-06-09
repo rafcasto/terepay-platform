@@ -68,6 +68,33 @@ export interface PaymentConsent {
   attempts: PaymentConsentAttempt[];
 }
 
+// ---------------------------------------------------------------------------
+// Scheduled Payments (Qippay SetPay recurring instalment tracking)
+// Each entry corresponds to one instalment from paymentConsent.scheduleSummary.
+// Created when the lender schedules a payment via POST /v1/setpay;
+// status is updated by either the webhook receiver or the manual poll route.
+// ---------------------------------------------------------------------------
+export type ScheduledPaymentStatus =
+  | 'pending'    // not yet submitted to Qippay
+  | 'scheduled'  // submitted — Qippay will collect on dueDate
+  | 'success'    // collected successfully
+  | 'retrying'   // failed, Qippay retrying next day (max_retry)
+  | 'failed'     // failed and will not be retried
+  | 'cancelled'; // consent was revoked/cancelled before collection
+
+export interface ScheduledPayment {
+  installmentNumber: number;        // 1-based index
+  dueDate: string;                  // YYYY-MM-DD (the scheduled_for date sent to Qippay)
+  amountCents: number;
+  qippayPaymentId?: string;         // pmU_... returned by POST /v1/setpay
+  status: ScheduledPaymentStatus;
+  scheduledAt?: Timestamp;          // when we called POST /v1/setpay
+  completedAt?: Timestamp;          // when payment.status.success confirmed
+  failedAt?: Timestamp;
+  failureReason?: string;
+  retryCount: number;               // incremented on each setpay.status.retry event
+}
+
 // Legacy statuses retained for backward-compat during migration
 export type LegacyApplicationStatus =
   | 'submitted'
@@ -409,6 +436,13 @@ export interface LoanApplication {
 
   /** Qippay SetPay mandate gating disbursement. Created post-accept; mandate must be `active` before lender can disburse. */
   paymentConsent?: PaymentConsent;
+
+  /**
+   * Tracks the status of each fortnightly instalment scheduled via POST /v1/setpay.
+   * Initialised from paymentConsent.scheduleSummary.installments when the lender
+   * first schedules a payment. Updated by the webhook receiver or the manual poll route.
+   */
+  scheduledPayments?: ScheduledPayment[];
 
   // TerePay 8-section form data
   personalInfo?: TerePayPersonalInfo;
