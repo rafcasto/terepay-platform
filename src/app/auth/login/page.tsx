@@ -168,7 +168,7 @@ function LoginFormInner() {
     try {
       const recaptchaToken = executeRecaptcha ? await executeRecaptcha('login') : undefined;
       const user = await login(data.email, data.password, recaptchaToken);
-      const dest = redirectTo ?? (user?.role === 'lender' ? '/lender/dashboard' : '/applicant/dashboard');
+      const dest = redirectTo ?? (user?.role === 'admin' ? '/admin/dashboard' : user?.role === 'lender' ? '/lender/dashboard' : '/applicant/dashboard');
       router.push(dest);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Invalid email or password';

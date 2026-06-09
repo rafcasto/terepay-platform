@@ -50,14 +50,20 @@ export function middleware(request: NextRequest) {
     if (pathname.startsWith('/lender') && role !== 'lender') {
       // Known-role mismatch → send to correct dashboard; missing/unknown role → login
       return NextResponse.redirect(
-        new URL(role === 'applicant' ? '/applicant/dashboard' : '/auth/login', request.url),
+        new URL(
+          role === 'applicant' ? '/applicant/dashboard' : role === 'admin' ? '/admin/dashboard' : '/auth/login',
+          request.url,
+        ),
       );
     }
 
     if (pathname.startsWith('/applicant') && role !== 'applicant') {
       // Known-role mismatch → send to correct dashboard; missing/unknown role → login
       return NextResponse.redirect(
-        new URL(role === 'lender' ? '/lender/dashboard' : '/auth/login', request.url),
+        new URL(
+          role === 'lender' ? '/lender/dashboard' : role === 'admin' ? '/admin/dashboard' : '/auth/login',
+          request.url,
+        ),
       );
     }
   } catch {
