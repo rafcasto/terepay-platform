@@ -264,7 +264,7 @@ export default function LoginPage() {
             <span className="text-2xl font-extrabold text-[#F5A523]">TerePay</span>
           </div>
 
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">Welcome back</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-3">Welcome back</h1>
           <p className="text-sm text-gray-500 mb-8">Sign in to your account</p>
 
           <Suspense>

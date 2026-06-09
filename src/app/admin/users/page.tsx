@@ -32,10 +32,15 @@ export default function AdminUsersPage() {
 
   const load = () => {
     setLoading(true);
+    setError(null);
     fetch('/api/admin/users')
-      .then((r) => r.json())
+      .then(async (r) => {
+        const json = await r.json();
+        if (!r.ok) throw new Error(json.error?.message ?? `Server error ${r.status}`);
+        return json;
+      })
       .then((json) => setUsers(json.data ?? []))
-      .catch(() => setError('Failed to load users'))
+      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load users'))
       .finally(() => setLoading(false));
   };
 

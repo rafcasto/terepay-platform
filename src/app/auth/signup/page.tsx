@@ -240,8 +240,8 @@ export default function SignupPage() {
             <span className="text-2xl font-extrabold text-[#F5A523]">TerePay</span>
           </div>
 
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">Create your account</h1>
-          <p className="text-sm text-gray-500 mb-7">Fill in your details to get started</p>
+          <h1 className="text-2xl font-bold text-gray-900 mb-3">Create your account</h1>
+          <p className="text-sm text-gray-500 mb-8">Fill in your details to get started</p>
 
           <div className="space-y-4">
             {/* Name row */}

@@ -34,11 +34,15 @@ export const disableSmsOtp = flag<boolean>({
  * DEFAULT OFF. Must be enabled explicitly in the Vercel dashboard before the
  * reset button becomes active. Intended for dev/staging environments only.
  * Never enable this on production.
+ *
+ * Local override: set ENV_RESET_ENABLED=true in .env.local.
+ * Vercel override: toggle the `env_reset_enabled` flag in the Vercel dashboard
+ * (Flags section) for your dev/staging project.
  */
 export const envResetEnabled = flag<boolean>({
   key: 'env_reset_enabled',
   description: 'Allow full environment data reset from admin console (dev/staging only — never enable on production)',
-  decide: () => false,
+  decide: () => process.env.ENV_RESET_ENABLED === 'true',
 });
 
 // Keep lazy-getter aliases for backward compatibility
