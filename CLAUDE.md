@@ -137,3 +137,178 @@ Don't duplicate these — point at them.
 - Don't use inline `style={}` for brand colors — use Tailwind arbitrary values
 - Don't use `Math.random()` for any security-sensitive value — use `crypto.randomBytes()` or `randomUUID()`
 - Don't return raw Firebase errors, Zod errors, or stack traces to the client — use `errorResponse()` / `internalError()`
+
+---
+
+## Design System
+
+TerePay uses a brand design system defined in [src/app/globals.css](src/app/globals.css). Every agent working on UI **must read this section** before writing any styling or components.
+
+### Token layers
+
+`globals.css` has two layers of tokens — both are live, both must be preserved:
+
+| Layer | Token style | Purpose |
+|---|---|---|
+| **App tokens** | `--ink`, `--accent`, `--surface`, `--border` | Used by all existing components — do not remove |
+| **DS tokens** | `--orange-500`, `--ink-900`, `--surface-card` | Full design system scale — use for all new work |
+
+### Brand identity
+
+TerePay is a New Zealand micro-lending service for migrant communities. The visual language is **clean, trustworthy, institutional** — warm orange identity on a disciplined navy-slate-and-white base. The orange brings human, optimistic energy; the navy keeps it feeling like a regulated financial service, not a payday app.
+
+**Tagline:** *Borrowing power in your hands.*
+**Always beside borrowing CTAs:** *All loans are charged interest (see below).*
+
+### Compliance rules — never break
+
+TerePay is a registered NZ financial service provider (CCCFA / Commerce Commission guidelines, Aug 2025):
+
+- **Never** imply a loan is free, guaranteed, instant-with-no-checks, or consequence-free.
+- **Always** keep interest + fees visible wherever an amount or borrow/apply CTA appears.
+- **Always** state that applications can be declined and keep hardship + dispute-resolution links reachable.
+- CTAs must be honest: "Apply now", "Ready to borrow?", "Check what you'll repay" — never "Get free cash" or "Approved instantly".
+- No emoji in product UI (user-generated content is the exception).
+
+### Colour system
+
+Use **semantic aliases** in components. Reach for raw scale tokens only in the token layer.
+
+| Token | Value | Use |
+|---|---|---|
+| `--orange-500` | `#F08000` | BRAND — surfaces and large graphics only, **never body text on white** |
+| `--orange-700` | `#B45600` | Accessible orange **text / CTAs** on white (≥ 4.5:1) |
+| `--gold-500` | `#F59A1E` | Hero band amber (≈ `--accent`) |
+| `--gold-300` | `#FBC78D` | Peach accent (the "Pay" wordmark colour) |
+| `--ink-800` | `#16263B` | Dark surfaces, primary "ink" buttons |
+| `--ink-900` | `#0F1D2E` | Text on bright orange/gold surfaces |
+| `--slate-50` | `#F6F8FB` | Page background |
+| `--text-body` | `#1C2A3A` | Body text (≈ 12:1 on white) |
+| `--text-muted` | `--slate-500` | Secondary text (≈ 4.9:1) |
+| `--text-accent` | `--orange-700` | Accessible orange text |
+
+**Accessibility contract:**
+- `--orange-500` on white fails AA — never use as text.
+- `--orange-700` is the minimum for orange text/icon on white.
+- Ink text on bright-orange/gold surfaces; white text only on `--orange-700`+.
+
+### Typography
+
+New components should use the DS font tokens (via Tailwind `font-display`, `font-brand`, `font-tabular`). Existing components using `font-sans` / `font-mono` continue to get Inter / JetBrains — both font sets are loaded.
+
+| Token | Family | Use |
+|---|---|---|
+| `--font-serif` / `font-serif` | Lora | Brand wordmark, big editorial moments |
+| `--font-display` / `font-display` | Poppins | Marketing headings |
+| `--font-brand` | Public Sans | Body & UI for new DS components |
+| `--font-tabular` | IBM Plex Mono | Money figures, reference numbers |
+| `--font-sans` / `font-sans` | Inter | Existing components (backward compat) |
+| `--font-mono` / `font-mono` | JetBrains Mono | Existing components (backward compat) |
+
+Type scale: `--text-caption` (12px min) → `--text-body-sm` (14) → `--text-body-size` (16) → `--text-h4` (18) → `--text-h3` (20) → `--text-h2` (24) → `--text-h1` (32) → display sizes up to 56px.
+
+### Spacing & radii
+
+4px base grid: `--space-1` (4px) … `--space-24` (96px).
+
+| Token | Value | Use |
+|---|---|---|
+| `--radius-md` | 10px | Inputs, small controls |
+| `--radius` / `--radius-card` | 14px | Cards |
+| `--radius-xl` | 20px | Large panels |
+| `--radius-2xl` | 28px | Hero/feature surfaces |
+| `--radius-pill` | 999px | Tags, chips, pills |
+
+### Shadows
+
+Cool navy-tinted, low opacity — cards lift gently, never float dramatically.
+
+| Token | Use |
+|---|---|
+| `--shadow-md` | Default card shadow |
+| `--shadow-lg` | Elevated panels, modals |
+| `--shadow-brand` | Rare warm orange glow for brand emphasis |
+
+### Cards
+
+```css
+background: var(--surface-card);
+border-radius: var(--radius-card);
+border: 1px solid var(--border-default);
+box-shadow: var(--shadow-md);
+```
+
+Use utility class `.tp-card` or replicate these four rules.
+
+### Motion
+
+Quick and confident — 120–200ms, `--ease-standard`. No decorative looping animation in product UI. All motion respects `prefers-reduced-motion` (handled globally in `globals.css`).
+
+| Token | Value |
+|---|---|
+| `--dur-fast` | 120ms |
+| `--dur-base` | 200ms |
+| `--ease-standard` | `cubic-bezier(0.2, 0, 0, 1)` |
+
+### Focus
+
+Always visible: `2px solid var(--focus-ring)` with `2px offset`. Never remove focus outlines. Handled globally in `globals.css` via `:focus-visible`.
+
+### Icons
+
+Use **Lucide** icons — line style, 20–24px in UI, stroke `1.75`, `currentColor`. The TerePay chevron mark (`/brand/terepay-mark.png`) is the one brand glyph for logo lockups only. No emoji in product UI.
+
+### Logo assets
+
+Stored in `public/brand/`. Use correct variant per surface:
+
+| File | Use |
+|---|---|
+| `terepay-logo.png` | Primary lockup (chevron mark + wordmark) |
+| `terepay-mark.png` | Compact / favicon / icon |
+| `terepay-wordmark.png` | Inline / footer |
+| `terepay-logo-white.png` | On dark or orange surfaces |
+| `terepay-mark-white.png` | Compact on dark/orange |
+| `terepay-wordmark-white.png` | Wordmark on dark/orange |
+
+Keep clear space of at least one chevron-height around the mark. Don't recolour or stretch.
+
+### Design system utility classes
+
+| Class | Purpose |
+|---|---|
+| `.tp-card` | White card with 14px radius, hairline border, `--shadow-md` |
+| `.tp-num` | IBM Plex Mono tabular figures (money amounts) |
+| `.tp-eyebrow` | Uppercase Poppins label in `--text-accent` |
+| `.tp-wave` | Signature concave/convex section-transition wave divider |
+
+### Surfaces
+
+| Context | Background | Text |
+|---|---|---|
+| Page | `--surface-page` (`#F6F8FB`) | `--text-body` |
+| Card | `--surface-card` (white) | `--text-body` |
+| Hero/CTA band | `--surface-hero` (amber) | `--text-on-brand` (ink) |
+| Dark section | `--surface-inverse` (navy) | `--text-on-inverse` |
+| Brand accent | `--surface-brand` (orange) | `--text-on-brand` (ink) |
+
+### Voice & tone
+
+- **Warm but factual** — reassuring yet always paired with real terms.
+- **Second person, active** — "you" for the reader, "we" for TerePay.
+- **Plain words, short sentences** — "pay back" not "amortise"; spell out jargon.
+- **Transparent, never minimising** — costs and decline risk are stated openly.
+- **No emoji in product UI.** Sentence case for body; Title Case for a few marketing display lines only.
+- Currency: `$1,067.00` NZD, two decimals, comma thousands. Rates as `0.04%`.
+
+### Tailwind mapping
+
+DS tokens are bridged into Tailwind utilities via `@theme inline` in `globals.css`:
+
+```tsx
+className="bg-brand text-brand-text border-border-default rounded-card shadow-md"
+className="font-display"   // Poppins headings
+className="font-tabular"   // IBM Plex Mono money figures
+```
+
+See the `@theme inline` block in `globals.css` for the full token → utility mapping.
