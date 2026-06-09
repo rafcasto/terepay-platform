@@ -7,14 +7,20 @@ type Permission =
   | 'applications:read:all'
   | 'applications:update:own'
   | 'applications:approve'
+  | 'applications:reassign'
   | 'customers:create'
   | 'customers:read:all'
   | 'users:read:own'
   | 'users:update:own'
   | 'users:read:all'
+  | 'users:create:lender'
+  | 'users:update:any'
   | 'payments:create'
   | 'payments:read:own'
-  | 'payments:read:all';
+  | 'payments:read:all'
+  | 'admin:settings'
+  | 'admin:config'
+  | 'admin:email_templates';
 
 const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   applicant: [
@@ -36,6 +42,28 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'users:update:own',
     'users:read:all',
     'payments:read:all',
+  ],
+  admin: [
+    'applications:create',
+    'applications:create:on_behalf',
+    'applications:read:own',
+    'applications:read:all',
+    'applications:update:own',
+    'applications:approve',
+    'applications:reassign',
+    'customers:create',
+    'customers:read:all',
+    'users:read:own',
+    'users:update:own',
+    'users:read:all',
+    'users:create:lender',
+    'users:update:any',
+    'payments:create',
+    'payments:read:own',
+    'payments:read:all',
+    'admin:settings',
+    'admin:config',
+    'admin:email_templates',
   ],
 };
 

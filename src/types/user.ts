@@ -1,6 +1,6 @@
 import type { Timestamp } from 'firebase-admin/firestore';
 
-export type UserRole = 'applicant' | 'lender';
+export type UserRole = 'applicant' | 'lender' | 'admin';
 export type UserStatus = 'active' | 'suspended' | 'inactive';
 export type KycStatus = 'not_started' | 'in_progress' | 'submitted' | 'approved' | 'rejected';
 export type ImmigrationStatus = 'student' | 'work_visa' | 'resident' | 'permanent_resident' | 'citizen';
