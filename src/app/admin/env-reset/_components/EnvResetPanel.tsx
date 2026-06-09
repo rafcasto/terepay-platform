@@ -23,7 +23,7 @@ const CONFIRM_PHRASE = 'RESET ENVIRONMENT';
 
 type ResetSummary = Record<string, number>;
 
-export default function EnvResetPanel({ flagEnabled }: { flagEnabled: boolean }) {
+export default function EnvResetPanel() {
   const [confirmInput, setConfirmInput] = useState('');
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -64,39 +64,6 @@ export default function EnvResetPanel({ flagEnabled }: { flagEnabled: boolean })
 
   return (
     <div className="space-y-6">
-      {/* Flag status banner */}
-      <div
-        className={`rounded-xl border p-4 flex items-start gap-3 ${
-          flagEnabled
-            ? 'border-red-200 bg-red-50'
-            : 'border-slate-200 bg-slate-50'
-        }`}
-      >
-        <div
-          className={`mt-0.5 h-2 w-2 rounded-full shrink-0 ${
-            flagEnabled ? 'bg-red-500' : 'bg-slate-400'
-          }`}
-        />
-        <div>
-          <p className={`text-sm font-semibold ${flagEnabled ? 'text-red-800' : 'text-slate-700'}`}>
-            {flagEnabled ? 'Reset flag is ENABLED' : 'Reset flag is disabled'}
-          </p>
-          <p className={`text-xs mt-0.5 ${flagEnabled ? 'text-red-700' : 'text-slate-500'}`}>
-            {flagEnabled
-              ? 'The env_reset_enabled flag is ON in Vercel. The reset button below is active.'
-              : 'To enable this feature, turn on the env_reset_enabled flag in the Vercel dashboard. This is intentionally off by default.'}
-          </p>
-        </div>
-        <a
-          href="https://vercel.com/dashboard"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="ml-auto shrink-0 text-xs font-medium text-slate-500 hover:text-slate-700 underline"
-        >
-          Open Vercel
-        </a>
-      </div>
-
       {/* What will happen */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="tp-card p-5">
@@ -162,7 +129,7 @@ export default function EnvResetPanel({ flagEnabled }: { flagEnabled: boolean })
           value={confirmInput}
           onChange={(e) => setConfirmInput(e.target.value)}
           placeholder={CONFIRM_PHRASE}
-          disabled={!flagEnabled || running}
+          disabled={running}
           className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-mono focus:border-red-400 focus:outline-none focus:ring-1 focus:ring-red-300 disabled:bg-slate-50 disabled:text-slate-400 mb-4"
         />
 
@@ -175,7 +142,7 @@ export default function EnvResetPanel({ flagEnabled }: { flagEnabled: boolean })
         <button
           type="button"
           onClick={handleReset}
-          disabled={!flagEnabled || !confirmed || running}
+          disabled={!confirmed || running}
           className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {running ? (
@@ -195,12 +162,6 @@ export default function EnvResetPanel({ flagEnabled }: { flagEnabled: boolean })
             </>
           )}
         </button>
-
-        {!flagEnabled && (
-          <p className="mt-3 text-xs text-slate-400">
-            Button disabled — enable the Vercel flag first.
-          </p>
-        )}
       </div>
     </div>
   );

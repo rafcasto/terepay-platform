@@ -1,8 +1,14 @@
+import { redirect } from 'next/navigation';
 import { envResetEnabled } from '@/lib/flags/flags';
 import EnvResetPanel from './_components/EnvResetPanel';
 
 export default async function EnvResetPage() {
   const flagEnabled = await envResetEnabled();
+
+  // Page is inaccessible when the flag is off — direct URL access redirects away
+  if (!flagEnabled) {
+    redirect('/admin/dashboard');
+  }
 
   return (
     <div className="p-6 max-w-3xl mx-auto">
@@ -42,7 +48,7 @@ export default async function EnvResetPage() {
         </div>
       </div>
 
-      <EnvResetPanel flagEnabled={flagEnabled} />
+      <EnvResetPanel />
     </div>
   );
 }

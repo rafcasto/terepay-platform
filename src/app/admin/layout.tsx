@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { verifySessionOrIdToken } from '@/lib/firebase/admin';
+import { envResetEnabled } from '@/lib/flags/flags';
 import AdminShell from './_components/AdminShell';
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
@@ -12,5 +13,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   const decoded = await verifySessionOrIdToken(session).catch(() => null);
   if (!decoded || decoded.role !== 'admin') redirect('/auth/login');
 
-  return <AdminShell>{children}</AdminShell>;
+  const showEnvReset = await envResetEnabled();
+
+  return <AdminShell showEnvReset={showEnvReset}>{children}</AdminShell>;
 }
