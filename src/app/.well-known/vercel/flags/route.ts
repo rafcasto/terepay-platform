@@ -6,6 +6,7 @@ import {
   paymentTrackingV2,
   autoUnderwriting,
   disableSmsOtp,
+  envResetEnabled,
 } from '../../../../lib/flags/flags';
 
 export async function GET(request: NextRequest) {
@@ -18,6 +19,7 @@ export async function GET(request: NextRequest) {
     paymentTrackingV2,
     autoUnderwriting,
     disableSmsOtp,
+    envResetEnabled,
   });
   return NextResponse.json(data);
 }

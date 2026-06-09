@@ -117,7 +117,24 @@ export default function AdminShell({ children }: { children: ReactNode }) {
             })}
           </nav>
 
-          <div className="px-3 py-4 border-t border-white/10">
+          {/* Danger zone + Sign out */}
+          <div className="px-3 pb-4 space-y-0.5 border-t border-white/10 pt-3">
+            {/* Env Reset */}
+            <Link
+              href="/admin/env-reset"
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                pathname?.startsWith('/admin/env-reset')
+                  ? 'bg-red-500/20 text-red-400'
+                  : 'text-slate-500 hover:bg-red-500/10 hover:text-red-400'
+              }`}
+            >
+              <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+              </svg>
+              Env Reset
+            </Link>
+
+            {/* Sign Out */}
             <form action="/api/auth/logout" method="POST">
               <button
                 type="submit"
