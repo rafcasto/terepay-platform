@@ -538,3 +538,122 @@ export function normaliseNzPhoneForQippay(input: string): string {
   if (raw.startsWith('0')) return `+64-${raw.slice(1)}`;
   return `+64-${raw}`;
 }
+
+
+// --- Detailed consent status (real-time bank check + payment history) ----
+
+export type SetPayConsentOverallStatus = {
+  periodIndex: number;
+  periodStart: string | null;
+  periodEnd: string | null;
+  amountComplete: number;
+  amountScheduled: number;
+  amountAvailable: number | null;
+  countComplete: number;
+  countScheduled: number;
+  countAvailable: number | null;
+};
+
+export type SetPayDetailedStatus = {
+  epcId: string;
+  status: string;
+  providerStatus: { status: string; statusUpdateDateTime: string; error: unknown } | null;
+  consentOverallStatus: SetPayConsentOverallStatus | null;
+  periodStatus: SetPayConsentOverallStatus[];
+};
+
+type DetailedStatusResponse = {
+  enduringConsent?: {
+    id: string;
+    status: string;
+  };
+  providerStatus?: {
+    Status: string;
+    StatusUpdateDateTime: string;
+    Error: unknown;
+  } | null;
+  consent_overall_status?: {
+    period_index: number;
+    period_start: string | null;
+    period_end: string | null;
+    amount_complete: number;
+    amount_scheduled: number;
+    amount_available: number | null;
+    count_complete: number;
+    count_scheduled: number;
+    count_available: number | null;
+  } | null;
+  period_status?: Array<{
+    period_index: number;
+    period_start: string | null;
+    period_end: string | null;
+    amount_complete: number;
+    amount_scheduled: number;
+    amount_available: number | null;
+    count_complete: number;
+    count_scheduled: number;
+    count_available: number | null;
+  }>;
+};
+
+function mapOverallStatus(
+  raw: DetailedStatusResponse['consent_overall_status'],
+): SetPayConsentOverallStatus | null {
+  if (!raw) return null;
+  return {
+    periodIndex: raw.period_index,
+    periodStart: raw.period_start,
+    periodEnd: raw.period_end,
+    amountComplete: raw.amount_complete,
+    amountScheduled: raw.amount_scheduled,
+    amountAvailable: raw.amount_available,
+    countComplete: raw.count_complete,
+    countScheduled: raw.count_scheduled,
+    countAvailable: raw.count_available,
+  };
+}
+
+export async function getDetailedConsentStatus(
+  epcId: string,
+): Promise<SetPayDetailedStatus> {
+  const env = readEnv();
+
+  if (env.mode === 'stub') {
+    return {
+      epcId,
+      status: 'success',
+      providerStatus: { status: 'Authorised', statusUpdateDateTime: new Date().toISOString(), error: null },
+      consentOverallStatus: {
+        periodIndex: 0,
+        periodStart: null,
+        periodEnd: null,
+        amountComplete: 0,
+        amountScheduled: 0,
+        amountAvailable: null,
+        countComplete: 0,
+        countScheduled: 0,
+        countAvailable: null,
+      },
+      periodStatus: [],
+    };
+  }
+
+  const data = await qippayFetch<DetailedStatusResponse>(
+    `/v1/enduring_initiation/${encodeURIComponent(epcId)}/status`,
+    { method: 'GET' },
+  );
+
+  return {
+    epcId: data.enduringConsent?.id ?? epcId,
+    status: data.enduringConsent?.status ?? 'unknown',
+    providerStatus: data.providerStatus
+      ? {
+          status: data.providerStatus.Status,
+          statusUpdateDateTime: data.providerStatus.StatusUpdateDateTime,
+          error: data.providerStatus.Error,
+        }
+      : null,
+    consentOverallStatus: mapOverallStatus(data.consent_overall_status),
+    periodStatus: (data.period_status ?? []).map((p) => mapOverallStatus(p)!),
+  };
+}
