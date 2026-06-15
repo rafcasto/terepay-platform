@@ -6,6 +6,10 @@ import { getSiteSettings } from '@/lib/admin/site-settings';
 import MaintenancePage from '@/components/shared/MaintenancePage';
 import LenderShell from './_components/LenderShell';
 
+// Maintenance mode is read from Firestore per request — never statically prerender
+// this segment, or the flag would be frozen at build time. Applies to all /lender/* routes.
+export const dynamic = 'force-dynamic';
+
 export default async function LenderLayout({ children }: { children: ReactNode }) {
   const cookieStore = await cookies();
   const session = cookieStore.get('__session')?.value;

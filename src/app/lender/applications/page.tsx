@@ -1,55 +1,11 @@
 import { cookies } from 'next/headers';
 import Link from 'next/link';
 import { adminDb, verifySessionOrIdToken } from '@/lib/firebase/admin';
-import Badge from '@/components/shared/Badge';
-import type { ApplicationStatus } from '@/types/application';
+import { loanPurposeLabel } from '@/lib/constants/loan-purposes';
+import ConsoleIcon, { type ConsoleIconName } from '@/components/lender/ConsoleIcon';
+import WorklistTable, { type WorklistRow } from './_components/WorklistTable';
 
-type BadgeVariant = 'default' | 'success' | 'warning' | 'error' | 'info';
-
-const STATUS_VARIANT: Record<string, BadgeVariant> = {
-  pending_review: 'info',
-  under_assessment: 'warning',
-  waiting_for_docs: 'warning',
-  credit_check: 'info',
-  approved: 'success',
-  loan_accepted: 'success',
-  awaiting_payment_consent: 'warning',
-  offer_declined: 'default',
-  disbursed: 'success',
-  active: 'success',
-  closed_repaid: 'default',
-  declined: 'error',
-  withdrawn: 'default',
-  expired: 'default',
-  // legacy
-  submitted: 'info',
-  under_review: 'warning',
-  rejected: 'error',
-  funded: 'success',
-  completed: 'success',
-};
-
-const STATUS_LABEL: Record<string, string> = {
-  pending_review: 'Pending Review',
-  under_assessment: 'Under Assessment',
-  waiting_for_docs: 'Waiting for Docs',
-  credit_check: 'Credit Check',
-  approved: 'Approved',
-  loan_accepted: 'Loan Accepted',
-  awaiting_payment_consent: 'Awaiting Bank Authorisation',
-  offer_declined: 'Offer Declined',
-  disbursed: 'Disbursed',
-  active: 'Active',
-  closed_repaid: 'Closed — Repaid',
-  declined: 'Declined',
-  withdrawn: 'Withdrawn',
-  expired: 'Expired',
-  submitted: 'Submitted',
-  under_review: 'Under Review',
-  rejected: 'Rejected',
-  funded: 'Funded',
-  completed: 'Completed',
-};
+export const dynamic = 'force-dynamic';
 
 const ALL_STATUSES = [
   'pending_review', 'under_assessment', 'waiting_for_docs', 'credit_check',
@@ -58,19 +14,33 @@ const ALL_STATUSES = [
   // Firestore admin SDK supports up to 30 'in' values.
 ];
 
-const fmt = (n: number) =>
-  new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD', minimumFractionDigits: 0 }).format(n);
+type TS = { toDate?: () => Date; _seconds?: number } | null | undefined;
 
-const fmtDate = (ts?: { toDate?: () => Date } | null) => {
-  if (!ts?.toDate) return '—';
-  return new Intl.DateTimeFormat('en-NZ', { dateStyle: 'medium' }).format(ts.toDate());
+function tsToDate(ts: TS): Date | null {
+  if (!ts) return null;
+  if (typeof ts.toDate === 'function') return ts.toDate();
+  if (typeof ts._seconds === 'number') return new Date(ts._seconds * 1000);
+  return null;
+}
+
+const fmtDate = (ts: TS) => {
+  const d = tsToDate(ts);
+  return d ? new Intl.DateTimeFormat('en-NZ', { dateStyle: 'medium' }).format(d) : '—';
 };
 
-function daysPending(submittedAt?: { toDate?: () => Date } | null): number | null {
-  if (!submittedAt?.toDate) return null;
-  const ms = Date.now() - submittedAt.toDate().getTime();
-  return Math.floor(ms / (1000 * 60 * 60 * 24));
+function daysPending(ts: TS): number | null {
+  const d = tsToDate(ts);
+  if (!d) return null;
+  return Math.floor((Date.now() - d.getTime()) / (1000 * 60 * 60 * 24));
 }
+
+// KPI icon container tone → [bg class, fg class]
+const KPI_TONE: Record<string, [string, string]> = {
+  brand: ['bg-[var(--orange-50)]', 'text-[var(--orange-700)]'],
+  info: ['bg-[var(--info-50)]', 'text-[var(--info-700)]'],
+  warning: ['bg-[var(--warning-50)]', 'text-[var(--warning-700)]'],
+  success: ['bg-[var(--success-50)]', 'text-[var(--success-700)]'],
+};
 
 export default async function LenderApplicationsPage() {
   const cookieStore = await cookies();
@@ -86,120 +56,86 @@ export default async function LenderApplicationsPage() {
     .orderBy('timeline.submittedAt', 'asc') // oldest first per requirements
     .get();
 
-  const applications = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const apps = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Record<string, unknown>));
 
-  const pending = applications.filter((a) => {
-    const s = (a as Record<string, unknown>).status as string;
-    return s === 'pending_review';
-  });
-  const inProgress = applications.filter((a) => {
-    const s = (a as Record<string, unknown>).status as string;
-    return ['under_assessment', 'waiting_for_docs', 'credit_check', 'loan_accepted', 'awaiting_payment_consent'].includes(s);
-  });
-  const decided = applications.filter((a) => {
-    const s = (a as Record<string, unknown>).status as string;
-    return ['approved', 'disbursed', 'active', 'closed_repaid', 'declined', 'withdrawn'].includes(s);
+  const rows: WorklistRow[] = apps.map((a) => {
+    const ld = a.loanDetails as { requestedAmount?: number; loanPurpose?: string } | undefined;
+    const pi = a.personalInfo as { firstName?: string; lastName?: string } | undefined;
+    const submittedAt = (a.timeline as Record<string, TS> | undefined)?.submittedAt;
+    return {
+      id: a.id as string,
+      reference: (a.referenceNumber as string) ?? `#${(a.id as string).slice(0, 8)}`,
+      name: pi ? `${pi.firstName ?? ''} ${pi.lastName ?? ''}`.trim() : '',
+      amount: ld?.requestedAmount ?? 0,
+      purpose: loanPurposeLabel(ld?.loanPurpose),
+      status: a.status as string,
+      submittedLabel: fmtDate(submittedAt),
+      daysPending: daysPending(submittedAt),
+    };
   });
 
-  const sections = [
-    { title: '⏳ Pending Review', apps: pending },
-    { title: '🔍 In Progress', apps: inProgress },
-    { title: '✅ Decided', apps: decided },
+  const countBy = (statuses: string[]) => rows.filter((r) => statuses.includes(r.status)).length;
+
+  const kpis: { label: string; value: number; icon: ConsoleIconName; tone: string }[] = [
+    { label: 'Pending review', value: countBy(['pending_review']), icon: 'inbox', tone: 'brand' },
+    { label: 'In assessment', value: countBy(['under_assessment', 'waiting_for_docs', 'credit_check']), icon: 'shield', tone: 'info' },
+    { label: 'Awaiting authorisation', value: countBy(['loan_accepted', 'awaiting_payment_consent']), icon: 'clock', tone: 'warning' },
+    { label: 'Active loans', value: countBy(['disbursed', 'active']), icon: 'wallet', tone: 'success' },
   ];
 
+  const overdue = rows.filter((r) => r.status === 'pending_review' && (r.daysPending ?? 0) > 2).length;
+
   return (
-    <div className="p-4 sm:p-8">
-      <div className="mb-6 flex items-center justify-between">
+    <div className="mx-auto max-w-[1480px] px-6 pb-14 pt-6 sm:px-[26px]">
+      {/* Page head */}
+      <div className="mb-[18px] flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Applications</h1>
-          <p className="text-gray-500 mt-1 text-sm">{applications.length} total application{applications.length !== 1 ? 's' : ''}</p>
+          <h1 className="m-0 font-display text-2xl font-bold tracking-[-0.01em] text-[var(--text-strong)]">
+            Worklist
+          </h1>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">
+            {rows.length} application{rows.length !== 1 ? 's' : ''} in the pipeline
+            {overdue > 0 && (
+              <>
+                {' · '}
+                <span className="font-semibold text-[var(--text-danger)]">{overdue} overdue</span>
+              </>
+            )}
+          </p>
         </div>
         <Link
           href="/lender/applications/new"
-          className="inline-flex items-center gap-2 px-4 py-2 bg-[#F5A523] text-white text-sm font-medium rounded-lg hover:bg-[#E08B00] transition-colors"
+          className="inline-flex h-[38px] items-center gap-2 rounded-[10px] bg-[var(--orange-500)] px-4 font-display text-[13.5px] font-semibold text-[var(--ink-900)] transition-[filter] hover:brightness-105"
         >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          New Application
+          <ConsoleIcon name="plus" size={17} />
+          New application
         </Link>
       </div>
 
-      {sections.map(({ title, apps }) => (
-        <div key={title} className="mb-8">
-          <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3">{title}</h2>
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            {apps.length === 0 ? (
-              <p className="px-6 py-8 text-sm text-gray-400 text-center">No applications in this category.</p>
-            ) : (
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Reference</th>
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide hidden sm:table-cell">Applicant</th>
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Amount</th>
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide hidden md:table-cell">Submitted</th>
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide hidden md:table-cell">Days Pending</th>
-                    <th className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {apps.map((app) => {
-                    const a = app as Record<string, unknown>;
-                    const status = a.status as string;
-                    const ld = a.loanDetails as { requestedAmount?: number; loanPurpose?: string } | undefined;
-                    const pi = a.personalInfo as { firstName?: string; lastName?: string } | undefined;
-                    const days = daysPending(a['timeline'] ? (a['timeline'] as Record<string, unknown>).submittedAt as { toDate?: () => Date } : null);
-                    const isOverdue = days !== null && days > 2 && status === 'pending_review';
+      {/* KPI strip */}
+      <div className="mb-[18px] grid gap-[18px] [grid-template-columns:repeat(auto-fit,minmax(190px,1fr))]">
+        {kpis.map((k) => {
+          const [bg, fg] = KPI_TONE[k.tone];
+          return (
+            <div
+              key={k.label}
+              className="rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-white p-[18px] shadow-[var(--shadow-xs)]"
+            >
+              <div className="mb-[11px] flex items-center justify-between gap-2">
+                <span className="text-[12.5px] font-medium text-[var(--text-muted)]">{k.label}</span>
+                <span className={`flex h-[34px] w-[34px] items-center justify-center rounded-[9px] ${bg} ${fg}`}>
+                  <ConsoleIcon name={k.icon} size={18} />
+                </span>
+              </div>
+              <div className="font-display text-[27px] font-bold leading-none tracking-[-0.02em] text-[var(--text-strong)]">
+                {k.value}
+              </div>
+            </div>
+          );
+        })}
+      </div>
 
-                    return (
-                      <tr key={app.id} className={`hover:bg-gray-50 transition-colors ${isOverdue ? 'bg-amber-50' : ''}`}>
-                        <td className="px-4 sm:px-6 py-4 font-mono text-xs text-gray-700">
-                          {(a.referenceNumber as string) ?? `#${app.id.slice(0, 8)}`}
-                          {isOverdue && (
-                            <span className="ml-2 text-amber-600 text-xs font-medium">⚠ Overdue</span>
-                          )}
-                        </td>
-                        <td className="px-4 sm:px-6 py-4 text-gray-700 hidden sm:table-cell">
-                          {pi ? `${pi.firstName ?? ''} ${pi.lastName ?? ''}`.trim() : '—'}
-                        </td>
-                        <td className="px-4 sm:px-6 py-4 text-gray-700 font-medium">
-                          {fmt(ld?.requestedAmount ?? 0)}
-                        </td>
-                        <td className="px-4 sm:px-6 py-4">
-                          <Badge variant={STATUS_VARIANT[status] ?? 'default'}>
-                            {STATUS_LABEL[status] ?? status}
-                          </Badge>
-                        </td>
-                        <td className="px-4 sm:px-6 py-4 text-gray-500 hidden md:table-cell">
-                          {fmtDate((a['timeline'] as Record<string, unknown>)?.submittedAt as { toDate?: () => Date } | null)}
-                        </td>
-                        <td className="px-4 sm:px-6 py-4 hidden md:table-cell">
-                          {days !== null ? (
-                            <span className={days > 2 && status === 'pending_review' ? 'text-amber-600 font-medium' : 'text-gray-500'}>
-                              {days}d
-                            </span>
-                          ) : '—'}
-                        </td>
-                        <td className="px-4 sm:px-6 py-4 text-right">
-                          <Link
-                            href={`/lender/applications/${app.id}`}
-                            className="text-indigo-600 hover:underline font-medium text-sm"
-                          >
-                            {status === 'pending_review' ? 'Review →' : 'View →'}
-                          </Link>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
-      ))}
+      <WorklistTable rows={rows} />
     </div>
   );
 }
-
