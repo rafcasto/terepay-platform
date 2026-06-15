@@ -26,6 +26,10 @@ export const metadata: Metadata = {
   },
 };
 
+// The landing page is gated by maintenance mode, which is read from Firestore
+// per request — force dynamic rendering so the flag is never frozen at build time.
+export const dynamic = 'force-dynamic';
+
 export default async function Home() {
   const settings = await getSiteSettings();
   if (settings.maintenanceMode.public) {
