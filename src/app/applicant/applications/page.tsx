@@ -1,4 +1,5 @@
 import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 import { getAdminDb, verifySessionOrIdToken } from '@/lib/firebase/admin';
 import Link from 'next/link';
 import { loanPurposeLabel } from '@/lib/constants/loan-purposes';
@@ -21,10 +22,10 @@ const DISPLAY_TONE: Record<LoanDisplayState, Parameters<typeof Pill>[0]['tone']>
 export default async function ApplicantApplicationsPage() {
   const cookieStore = await cookies();
   const session = cookieStore.get('__session')?.value;
-  if (!session) return null;
+  if (!session) redirect('/auth/login');
 
   const decoded = await verifySessionOrIdToken(session).catch(() => null);
-  if (!decoded) return null;
+  if (!decoded) redirect('/auth/login');
 
   const db = getAdminDb();
 

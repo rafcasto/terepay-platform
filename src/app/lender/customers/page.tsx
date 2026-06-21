@@ -1,4 +1,5 @@
 import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { adminDb, verifySessionOrIdToken } from '@/lib/firebase/admin';
 import CustomersTable from './_components/CustomersTable';
@@ -24,10 +25,10 @@ export type MergedCustomer = {
 export default async function LenderCustomersPage() {
   const cookieStore = await cookies();
   const session = cookieStore.get('__session')?.value;
-  if (!session) return null;
+  if (!session) redirect('/auth/login');
 
   const decoded = await verifySessionOrIdToken(session).catch(() => null);
-  if (!decoded || decoded.role !== 'lender') return null;
+  if (!decoded || decoded.role !== 'lender') redirect('/auth/login');
 
   // Fetch both collections in parallel
   const [onlineSnap, offlineSnap] = await Promise.all([

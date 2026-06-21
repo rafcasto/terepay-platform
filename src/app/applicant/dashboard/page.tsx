@@ -48,10 +48,10 @@ async function getDashboardData(uid: string) {
 export default async function ApplicantDashboard() {
   const cookieStore = await cookies();
   const session = cookieStore.get('__session')?.value;
-  if (!session) return null;
+  if (!session) redirect('/auth/login');
 
   const decoded = await verifySessionOrIdToken(session).catch(() => null);
-  if (!decoded) return null;
+  if (!decoded) redirect('/auth/login');
 
   const nextOnboardingStep = await resolveOnboardingStep(decoded.uid);
   if (nextOnboardingStep) redirect(nextOnboardingStep);
