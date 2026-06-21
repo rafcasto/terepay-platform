@@ -167,7 +167,7 @@ export default function SignupPage() {
               id="firstName"
               type="text"
               autoComplete="given-name"
-              placeholder="Rafael"
+              placeholder="Your first name"
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
               invalid={!!errors.firstName}
@@ -178,7 +178,7 @@ export default function SignupPage() {
               id="lastName"
               type="text"
               autoComplete="family-name"
-              placeholder="Castillo"
+              placeholder="Your last name"
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
               invalid={!!errors.lastName}
