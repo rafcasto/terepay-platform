@@ -12,6 +12,17 @@ import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 // Constants
 // ---------------------------------------------------------------------------
 
+const DIAL_CODES = [
+  { flag: '🇳🇿', code: '+64', country: 'NZ' },
+  { flag: '🇦🇺', code: '+61', country: 'AU' },
+  { flag: '🇺🇸', code: '+1',  country: 'US' },
+  { flag: '🇬🇧', code: '+44', country: 'GB' },
+  { flag: '🇵🇭', code: '+63', country: 'PH' },
+  { flag: '🇮🇳', code: '+91', country: 'IN' },
+  { flag: '🇨🇦', code: '+1',  country: 'CA' },
+  { flag: '🇸🇬', code: '+65', country: 'SG' },
+];
+
 const SLIDES = [
   { heading: 'Getting funded starts here.', body: 'Apply in minutes and receive a lending decision within 24 hours.' },
   { heading: 'Secure by design.', body: 'End-to-end encryption and strict access controls protect your data at every step.' },
@@ -149,6 +160,8 @@ export default function SignupPage() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName]   = useState('');
   const [email, setEmail]         = useState('');
+  const [dialCode, setDialCode]   = useState('+64');
+  const [phone, setPhone]         = useState('');
   const [password, setPassword]           = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
@@ -162,12 +175,13 @@ export default function SignupPage() {
     if (!firstName.trim()) errs.firstName = 'First name is required';
     if (!lastName.trim())  errs.lastName  = 'Last name is required';
     if (!email.trim() || !/^\S+@\S+\.\S+$/.test(email)) errs.email = 'Valid email address is required';
+    if (!phone.trim() || phone.replace(/\D/g, '').length < 6) errs.phone = 'Valid phone number is required';
     if (PASSWORD_RULES.some((r) => !r.test(password))) errs.password = 'Password does not meet all requirements.';
     if (password !== confirmPassword) errs.confirm = 'Passwords do not match.';
     if (!agreedToTerms) errs.terms = 'You must accept the Terms of Service and Privacy Policy.';
     setErrors(errs);
     return Object.keys(errs).length === 0;
-  }, [firstName, lastName, email, password, confirmPassword, agreedToTerms]);
+  }, [firstName, lastName, email, phone, password, confirmPassword, agreedToTerms]);
 
   const handleSubmit = useCallback(async () => {
     if (!validate()) return;
@@ -185,10 +199,11 @@ export default function SignupPage() {
 
       // 3. Create Firestore profile and set role: 'applicant' custom claim
       const recaptchaToken = executeRecaptcha ? await executeRecaptcha('signup') : undefined;
+      const fullPhone = `${dialCode} ${phone}`.trim();
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firstName, lastName, idToken, ...(recaptchaToken ? { recaptchaToken } : {}) }),
+        body: JSON.stringify({ firstName, lastName, phone: fullPhone, idToken, ...(recaptchaToken ? { recaptchaToken } : {}) }),
       });
 
       if (!res.ok) {
@@ -213,7 +228,7 @@ export default function SignupPage() {
     } finally {
       setLoading(false);
     }
-  }, [firstName, lastName, email, password, confirmPassword, agreedToTerms, executeRecaptcha, login, router, validate]);
+  }, [firstName, lastName, email, dialCode, phone, password, confirmPassword, agreedToTerms, executeRecaptcha, login, router, validate]);
 
   return (
     <div className="flex min-h-screen">
@@ -265,6 +280,25 @@ export default function SignupPage() {
                   )}
                 </p>
               )}
+            </div>
+
+            {/* Phone */}
+            <div>
+              <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1.5">
+                Mobile number <span className="text-red-500">*</span>
+              </label>
+              <div className="flex rounded-xl border border-gray-200 focus-within:ring-2 focus-within:ring-[#F5A523] focus-within:border-[#F5A523] overflow-hidden transition-all bg-gray-50 focus-within:bg-white">
+                <select aria-label="Country dial code" value={dialCode} onChange={(e) => setDialCode(e.target.value)}
+                  className="bg-transparent border-r border-gray-200 px-2 py-3 text-sm text-gray-700 outline-none shrink-0">
+                  {DIAL_CODES.map((d) => (
+                    <option key={`${d.country}-${d.code}`} value={d.code}>{d.flag} {d.code}</option>
+                  ))}
+                </select>
+                <input id="phone" type="tel" inputMode="numeric" value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="flex-1 px-3 py-3 text-sm outline-none bg-transparent" placeholder="21 123 4567" />
+              </div>
+              {errors.phone && <p className={errorCls}>{errors.phone}</p>}
             </div>
 
             {/* Password */}
