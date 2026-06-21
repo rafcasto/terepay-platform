@@ -2,8 +2,11 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged, sendEmailVerification, type User } from 'firebase/auth';
+import { onAuthStateChanged, type User } from 'firebase/auth';
 import { clientAuth } from '@/lib/firebase/client';
+
+const CHANNEL = 'terepay-email-verify';
+const NEXT_STEP = '/applicant/onboarding/verify-mobile';
 
 export default function VerifyEmailPage() {
   const router = useRouter();
@@ -35,33 +38,12 @@ export default function VerifyEmailPage() {
     }, 1000);
   }, []);
 
-  // ── Send verification email ─────────────────────────────────────────────
-  const sendVerification = useCallback(async (currentUser: User) => {
-    try {
-      const continueUrl = typeof window !== 'undefined'
-        ? `${window.location.origin}/applicant/onboarding/verify-email`
-        : '/applicant/onboarding/verify-email';
-      await sendEmailVerification(currentUser, { url: continueUrl, handleCodeInApp: false });
-      setSent(true);
-      startCooldown();
-    } catch (err: unknown) {
-      const code = (err as { code?: string }).code;
-      if (code === 'auth/too-many-requests') {
-        setError('Too many requests. Please wait before requesting another email.');
-        // Still mark as sent so the UI shows the waiting state
-        setSent(true);
-      } else {
-        setError('Failed to send verification email. Please try again.');
-      }
-    }
-  }, [startCooldown]);
-
   // ── Advance after verification ──────────────────────────────────────────
   const handleVerified = useCallback(async (currentUser: User) => {
     setVerified(true);
     if (pollRef.current) clearInterval(pollRef.current);
-    // Refresh session cookie — the /api/auth/session endpoint already sets
-    // emailVerified: true in Firestore when email_verified claim is present.
+    // Refresh session cookie — the /api/auth/session endpoint sets
+    // emailVerified: true in Firestore when the email_verified claim is present.
     try {
       const idToken = await currentUser.getIdToken(true);
       await fetch('/api/auth/session', {
@@ -70,8 +52,39 @@ export default function VerifyEmailPage() {
         body: JSON.stringify({ idToken }),
       });
     } catch { /* non-critical — session refresh failure won't block navigation */ }
-    router.push('/applicant/onboarding/verify-mobile');
+    router.push(NEXT_STEP);
   }, [router]);
+
+  // ── Send verification email (branded, via our API) ──────────────────────
+  const sendVerification = useCallback(async () => {
+    try {
+      const res = await fetch('/api/auth/send-verification-email', { method: 'POST' });
+      if (!res.ok) {
+        if (res.status === 429) {
+          setError('Too many requests. Please wait a little before requesting another email.');
+          setSent(true);
+          return;
+        }
+        setError('Failed to send verification email. Please try again.');
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      if (data?.alreadyVerified) {
+        const current = clientAuth.currentUser;
+        if (current) await handleVerified(current);
+        return;
+      }
+      // Dev convenience: when no email provider is configured the API returns
+      // the link so the flow can be completed against the emulator.
+      if (data?.devVerificationUrl) {
+        console.log('[dev] Open this verification link:', data.devVerificationUrl);
+      }
+      setSent(true);
+      startCooldown();
+    } catch {
+      setError('Failed to send verification email. Please try again.');
+    }
+  }, [startCooldown, handleVerified]);
 
   // ── Initialize: wait for Firebase auth, then send email ─────────────────
   useEffect(() => {
@@ -89,11 +102,37 @@ export default function VerifyEmailPage() {
       }
 
       // Send on first load only
-      await sendVerification(currentUser);
+      await sendVerification();
     });
     return unsubscribe;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ── Listen for the branded action handler verifying in another tab ───────
+  useEffect(() => {
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel(CHANNEL);
+      channel.onmessage = async (e: MessageEvent) => {
+        if (e.data?.type !== 'email-verified') return;
+        // Acknowledge so the other tab knows we'll drive — and can close itself.
+        channel?.postMessage({ type: 'verify-ack' });
+        const current = clientAuth.currentUser;
+        if (current) {
+          try { await current.reload(); } catch { /* ignore */ }
+          const refreshed = clientAuth.currentUser;
+          if (refreshed) {
+            await handleVerified(refreshed);
+            return;
+          }
+        }
+        router.push(NEXT_STEP);
+      };
+    } catch {
+      channel = null;
+    }
+    return () => channel?.close();
+  }, [handleVerified, router]);
 
   // ── Poll for email verification every 3 seconds ─────────────────────────
   useEffect(() => {
@@ -125,7 +164,7 @@ export default function VerifyEmailPage() {
   const handleResend = async () => {
     if (cooldown > 0 || !user) return;
     setError('');
-    await sendVerification(user);
+    await sendVerification();
   };
 
   // ── Update email address ────────────────────────────────────────────────
@@ -155,7 +194,7 @@ export default function VerifyEmailPage() {
       setError('');
       setShowEmailForm(false);
       setNewEmailInput('');
-      await sendVerification(refreshed);
+      await sendVerification();
     } catch {
       setEmailUpdateError('Network error. Please check your connection.');
     } finally {

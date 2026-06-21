@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { EmailTemplate, EmailTemplateType, EmailTemplateCategory } from '@/types/admin';
+import { EMAIL_DEFAULT_TEMPLATES } from '@/lib/email/default-templates';
 import {
   EMAIL_TEMPLATE_TYPE_LABELS,
   EMAIL_TEMPLATE_CATEGORY_LABELS,
@@ -32,6 +33,19 @@ const EMPTY_FORM: TemplateForm = {
   isActive: true,
 };
 
+const PREVIEW_SAMPLE: Record<string, string> = {
+  firstName: 'Rafael',
+  lastName: 'Domingo',
+  verificationUrl: 'https://app.terepay.example/auth/action?mode=verifyEmail&oobCode=SAMPLE',
+  loanAmount: '$1,500.00',
+  loanPurpose: 'Car repairs',
+  dueDate: '21 June 2026',
+};
+
+function renderPreview(html: string): string {
+  return html.replace(/\{\{\s*(\w+)\s*\}\}/g, (_m, k: string) => PREVIEW_SAMPLE[k] ?? `[${k}]`);
+}
+
 const ALL_TYPES = Object.keys(EMAIL_TEMPLATE_TYPE_LABELS) as EmailTemplateType[];
 const ALL_CATEGORIES = Object.keys(EMAIL_TEMPLATE_CATEGORY_LABELS) as EmailTemplateCategory[];
 
@@ -47,6 +61,8 @@ export default function AdminEmailTemplatesPage() {
   const [form, setForm] = useState<TemplateForm>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [previewMode, setPreviewMode] = useState(false);
+  const htmlBodyRef = useRef<HTMLTextAreaElement | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -68,6 +84,7 @@ export default function AdminEmailTemplatesPage() {
     setEditingId(null);
     setForm(EMPTY_FORM);
     setFormError(null);
+    setPreviewMode(false);
     setShowForm(true);
   };
 
@@ -85,6 +102,7 @@ export default function AdminEmailTemplatesPage() {
       isActive: t.isActive,
     });
     setFormError(null);
+    setPreviewMode(false);
     setShowForm(true);
   };
 
@@ -144,6 +162,41 @@ export default function AdminEmailTemplatesPage() {
       load();
     } catch {
       setError('Failed to delete template');
+    }
+  };
+
+  const mergeFields = form.availableVariables
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean);
+  const hasDefault = !!EMAIL_DEFAULT_TEMPLATES[form.type];
+
+  const applyDefaultContent = () => {
+    const def = EMAIL_DEFAULT_TEMPLATES[form.type];
+    if (!def) return;
+    setForm((p) => ({
+      ...p,
+      subject: p.subject || def.subject,
+      htmlBody: def.htmlBody,
+      textBody: def.textBody,
+      availableVariables: def.availableVariables.join(', '),
+    }));
+  };
+
+  const insertMergeField = (field: string) => {
+    const token = `{{${field}}}`;
+    const ta = htmlBodyRef.current;
+    if (ta) {
+      const start = ta.selectionStart;
+      const end = ta.selectionEnd;
+      const next = form.htmlBody.slice(0, start) + token + form.htmlBody.slice(end);
+      setForm((p) => ({ ...p, htmlBody: next }));
+      requestAnimationFrame(() => {
+        ta.focus();
+        ta.selectionStart = ta.selectionEnd = start + token.length;
+      });
+    } else {
+      setForm((p) => ({ ...p, htmlBody: p.htmlBody + token }));
     }
   };
 
@@ -286,6 +339,19 @@ export default function AdminEmailTemplatesPage() {
                 </div>
               </div>
 
+              {hasDefault && (
+                <div className="flex items-center justify-between gap-3 rounded-lg border border-[#F5A523]/40 bg-[#FEF4E0] px-3 py-2">
+                  <span className="text-xs text-[#8f4400]">A branded default exists for this template type.</span>
+                  <button
+                    type="button"
+                    onClick={applyDefaultContent}
+                    className="shrink-0 text-xs font-semibold text-[#B45600] hover:underline"
+                  >
+                    Use default content
+                  </button>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1">Subject line</label>
                 <input
@@ -323,15 +389,62 @@ export default function AdminEmailTemplatesPage() {
               )}
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">HTML body</label>
-                <textarea
-                  required
-                  rows={8}
-                  value={form.htmlBody}
-                  onChange={(e) => setForm((p) => ({ ...p, htmlBody: e.target.value }))}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-mono focus:border-[#F5A523] focus:outline-none focus:ring-1 focus:ring-[#F5A523] resize-y"
-                  placeholder="<p>Hello {{firstName}},</p>"
-                />
+                <div className="mb-1 flex items-center justify-between">
+                  <label className="block text-xs font-medium text-slate-700">HTML body</label>
+                  <div className="inline-flex overflow-hidden rounded-lg border border-gray-200 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setPreviewMode(false)}
+                      className={`px-2.5 py-1 transition-colors ${!previewMode ? 'bg-[#F5A523] text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewMode(true)}
+                      className={`px-2.5 py-1 transition-colors ${previewMode ? 'bg-[#F5A523] text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+                    >
+                      Preview
+                    </button>
+                  </div>
+                </div>
+
+                {previewMode ? (
+                  <iframe
+                    title="Email preview"
+                    className="h-72 w-full rounded-lg border border-gray-200 bg-white"
+                    srcDoc={renderPreview(form.htmlBody)}
+                  />
+                ) : (
+                  <textarea
+                    ref={htmlBodyRef}
+                    required
+                    rows={8}
+                    value={form.htmlBody}
+                    onChange={(e) => setForm((p) => ({ ...p, htmlBody: e.target.value }))}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-mono focus:border-[#F5A523] focus:outline-none focus:ring-1 focus:ring-[#F5A523] resize-y"
+                    placeholder="<p>Hello {{firstName}},</p>"
+                  />
+                )}
+
+                {!previewMode && mergeFields.length > 0 && (
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                    <span className="mr-1 text-[11px] text-slate-400">Insert:</span>
+                    {mergeFields.map((f) => (
+                      <button
+                        key={f}
+                        type="button"
+                        onClick={() => insertMergeField(f)}
+                        className="rounded-full bg-slate-100 px-2 py-0.5 font-mono text-[11px] text-slate-600 hover:bg-slate-200"
+                      >
+                        + {f}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {previewMode && (
+                  <p className="mt-1.5 text-[11px] text-slate-400">Preview uses sample data for merge fields.</p>
+                )}
               </div>
 
               <div>

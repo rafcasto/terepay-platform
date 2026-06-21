@@ -18,10 +18,12 @@ export async function GET(request: NextRequest): Promise<Response> {
     const auth = await withAuth(request, ['admin']);
     await checkRateLimit(defaultLimiter, auth.uid);
 
+    // Order by type only — a secondary orderBy('sequenceOrder') would exclude
+    // any template document that has no sequenceOrder field (e.g. transactional
+    // templates like email_verification). Secondary sort is applied in code.
     const snap = await adminDb
       .collection('emailTemplates')
       .orderBy('type')
-      .orderBy('sequenceOrder')
       .limit(200)
       .get();
 
@@ -43,6 +45,11 @@ export async function GET(request: NextRequest): Promise<Response> {
         createdAt: d.createdAt?.toMillis?.() ?? null,
         updatedAt: d.updatedAt?.toMillis?.() ?? null,
       };
+    });
+
+    templates.sort((a, b) => {
+      if (a.type !== b.type) return 0; // preserve Firestore type ordering
+      return (a.sequenceOrder ?? 0) - (b.sequenceOrder ?? 0);
     });
 
     return NextResponse.json({ data: templates });

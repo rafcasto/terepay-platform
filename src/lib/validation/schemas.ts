@@ -508,6 +508,7 @@ export const adminReassignApplicationsSchema = z.object({
 export const adminEmailTemplateSchema = z.object({
   name: z.string().min(1, 'Template name is required').max(100),
   type: z.enum([
+    'email_verification',
     'onboarding_followup',
     'welcome_sequence',
     'loan_submitted',

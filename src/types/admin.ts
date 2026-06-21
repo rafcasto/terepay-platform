@@ -74,6 +74,7 @@ export const ADMIN_CONFIG_KEYS: { key: AdminConfigKey; label: string; envVar: st
 // ---------------------------------------------------------------------------
 
 export type EmailTemplateType =
+  | 'email_verification'
   | 'onboarding_followup'
   | 'welcome_sequence'
   | 'loan_submitted'
@@ -84,9 +85,10 @@ export type EmailTemplateType =
   | 'payment_reminder'
   | 'payment_received';
 
-export type EmailTemplateCategory = 'onboarding' | 'welcome' | 'loan_events' | 'payments';
+export type EmailTemplateCategory = 'account' | 'onboarding' | 'welcome' | 'loan_events' | 'payments';
 
 export const EMAIL_TEMPLATE_TYPE_LABELS: Record<EmailTemplateType, string> = {
+  email_verification: 'Email Verification',
   onboarding_followup: 'Onboarding Follow-up',
   welcome_sequence: 'Welcome Sequence',
   loan_submitted: 'Loan Submitted',
@@ -99,6 +101,7 @@ export const EMAIL_TEMPLATE_TYPE_LABELS: Record<EmailTemplateType, string> = {
 };
 
 export const EMAIL_TEMPLATE_CATEGORY_LABELS: Record<EmailTemplateCategory, string> = {
+  account: 'Account & Security',
   onboarding: 'Onboarding Sequence',
   welcome: 'Welcome Sequence',
   loan_events: 'Loan Events',
@@ -106,6 +109,7 @@ export const EMAIL_TEMPLATE_CATEGORY_LABELS: Record<EmailTemplateCategory, strin
 };
 
 export const EMAIL_TEMPLATE_TYPE_CATEGORY: Record<EmailTemplateType, EmailTemplateCategory> = {
+  email_verification: 'account',
   onboarding_followup: 'onboarding',
   welcome_sequence: 'welcome',
   loan_submitted: 'loan_events',
