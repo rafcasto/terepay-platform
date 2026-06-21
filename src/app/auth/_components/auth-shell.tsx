@@ -35,16 +35,19 @@ function BrandPanel({ mode }: { mode: Mode }) {
         style={{ background: 'radial-gradient(circle at center, rgba(240,128,0,0.20), rgba(240,128,0,0) 68%)' }}
       />
 
-      <div className="flex flex-col gap-2.5">
+      <div className="flex items-center gap-3">
         <Image
-          src="/brand/terepay-logo-white.png"
-          alt="TerePay"
-          width={84}
-          height={98}
+          src="/brand/terepay-mark-white.png"
+          alt=""
+          width={40}
+          height={35}
           priority
-          className="h-[92px] w-auto"
+          className="h-9 w-auto"
         />
-        <span className="text-[13px] text-[#8295ab]">Borrowing power in your hands</span>
+        <div>
+          <div className="font-display text-[19px] font-bold leading-none text-white">TerePay</div>
+          <div className="mt-1 text-[12px] text-[#8295ab]">Borrowing power in your hands</div>
+        </div>
       </div>
 
       <div className="relative z-10 my-auto max-w-[440px] py-12">

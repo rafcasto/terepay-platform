@@ -66,7 +66,7 @@ export const InputShell = forwardRef<HTMLInputElement, InputShellProps>(function
       <input
         ref={ref}
         aria-invalid={invalid || undefined}
-        className="h-full min-w-0 flex-1 border-0 bg-transparent text-[15px] text-[var(--text-strong)] outline-none placeholder:text-[var(--slate-400)]"
+        className="field-control h-full min-w-0 flex-1 border-0 bg-transparent text-[15px] text-[var(--text-strong)] outline-none placeholder:text-[var(--slate-400)]"
         {...rest}
       />
       {suffix != null && <span className={affixCls}>{suffix}</span>}

@@ -406,6 +406,14 @@ img { max-width: 100%; display: block; }
   border-radius: var(--radius-xs);
 }
 
+/* Controls wrapped in a styled field show their focus ring on the wrapper
+   (via :focus-within); suppress the duplicate outline on the inner control. */
+.field-control:focus,
+.field-control:focus-visible {
+  outline: none;
+  border-radius: 0;
+}
+
 /* ==========================================================================
    Component animations
    ========================================================================== */
