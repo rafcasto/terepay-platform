@@ -19,7 +19,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const response = NextResponse.redirect(new URL('/auth/login', request.url));
+    // Use 303 See Other so the browser follows the redirect with a GET.
+    // A form POST to this route would otherwise hit the default 307 redirect,
+    // which preserves the POST method and re-POSTs to the /auth/login page —
+    // that returns an empty response and renders a blank screen.
+    const response = NextResponse.redirect(new URL('/auth/login', request.url), 303);
     response.cookies.set('__session', '', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',

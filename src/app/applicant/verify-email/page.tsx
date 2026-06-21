@@ -137,13 +137,15 @@ export default function VerifyEmailPage() {
             <p className="mt-2 text-xs text-danger">Could not resend. Please try again.</p>
           )}
 
-          <p className="mt-6 text-xs text-muted/70">
+          <div className="mt-6 text-xs text-muted/70">
             Wrong email?{' '}
-            <a href="/api/auth/logout" className="text-accent-2 hover:underline">
-              Sign out
-            </a>{' '}
+            <form action="/api/auth/logout" method="POST" className="inline">
+              <button type="submit" className="text-accent-2 hover:underline">
+                Sign out
+              </button>
+            </form>{' '}
             and register again.
-          </p>
+          </div>
         </div>
       </div>
     </div>
