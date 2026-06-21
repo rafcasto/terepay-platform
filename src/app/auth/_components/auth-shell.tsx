@@ -119,16 +119,23 @@ export function AuthShell({
 
       <div className="flex items-start justify-center px-5 py-10 sm:items-center sm:px-7 sm:py-12">
         <div className="w-full max-w-[424px]">
-          <div className="mb-6 flex items-center gap-3 lg:hidden">
+          <div className="mb-6 flex items-center gap-2.5 lg:hidden">
             <Image
-              src="/brand/terepay-logo.png"
-              alt="TerePay"
-              width={44}
-              height={52}
+              src="/brand/terepay-mark.png"
+              alt=""
+              width={34}
+              height={30}
               priority
-              className="h-[48px] w-auto"
+              className="h-[30px] w-auto"
             />
-            <span className="text-[12px] text-[var(--text-muted)]">Borrowing power in your hands</span>
+            <Image
+              src="/brand/terepay-wordmark.png"
+              alt="TerePay"
+              width={67}
+              height={20}
+              priority
+              className="h-[20px] w-auto"
+            />
           </div>
 
           <span className="font-display text-[13px] font-semibold uppercase tracking-wide text-[var(--text-accent)]">
