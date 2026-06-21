@@ -234,7 +234,7 @@ export default function SignupPage() {
               aria-label="Country dial code"
               value={dialCode}
               onChange={(e) => setDialCode(e.target.value)}
-              className="h-full shrink-0 rounded-l-[10px] border-0 border-r border-[var(--border-default)] bg-transparent px-2.5 text-[14px] text-[var(--text-strong)] outline-none"
+              className="field-control h-full shrink-0 rounded-l-[10px] border-0 border-r border-[var(--border-default)] bg-transparent px-2.5 text-[14px] text-[var(--text-strong)] outline-none"
             >
               {DIAL_CODES.map((d) => (
                 <option key={`${d.country}-${d.code}`} value={d.code}>
@@ -249,7 +249,7 @@ export default function SignupPage() {
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="21 123 4567"
-              className="h-full min-w-0 flex-1 border-0 bg-transparent px-3.5 text-[15px] text-[var(--text-strong)] outline-none placeholder:text-[var(--slate-400)]"
+              className="field-control h-full min-w-0 flex-1 border-0 bg-transparent px-3.5 text-[15px] text-[var(--text-strong)] outline-none placeholder:text-[var(--slate-400)]"
             />
           </div>
         </Field>
