@@ -155,6 +155,12 @@ function LoginFormInner() {
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get('redirect');
   const [showPassword, setShowPassword] = useState(false);
+  // Latch that stays true from a successful login until the page unmounts.
+  // `isSubmitting` flips back to false the moment router.push() is called, but
+  // the client-side navigation + redirect takes a couple of seconds. Without
+  // this latch the button briefly re-enables in that gap and the user can fire
+  // duplicate login requests.
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const { executeRecaptcha } = useGoogleReCaptcha();
 
   const {
@@ -168,6 +174,8 @@ function LoginFormInner() {
     try {
       const recaptchaToken = executeRecaptcha ? await executeRecaptcha('login') : undefined;
       const user = await login(data.email, data.password, recaptchaToken);
+      // Keep the button disabled through navigation — never reset on success.
+      setIsRedirecting(true);
       const dest = redirectTo ?? (user?.role === 'admin' ? '/admin/dashboard' : user?.role === 'lender' ? '/lender/dashboard' : '/applicant/dashboard');
       router.push(dest);
     } catch (err) {
@@ -175,6 +183,9 @@ function LoginFormInner() {
       setError('root', { message: msg });
     }
   }, [executeRecaptcha, login, redirectTo, router, setError]);
+
+  // Busy whenever the form is submitting OR a successful login is mid-redirect.
+  const isBusy = isSubmitting || isRedirecting;
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
@@ -186,6 +197,7 @@ function LoginFormInner() {
           id="email"
           type="email"
           autoComplete="email"
+          disabled={isBusy}
           {...register('email')}
           className={inputCls}
           placeholder="you@example.com"
@@ -209,6 +221,7 @@ function LoginFormInner() {
             id="password"
             type={showPassword ? 'text' : 'password'}
             autoComplete="current-password"
+            disabled={isBusy}
             {...register('password')}
             className={`${inputCls} pr-14`}
             placeholder="••••••••"
@@ -235,10 +248,11 @@ function LoginFormInner() {
 
       <button
         type="submit"
-        disabled={isSubmitting}
+        disabled={isBusy}
+        aria-busy={isBusy}
         className="w-full py-3 px-4 bg-[#F5A523] hover:bg-[#E08B00] text-white font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-2"
       >
-        {isSubmitting ? 'Signing in…' : 'Sign in'}
+        {isBusy ? 'Signing in…' : 'Sign in'}
       </button>
 
       <p className="text-center text-sm text-gray-500 pt-1">
@@ -275,4 +289,3 @@ export default function LoginPage() {
     </div>
   );
 }
-
