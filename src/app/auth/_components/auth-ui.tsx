@@ -54,19 +54,22 @@ type InputShellProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'prefix'> & {
 const affixCls = 'inline-flex items-center text-[var(--text-muted)] [&_svg]:h-[18px] [&_svg]:w-[18px]';
 
 export const InputShell = forwardRef<HTMLInputElement, InputShellProps>(function InputShell(
-  { prefix, suffix, invalid = false, className = '', ...rest },
+  { prefix, suffix, invalid = false, disabled = false, className = '', ...rest },
   ref,
 ) {
-  const stateCls = invalid
-    ? 'border-[var(--danger-500)] focus-within:border-[var(--danger-500)] focus-within:shadow-[0_0_0_3px_rgba(220,38,38,0.16)]'
-    : 'border-[var(--border-default)] hover:border-[var(--slate-300)] focus-within:border-[var(--orange-500)] focus-within:shadow-[0_0_0_3px_rgba(240,128,0,0.18)]';
+  const stateCls = disabled
+    ? 'border-[var(--border-default)] bg-[var(--slate-100)] opacity-70'
+    : invalid
+      ? 'border-[var(--danger-500)] bg-white focus-within:border-[var(--danger-500)] focus-within:shadow-[0_0_0_3px_rgba(220,38,38,0.16)]'
+      : 'border-[var(--border-default)] bg-white hover:border-[var(--slate-300)] focus-within:border-[var(--orange-500)] focus-within:shadow-[0_0_0_3px_rgba(240,128,0,0.18)]';
   return (
-    <div className={`flex h-12 items-center gap-2 rounded-[10px] border bg-white px-3.5 transition-[border-color,box-shadow] duration-150 ${stateCls} ${className}`}>
+    <div className={`flex h-12 items-center gap-2 rounded-[10px] border px-3.5 transition-[border-color,box-shadow] duration-150 ${stateCls} ${className}`}>
       {prefix != null && <span className={affixCls}>{prefix}</span>}
       <input
         ref={ref}
+        disabled={disabled}
         aria-invalid={invalid || undefined}
-        className="field-control h-full min-w-0 flex-1 border-0 bg-transparent text-[15px] text-[var(--text-strong)] outline-none placeholder:text-[var(--slate-400)]"
+        className="field-control h-full min-w-0 flex-1 border-0 bg-transparent text-[15px] text-[var(--text-strong)] outline-none placeholder:text-[var(--slate-400)] disabled:cursor-not-allowed"
         {...rest}
       />
       {suffix != null && <span className={affixCls}>{suffix}</span>}

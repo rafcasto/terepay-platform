@@ -18,6 +18,12 @@ function LoginFormInner() {
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get('redirect');
   const [showPassword, setShowPassword] = useState(false);
+  // Latch that stays true from a successful login until the page unmounts.
+  // `isSubmitting` flips back to false the moment router.push() is called, but
+  // the client-side navigation + redirect takes a couple of seconds. Without
+  // this latch the button briefly re-enables in that gap and the user can fire
+  // duplicate login requests.
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const { executeRecaptcha } = useGoogleReCaptcha();
 
   const {
@@ -32,6 +38,8 @@ function LoginFormInner() {
       try {
         const recaptchaToken = executeRecaptcha ? await executeRecaptcha('login') : undefined;
         const user = await login(data.email, data.password, recaptchaToken);
+        // Keep the button disabled through navigation — never reset on success.
+        setIsRedirecting(true);
         const dest =
           redirectTo ??
           (user?.role === 'admin'
@@ -48,8 +56,11 @@ function LoginFormInner() {
     [executeRecaptcha, login, redirectTo, router, setError],
   );
 
+  // Busy whenever the form is submitting OR a successful login is mid-redirect.
+  const isBusy = isSubmitting || isRedirecting;
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-[18px]" noValidate>
+    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-[18px]" noValidate aria-busy={isBusy}>
       <Field htmlFor="email" label="Email address" required error={errors.email?.message}>
         <InputShell
           id="email"
@@ -58,6 +69,7 @@ function LoginFormInner() {
           placeholder="you@example.com"
           prefix={AuthIcon.mail}
           invalid={!!errors.email}
+          disabled={isBusy}
           {...register('email')}
         />
       </Field>
@@ -71,6 +83,7 @@ function LoginFormInner() {
           prefix={AuthIcon.lock}
           suffix={<EyeToggle shown={showPassword} onToggle={() => setShowPassword((v) => !v)} />}
           invalid={!!errors.password}
+          disabled={isBusy}
           {...register('password')}
         />
       </Field>
@@ -84,9 +97,9 @@ function LoginFormInner() {
       {errors.root && <ErrorAlert>{errors.root.message}</ErrorAlert>}
 
       <div className="mt-2">
-        <SubmitButton type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Signing in…' : 'Sign in'}
-          {!isSubmitting && AuthIcon.arrow}
+        <SubmitButton type="submit" disabled={isBusy} aria-busy={isBusy}>
+          {isBusy ? 'Signing in…' : 'Sign in'}
+          {!isBusy && AuthIcon.arrow}
         </SubmitButton>
       </div>
 
