@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import type { ReactNode } from 'react';
 import { AuthIcon } from './auth-icons';
 
@@ -34,8 +35,15 @@ function BrandPanel({ mode }: { mode: Mode }) {
         style={{ background: 'radial-gradient(circle at center, rgba(240,128,0,0.20), rgba(240,128,0,0) 68%)' }}
       />
 
-      <div className="flex items-baseline gap-2.5">
-        <b className="font-display text-[26px] font-bold tracking-tight text-[var(--orange-500)]">TerePay</b>
+      <div className="flex flex-col gap-2.5">
+        <Image
+          src="/brand/terepay-logo-white.png"
+          alt="TerePay"
+          width={84}
+          height={98}
+          priority
+          className="h-[92px] w-auto"
+        />
         <span className="text-[13px] text-[#8295ab]">Borrowing power in your hands</span>
       </div>
 
@@ -111,8 +119,15 @@ export function AuthShell({
 
       <div className="flex items-start justify-center px-5 py-10 sm:items-center sm:px-7 sm:py-12">
         <div className="w-full max-w-[424px]">
-          <div className="mb-6 flex items-baseline gap-2.5 lg:hidden">
-            <b className="font-display text-[22px] font-bold text-[var(--orange-700)]">TerePay</b>
+          <div className="mb-6 flex items-center gap-3 lg:hidden">
+            <Image
+              src="/brand/terepay-logo.png"
+              alt="TerePay"
+              width={44}
+              height={52}
+              priority
+              className="h-[48px] w-auto"
+            />
             <span className="text-[12px] text-[var(--text-muted)]">Borrowing power in your hands</span>
           </div>
 
