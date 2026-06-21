@@ -23,6 +23,11 @@ Two user roles: `applicant` and `lender`. Two customer models:
 
 **No test runner is configured.** No `typecheck` script — type errors surface via `next build` or your editor.
 
+## Workflow
+
+- **Always branch from the `dev` branch.** Before starting any task, check out `dev`, pull latest, then create your working branch off it (`git checkout dev && git pull && git checkout -b <branch>`). Never branch off `main`/`master`.
+- **On task completion:** build the project (`npm run build`) to surface type/build errors and confirm it passes, then commit your work and push the branch to create a PR (`gh pr create`). A task isn't done until the build is green and a PR exists.
+
 ## Stack
 
 Next.js 16.1.6 · React 19.2.3 · TypeScript 5 (strict) · Tailwind CSS 4 · Firebase 12.10 / firebase-admin 13.7 · Zod 4 + React Hook Form 7 · Twilio (SMS) · Resend (email) · Upstash Ratelimit · `@react-pdf/renderer` · `googleapis` · **Babel React Compiler enabled** (auto-memoization — don't reach for `useMemo` / `useCallback` reflexively).
