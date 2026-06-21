@@ -1,5 +1,5 @@
 import { cookies } from 'next/headers';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
 import { getAdminDb, verifySessionOrIdToken } from '@/lib/firebase/admin';
 import type { LoanApplication, AnyApplicationStatus } from '@/types/application';
@@ -109,10 +109,10 @@ export default async function ApplicationDetailPage({
   const justSubmitted = sp.submitted === 'true';
   const cookieStore = await cookies();
   const session = cookieStore.get('__session')?.value;
-  if (!session) return null;
+  if (!session) redirect('/auth/login');
 
   const decoded = await verifySessionOrIdToken(session).catch(() => null);
-  if (!decoded) return null;
+  if (!decoded) redirect('/auth/login');
 
   const db = getAdminDb();
 
