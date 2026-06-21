@@ -4,10 +4,10 @@ import { useState, useEffect, Suspense } from 'react';
 import { useForm, FormProvider } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Link from 'next/link';
 import { terepayApplicationSchema, type TerepayApplicationInput } from '@/lib/validation/schemas';
 import { useAuth } from '@/hooks/useAuth';
 import { normalizeLoanPurpose } from '@/lib/constants/loan-purposes';
+import { Button, ButtonLink, Card, Icons } from '@/components/ui';
 import Step1PersonalInfo from './_components/Step1PersonalInfo';
 import Step2Employment from './_components/Step2Employment';
 import Step3LivingExpenses from './_components/Step3LivingExpenses';
@@ -323,83 +323,67 @@ function ApplyPageInner() {
 
   const StepComponent = STEP_COMPONENTS[currentStep];
 
-  // Show spinner while loading draft data
   if (draftLoading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
+      <div className="min-h-screen bg-bg flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 rounded-full border-2 border-[#F5A523] border-t-transparent animate-spin" />
-          <p className="text-sm text-gray-400">Loading your application...</p>
+          <div className="h-8 w-8 rounded-full border-2 border-accent border-t-transparent animate-spin" />
+          <p className="text-sm text-muted">Loading your application...</p>
         </div>
       </div>
     );
   }
 
-  // Block unverified users before rendering the form
   if (!loading && user && !user.emailVerified) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="max-w-md w-full bg-white rounded-xl border border-amber-200 shadow-sm p-8 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-amber-50">
-            <svg className="h-7 w-7 text-[#F5A523]" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
-            </svg>
+      <div className="min-h-screen bg-bg flex items-center justify-center px-4">
+        <Card className="max-w-md w-full text-center border-accent/40">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-accent-soft">
+            <Icons.AlertTriangle size={28} className="text-accent-2" />
           </div>
-          <h2 className="text-lg font-bold text-gray-900 mb-2">Email verification required</h2>
-          <p className="text-sm text-gray-500 mb-6">
+          <h2 className="text-lg font-bold mb-2">Email verification required</h2>
+          <p className="text-sm text-muted mb-6">
             You must verify your email address before you can submit a loan application.
           </p>
-          <Link
-            href="/applicant/verify-email"
-            className="inline-block w-full py-2.5 px-4 bg-[#F5A523] text-white text-sm font-medium rounded-lg hover:bg-[#E08B00] transition-colors"
-          >
+          <ButtonLink href="/applicant/verify-email" fullWidth>
             Verify my email
-          </Link>
-        </div>
+          </ButtonLink>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-bg">
       <FormProvider {...methods}>
-        <div className="max-w-2xl mx-auto px-4 py-8 pb-12">
+        <div className="max-w-2xl mx-auto px-4 py-8 pb-12 screen-in">
           {serverError && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
-              <p className="text-sm text-red-700">{serverError}</p>
-            </div>
+            <Card className="mb-6 border-danger/40 bg-danger-soft">
+              <p className="text-sm text-[#991b1b] font-medium">{serverError}</p>
+            </Card>
           )}
 
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 sm:p-8">
+          <Card className="p-6 sm:p-8">
             <StepComponent />
-          </div>
+          </Card>
 
-          {/* Navigation — matches onboarding pill style */}
           <div className="mt-6 flex flex-col gap-3">
             {isLastStep ? (
-              <button
-                type="button"
-                onClick={handleSubmit(onSubmit)}
-                disabled={isSubmitting}
-                className="w-full bg-[#F5A523] hover:bg-[#E08B00] disabled:opacity-60 text-white font-semibold rounded-full py-3.5 transition-colors"
-              >
-                {isSubmitting ? 'Submitting…' : 'Submit Application'}
-              </button>
+              <Button type="button" onClick={handleSubmit(onSubmit)} disabled={isSubmitting} size="lg" fullWidth>
+                {isSubmitting ? 'Submitting…' : 'Submit application'}
+              </Button>
             ) : (
-              <button
-                type="button"
-                onClick={handleNext}
-                className="w-full bg-[#F5A523] hover:bg-[#E08B00] text-white font-semibold rounded-full py-3.5 transition-colors"
-              >
+              <Button type="button" onClick={handleNext} size="lg" fullWidth>
                 Continue
-              </button>
+              </Button>
             )}
             <button
               type="button"
               onClick={handleBack}
-              className="w-full py-3 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors"
+              className="w-full py-3 text-sm font-semibold text-muted hover:text-text transition-colors flex items-center justify-center gap-1.5"
             >
-              {currentStep === 0 ? '← Back to Applications' : '← Back'}
+              <Icons.ArrowLeft size={16} />
+              {currentStep === 0 ? 'Back to dashboard' : 'Back'}
             </button>
           </div>
         </div>

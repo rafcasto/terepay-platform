@@ -3,12 +3,11 @@ import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getAdminDb, verifySessionOrIdToken } from '@/lib/firebase/admin';
+import { Icons } from '@/components/ui';
 import LoanStepTracker from './_components/LoanStepTracker';
 
-// Statuses that are terminal — user may start a fresh application after these
 const TERMINAL_STATUSES = new Set([
   'declined', 'withdrawn', 'expired', 'closed_repaid', 'offer_declined',
-  // legacy
   'rejected', 'completed',
 ]);
 
@@ -16,13 +15,7 @@ interface Props {
   children: ReactNode;
 }
 
-/**
- * Layout for the loan application flow.
- * Mirrors the onboarding split-panel design: navy left panel (desktop) + white content right.
- * Intentionally does NOT include the applicant shell nav.
- */
 export default async function ApplyLayout({ children }: Props) {
-  // Block access if the user has an active (non-draft, non-terminal) application
   const cookieStore = await cookies();
   const session = cookieStore.get('__session')?.value;
   if (session) {
@@ -44,12 +37,11 @@ export default async function ApplyLayout({ children }: Props) {
   }
 
   return (
-    <div className="min-h-screen flex flex-col sm:flex-row">
-      {/* ── Left Brand Panel (desktop only) ─────────────────────────────── */}
-      <aside className="hidden sm:flex flex-col w-72 lg:w-80 bg-[#0D1B2A] shrink-0 px-8 py-10">
+    <div className="min-h-screen flex flex-col sm:flex-row bg-bg">
+      <aside className="hidden sm:flex flex-col w-72 lg:w-80 bg-ink shrink-0 px-8 py-10 text-white">
         <div className="mb-10">
-          <span className="text-2xl font-bold text-[#F5A523] tracking-tight">TerePay</span>
-          <p className="text-xs text-white/40 mt-1">Loan Application</p>
+          <span className="text-2xl font-extrabold text-accent tracking-tight">TerePay</span>
+          <p className="text-xs text-white/40 mt-1">Loan application</p>
         </div>
 
         <LoanStepTracker />
@@ -59,10 +51,8 @@ export default async function ApplyLayout({ children }: Props) {
             href="/applicant/dashboard"
             className="flex items-center gap-2 text-sm text-white/50 hover:text-white/80 transition-colors"
           >
-            <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
-            </svg>
-            Back to Dashboard
+            <Icons.ArrowLeft size={16} />
+            Back to dashboard
           </Link>
 
           <p className="text-xs text-white/30 leading-relaxed">
@@ -71,32 +61,24 @@ export default async function ApplyLayout({ children }: Props) {
         </div>
       </aside>
 
-      {/* ── Main Content Panel ────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-h-screen sm:min-h-0">
-        {/* Mobile top bar */}
-        <header className="sm:hidden sticky top-0 z-20 bg-[#0D1B2A] px-4 h-12 flex items-center justify-between shrink-0">
+        <header className="sm:hidden sticky top-0 z-20 bg-ink px-4 h-12 flex items-center justify-between shrink-0">
           <Link
             href="/applicant/dashboard"
             className="flex items-center gap-1.5 text-white/70 hover:text-white transition-colors"
-            aria-label="Back to Dashboard"
+            aria-label="Back to dashboard"
           >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
-            </svg>
+            <Icons.ArrowLeft size={20} />
           </Link>
-          <span className="text-lg font-bold text-[#F5A523]">TerePay</span>
-          {/* spacer to balance the back arrow */}
+          <span className="text-lg font-extrabold text-accent tracking-tight">TerePay</span>
           <div className="w-5" aria-hidden="true" />
         </header>
 
-        {/* Mobile step progress */}
         <div className="sm:hidden">
           <LoanStepTracker />
         </div>
 
-        <main className="flex-1 bg-white overflow-auto">
-          {children}
-        </main>
+        <main className="flex-1 bg-bg overflow-auto">{children}</main>
       </div>
     </div>
   );

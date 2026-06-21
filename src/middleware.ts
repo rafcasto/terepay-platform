@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
-const PROTECTED_PATHS = ['/applicant', '/lender'];
+const PROTECTED_PATHS = ['/applicant', '/lender', '/admin'];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -35,20 +35,35 @@ export function middleware(request: NextRequest) {
       return res;
     }
 
-    // Role-based routing: prevent applicants from accessing lender pages and vice versa.
+    // Role-based routing: prevent role mismatch across portals.
     const role = payload.role as string | undefined;
+
+    if (pathname.startsWith('/admin') && role !== 'admin') {
+      return NextResponse.redirect(
+        new URL(
+          role === 'lender' ? '/lender/dashboard' : role === 'applicant' ? '/applicant/dashboard' : '/auth/login',
+          request.url,
+        ),
+      );
+    }
 
     if (pathname.startsWith('/lender') && role !== 'lender') {
       // Known-role mismatch → send to correct dashboard; missing/unknown role → login
       return NextResponse.redirect(
-        new URL(role === 'applicant' ? '/applicant/dashboard' : '/auth/login', request.url),
+        new URL(
+          role === 'applicant' ? '/applicant/dashboard' : role === 'admin' ? '/admin/dashboard' : '/auth/login',
+          request.url,
+        ),
       );
     }
 
     if (pathname.startsWith('/applicant') && role !== 'applicant') {
       // Known-role mismatch → send to correct dashboard; missing/unknown role → login
       return NextResponse.redirect(
-        new URL(role === 'lender' ? '/lender/dashboard' : '/auth/login', request.url),
+        new URL(
+          role === 'lender' ? '/lender/dashboard' : role === 'admin' ? '/admin/dashboard' : '/auth/login',
+          request.url,
+        ),
       );
     }
   } catch {
@@ -63,5 +78,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/applicant/:path*', '/lender/:path*'],
+  matcher: ['/applicant/:path*', '/lender/:path*', '/admin/:path*'],
 };

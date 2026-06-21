@@ -51,7 +51,7 @@ function makeProxy<T extends object>(getInstance: () => T): T {
     get(_t, prop) {
       const instance = getInstance();
       const value = (instance as unknown as Record<string | symbol, unknown>)[prop];
-      return typeof value === 'function' ? (value as Function).bind(instance) : value;
+      return typeof value === 'function' ? (value as (...args: unknown[]) => unknown).bind(instance) : value;
     },
   });
 }

@@ -80,29 +80,29 @@ export default function VerifyEmailPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-surface-2 flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-[#F5A523]">TerePay</h1>
+          <h1 className="text-3xl font-bold text-accent-2">TerePay</h1>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
+        <div className="bg-white rounded-xl shadow-sm border border-border p-8 text-center">
           {/* Email icon */}
-          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-amber-50">
-            <svg className="h-8 w-8 text-[#F5A523]" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-accent-soft">
+            <svg className="h-8 w-8 text-accent-2" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
             </svg>
           </div>
 
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Verify your email</h2>
-          <p className="text-gray-500 text-sm mb-1">
+          <h2 className="text-xl font-bold text-text mb-2">Verify your email</h2>
+          <p className="text-muted text-sm mb-1">
             We sent a verification link to
           </p>
           <p className="font-medium text-gray-800 text-sm mb-6">
             {user?.email ?? 'your email address'}
           </p>
 
-          <p className="text-xs text-gray-400 mb-8">
+          <p className="text-xs text-muted/70 mb-8">
             Click the link in the email to verify your account. You must verify your email before you can submit a loan application.
           </p>
 
@@ -110,13 +110,13 @@ export default function VerifyEmailPage() {
           <button
             onClick={handleCheckVerification}
             disabled={checkStatus === 'checking'}
-            className="w-full py-2.5 px-4 bg-[#F5A523] text-white text-sm font-medium rounded-lg hover:bg-[#E08B00] disabled:opacity-50 disabled:cursor-not-allowed transition-colors mb-3"
+            className="w-full py-2.5 px-4 bg-accent text-white text-sm font-medium rounded-lg hover:bg-accent-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors mb-3"
           >
             {checkStatus === 'checking' ? 'Checking…' : "I've verified my email"}
           </button>
 
           {checkStatus === 'error' && (
-            <p className="text-xs text-red-600 mb-3">
+            <p className="text-xs text-danger mb-3">
               Email not verified yet. Please click the link in your inbox first.
             </p>
           )}
@@ -125,25 +125,27 @@ export default function VerifyEmailPage() {
           <button
             onClick={handleResend}
             disabled={resendCooldown > 0}
-            className="w-full py-2.5 px-4 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="w-full py-2.5 px-4 border border-border text-text text-sm font-medium rounded-lg hover:bg-surface-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend verification email'}
           </button>
 
           {resendStatus === 'sent' && resendCooldown > 0 && (
-            <p className="mt-2 text-xs text-green-600">Verification email sent!</p>
+            <p className="mt-2 text-xs text-success">Verification email sent!</p>
           )}
           {resendStatus === 'error' && (
-            <p className="mt-2 text-xs text-red-600">Could not resend. Please try again.</p>
+            <p className="mt-2 text-xs text-danger">Could not resend. Please try again.</p>
           )}
 
-          <p className="mt-6 text-xs text-gray-400">
+          <div className="mt-6 text-xs text-muted/70">
             Wrong email?{' '}
-            <a href="/api/auth/logout" className="text-[#F5A523] hover:underline">
-              Sign out
-            </a>{' '}
+            <form action="/api/auth/logout" method="POST" className="inline">
+              <button type="submit" className="text-accent-2 hover:underline">
+                Sign out
+              </button>
+            </form>{' '}
             and register again.
-          </p>
+          </div>
         </div>
       </div>
     </div>

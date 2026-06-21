@@ -6,6 +6,11 @@ import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { auditLog, getClientIp } from '@/lib/utils/audit';
 import { FieldValue } from 'firebase-admin/firestore';
 import { ZodError } from 'zod';
+import {
+  schedulePayment,
+  getBeneficiaryId,
+} from '@/lib/qippay/setpay-client';
+import type { PaymentConsent, ScheduledPayment } from '@/types/application';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,6 +22,12 @@ type RouteParams = { params: Promise<{ id: string }> };
  * amount as approvedAmount − applicationFee using values already on the
  * application. Idempotent: re-running on an already-disbursed application
  * returns the existing values.
+ *
+ * After a successful disbursement, all fortnightly instalments are submitted
+ * to Qippay (POST /v1/setpay) with their future due dates. Each instalment
+ * is tracked in `scheduledPayments`. If Qippay scheduling fails for any
+ * instalment, that instalment is stored as `status: 'pending'` so it can be
+ * retried — the disbursement itself is not rolled back.
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   const ip = getClientIp(request);
@@ -45,6 +56,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           status: 'disbursed' as const,
           disbursedAmount: appData.loanDetails?.disbursedAmount ?? 0,
           alreadyDisbursed: true,
+          paymentConsent: null as PaymentConsent | null,
+          applicationShortId: id.slice(0, 12),
         };
       }
 
@@ -125,13 +138,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         'timeline.updatedAt': now,
       });
 
+      const consent = appData.paymentConsent as PaymentConsent | undefined;
+
       return {
         status: 'disbursed' as const,
         disbursedAmount,
         alreadyDisbursed: false,
         applicationFee,
         isOverride,
-        consentMandateId: appData.paymentConsent?.mandateId,
+        paymentConsent: consent ?? null,
+        applicationShortId: id.slice(0, 12),
       };
     });
 
@@ -146,10 +162,118 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           disbursedAmount: result.disbursedAmount,
           applicationFee: result.applicationFee,
           override: result.isOverride,
-          consentMandateId: result.consentMandateId,
+          consentMandateId: result.paymentConsent?.mandateId,
         },
         ipAddress: ip,
       });
+
+      // ── Auto-schedule instalments with Qippay ──────────────────────────────
+      // For applications that went through the new Qippay consent flow, submit
+      // each instalment to POST /v1/setpay immediately after disbursement.
+      // Instalments with a due date in the past are skipped (they can't be
+      // scheduled). If Qippay is unreachable, the instalment is recorded as
+      // `pending` so an operator can retry.
+      const consent = result.paymentConsent;
+      const installments = consent?.scheduleSummary?.installments ?? [];
+
+      if (consent?.mandateId && installments.length > 0) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        let beneficiaryId = '';
+        try {
+          beneficiaryId = getBeneficiaryId();
+        } catch {
+          // Not configured — skip scheduling, store all as pending
+        }
+
+        const scheduledPayments: ScheduledPayment[] = await Promise.all(
+          installments.map(async (inst, i): Promise<ScheduledPayment> => {
+            const installmentNumber = i + 1;
+            const dueDate = new Date(inst.dueDate);
+
+            // Skip past-due dates
+            if (dueDate <= today) {
+              return {
+                installmentNumber,
+                dueDate: inst.dueDate,
+                amountCents: inst.amountCents,
+                status: 'pending',
+                retryCount: 0,
+              };
+            }
+
+            if (!beneficiaryId) {
+              return {
+                installmentNumber,
+                dueDate: inst.dueDate,
+                amountCents: inst.amountCents,
+                status: 'pending',
+                retryCount: 0,
+              };
+            }
+
+            try {
+              const scheduled = await schedulePayment({
+                epcId: consent.mandateId,
+                beneficiaryId,
+                amountCents: inst.amountCents,
+                scheduledFor: `${inst.dueDate}T00:00:00.000Z`,
+                statementParticulars: 'TerePay',
+                statementCode: `Inst${installmentNumber}`,
+                statementReference: result.applicationShortId,
+              });
+
+              return {
+                installmentNumber,
+                dueDate: inst.dueDate,
+                amountCents: inst.amountCents,
+                qippayPaymentId: scheduled.paymentId,
+                status: 'scheduled',
+                retryCount: 0,
+              };
+            } catch (err) {
+              console.error(
+                `[disburse] Failed to schedule instalment ${installmentNumber} with Qippay`,
+                err,
+              );
+              return {
+                installmentNumber,
+                dueDate: inst.dueDate,
+                amountCents: inst.amountCents,
+                status: 'pending',
+                retryCount: 0,
+              };
+            }
+          }),
+        );
+
+        await adminDb
+          .collection('loanApplications')
+          .doc(id)
+          .update({
+            scheduledPayments,
+            'timeline.updatedAt': FieldValue.serverTimestamp(),
+          });
+
+        const scheduledCount = scheduledPayments.filter((p) => p.status === 'scheduled').length;
+        const pendingCount = scheduledPayments.filter((p) => p.status === 'pending').length;
+
+        await auditLog({
+          userId: auth.uid,
+          action: 'setpay_payments_scheduled',
+          targetId: id,
+          targetType: 'application',
+          outcome: 'success',
+          changes: {
+            mandateId: consent.mandateId,
+            totalInstallments: installments.length,
+            scheduledCount,
+            pendingCount,
+          },
+          ipAddress: ip,
+        });
+      }
     }
 
     return NextResponse.json({

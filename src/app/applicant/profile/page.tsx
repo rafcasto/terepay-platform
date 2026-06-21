@@ -70,126 +70,126 @@ export default function ApplicantProfilePage() {
 
   return (
     <div className="p-8 max-w-2xl">
-      <h1 className="text-2xl font-bold text-gray-900 mb-2">Your Profile</h1>
-      <p className="text-gray-500 mb-8">Update your personal information.</p>
+      <h1 className="text-2xl font-bold text-text mb-2">Your Profile</h1>
+      <p className="text-muted mb-8">Update your personal information.</p>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
-        <section className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
-          <h2 className="font-semibold text-gray-900">Personal Details</h2>
+        <section className="bg-white rounded-xl border border-border p-6 space-y-5">
+          <h2 className="font-semibold text-text">Personal Details</h2>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+              <label className="block text-sm font-medium text-text mb-1">First Name</label>
               <input
                 type="text"
                 {...register('firstName')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#F5A523] focus:outline-none"
+                className="w-full px-3 py-2 border border-border rounded-md text-sm focus:ring-2 focus:ring-accent focus:outline-none"
               />
               {errors.firstName && (
-                <p className="mt-1 text-xs text-red-600">{errors.firstName.message}</p>
+                <p className="mt-1 text-xs text-danger">{errors.firstName.message}</p>
               )}
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+              <label className="block text-sm font-medium text-text mb-1">Last Name</label>
               <input
                 type="text"
                 {...register('lastName')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#F5A523] focus:outline-none"
+                className="w-full px-3 py-2 border border-border rounded-md text-sm focus:ring-2 focus:ring-accent focus:outline-none"
               />
               {errors.lastName && (
-                <p className="mt-1 text-xs text-red-600">{errors.lastName.message}</p>
+                <p className="mt-1 text-xs text-danger">{errors.lastName.message}</p>
               )}
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <label className="block text-sm font-medium text-text mb-1">Email</label>
             <input
               type="email"
               value={profile?.email ?? ''}
               disabled
-              className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-gray-50 text-gray-500 cursor-not-allowed"
+              className="w-full px-3 py-2 border border-border rounded-md text-sm bg-surface-2 text-muted cursor-not-allowed"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+            <label className="block text-sm font-medium text-text mb-1">Phone Number</label>
             <input
               type="tel"
               {...register('phoneNumber')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#F5A523] focus:outline-none"
+              className="w-full px-3 py-2 border border-border rounded-md text-sm focus:ring-2 focus:ring-accent focus:outline-none"
               placeholder="+1 (555) 000-0000"
             />
           </div>
         </section>
 
-        <section className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
-          <h2 className="font-semibold text-gray-900">Address</h2>
+        <section className="bg-white rounded-xl border border-border p-6 space-y-5">
+          <h2 className="font-semibold text-text">Address</h2>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Street</label>
+            <label className="block text-sm font-medium text-text mb-1">Street</label>
             <input
               type="text"
               {...register('address.street')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#F5A523] focus:outline-none"
+              className="w-full px-3 py-2 border border-border rounded-md text-sm focus:ring-2 focus:ring-accent focus:outline-none"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+              <label className="block text-sm font-medium text-text mb-1">City</label>
               <input
                 type="text"
                 {...register('address.city')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#F5A523] focus:outline-none"
+                className="w-full px-3 py-2 border border-border rounded-md text-sm focus:ring-2 focus:ring-accent focus:outline-none"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+              <label className="block text-sm font-medium text-text mb-1">State</label>
               <input
                 type="text"
                 {...register('address.state')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#F5A523] focus:outline-none"
+                className="w-full px-3 py-2 border border-border rounded-md text-sm focus:ring-2 focus:ring-accent focus:outline-none"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">ZIP Code</label>
+              <label className="block text-sm font-medium text-text mb-1">ZIP Code</label>
               <input
                 type="text"
                 {...register('address.zipCode')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#F5A523] focus:outline-none"
+                className="w-full px-3 py-2 border border-border rounded-md text-sm focus:ring-2 focus:ring-accent focus:outline-none"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
+              <label className="block text-sm font-medium text-text mb-1">Country</label>
               <input
                 type="text"
                 {...register('address.country')}
                 defaultValue="US"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#F5A523] focus:outline-none"
+                className="w-full px-3 py-2 border border-border rounded-md text-sm focus:ring-2 focus:ring-accent focus:outline-none"
               />
             </div>
           </div>
         </section>
 
         {serverError && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-md">
-            <p className="text-sm text-red-600">{serverError}</p>
+          <div className="p-3 bg-danger-soft border border-danger/40 rounded-md">
+            <p className="text-sm text-danger">{serverError}</p>
           </div>
         )}
         {saveSuccess && (
-          <div className="p-3 bg-green-50 border border-green-200 rounded-md">
-            <p className="text-sm text-green-700">Profile saved successfully.</p>
+          <div className="p-3 bg-success-soft border border-success/40 rounded-md">
+            <p className="text-sm text-success">Profile saved successfully.</p>
           </div>
         )}
 
         <button
           type="submit"
           disabled={isSubmitting || !isDirty}
-          className="w-full py-2.5 px-4 bg-[#F5A523] text-white text-sm font-medium rounded-md hover:bg-[#E08B00] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="w-full py-2.5 px-4 bg-accent text-white text-sm font-medium rounded-md hover:bg-accent-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {isSubmitting ? 'Saving…' : 'Save Changes'}
         </button>

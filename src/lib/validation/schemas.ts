@@ -465,3 +465,74 @@ export type ReviewDocumentInput = z.infer<typeof reviewDocumentSchema>;
 export type AffordabilityAssessmentInput = z.infer<typeof affordabilityAssessmentSchema>;
 export type LenderDecisionInput = z.infer<typeof lenderDecisionSchema>;
 export type BenchmarkEntryInput = z.infer<typeof benchmarkEntrySchema>;
+
+// ---------------------------------------------------------------------------
+// Admin schemas
+// ---------------------------------------------------------------------------
+
+export const adminCreateLenderSchema = z.object({
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  firstName: z.string().min(1, 'First name is required').max(50),
+  lastName: z.string().min(1, 'Last name is required').max(50),
+});
+
+export const adminUpdateLenderSchema = z.object({
+  firstName: z.string().min(1).max(50).optional(),
+  lastName: z.string().min(1).max(50).optional(),
+  status: z.enum(['active', 'suspended', 'inactive']).optional(),
+});
+
+export const adminSiteSettingsSchema = z.object({
+  maintenanceMode: z.object({
+    public: z.boolean(),
+    applicants: z.boolean(),
+    lenders: z.boolean(),
+  }).optional(),
+  maintenanceMessage: z.string().max(500).optional(),
+});
+
+export const adminConfigSchema = z.object({
+  resendApiKey: z.string().optional(),
+  twilioAccountSid: z.string().optional(),
+  twilioAuthToken: z.string().optional(),
+  twilioVerifyServiceSid: z.string().optional(),
+  googleDriveKycFolderId: z.string().optional(),
+});
+
+export const adminReassignApplicationsSchema = z.object({
+  applicationIds: z.array(z.string().min(1)).min(1, 'Select at least one application'),
+  targetLenderId: z.string().min(1, 'Target lender is required'),
+});
+
+export const adminEmailTemplateSchema = z.object({
+  name: z.string().min(1, 'Template name is required').max(100),
+  type: z.enum([
+    'onboarding_followup',
+    'welcome_sequence',
+    'loan_submitted',
+    'loan_under_review',
+    'loan_approved',
+    'loan_declined',
+    'loan_disbursed',
+    'payment_reminder',
+    'payment_received',
+  ]),
+  subject: z.string().min(1, 'Subject is required').max(200),
+  htmlBody: z.string().min(1, 'HTML body is required'),
+  textBody: z.string().min(1, 'Text body is required'),
+  sequenceOrder: z.number().int().min(1).optional(),
+  delayDays: z.number().int().min(0).optional(),
+  availableVariables: z.array(z.string()).default([]),
+  isActive: z.boolean().default(true),
+});
+
+export const adminEmailTemplatePatchSchema = adminEmailTemplateSchema.partial();
+
+export type AdminCreateLenderInput = z.infer<typeof adminCreateLenderSchema>;
+export type AdminUpdateLenderInput = z.infer<typeof adminUpdateLenderSchema>;
+export type AdminSiteSettingsInput = z.infer<typeof adminSiteSettingsSchema>;
+export type AdminConfigInput = z.infer<typeof adminConfigSchema>;
+export type AdminReassignApplicationsInput = z.infer<typeof adminReassignApplicationsSchema>;
+export type AdminEmailTemplateInput = z.infer<typeof adminEmailTemplateSchema>;
+export type AdminEmailTemplatePatchInput = z.infer<typeof adminEmailTemplatePatchSchema>;

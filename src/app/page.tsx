@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import { getSiteSettings } from '@/lib/admin/site-settings';
+import MaintenancePage from '@/components/shared/MaintenancePage';
 import Navbar from './_landing/Navbar';
 import HeroSection from './_landing/HeroSection';
 import HowItWorksSection from './_landing/HowItWorksSection';
@@ -24,7 +26,16 @@ export const metadata: Metadata = {
   },
 };
 
-export default function Home() {
+// The landing page is gated by maintenance mode, which is read from Firestore
+// per request — force dynamic rendering so the flag is never frozen at build time.
+export const dynamic = 'force-dynamic';
+
+export default async function Home() {
+  const settings = await getSiteSettings();
+  if (settings.maintenanceMode.public) {
+    return <MaintenancePage message={settings.maintenanceMessage} />;
+  }
+
   return (
     <div className="min-h-screen bg-white text-gray-900">
       <Navbar />

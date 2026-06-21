@@ -1,5 +1,5 @@
 import { cookies } from 'next/headers';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
 import { getAdminDb, verifySessionOrIdToken } from '@/lib/firebase/admin';
 import type { LoanApplication, AnyApplicationStatus } from '@/types/application';
@@ -10,7 +10,7 @@ import InitiatePaymentConsentCard from './_components/InitiatePaymentConsentCard
 import { loanPurposeLabel } from '@/lib/constants/loan-purposes';
 import { computeApplicationFee } from '@/lib/constants/fees';
 import { reconcileConsent } from '@/lib/qippay/reconcile-consent';
-import type { PaymentConsent } from '@/types/application';
+import type { PaymentConsent, ScheduledPayment } from '@/types/application';
 
 export const dynamic = 'force-dynamic';
 
@@ -109,10 +109,10 @@ export default async function ApplicationDetailPage({
   const justSubmitted = sp.submitted === 'true';
   const cookieStore = await cookies();
   const session = cookieStore.get('__session')?.value;
-  if (!session) return null;
+  if (!session) redirect('/auth/login');
 
   const decoded = await verifySessionOrIdToken(session).catch(() => null);
-  if (!decoded) return null;
+  if (!decoded) redirect('/auth/login');
 
   const db = getAdminDb();
 
@@ -178,6 +178,8 @@ export default async function ApplicationDetailPage({
   const emp = app.employment;
   const decision = app.decision;
   const repayment = app.repaymentSchedule;
+  const scheduledPayments = (app.scheduledPayments ?? []) as ScheduledPayment[];
+  const qippayStatusMap = new Map(scheduledPayments.map((p) => [p.installmentNumber, p]));
   const docRequest = app.documentRequest as { requiredDocuments?: string[]; message?: string } | undefined;
   const documents = app.documents ?? [];
   const timeline = app.timeline as Record<string, { _seconds?: number; toDate?: () => Date }> | undefined;
@@ -465,22 +467,42 @@ export default async function ApplicationDetailPage({
                 </tr>
               </thead>
               <tbody>
-                {repayment.installments.map((ins) => (
-                  <tr key={ins.installmentNumber} className="border-b border-gray-50">
-                    <td className="py-2 text-gray-500">{ins.installmentNumber}</td>
-                    <td className="py-2 text-gray-700">{ins.dueDate}</td>
-                    <td className="py-2 text-right font-medium text-gray-900">{fmt(ins.amount)}</td>
-                    <td className="py-2 text-right">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                        ins.status === 'paid' ? 'bg-green-100 text-green-700' :
-                        ins.status === 'overdue' ? 'bg-red-100 text-red-700' :
-                        'bg-gray-100 text-gray-600'
-                      }`}>
-                        {ins.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                {repayment.installments.map((ins) => {
+                  // Prefer live Qippay payment status when available (post-disbursement)
+                  const qp = qippayStatusMap.get(ins.installmentNumber);
+                  const label =
+                    qp?.status === 'success'    ? 'Paid' :
+                    qp?.status === 'failed'     ? 'Failed' :
+                    qp?.status === 'retrying'   ? 'Processing' :
+                    qp?.status === 'cancelled'  ? 'Cancelled' :
+                    qp?.status === 'scheduled'  ? 'Scheduled' :
+                    qp?.status === 'pending'    ? 'Upcoming' :
+                    ins.status === 'paid'       ? 'Paid' :
+                    ins.status === 'overdue'    ? 'Overdue' :
+                    'Scheduled';
+                  const badgeCls =
+                    (qp?.status === 'success' || ins.status === 'paid')
+                      ? 'bg-green-100 text-green-700' :
+                    (qp?.status === 'failed' || ins.status === 'overdue')
+                      ? 'bg-red-100 text-red-700' :
+                    (qp?.status === 'retrying')
+                      ? 'bg-amber-100 text-amber-700' :
+                    (qp?.status === 'cancelled')
+                      ? 'bg-gray-100 text-gray-400' :
+                      'bg-gray-100 text-gray-600';
+                  return (
+                    <tr key={ins.installmentNumber} className="border-b border-gray-50">
+                      <td className="py-2 text-gray-500">{ins.installmentNumber}</td>
+                      <td className="py-2 text-gray-700">{ins.dueDate}</td>
+                      <td className="py-2 text-right font-medium text-gray-900">{fmt(ins.amount)}</td>
+                      <td className="py-2 text-right">
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${badgeCls}`}>
+                          {label}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
               <tfoot>
                 <tr className="border-t border-gray-200">

@@ -5,7 +5,7 @@ import { AppError } from '@/lib/utils/api-error';
 export type AuthResult = {
   uid: string;
   email: string;
-  role: 'applicant' | 'lender';
+  role: 'applicant' | 'lender' | 'admin';
   emailVerified: boolean;
 };
 
@@ -17,7 +17,7 @@ export type AuthResult = {
  */
 export async function withAuth(
   request: NextRequest,
-  allowedRoles?: ('applicant' | 'lender')[],
+  allowedRoles?: ('applicant' | 'lender' | 'admin')[],
 ): Promise<AuthResult> {
   const sessionCookie = request.cookies.get('__session')?.value;
 
@@ -32,7 +32,7 @@ export async function withAuth(
     throw new AppError('AUTH_EXPIRED', 401, 'Session expired or invalid');
   }
 
-  const role = decoded.role as 'applicant' | 'lender';
+  const role = decoded.role as 'applicant' | 'lender' | 'admin';
 
   if (allowedRoles && !allowedRoles.includes(role)) {
     throw new AppError('FORBIDDEN', 403, 'You do not have permission to access this resource');

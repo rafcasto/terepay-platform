@@ -14,7 +14,7 @@ type AppUser = {
   email: string;
   firstName: string;
   lastName: string;
-  role: 'applicant' | 'lender';
+  role: 'applicant' | 'lender' | 'admin';
   profileComplete: boolean;
   emailVerified: boolean;
   isExistingCustomer?: boolean;

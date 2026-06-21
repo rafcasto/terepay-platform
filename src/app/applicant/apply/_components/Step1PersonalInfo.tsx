@@ -5,14 +5,17 @@ import { useFormContext } from 'react-hook-form';
 import type { TerepayApplicationInput } from '@/lib/validation/schemas';
 import AddressAutocomplete from './AddressAutocomplete';
 
+// Computed at module load time — acceptable for DOB age gate (changes at most once daily)
+const MAX_DOB_DATE = new Date(Date.now() - 18 * 365.25 * 86400000).toISOString().split('T')[0];
+
 const inputCls =
-  'w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#F5A523] focus:border-[#F5A523] focus:outline-none transition-colors bg-white';
+  'w-full px-3 h-11 border border-border rounded-xl text-sm focus:ring-2 focus:ring-accent focus:border-accent focus:outline-none transition-colors bg-surface text-text placeholder:text-muted/70';
 const inputPrefilledCls =
-  'w-full px-3 py-2.5 border border-blue-200 rounded-lg text-sm focus:ring-2 focus:ring-[#F5A523] focus:border-[#F5A523] focus:outline-none transition-colors bg-blue-50';
+  'w-full px-3 h-11 border border-info/40 rounded-xl text-sm focus:ring-2 focus:ring-accent focus:border-accent focus:outline-none transition-colors bg-info-soft/30 text-text';
 const selectCls = inputCls + ' appearance-none';
 const selectPrefilledCls = inputPrefilledCls + ' appearance-none';
-const labelCls = 'block text-sm font-medium text-gray-700 mb-1';
-const errorCls = 'mt-1 text-xs text-red-600';
+const labelCls = 'block text-sm font-semibold text-text mb-1.5';
+const errorCls = 'mt-1.5 text-xs text-danger font-medium';
 
 type PrefilledFields = Set<string>;
 
@@ -111,22 +114,22 @@ export default function Step1PersonalInfo() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-gray-900">Personal Information</h2>
-        <p className="text-sm text-gray-500 mt-1">Please provide your legal personal details.</p>
+        <h2 className="text-xl font-bold text-text">Personal Information</h2>
+        <p className="text-sm text-muted mt-1">Please provide your legal personal details.</p>
       </div>
 
       {/* Name row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className={labelCls}>
-            First Name <span className="text-red-500">*</span>
+            First Name <span className="text-danger">*</span>
           </label>
           <input {...register('personalInfo.firstName')} className={cls('firstName')} placeholder="Jane" />
           {e?.firstName && <p className={errorCls}>{e.firstName.message}</p>}
         </div>
         <div>
           <label className={labelCls}>
-            Last Name <span className="text-red-500">*</span>
+            Last Name <span className="text-danger">*</span>
           </label>
           <input {...register('personalInfo.lastName')} className={cls('lastName')} placeholder="Smith" />
           {e?.lastName && <p className={errorCls}>{e.lastName.message}</p>}
@@ -137,19 +140,19 @@ export default function Step1PersonalInfo() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className={labelCls}>
-            Date of Birth <span className="text-red-500">*</span>
+            Date of Birth <span className="text-danger">*</span>
           </label>
           <input
             type="date"
             {...register('personalInfo.dateOfBirth')}
             className={cls('dateOfBirth')}
-            max={new Date(Date.now() - 18 * 365.25 * 86400000).toISOString().split('T')[0]}
+            max={MAX_DOB_DATE}
           />
           {e?.dateOfBirth && <p className={errorCls}>{e.dateOfBirth.message}</p>}
         </div>
         <div>
           <label className={labelCls}>
-            Mobile Phone <span className="text-red-500">*</span>
+            Mobile Phone <span className="text-danger">*</span>
           </label>
           <input
             type="tel"
@@ -164,7 +167,7 @@ export default function Step1PersonalInfo() {
       {/* Email */}
       <div>
         <label className={labelCls}>
-          Email Address <span className="text-red-500">*</span>
+          Email Address <span className="text-danger">*</span>
         </label>
         <input
           type="email"
@@ -182,7 +185,7 @@ export default function Step1PersonalInfo() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className={labelCls}>
-            How long at this address? <span className="text-red-500">*</span>
+            How long at this address? <span className="text-danger">*</span>
           </label>
           <input
             {...register('personalInfo.timeAtAddress')}
@@ -193,7 +196,7 @@ export default function Step1PersonalInfo() {
         </div>
         <div>
           <label className={labelCls}>
-            Housing Status <span className="text-red-500">*</span>
+            Housing Status <span className="text-danger">*</span>
           </label>
           <select {...register('personalInfo.housingStatus')} className={cls('housingStatus')}>
             <option value="">Select…</option>
@@ -210,7 +213,7 @@ export default function Step1PersonalInfo() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className={labelCls}>
-            Visa Status <span className="text-red-500">*</span>
+            Visa Status <span className="text-danger">*</span>
           </label>
           <select {...register('personalInfo.visaStatus')} className={cls('visaStatus')}>
             <option value="">Select…</option>
@@ -233,7 +236,7 @@ export default function Step1PersonalInfo() {
       {/* Household Type */}
       <div>
         <label className={labelCls}>
-          Household Type <span className="text-red-500">*</span>
+          Household Type <span className="text-danger">*</span>
         </label>
         <select {...register('personalInfo.householdType')} className={cls('householdType')}>
           <option value="">Select…</option>

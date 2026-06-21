@@ -1,7 +1,10 @@
 import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { getAdminDb, verifySessionOrIdToken } from '@/lib/firebase/admin';
 import { loanPurposeLabel } from '@/lib/constants/loan-purposes';
+import ConsoleIcon, { type ConsoleIconName } from '@/components/lender/ConsoleIcon';
+import ConsolePill, { type PillTone } from '@/components/lender/ConsolePill';
 
 export const dynamic = 'force-dynamic';
 
@@ -92,28 +95,35 @@ const STATUS_LABELS: Record<string, string> = {
   declined: 'Declined',
 };
 
-const STATUS_COLOR: Record<string, string> = {
-  pending_review: 'bg-amber-100 text-amber-800',
-  under_assessment: 'bg-blue-100 text-blue-800',
-  waiting_for_docs: 'bg-orange-100 text-orange-800',
-  credit_check: 'bg-purple-100 text-purple-800',
-  approved: 'bg-green-100 text-green-800',
-  loan_accepted: 'bg-emerald-100 text-emerald-700',
-  awaiting_payment_consent: 'bg-amber-100 text-amber-800',
-  offer_declined: 'bg-amber-100 text-amber-800',
-  disbursed: 'bg-emerald-100 text-emerald-800',
-  active: 'bg-teal-100 text-teal-800',
-  closed_repaid: 'bg-gray-100 text-gray-600',
-  declined: 'bg-red-100 text-red-700',
+const STATUS_TONE: Record<string, PillTone> = {
+  pending_review: 'info',
+  under_assessment: 'warning',
+  waiting_for_docs: 'warning',
+  credit_check: 'info',
+  approved: 'success',
+  loan_accepted: 'success',
+  awaiting_payment_consent: 'warning',
+  offer_declined: 'neutral',
+  disbursed: 'success',
+  active: 'success',
+  closed_repaid: 'neutral',
+  declined: 'danger',
+};
+
+const KPI_TONE: Record<string, [string, string]> = {
+  brand: ['bg-[var(--orange-50)]', 'text-[var(--orange-700)]'],
+  info: ['bg-[var(--info-50)]', 'text-[var(--info-700)]'],
+  warning: ['bg-[var(--warning-50)]', 'text-[var(--warning-700)]'],
+  success: ['bg-[var(--success-50)]', 'text-[var(--success-700)]'],
 };
 
 export default async function LenderDashboardPage() {
   const cookieStore = await cookies();
   const session = cookieStore.get('__session')?.value;
-  if (!session) return null;
+  if (!session) redirect('/auth/login');
 
   const decoded = await verifySessionOrIdToken(session).catch(() => null);
-  if (!decoded) return null;
+  if (!decoded) redirect('/auth/login');
 
   const lenderUid: string = decoded.uid;
   const { counts, totalDisbursed, avgDecisionDays, approvalRate, decisionCount, pending, myApps } =
@@ -125,72 +135,94 @@ export default async function LenderDashboardPage() {
     (counts.waiting_for_docs ?? 0) +
     (counts.credit_check ?? 0);
 
-  const STAT_CARDS = [
-    { label: 'Active Pipeline', value: totalActive, sub: 'Pending + in assessment' },
+  const STAT_CARDS: { label: string; value: string | number; sub: string; icon: ConsoleIconName; tone: string }[] = [
+    { label: 'Active pipeline', value: totalActive, sub: 'Pending + in assessment', icon: 'inbox', tone: 'brand' },
     {
-      label: 'Avg. Decision Time',
+      label: 'Avg. decision time',
       value: avgDecisionDays != null ? `${avgDecisionDays}d` : '—',
       sub: `Based on ${decisionCount} decided`,
+      icon: 'clock',
+      tone: 'info',
     },
     {
-      label: 'Approval Rate',
+      label: 'Approval rate',
       value: approvalRate != null ? `${approvalRate}%` : '—',
       sub: 'Approved vs. decided',
+      icon: 'trending',
+      tone: 'success',
     },
     {
-      label: 'Total Disbursed',
+      label: 'Total disbursed',
       value: fmt(totalDisbursed),
       sub: 'Disbursed + active + repaid',
+      icon: 'wallet',
+      tone: 'warning',
     },
   ];
 
-  const PIPELINE_STATUSES = ['pending_review', 'under_assessment', 'waiting_for_docs', 'credit_check'];
+  const PIPELINE_STATUSES = ['pending_review', 'under_assessment', 'waiting_for_docs', 'credit_check', 'approved', 'declined', 'disbursed', 'active', 'closed_repaid'];
 
   return (
-    <div className="px-4 py-6 sm:px-8 sm:py-8 space-y-6 sm:space-y-8">
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Lender Dashboard</h1>
-        <p className="text-gray-500 mt-1 text-sm">Overview of the TerePay LMS pipeline.</p>
+    <div className="mx-auto max-w-[1240px] px-6 pb-14 pt-6 sm:px-[26px]">
+      {/* Page head */}
+      <div className="mb-[18px]">
+        <h1 className="m-0 font-display text-2xl font-bold tracking-[-0.01em] text-[var(--text-strong)]">
+          Overview
+        </h1>
+        <p className="mt-1 text-sm text-[var(--text-muted)]">Pipeline health & activity across the TerePay platform.</p>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {STAT_CARDS.map((s) => (
-          <div key={s.label} className="bg-white rounded-xl border border-gray-200 p-4 sm:p-5">
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide leading-tight">{s.label}</p>
-            <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{s.value}</p>
-            <p className="text-xs text-gray-400 mt-0.5">{s.sub}</p>
-          </div>
-        ))}
+      {/* KPI cards */}
+      <div className="mb-[18px] grid gap-[18px] [grid-template-columns:repeat(auto-fit,minmax(190px,1fr))]">
+        {STAT_CARDS.map((s) => {
+          const [bg, fg] = KPI_TONE[s.tone];
+          return (
+            <div
+              key={s.label}
+              className="rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-white p-[18px] shadow-[var(--shadow-xs)]"
+            >
+              <div className="mb-[11px] flex items-center justify-between gap-2">
+                <span className="text-[12.5px] font-medium text-[var(--text-muted)]">{s.label}</span>
+                <span className={`flex h-[34px] w-[34px] items-center justify-center rounded-[9px] ${bg} ${fg}`}>
+                  <ConsoleIcon name={s.icon} size={18} />
+                </span>
+              </div>
+              <div className="font-display text-[27px] font-bold leading-none tracking-[-0.02em] text-[var(--text-strong)]">
+                {s.value}
+              </div>
+              <div className="mt-[7px] text-[12.5px] text-[var(--text-muted)]">{s.sub}</div>
+            </div>
+          );
+        })}
       </div>
 
-      {/* Status Breakdown */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
-        <h2 className="font-semibold text-gray-900 mb-4">Pipeline Breakdown</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-          {PIPELINE_STATUSES.concat(['approved', 'declined', 'disbursed', 'active', 'closed_repaid']).map((s) => (
-            <div key={s} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2.5">
-              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_COLOR[s] ?? 'bg-gray-100 text-gray-600'}`}>
-                {STATUS_LABELS[s] ?? s}
-              </span>
-              <span className="text-sm font-bold text-gray-900 ml-2">{counts[s] ?? 0}</span>
+      {/* Pipeline breakdown */}
+      <div className="mb-[18px] rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-white shadow-[var(--shadow-xs)]">
+        <div className="border-b border-[var(--border-subtle)] px-5 py-[15px]">
+          <h2 className="m-0 font-display text-[15px] font-semibold text-[var(--text-strong)]">Pipeline breakdown</h2>
+        </div>
+        <div className="grid grid-cols-2 gap-3 p-5 sm:grid-cols-3 md:grid-cols-4">
+          {PIPELINE_STATUSES.map((s) => (
+            <div key={s} className="flex items-center justify-between gap-2 rounded-[10px] bg-[var(--surface-sunken)] px-3 py-2.5">
+              <ConsolePill tone={STATUS_TONE[s] ?? 'neutral'}>{STATUS_LABELS[s] ?? s}</ConsolePill>
+              <span className="ml-1 font-display text-sm font-bold text-[var(--text-strong)]">{counts[s] ?? 0}</span>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Pending Review Queue */}
-      <div className="bg-white rounded-xl border border-gray-200">
-        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100">
-          <h2 className="font-semibold text-gray-900">Pending Review (Oldest First)</h2>
-          <Link href="/lender/applications" className="text-sm text-indigo-600 hover:underline shrink-0 ml-4">
+      {/* Pending review queue */}
+      <div className="mb-[18px] rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-white shadow-[var(--shadow-xs)]">
+        <div className="flex items-center justify-between gap-3 border-b border-[var(--border-subtle)] px-5 py-[15px]">
+          <h2 className="m-0 font-display text-[15px] font-semibold text-[var(--text-strong)]">Pending review · oldest first</h2>
+          <Link href="/lender/applications" className="shrink-0 text-sm font-semibold text-[var(--orange-700)] hover:underline">
             View all →
           </Link>
         </div>
         {pending.length === 0 ? (
-          <p className="px-4 sm:px-6 py-8 text-sm text-gray-400 text-center">No applications pending review.</p>
+          <p className="px-5 py-10 text-center text-sm text-[var(--text-muted)]">No applications pending review.</p>
         ) : (
-          <ul className="divide-y divide-gray-50">
+          <ul className="divide-y divide-[var(--border-subtle)]">
             {pending.map((app) => {
               const timeline = app.timeline as Record<string, { _seconds: number }> | undefined;
               const days = daysSince(timeline?.submittedAt ?? null);
@@ -199,23 +231,25 @@ export default async function LenderDashboardPage() {
               return (
                 <li
                   key={app.id as string}
-                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0 px-4 sm:px-6 py-4 hover:bg-gray-50 transition-colors"
+                  className="flex flex-col gap-2 px-5 py-3.5 transition-colors hover:bg-[var(--orange-50)] sm:flex-row sm:items-center sm:justify-between sm:gap-0"
                 >
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-900 font-mono">
+                    <p className="font-mono text-sm font-medium text-[var(--text-strong)]">
                       {(app.referenceNumber as string) ?? (app.id as string)}
                     </p>
-                    <p className="text-xs text-gray-400 mt-0.5 truncate">
+                    <p className="mt-0.5 truncate text-xs text-[var(--text-muted)]">
                       {fmt(ld?.requestedAmount ?? 0)} · {loanPurposeLabel(ld?.loanPurpose)}
                     </p>
                   </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    <span className={`text-xs font-medium ${overdue ? 'text-red-600' : 'text-gray-500'}`}>
-                      {overdue ? `⚠ ${days}d overdue` : `${days}d pending`}
-                    </span>
+                  <div className="flex shrink-0 items-center gap-3">
+                    {overdue ? (
+                      <ConsolePill tone="danger" dot>{days}d overdue</ConsolePill>
+                    ) : (
+                      <ConsolePill tone="success" dot>{days}d pending</ConsolePill>
+                    )}
                     <Link
                       href={`/lender/applications/${app.id as string}`}
-                      className="text-xs text-indigo-600 hover:underline font-medium"
+                      className="text-xs font-semibold text-[var(--orange-700)] hover:underline"
                     >
                       Claim →
                     </Link>
@@ -227,34 +261,32 @@ export default async function LenderDashboardPage() {
         )}
       </div>
 
-      {/* My Active Applications */}
+      {/* My active assessments */}
       {myApps.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200">
-          <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100">
-            <h2 className="font-semibold text-gray-900">My Active Assessments</h2>
+        <div className="mb-[18px] rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-white shadow-[var(--shadow-xs)]">
+          <div className="border-b border-[var(--border-subtle)] px-5 py-[15px]">
+            <h2 className="m-0 font-display text-[15px] font-semibold text-[var(--text-strong)]">My active assessments</h2>
           </div>
-          <ul className="divide-y divide-gray-50">
+          <ul className="divide-y divide-[var(--border-subtle)]">
             {myApps.map((app) => {
               const ld = app.loanDetails as { requestedAmount?: number } | undefined;
               const status = app.status as string;
               return (
                 <li
                   key={app.id as string}
-                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0 px-4 sm:px-6 py-4 hover:bg-gray-50 transition-colors"
+                  className="flex flex-col gap-2 px-5 py-3.5 transition-colors hover:bg-[var(--orange-50)] sm:flex-row sm:items-center sm:justify-between sm:gap-0"
                 >
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-900 font-mono">
+                    <p className="font-mono text-sm font-medium text-[var(--text-strong)]">
                       {(app.referenceNumber as string) ?? (app.id as string)}
                     </p>
-                    <p className="text-xs text-gray-400 mt-0.5">{fmt(ld?.requestedAmount ?? 0)}</p>
+                    <p className="mt-0.5 text-xs text-[var(--text-muted)]">{fmt(ld?.requestedAmount ?? 0)}</p>
                   </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLOR[status] ?? 'bg-gray-100 text-gray-600'}`}>
-                      {STATUS_LABELS[status] ?? status}
-                    </span>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <ConsolePill tone={STATUS_TONE[status] ?? 'neutral'} dot>{STATUS_LABELS[status] ?? status}</ConsolePill>
                     <Link
                       href={`/lender/applications/${app.id as string}`}
-                      className="text-xs text-indigo-600 hover:underline font-medium"
+                      className="text-xs font-semibold text-[var(--orange-700)] hover:underline"
                     >
                       View →
                     </Link>
@@ -266,20 +298,23 @@ export default async function LenderDashboardPage() {
         </div>
       )}
 
-      {/* Quick Links */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      {/* Quick links */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {[
-          { href: '/lender/applications', label: 'Applications Queue', desc: 'View and manage all applications' },
-          { href: '/lender/benchmarks', label: 'Benchmark Catalog', desc: 'Manage expense benchmarks' },
-          { href: '/lender/portfolio', label: 'Portfolio', desc: 'View active loans' },
+          { href: '/lender/applications', label: 'Application worklist', desc: 'View and manage all applications', icon: 'inbox' as ConsoleIconName },
+          { href: '/lender/benchmarks', label: 'Benchmark catalog', desc: 'Manage expense benchmarks', icon: 'sliders' as ConsoleIconName },
+          { href: '/lender/portfolio', label: 'Portfolio', desc: 'View active loans', icon: 'wallet' as ConsoleIconName },
         ].map((l) => (
           <Link
             key={l.href}
             href={l.href}
-            className="bg-white rounded-xl border border-gray-200 p-4 hover:border-indigo-300 hover:shadow-sm transition-all group"
+            className="group rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-white p-4 shadow-[var(--shadow-xs)] transition-all hover:border-[var(--orange-400)] hover:shadow-[var(--shadow-sm)]"
           >
-            <p className="font-medium text-gray-900 group-hover:text-indigo-700">{l.label}</p>
-            <p className="text-xs text-gray-400 mt-0.5">{l.desc}</p>
+            <div className="mb-2 flex h-[34px] w-[34px] items-center justify-center rounded-[9px] bg-[var(--orange-50)] text-[var(--orange-700)]">
+              <ConsoleIcon name={l.icon} size={18} />
+            </div>
+            <p className="font-display font-semibold text-[var(--text-strong)] group-hover:text-[var(--orange-700)]">{l.label}</p>
+            <p className="mt-0.5 text-xs text-[var(--text-muted)]">{l.desc}</p>
           </Link>
         ))}
       </div>

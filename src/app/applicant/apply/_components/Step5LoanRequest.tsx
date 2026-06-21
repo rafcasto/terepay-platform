@@ -12,10 +12,10 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 
 const inputCls =
-  'w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#F5A523] focus:border-[#F5A523] focus:outline-none transition-colors bg-white';
+  'w-full px-3 h-11 border border-border rounded-xl text-sm focus:ring-2 focus:ring-accent focus:border-accent focus:outline-none transition-colors bg-surface text-text placeholder:text-muted/70';
 const selectCls = inputCls + ' appearance-none';
-const labelCls = 'block text-sm font-medium text-gray-700 mb-1';
-const errorCls = 'mt-1 text-xs text-red-600';
+const labelCls = 'block text-sm font-semibold text-text mb-1.5';
+const errorCls = 'mt-1.5 text-xs text-danger font-medium';
 
 const REMITTANCE_PURPOSES = [
   'Family support',
@@ -53,13 +53,13 @@ export default function Step5LoanRequest() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-gray-900">Loan Request</h2>
-        <p className="text-sm text-gray-500 mt-1">Tell us about the loan you need.</p>
+        <h2 className="text-xl font-bold text-text">Loan Request</h2>
+        <p className="text-sm text-muted mt-1">Tell us about the loan you need.</p>
       </div>
 
       {/* Loan terms banner */}
-      <div className="bg-[#FEF7E9] border border-[#F5A523]/30 rounded-xl p-4 space-y-2">
-        <h3 className="text-xs font-bold text-[#E08B00] uppercase tracking-wide">Loan Terms</h3>
+      <div className="bg-[#FEF7E9] border border-accent/30 rounded-xl p-4 space-y-2">
+        <h3 className="text-xs font-bold text-accent-2 uppercase tracking-wide">Loan Terms</h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs text-[#1C2740]">
           <div><span className="font-semibold">Period:</span> 8 weeks (56 days)</div>
           <div><span className="font-semibold">Payments:</span> 4 × fortnightly</div>
@@ -73,10 +73,10 @@ export default function Step5LoanRequest() {
       {/* Requested amount */}
       <div>
         <label className={labelCls}>
-          Requested Amount (NZD) <span className="text-red-500">*</span>
+          Requested Amount (NZD) <span className="text-danger">*</span>
         </label>
         <div className="relative">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">$</span>
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted/70">$</span>
           <input
             type="number"
             min={100}
@@ -112,7 +112,7 @@ export default function Step5LoanRequest() {
       {/* Purpose */}
       <div>
         <label className={labelCls}>
-          Purpose of Loan <span className="text-red-500">*</span>
+          Purpose of Loan <span className="text-danger">*</span>
         </label>
         <select {...register('loanRequest.purpose')} className={selectCls}>
           <option value="">Select a purpose…</option>
@@ -128,12 +128,12 @@ export default function Step5LoanRequest() {
       {/* Purpose description */}
       <div>
         <label className={labelCls}>
-          Please provide details <span className="text-red-500">*</span>
+          Please provide details <span className="text-danger">*</span>
         </label>
         <textarea
           rows={3}
           {...register('loanRequest.purposeDescription')}
-          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#F5A523] focus:outline-none resize-none"
+          className="w-full px-3 py-2.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-accent focus:outline-none resize-none"
           placeholder="Briefly explain the purpose of this loan…"
         />
         {e?.purposeDescription && <p className={errorCls}>{e.purposeDescription.message}</p>}
@@ -142,7 +142,7 @@ export default function Step5LoanRequest() {
       {/* Primary income source */}
       <div>
         <label className={labelCls}>
-          Primary Source(s) of Income <span className="text-red-500">*</span>
+          Primary Source(s) of Income <span className="text-danger">*</span>
         </label>
         <input
           {...register('loanRequest.primaryIncomeSource')}
@@ -153,12 +153,12 @@ export default function Step5LoanRequest() {
       </div>
 
       {/* PEP */}
-      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
+      <div className="bg-accent-soft border border-accent/40 rounded-xl p-4 space-y-3">
         <label className="flex items-start gap-3 cursor-pointer">
           <input
             type="checkbox"
             {...register('loanRequest.isPEP')}
-            className="mt-0.5 h-4 w-4 rounded border-gray-300 text-[#F5A523] focus:ring-[#F5A523]"
+            className="mt-0.5 h-4 w-4 rounded border-border text-accent-2 focus:ring-accent"
           />
           <span className="text-sm text-amber-900">
             I, or an immediate family member, am a{' '}
@@ -182,14 +182,14 @@ export default function Step5LoanRequest() {
       <div className="space-y-4">
         <div>
           <h3 className="text-sm font-semibold text-gray-800 mb-1">Remittance Information</h3>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-muted">
             Regular money transfers abroad help us understand your financial commitments.
           </p>
         </div>
 
         <div>
           <label className={labelCls}>
-            How often do you send remittances? <span className="text-red-500">*</span>
+            How often do you send remittances? <span className="text-danger">*</span>
           </label>
           <select {...register('loanRequest.remittance.frequency')} className={selectCls}>
             <option value="">Select…</option>
@@ -211,7 +211,7 @@ export default function Step5LoanRequest() {
                 Average Amount per Remittance per Fortnight (NZD)
               </label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">$</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted/70">$</span>
                 <input
                   type="number"
                   min={0}
@@ -232,9 +232,9 @@ export default function Step5LoanRequest() {
                       type="checkbox"
                       value={p}
                       {...register('loanRequest.remittance.purposes')}
-                      className="h-4 w-4 rounded border-gray-300 text-[#F5A523] focus:ring-[#F5A523]"
+                      className="h-4 w-4 rounded border-border text-accent-2 focus:ring-accent"
                     />
-                    <span className="text-sm text-gray-700">{p}</span>
+                    <span className="text-sm text-text">{p}</span>
                   </label>
                 ))}
               </div>

@@ -1,74 +1,126 @@
-import Link from 'next/link';
+import { ActionRow, Icons } from '@/components/ui';
+import type { LoanDisplayState } from '@/lib/loan/status-display';
 
-const ACTIONS = [
-  {
-    href: '/applicant/apply',
-    label: 'Apply for a Loan',
-    description: 'Get funds in as little as 24 hours',
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
-        <rect x="1" y="5" width="20" height="14" rx="2.5" stroke="currentColor" strokeWidth="1.5" />
-        <path d="M1 9h20" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        <rect x="4" y="13" width="5" height="2" rx="1" fill="currentColor" />
-      </svg>
-    ),
-    iconBg: 'bg-amber-50',
-    iconColor: 'text-amber-600',
-  },
-  {
-    href: '/applicant/applications',
-    label: 'Make a Payment',
-    description: 'Pay off your balance or schedule a payment',
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
-        <path d="M7 10.5C7 8.015 9.015 6 11.5 6c1.38 0 2.618.59 3.484 1.534M15 11.5c0 2.485-2.015 4.5-4.5 4.5a4.493 4.493 0 0 1-3.484-1.534" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        <path d="M11.5 3v2M11.5 17v2M3 11.5h2M18 11.5h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      </svg>
-    ),
-    iconBg: 'bg-blue-50',
-    iconColor: 'text-blue-600',
-  },
-  {
-    href: '/applicant/applications',
-    label: 'Loan History',
-    description: 'View all past and active loans',
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
-        <rect x="4" y="2" width="14" height="18" rx="2" stroke="currentColor" strokeWidth="1.5" />
-        <path d="M8 7h6M8 11h6M8 15h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      </svg>
-    ),
-    iconBg: 'bg-gray-100',
-    iconColor: 'text-gray-600',
-  },
-];
+interface QuickActionsProps {
+  state: LoanDisplayState;
+  pendingAppId?: string | null;
+}
 
-export default function QuickActions() {
+export default function QuickActions({ state, pendingAppId }: QuickActionsProps) {
+  const items: Array<{
+    href: string;
+    title: string;
+    subtitle: string;
+    icon: React.ReactElement;
+    tone: 'amber' | 'info' | 'muted' | 'success' | 'danger';
+  }> = [];
+
+  if (state === 'active') {
+    items.push(
+      {
+        href: pendingAppId ? `/applicant/applications/${pendingAppId}` : '/applicant/applications',
+        title: 'View repayment schedule',
+        subtitle: 'Each instalment is auto-debited on its due date',
+        icon: <Icons.Calendar size={20} />,
+        tone: 'amber',
+      },
+      {
+        href: '/applicant/applications',
+        title: 'Loan history',
+        subtitle: 'View all past and active loans',
+        icon: <Icons.History size={20} />,
+        tone: 'muted',
+      },
+    );
+  } else if (state === 'review' || state === 'approved') {
+    if (pendingAppId) {
+      items.push({
+        href: `/applicant/applications/${pendingAppId}`,
+        title: state === 'approved' ? 'Review your offer' : 'Track application',
+        subtitle:
+          state === 'approved'
+            ? 'Accept or decline your loan offer'
+            : 'See the current step and estimated timing',
+        icon: <Icons.Receipt size={20} />,
+        tone: state === 'approved' ? 'success' : 'amber',
+      });
+    }
+    items.push({
+      href: '/applicant/applications',
+      title: 'All applications',
+      subtitle: 'See past applications and decisions',
+      icon: <Icons.History size={20} />,
+      tone: 'muted',
+    });
+  } else if (state === 'rejected') {
+    items.push(
+      {
+        href: '/applicant/apply',
+        title: 'Apply again',
+        subtitle: 'Start a fresh application',
+        icon: <Icons.Refresh size={20} />,
+        tone: 'amber',
+      },
+      {
+        href: '/applicant/applications',
+        title: 'Application history',
+        subtitle: 'Review past applications',
+        icon: <Icons.History size={20} />,
+        tone: 'muted',
+      },
+    );
+  } else if (state === 'paid') {
+    items.push(
+      {
+        href: '/applicant/apply',
+        title: 'Start a new loan',
+        subtitle: 'Your repayment history is on your side',
+        icon: <Icons.Sparkles size={20} />,
+        tone: 'amber',
+      },
+      {
+        href: '/applicant/applications',
+        title: 'Loan history',
+        subtitle: 'Download statements and view past loans',
+        icon: <Icons.History size={20} />,
+        tone: 'muted',
+      },
+    );
+  } else {
+    // new
+    items.push(
+      {
+        href: '/applicant/apply',
+        title: 'Apply for a loan',
+        subtitle: 'Quick application · decision in 1–2 business days',
+        icon: <Icons.Card size={20} />,
+        tone: 'amber',
+      },
+      {
+        href: '/applicant/profile',
+        title: 'Update your profile',
+        subtitle: 'Keep your details current for faster approvals',
+        icon: <Icons.User size={20} />,
+        tone: 'info',
+      },
+    );
+  }
+
   return (
-    <section>
-      <p className="text-xs font-semibold tracking-widest text-gray-400 uppercase mb-3">
-        Quick Actions
+    <section className="space-y-2.5">
+      <p className="text-[11.5px] font-semibold tracking-[0.08em] text-muted uppercase">
+        Quick actions
       </p>
-      <div className="space-y-2.5">
-        {ACTIONS.map((action) => (
-          <Link
-            key={action.label}
-            href={action.href}
-            className="flex items-center gap-4 bg-white rounded-xl px-4 py-4 hover:shadow-sm transition-shadow border border-gray-100"
-          >
-            <div className={`h-11 w-11 rounded-xl flex items-center justify-center shrink-0 ${action.iconBg} ${action.iconColor}`}>
-              {action.icon}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-gray-900">{action.label}</p>
-              <p className="text-xs text-gray-500 mt-0.5">{action.description}</p>
-            </div>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" className="shrink-0 text-gray-300">
-              <path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </Link>
-        ))}
-      </div>
+      {items.map((it) => (
+        <ActionRow
+          key={it.title}
+          href={it.href}
+          icon={it.icon}
+          iconTone={it.tone}
+          title={it.title}
+          subtitle={it.subtitle}
+        />
+      ))}
     </section>
   );
 }

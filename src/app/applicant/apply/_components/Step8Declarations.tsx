@@ -5,7 +5,7 @@ import type { TerepayApplicationInput } from '@/lib/validation/schemas';
 import { useAuth } from '@/hooks/useAuth';
 import { LOAN_INTEREST_RATE, computeApplicationFee } from '@/lib/constants/fees';
 
-const errorCls = 'mt-1 text-xs text-red-600';
+const errorCls = 'mt-1.5 text-xs text-danger font-medium';
 
 const DECLARATIONS = [
   {
@@ -71,45 +71,45 @@ export default function Step8Declarations() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-gray-900">Declarations &amp; Consent</h2>
-        <p className="text-sm text-gray-500 mt-1">
+        <h2 className="text-xl font-bold text-text">Declarations &amp; Consent</h2>
+        <p className="text-sm text-muted mt-1">
           Please read and confirm each declaration before submitting your application.{' '}
           For legal compliance, your consent must be confirmed fresh each time you submit.
         </p>
       </div>
 
       {/* Fees & Repayment Summary */}
-      <div className="bg-[#FEF7E9] border border-[#F5A523]/30 rounded-xl p-4 space-y-3">
-        <h3 className="text-xs font-bold text-[#E08B00] uppercase tracking-wide">
+      <div className="bg-[#FEF7E9] border border-accent/30 rounded-xl p-4 space-y-3">
+        <h3 className="text-xs font-bold text-accent-2 uppercase tracking-wide">
           Fees &amp; Repayment Summary
         </h3>
         <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-sm text-[#1C2740]">
           <div className="flex justify-between sm:block">
-            <dt className="text-gray-600">Requested amount</dt>
+            <dt className="text-muted">Requested amount</dt>
             <dd className="font-semibold sm:mt-0.5">${principal.toFixed(2)}</dd>
           </div>
           <div className="flex justify-between sm:block">
-            <dt className="text-gray-600">Interest (4.7%)</dt>
+            <dt className="text-muted">Interest (4.7%)</dt>
             <dd className="font-semibold sm:mt-0.5">${interest.toFixed(2)}</dd>
           </div>
           <div className="flex justify-between sm:block">
-            <dt className="text-gray-600">Application fee</dt>
+            <dt className="text-muted">Application fee</dt>
             <dd className="font-semibold sm:mt-0.5">
-              ${applicationFee} <span className="text-xs font-normal text-gray-500">({customerLabel})</span>
+              ${applicationFee} <span className="text-xs font-normal text-muted">({customerLabel})</span>
             </dd>
           </div>
           <div className="flex justify-between sm:block">
-            <dt className="text-gray-600">Total repayable</dt>
+            <dt className="text-muted">Total repayable</dt>
             <dd className="font-bold sm:mt-0.5">${totalRepayable.toFixed(2)}</dd>
           </div>
-          <div className="flex justify-between sm:block sm:col-span-2 pt-2 border-t border-[#F5A523]/30">
-            <dt className="text-gray-700 font-medium">Fortnightly payment</dt>
+          <div className="flex justify-between sm:block sm:col-span-2 pt-2 border-t border-accent/30">
+            <dt className="text-text font-medium">Fortnightly payment</dt>
             <dd className="font-bold sm:mt-0.5">
               4 × ${fortnightlyPayment.toFixed(2)}
             </dd>
           </div>
         </dl>
-        <p className="text-[11px] text-gray-500 leading-snug">
+        <p className="text-[11px] text-muted leading-snug">
           Estimate based on your customer status at the time of submission. The application fee will be
           confirmed at approval.
         </p>
@@ -117,15 +117,15 @@ export default function Step8Declarations() {
 
       {/* Individual declarations */}
       <div className="space-y-4">
-        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide">Declarations</h3>
+        <h3 className="text-xs font-bold text-muted uppercase tracking-wide">Declarations</h3>
         {DECLARATIONS.map((decl) => (
           <label key={decl.key} className="flex items-start gap-3 cursor-pointer">
             <input
               type="checkbox"
               {...register(`declarations.${decl.key}`)}
-              className="mt-0.5 h-4 w-4 rounded border-gray-300 text-[#F5A523] focus:ring-[#F5A523] shrink-0"
+              className="mt-0.5 h-4 w-4 rounded border-border text-accent-2 focus:ring-accent shrink-0"
             />
-            <span className="text-sm text-gray-700 leading-relaxed">{decl.text}</span>
+            <span className="text-sm text-text leading-relaxed">{decl.text}</span>
           </label>
         ))}
         {DECLARATIONS.map((decl) =>
@@ -139,7 +139,7 @@ export default function Step8Declarations() {
 
       {/* Privacy and credit reporting */}
       <div className="space-y-4">
-        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide">
+        <h3 className="text-xs font-bold text-muted uppercase tracking-wide">
           Privacy Policy &amp; Credit Reporting Consent
         </h3>
         {PRIVACY_DECLARATIONS.map((decl) => (
@@ -148,9 +148,9 @@ export default function Step8Declarations() {
               <input
                 type="checkbox"
                 {...register(`declarations.${decl.key}`)}
-                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-[#F5A523] focus:ring-[#F5A523] shrink-0"
+                className="mt-0.5 h-4 w-4 rounded border-border text-accent-2 focus:ring-accent shrink-0"
               />
-              <span className="text-sm text-gray-700 leading-relaxed">{decl.text}</span>
+              <span className="text-sm text-text leading-relaxed">{decl.text}</span>
             </label>
             {e?.[decl.key] && <p className={errorCls + ' ml-7'}>{e[decl.key]?.message}</p>}
           </div>
@@ -158,15 +158,15 @@ export default function Step8Declarations() {
       </div>
 
       {/* Footer branding */}
-      <div className="border-t border-gray-200 pt-4 text-center space-y-1">
-        <p className="text-xs font-semibold text-gray-700">TerePay Neophile Limited</p>
-        <p className="text-xs text-gray-400">
+      <div className="border-t border-border pt-4 text-center space-y-1">
+        <p className="text-xs font-semibold text-text">TerePay Neophile Limited</p>
+        <p className="text-xs text-muted/70">
           FSP1007414 | NZBN 9429052055232
         </p>
-        <p className="text-xs text-gray-400">
+        <p className="text-xs text-muted/70">
           27 Henry Partington Place, Greenhithe 0632, New Zealand
         </p>
-        <p className="text-xs text-gray-400">
+        <p className="text-xs text-muted/70">
           www.terepay.co.nz | info@terepay.co.nz
         </p>
       </div>
