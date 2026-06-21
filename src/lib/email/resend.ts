@@ -10,7 +10,7 @@ import { Resend } from 'resend';
  * - Never logs PII (recipient address) — only success/failure metadata.
  */
 
-const DEFAULT_FROM = 'TerePay <noreply@terepay.com>';
+const DEFAULT_FROM = 'TerePay <noreply@notifications.terepay.com>';
 
 let _resend: Resend | null = null;
 
