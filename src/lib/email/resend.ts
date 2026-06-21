@@ -41,8 +41,10 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
     return { sent: false, skipped: true };
   }
 
+  const from = process.env.EMAIL_FROM ?? DEFAULT_FROM;
+
   const { error } = await resend.emails.send({
-    from: process.env.EMAIL_FROM ?? DEFAULT_FROM,
+    from,
     to: input.to,
     subject: input.subject,
     html: input.html,
@@ -50,8 +52,12 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
   });
 
   if (error) {
-    // Log the provider error class/name, not the recipient.
-    console.error('[email] Resend send failed:', error.name ?? 'unknown_error');
+    // Log the provider's error name + message (these describe the
+    // configuration problem and do not contain recipient PII) plus the
+    // `from` address, which is the usual culprit (unverified domain).
+    console.error(
+      `[email] Resend send failed: ${error.name ?? 'unknown_error'} — ${error.message ?? 'no message'} (from: ${from})`,
+    );
     throw new Error('Email send failed');
   }
 
