@@ -17,10 +17,10 @@ export function QuickAmounts({ amounts, value, onChange, formatLabel }: QuickAmo
             type="button"
             key={a}
             onClick={() => onChange(a)}
-            className={`px-3.5 h-9 rounded-full border text-sm font-semibold transition-colors ${
+            className={`px-3.5 h-9 rounded-pill border-2 text-sm font-semibold font-tabular transition-colors ${
               selected
-                ? 'border-accent bg-accent text-white'
-                : 'border-border bg-surface text-text hover:border-accent/50 hover:bg-accent-soft'
+                ? 'border-brand bg-brand-soft text-brand-text'
+                : 'border-border-default bg-surface-card text-ink-strong hover:border-border-strong hover:bg-surface-sunken'
             }`}
             aria-pressed={selected}
           >

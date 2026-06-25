@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getAdminDb, verifySessionOrIdToken } from '@/lib/firebase/admin';
@@ -37,11 +38,21 @@ export default async function ApplyLayout({ children }: Props) {
   }
 
   return (
-    <div className="min-h-screen flex flex-col sm:flex-row bg-bg">
-      <aside className="hidden sm:flex flex-col w-72 lg:w-80 bg-ink shrink-0 px-8 py-10 text-white">
-        <div className="mb-10">
-          <span className="text-2xl font-extrabold text-accent tracking-tight">TerePay</span>
-          <p className="text-xs text-white/40 mt-1">Loan application</p>
+    <div className="min-h-screen flex flex-col sm:flex-row bg-[var(--surface-page)]">
+      {/* ── Sidebar (desktop) ──────────────────────────────────────────── */}
+      <aside className="hidden sm:flex flex-col w-72 lg:w-80 shrink-0 bg-surface-inverse text-white px-8 py-10">
+        <div className="mb-12">
+          <Image
+            src="/brand/terepay-wordmark-white.png"
+            alt="TerePay"
+            width={720}
+            height={216}
+            priority
+            className="h-7 w-auto"
+          />
+          <p className="mt-4 text-[11px] font-display font-semibold uppercase tracking-[0.08em] text-white/45">
+            Loan application
+          </p>
         </div>
 
         <LoanStepTracker />
@@ -49,20 +60,24 @@ export default async function ApplyLayout({ children }: Props) {
         <div className="mt-auto pt-10 flex flex-col gap-4">
           <Link
             href="/applicant/dashboard"
-            className="flex items-center gap-2 text-sm text-white/50 hover:text-white/80 transition-colors"
+            className="flex items-center gap-2 text-sm text-white/55 hover:text-white transition-colors"
           >
             <Icons.ArrowLeft size={16} />
             Back to dashboard
           </Link>
 
-          <p className="text-xs text-white/30 leading-relaxed">
-            Your information is encrypted and stored securely. We comply with NZ Privacy Act 2020.
-          </p>
+          <div className="flex items-start gap-2.5 text-white/55">
+            <Icons.ShieldCheck size={18} className="shrink-0 mt-0.5 text-[var(--gold-300)]" />
+            <p className="text-xs leading-relaxed">
+              Your information is encrypted and stored securely. We comply with the NZ Privacy Act 2020.
+            </p>
+          </div>
         </div>
       </aside>
 
+      {/* ── Main column ────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-h-screen sm:min-h-0">
-        <header className="sm:hidden sticky top-0 z-20 bg-ink px-4 h-12 flex items-center justify-between shrink-0">
+        <header className="sm:hidden sticky top-0 z-20 bg-surface-inverse px-4 h-14 flex items-center justify-between shrink-0">
           <Link
             href="/applicant/dashboard"
             className="flex items-center gap-1.5 text-white/70 hover:text-white transition-colors"
@@ -70,7 +85,14 @@ export default async function ApplyLayout({ children }: Props) {
           >
             <Icons.ArrowLeft size={20} />
           </Link>
-          <span className="text-lg font-extrabold text-accent tracking-tight">TerePay</span>
+          <Image
+            src="/brand/terepay-wordmark-white.png"
+            alt="TerePay"
+            width={720}
+            height={216}
+            priority
+            className="h-5 w-auto"
+          />
           <div className="w-5" aria-hidden="true" />
         </header>
 
@@ -78,7 +100,7 @@ export default async function ApplyLayout({ children }: Props) {
           <LoanStepTracker />
         </div>
 
-        <main className="flex-1 bg-bg overflow-auto">{children}</main>
+        <main className="flex-1 overflow-auto">{children}</main>
       </div>
     </div>
   );

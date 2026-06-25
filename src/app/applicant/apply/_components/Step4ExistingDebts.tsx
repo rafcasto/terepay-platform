@@ -4,7 +4,7 @@ import { useFormContext, useWatch, type UseFormRegister } from 'react-hook-form'
 import type { TerepayApplicationInput } from '@/lib/validation/schemas';
 
 const inputCls =
-  'w-full px-3 py-2 border border-border rounded-md text-sm focus:ring-2 focus:ring-accent focus:outline-none bg-white';
+  'w-full px-3 py-2 border border-border-default rounded-md text-sm focus:ring-2 focus:ring-[var(--focus-ring)] focus:outline-none bg-surface-card';
 
 function DebtRow({
   label,
@@ -17,11 +17,11 @@ function DebtRow({
   register: UseFormRegister<any>;
 }) {
   return (
-    <div className="grid grid-cols-12 gap-2 py-2 items-center border-b border-border-2 last:border-0">
-      <span className="col-span-12 sm:col-span-4 text-sm text-text">{label}</span>
+    <div className="grid grid-cols-12 gap-2 py-2 items-center border-b border-border-subtle last:border-0">
+      <span className="col-span-12 sm:col-span-4 text-sm text-ink-strong">{label}</span>
       <div className="col-span-6 sm:col-span-4">
         <div className="relative">
-          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted/70">$</span>
+          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-[var(--text-disabled)]">$</span>
           <input
             type="number"
             min={0}
@@ -36,7 +36,7 @@ function DebtRow({
       </div>
       <div className="col-span-6 sm:col-span-4">
         <div className="relative">
-          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted/70">$</span>
+          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-[var(--text-disabled)]">$</span>
           <input
             type="number"
             min={0}
@@ -79,22 +79,22 @@ export default function Step4ExistingDebts() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-text">Existing Debts &amp; Commitments</h2>
-        <p className="text-sm text-muted mt-1">
+        <h2 className="text-xl font-bold text-ink-strong">Existing Debts &amp; Commitments</h2>
+        <p className="text-sm text-[var(--text-muted)] mt-1">
           Enter 0 if a debt type does not apply to you.
         </p>
       </div>
 
-      <div className="bg-surface-2 rounded-xl border border-border p-4">
+      <div className="bg-surface-sunken rounded-xl border border-border-default p-4">
         {/* Column headers */}
-        <div className="grid grid-cols-12 gap-2 mb-2 pb-2 border-b border-border">
-          <span className="col-span-12 sm:col-span-4 text-xs font-semibold text-muted uppercase tracking-wide">
+        <div className="grid grid-cols-12 gap-2 mb-2 pb-2 border-b border-border-default">
+          <span className="col-span-12 sm:col-span-4 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide">
             Debt Type
           </span>
-          <span className="hidden sm:block col-span-4 text-xs font-semibold text-muted uppercase tracking-wide">
+          <span className="hidden sm:block col-span-4 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide">
             Total Owed (NZD)
           </span>
-          <span className="hidden sm:block col-span-4 text-xs font-semibold text-muted uppercase tracking-wide">
+          <span className="hidden sm:block col-span-4 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide">
             Fortnightly Payment
           </span>
         </div>
@@ -107,7 +107,7 @@ export default function Step4ExistingDebts() {
 
         {/* Other loans (3 rows) */}
         {[0, 1, 2].map((i) => (
-          <div key={i} className="grid grid-cols-12 gap-2 py-2 items-center border-b border-border-2 last:border-0">
+          <div key={i} className="grid grid-cols-12 gap-2 py-2 items-center border-b border-border-subtle last:border-0">
             <div className="col-span-12 sm:col-span-4">
               <input
                 {...register(`existingDebts.otherLoans.${i}.description`)}
@@ -117,7 +117,7 @@ export default function Step4ExistingDebts() {
             </div>
             <div className="col-span-6 sm:col-span-4">
               <div className="relative">
-                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted/70">$</span>
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-[var(--text-disabled)]">$</span>
                 <input
                   type="number"
                   min={0}
@@ -131,7 +131,7 @@ export default function Step4ExistingDebts() {
             </div>
             <div className="col-span-6 sm:col-span-4">
               <div className="relative">
-                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted/70">$</span>
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-[var(--text-disabled)]">$</span>
                 <input
                   type="number"
                   min={0}
@@ -149,12 +149,12 @@ export default function Step4ExistingDebts() {
         ))}
 
         {/* Totals row */}
-        <div className="grid grid-cols-12 gap-2 pt-3 mt-1 border-t-2 border-border">
-          <span className="col-span-12 sm:col-span-4 text-sm font-bold text-gray-800">TOTAL</span>
-          <span className="col-span-6 sm:col-span-4 px-3 py-2 bg-[#FEF7E9] text-accent-2 font-bold text-sm rounded-md text-right">
+        <div className="grid grid-cols-12 gap-2 pt-3 mt-1 border-t-2 border-border-default">
+          <span className="col-span-12 sm:col-span-4 text-sm font-bold text-ink-strong">TOTAL</span>
+          <span className="col-span-6 sm:col-span-4 px-3 py-2 bg-brand-soft text-brand-text font-bold text-sm rounded-md text-right">
             ${totalOwed.toFixed(2)}
           </span>
-          <span className="col-span-6 sm:col-span-4 px-3 py-2 bg-[#FEF7E9] text-accent-2 font-bold text-sm rounded-md text-right">
+          <span className="col-span-6 sm:col-span-4 px-3 py-2 bg-brand-soft text-brand-text font-bold text-sm rounded-md text-right">
             ${totalForthnightly.toFixed(2)}
           </span>
         </div>
@@ -162,16 +162,16 @@ export default function Step4ExistingDebts() {
 
       {/* Debt purpose description */}
       <div>
-        <label className="block text-sm font-medium text-text mb-1">
+        <label className="block text-sm font-medium text-ink-strong mb-1">
           Please help us understand your situation
         </label>
-        <p className="text-xs text-muted mb-2">
+        <p className="text-xs text-[var(--text-muted)] mb-2">
           What are the purposes of the existing loans, and when will they be finishing?
         </p>
         <textarea
           rows={4}
           {...register('existingDebts.debtPurposeDescription')}
-          className="w-full px-3 py-2.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-accent focus:outline-none resize-none"
+          className="w-full px-3 py-2.5 border border-border-default rounded-lg text-sm focus:ring-2 focus:ring-[var(--focus-ring)] focus:outline-none resize-none"
           placeholder="e.g. Car loan finishing in 18 months, credit card for emergency medical costs…"
         />
       </div>

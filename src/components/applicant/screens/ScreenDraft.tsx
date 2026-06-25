@@ -17,7 +17,6 @@ export default function ScreenDraft({ app, applicationId }: Props) {
     <div className="space-y-5">
       <Hero
         eyebrow={`Application ${refNum}`}
-        emoji="📝"
         title="Your draft is saved"
         subtitle="Pick up where you left off, or submit when you're ready."
         pill={

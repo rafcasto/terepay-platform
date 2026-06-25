@@ -29,7 +29,6 @@ export default function ScreenInReview({ app, status, applicationId }: Props) {
     <div className="space-y-5">
       <Hero
         eyebrow={`Application ${refNum}`}
-        emoji="🔎"
         title="Your application is being reviewed"
         subtitle={
           status === 'credit_check'

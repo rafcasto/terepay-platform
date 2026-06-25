@@ -101,8 +101,8 @@ export default async function ApplicantDashboard() {
   return (
     <div className="px-4 sm:px-5 pt-6 pb-20 max-w-[540px] mx-auto space-y-5">
       <div>
-        <p className="text-sm text-muted">{greeting} 👋</p>
-        <h1 className="mt-0.5 text-[26px] font-bold tracking-tight text-text">
+        <p className="text-sm text-[var(--text-muted)]">{greeting}</p>
+        <h1 className="mt-0.5 font-display text-[26px] font-bold tracking-tight text-ink-strong">
           Welcome back{firstName ? `, ${firstName}` : ''}
         </h1>
       </div>
@@ -113,9 +113,9 @@ export default async function ApplicantDashboard() {
 
       <QuickActions state={state} pendingAppId={recentApp?.id ?? null} />
 
-      <p className="pt-2 text-center text-[12.5px] text-muted">
+      <p className="pt-2 text-center text-[12.5px] text-[var(--text-muted)]">
         Need help? Email{' '}
-        <a href="mailto:support@terepay.co.nz" className="font-semibold text-accent-2 hover:underline">
+        <a href="mailto:support@terepay.co.nz" className="font-semibold text-brand-text hover:underline">
           support@terepay.co.nz
         </a>
       </p>

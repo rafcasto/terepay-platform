@@ -191,7 +191,6 @@ function ApplyPageInner() {
       }
     }
     loadDraft();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reset]);
 
   const isLastStep = currentStep === STEPS.length - 1;
@@ -208,7 +207,6 @@ function ApplyPageInner() {
       body: JSON.stringify({ [sectionKey]: sectionData, lastCompletedStep: step }),
     });
     if (res.ok) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const json = await res.json() as { data: { id: string } };
       setDraftId((prev) => prev ?? json.data.id);
     }
@@ -325,10 +323,10 @@ function ApplyPageInner() {
 
   if (draftLoading) {
     return (
-      <div className="min-h-screen bg-bg flex items-center justify-center">
+      <div className="min-h-screen bg-[var(--surface-page)] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 rounded-full border-2 border-accent border-t-transparent animate-spin" />
-          <p className="text-sm text-muted">Loading your application...</p>
+          <div className="h-8 w-8 rounded-full border-2 border-[var(--orange-700)] border-t-transparent animate-spin" />
+          <p className="text-sm text-[var(--text-muted)]">Loading your application...</p>
         </div>
       </div>
     );
@@ -336,13 +334,13 @@ function ApplyPageInner() {
 
   if (!loading && user && !user.emailVerified) {
     return (
-      <div className="min-h-screen bg-bg flex items-center justify-center px-4">
-        <Card className="max-w-md w-full text-center border-accent/40">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-accent-soft">
-            <Icons.AlertTriangle size={28} className="text-accent-2" />
+      <div className="min-h-screen bg-[var(--surface-page)] flex items-center justify-center px-4">
+        <Card className="max-w-md w-full text-center border-[var(--orange-500)]/40">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-brand-soft">
+            <Icons.AlertTriangle size={28} className="text-brand-text" />
           </div>
           <h2 className="text-lg font-bold mb-2">Email verification required</h2>
-          <p className="text-sm text-muted mb-6">
+          <p className="text-sm text-[var(--text-muted)] mb-6">
             You must verify your email address before you can submit a loan application.
           </p>
           <ButtonLink href="/applicant/verify-email" fullWidth>
@@ -354,12 +352,12 @@ function ApplyPageInner() {
   }
 
   return (
-    <div className="min-h-screen bg-bg">
+    <div className="min-h-screen bg-[var(--surface-page)]">
       <FormProvider {...methods}>
         <div className="max-w-2xl mx-auto px-4 py-8 pb-12 screen-in">
           {serverError && (
-            <Card className="mb-6 border-danger/40 bg-danger-soft">
-              <p className="text-sm text-[#991b1b] font-medium">{serverError}</p>
+            <Card className="mb-6 border-[var(--danger-500)]/40 bg-danger-soft-ds">
+              <p className="text-sm text-danger-text font-medium">{serverError}</p>
             </Card>
           )}
 
@@ -380,7 +378,7 @@ function ApplyPageInner() {
             <button
               type="button"
               onClick={handleBack}
-              className="w-full py-3 text-sm font-semibold text-muted hover:text-text transition-colors flex items-center justify-center gap-1.5"
+              className="w-full py-3 text-sm font-semibold text-[var(--text-muted)] hover:text-ink-strong transition-colors flex items-center justify-center gap-1.5"
             >
               <Icons.ArrowLeft size={16} />
               {currentStep === 0 ? 'Back to dashboard' : 'Back'}

@@ -9,15 +9,22 @@ import AddressAutocomplete from './AddressAutocomplete';
 const MAX_DOB_DATE = new Date(Date.now() - 18 * 365.25 * 86400000).toISOString().split('T')[0];
 
 const inputCls =
-  'w-full px-3 h-11 border border-border rounded-xl text-sm focus:ring-2 focus:ring-accent focus:border-accent focus:outline-none transition-colors bg-surface text-text placeholder:text-muted/70';
+  'w-full px-3 h-11 border border-border-default rounded-xl text-sm focus:ring-2 focus:ring-[var(--focus-ring)] focus:border-brand focus:outline-none transition-colors bg-surface-card text-ink-strong placeholder:text-[var(--text-disabled)]';
+// Prefilled indicator uses a subtle brand (orange) tint so it stays on-DS
 const inputPrefilledCls =
-  'w-full px-3 h-11 border border-info/40 rounded-xl text-sm focus:ring-2 focus:ring-accent focus:border-accent focus:outline-none transition-colors bg-info-soft/30 text-text';
-const selectCls = inputCls + ' appearance-none';
-const selectPrefilledCls = inputPrefilledCls + ' appearance-none';
-const labelCls = 'block text-sm font-semibold text-text mb-1.5';
-const errorCls = 'mt-1.5 text-xs text-danger font-medium';
+  'w-full px-3 h-11 border border-brand/40 rounded-xl text-sm focus:ring-2 focus:ring-[var(--focus-ring)] focus:border-brand focus:outline-none transition-colors bg-brand-soft/50 text-ink-strong';
+// DS chevron so native selects show a proper dropdown affordance
+const chevron =
+  " appearance-none bg-[url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 fill=%22none%22 stroke=%22%235A6B82%22 stroke-width=%221.75%22 viewBox=%220 0 24 24%22><path d=%22m6 9 6 6 6-6%22/></svg>')] bg-no-repeat bg-[length:18px_18px] bg-[position:right_12px_center] pr-10";
+const selectCls = inputCls + chevron;
+const selectPrefilledCls = inputPrefilledCls + chevron;
+const labelCls = 'block text-sm font-semibold text-ink-strong mb-1.5';
+const errorCls = 'mt-1.5 text-xs text-danger-text font-medium';
 
 type PrefilledFields = Set<string>;
+
+// Fields rendered as <select> (drive select vs input styling)
+const SELECT_FIELDS = new Set(['housingStatus', 'visaStatus', 'householdType', 'timeAtAddress']);
 
 export default function Step1PersonalInfo() {
   const {
@@ -56,6 +63,7 @@ export default function Step1PersonalInfo() {
         fill('lastName', data.lastName);
         fill('email', data.email);
         fill('phone', data.phone ?? data.phoneNumber);
+        // DOB is returned as a plain yyyy-MM-dd string (the API decrypts the owner's value)
         fill('dateOfBirth', data.dateOfBirth);
         fill('address', data.address);
         fill('suburb', data.suburb);
@@ -94,14 +102,12 @@ export default function Step1PersonalInfo() {
 
   // Remove prefill indicator when user touches a field
   const touched = touchedFields.personalInfo ?? {};
-  const cls = (field: string) =>
-    prefilled.has(field) && !touched[field as keyof typeof touched]
-      ? field.includes('Status') || field.includes('Type') || field.includes('household')
-        ? selectPrefilledCls
-        : inputPrefilledCls
-      : field.includes('Status') || field.includes('Type') || field.includes('household')
-      ? selectCls
-      : inputCls;
+  const cls = (field: string) => {
+    const isSelect = SELECT_FIELDS.has(field);
+    const showPrefill = prefilled.has(field) && !touched[field as keyof typeof touched];
+    if (showPrefill) return isSelect ? selectPrefilledCls : inputPrefilledCls;
+    return isSelect ? selectCls : inputCls;
+  };
 
   // Watch address to detect when the user edits it and remove the prefill indicator
   const currentAddress = watch('personalInfo.address');
@@ -114,22 +120,22 @@ export default function Step1PersonalInfo() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-text">Personal Information</h2>
-        <p className="text-sm text-muted mt-1">Please provide your legal personal details.</p>
+        <h2 className="text-xl font-bold text-ink-strong">Personal Information</h2>
+        <p className="text-sm text-[var(--text-muted)] mt-1">Please provide your legal personal details.</p>
       </div>
 
       {/* Name row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className={labelCls}>
-            First Name <span className="text-danger">*</span>
+            First Name <span className="text-danger-text">*</span>
           </label>
           <input {...register('personalInfo.firstName')} className={cls('firstName')} placeholder="Jane" />
           {e?.firstName && <p className={errorCls}>{e.firstName.message}</p>}
         </div>
         <div>
           <label className={labelCls}>
-            Last Name <span className="text-danger">*</span>
+            Last Name <span className="text-danger-text">*</span>
           </label>
           <input {...register('personalInfo.lastName')} className={cls('lastName')} placeholder="Smith" />
           {e?.lastName && <p className={errorCls}>{e.lastName.message}</p>}
@@ -140,7 +146,7 @@ export default function Step1PersonalInfo() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className={labelCls}>
-            Date of Birth <span className="text-danger">*</span>
+            Date of Birth <span className="text-danger-text">*</span>
           </label>
           <input
             type="date"
@@ -152,7 +158,7 @@ export default function Step1PersonalInfo() {
         </div>
         <div>
           <label className={labelCls}>
-            Mobile Phone <span className="text-danger">*</span>
+            Mobile Phone <span className="text-danger-text">*</span>
           </label>
           <input
             type="tel"
@@ -167,7 +173,7 @@ export default function Step1PersonalInfo() {
       {/* Email */}
       <div>
         <label className={labelCls}>
-          Email Address <span className="text-danger">*</span>
+          Email Address <span className="text-danger-text">*</span>
         </label>
         <input
           type="email"
@@ -185,18 +191,21 @@ export default function Step1PersonalInfo() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className={labelCls}>
-            How long at this address? <span className="text-danger">*</span>
+            How long at this address? <span className="text-danger-text">*</span>
           </label>
-          <input
-            {...register('personalInfo.timeAtAddress')}
-            className={cls('timeAtAddress')}
-            placeholder="e.g. 2 years"
-          />
+          <select {...register('personalInfo.timeAtAddress')} className={cls('timeAtAddress')}>
+            <option value="">Select…</option>
+            <option value="lt_6mo">Less than 6 months</option>
+            <option value="6_12mo">6–12 months</option>
+            <option value="1_2yr">1–2 years</option>
+            <option value="2_5yr">2–5 years</option>
+            <option value="gt_5yr">5+ years</option>
+          </select>
           {e?.timeAtAddress && <p className={errorCls}>{e.timeAtAddress.message}</p>}
         </div>
         <div>
           <label className={labelCls}>
-            Housing Status <span className="text-danger">*</span>
+            Housing Status <span className="text-danger-text">*</span>
           </label>
           <select {...register('personalInfo.housingStatus')} className={cls('housingStatus')}>
             <option value="">Select…</option>
@@ -213,7 +222,7 @@ export default function Step1PersonalInfo() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className={labelCls}>
-            Visa Status <span className="text-danger">*</span>
+            Visa Status <span className="text-danger-text">*</span>
           </label>
           <select {...register('personalInfo.visaStatus')} className={cls('visaStatus')}>
             <option value="">Select…</option>
@@ -236,7 +245,7 @@ export default function Step1PersonalInfo() {
       {/* Household Type */}
       <div>
         <label className={labelCls}>
-          Household Type <span className="text-danger">*</span>
+          Household Type <span className="text-danger-text">*</span>
         </label>
         <select {...register('personalInfo.householdType')} className={cls('householdType')}>
           <option value="">Select…</option>
