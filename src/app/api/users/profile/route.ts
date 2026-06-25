@@ -6,6 +6,7 @@ import { withAuth } from '@/lib/auth/middleware';
 import { patchProfileSchema } from '@/lib/validation/schemas';
 import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { FieldValue } from 'firebase-admin/firestore';
+import { decrypt } from '@/lib/encryption/crypto';
 import { ZodError } from 'zod';
 
 /**
@@ -33,6 +34,17 @@ export async function GET(request: NextRequest) {
       ...userSnap.data(),
       ...(profileSnap.exists ? profileSnap.data() : {}),
     };
+
+    // Decrypt the owner's own DOB (stored encrypted by the KYC step) so the
+    // client can prefill it. Guards for the plaintext form written elsewhere.
+    const m = merged as Record<string, unknown>;
+    if (typeof m.dateOfBirth === 'string' && /^v\d+:/.test(m.dateOfBirth)) {
+      try {
+        m.dateOfBirth = decrypt(m.dateOfBirth);
+      } catch {
+        delete m.dateOfBirth;
+      }
+    }
 
     return NextResponse.json({ data: merged, user: merged });
   } catch (err) {
