@@ -2,6 +2,8 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { Spinner } from '../_components/Spinner';
+import { obPrimaryBtn, obError } from '../_components/onboarding-styles';
 
 type Stage = 'phone' | 'otp';
 
@@ -132,13 +134,10 @@ export default function VerifyMobilePage() {
 
   return (
     <div className="flex items-center justify-center min-h-full py-10 px-4">
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-md screen-in">
         {checking ? (
           <div className="flex justify-center">
-            <svg className="animate-spin h-6 w-6 text-accent-2" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
+            <Spinner size={24} className="text-brand-text" />
           </div>
         ) : stage === 'phone' ? (
           <PhoneStage
@@ -187,20 +186,20 @@ function PhoneStage({
   return (
     <>
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-text">Verify your mobile</h2>
-        <p className="text-muted mt-1 text-sm">
+        <h2 className="font-display text-2xl font-bold text-ink-strong">Verify your mobile</h2>
+        <p className="text-[var(--text-muted)] mt-1 text-sm">
           We&apos;ll send a 6-digit code to your New Zealand mobile number.
         </p>
       </div>
 
       <div className="mb-4">
-        <label className="block text-sm font-medium text-text mb-1.5">
-          Mobile number <span className="text-danger">*</span>
+        <label className="block text-sm font-semibold text-ink-strong mb-1.5">
+          Mobile number <span className="text-danger-text">*</span>
         </label>
-        <div className="flex rounded-xl border border-border focus-within:ring-2 focus-within:ring-[#F5A523] focus-within:border-accent overflow-hidden transition-shadow">
-          {/* NZ flag + prefix */}
-          <span className="flex items-center gap-1.5 px-3 bg-surface-2 border-r border-border text-sm text-text shrink-0 select-none">
-            🇳🇿 +64
+        <div className="flex rounded-md border border-border-default bg-surface-card focus-within:ring-2 focus-within:ring-[var(--focus-ring)] focus-within:border-brand overflow-hidden transition-shadow">
+          {/* NZ prefix (no emoji per DS product-UI rule) */}
+          <span className="flex items-center px-3.5 bg-surface-sunken border-r border-border-default text-sm font-medium text-ink-strong shrink-0 select-none font-tabular">
+            NZ +64
           </span>
           <input
             type="tel"
@@ -209,19 +208,15 @@ function PhoneStage({
             onChange={(e) => setPhone(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && onSubmit()}
             placeholder="21 123 4567"
-            className="flex-1 px-3 py-2.5 text-sm outline-none bg-white"
+            className="flex-1 px-3.5 h-11 text-sm outline-none bg-surface-card text-[var(--text-body)] placeholder:text-[var(--text-disabled)]"
             autoFocus
           />
         </div>
       </div>
 
-      {error && <p className="text-xs text-danger mb-4">{error}</p>}
+      {error && <p className={`${obError} mb-4`}>{error}</p>}
 
-      <button
-        onClick={onSubmit}
-        disabled={loading}
-        className="w-full bg-accent hover:bg-accent-2 disabled:opacity-60 text-white font-semibold rounded-full py-3 transition-colors"
-      >
+      <button onClick={onSubmit} disabled={loading} className={obPrimaryBtn}>
         {loading ? 'Sending…' : 'Send code'}
       </button>
     </>
@@ -260,14 +255,14 @@ function OtpStage({
   return (
     <>
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-text">Enter the code</h2>
+        <h2 className="font-display text-2xl font-bold text-ink-strong">Enter the code</h2>
         {bypassMode ? (
-          <p className="text-amber-600 mt-1 text-sm font-medium">
+          <p className="text-warning-text mt-1 text-sm font-medium">
             SMS verification is currently disabled. Enter <strong>000000</strong> to continue.
           </p>
         ) : (
-          <p className="text-muted mt-1 text-sm">
-            We sent a 6-digit code to <span className="font-medium text-text">+64 {phone}</span>
+          <p className="text-[var(--text-muted)] mt-1 text-sm">
+            We sent a 6-digit code to <span className="font-medium text-ink-strong font-tabular">+64 {phone}</span>
           </p>
         )}
       </div>
@@ -286,31 +281,27 @@ function OtpStage({
             value={digit}
             onChange={(e) => onOtpChange(i, e.target.value)}
             onKeyDown={(e) => onOtpKeyDown(i, e)}
-            className="w-full max-w-[52px] h-14 text-center text-xl font-bold border border-border rounded-xl focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-shadow"
+            className="w-full max-w-[52px] h-14 text-center text-xl font-bold font-tabular border border-border-default rounded-md bg-surface-card text-ink-strong focus:ring-2 focus:ring-[var(--focus-ring)] focus:border-brand outline-none transition-shadow"
             autoFocus={i === 0}
           />
         ))}
       </div>
 
-      {error && <p className="text-xs text-danger mb-4">{error}</p>}
+      {error && <p className={`${obError} mb-4`}>{error}</p>}
 
-      <button
-        onClick={onVerify}
-        disabled={loading}
-        className="w-full bg-accent hover:bg-accent-2 disabled:opacity-60 text-white font-semibold rounded-full py-3 transition-colors mb-4"
-      >
+      <button onClick={onVerify} disabled={loading} className={`${obPrimaryBtn} mb-4`}>
         {loading ? 'Verifying…' : 'Verify code'}
       </button>
 
-      <p className="text-center text-sm text-muted">
+      <p className="text-center text-sm text-[var(--text-muted)]">
         Didn&apos;t receive a code?{' '}
         {cooldown > 0 ? (
-          <span className="text-muted/70">Resend in {cooldown}s</span>
+          <span className="text-[var(--text-disabled)]">Resend in {cooldown}s</span>
         ) : (
           <button
             onClick={onResend}
             disabled={loading}
-            className="text-accent-2 hover:text-accent-2 font-medium underline-offset-2 hover:underline disabled:opacity-50"
+            className="text-brand-text font-semibold underline-offset-2 hover:underline disabled:opacity-50"
           >
             Resend
           </button>
