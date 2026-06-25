@@ -2,7 +2,19 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { Icons } from '@/components/ui';
 import KycAddressAutocomplete, { type AddressValue } from '../_components/KycAddressAutocomplete';
+import { Spinner } from '../_components/Spinner';
+import { SegmentedRadio } from '../_components/SegmentedRadio';
+import {
+  obLabel,
+  obField,
+  obSelect,
+  obReadonly,
+  obError,
+  obPrimaryBtn,
+  obAlert,
+} from '../_components/onboarding-styles';
 
 interface ProfileForm {
   dateOfBirth: string;
@@ -16,15 +28,6 @@ interface ProfileForm {
 }
 
 type FieldErrors = Partial<Record<string, string>>;
-
-const selectCls =
-  'w-full px-3 py-2.5 border border-border rounded-xl text-sm focus:ring-2 focus:ring-accent focus:border-accent focus:outline-none transition-colors bg-white appearance-none';
-const inputCls =
-  'w-full px-3 py-2.5 border border-border rounded-xl text-sm focus:ring-2 focus:ring-accent focus:border-accent focus:outline-none transition-colors bg-white';
-const labelCls = 'block text-sm font-medium text-text mb-1';
-const errorCls = 'mt-1 text-xs text-danger';
-const readonlyCls =
-  'w-full px-3 py-2.5 border border-border rounded-xl text-sm bg-surface-2 text-muted cursor-not-allowed';
 
 export default function KycProfilePage() {
   const router = useRouter();
@@ -78,7 +81,6 @@ export default function KycProfilePage() {
         setChecking(false);
       })
       .catch(() => setChecking(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const set = <K extends keyof ProfileForm>(key: K, value: ProfileForm[K]) => {
@@ -170,16 +172,13 @@ export default function KycProfilePage() {
     <div className="flex items-start justify-center min-h-full py-8 px-4">
       {checking ? (
         <div className="flex justify-center w-full py-16">
-          <svg className="animate-spin h-6 w-6 text-accent-2" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-          </svg>
+          <Spinner size={24} className="text-brand-text" />
         </div>
       ) : (
-      <div className="w-full max-w-lg">
+      <div className="w-full max-w-lg screen-in">
         <div className="mb-7">
-          <h2 className="text-2xl font-bold text-text">Complete your profile</h2>
-          <p className="text-muted mt-1 text-sm">
+          <h2 className="font-display text-2xl font-bold text-ink-strong">Complete your profile</h2>
+          <p className="text-[var(--text-muted)] mt-1 text-sm">
             We need a few more details to verify your identity and process your application.
           </p>
         </div>
@@ -188,60 +187,40 @@ export default function KycProfilePage() {
           {/* ── Read-only user info ─────────────────────────────────────── */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className={labelCls}>First name</label>
-              <input type="text" value={user?.firstName ?? ''} readOnly className={readonlyCls} tabIndex={-1} />
+              <label className={obLabel}>First name</label>
+              <input type="text" value={user?.firstName ?? ''} readOnly className={obReadonly} tabIndex={-1} />
             </div>
             <div>
-              <label className={labelCls}>Last name</label>
-              <input type="text" value={user?.lastName ?? ''} readOnly className={readonlyCls} tabIndex={-1} />
+              <label className={obLabel}>Last name</label>
+              <input type="text" value={user?.lastName ?? ''} readOnly className={obReadonly} tabIndex={-1} />
             </div>
           </div>
           <div>
-            <label className={labelCls}>Email address</label>
-            <input type="email" value={user?.email ?? ''} readOnly className={readonlyCls} tabIndex={-1} />
+            <label className={obLabel}>Email address</label>
+            <input type="email" value={user?.email ?? ''} readOnly className={obReadonly} tabIndex={-1} />
           </div>
 
           {/* ── Existing TerePay client? ────────────────────────────── */}
-          <div className="rounded-xl border border-border bg-surface-2 px-4 py-4">
-            <p className="text-sm font-medium text-text mb-3">
-              Are you an existing TerePay client?{' '}
-              <span className="text-danger">*</span>
+          <div className="rounded-xl border border-border-default bg-surface-sunken px-4 py-4">
+            <p className="text-sm font-semibold text-ink-strong mb-3">
+              Are you an existing TerePay client? <span className="text-danger-text">*</span>
             </p>
-            <div className="flex gap-3">
-              {(['yes', 'no'] as const).map((opt) => {
-                const isSelected =
-                  opt === 'yes' ? form.isExistingClient === true : form.isExistingClient === false;
-                return (
-                  <label
-                    key={opt}
-                    className={[
-                      'flex-1 text-center py-2.5 px-4 rounded-xl border-2 text-sm font-medium cursor-pointer transition-colors capitalize',
-                      isSelected
-                        ? 'border-accent bg-[#FEF7E9] text-accent-2'
-                        : 'border-border bg-white text-muted hover:border-border',
-                    ].join(' ')}
-                  >
-                    <input
-                      type="radio"
-                      name="isExistingClient"
-                      className="sr-only"
-                      onChange={() =>
-                        set('isExistingClient', opt === 'yes' ? true : false)
-                      }
-                      checked={isSelected}
-                    />
-                    {opt === 'yes' ? 'Yes' : 'No'}
-                  </label>
-                );
-              })}
-            </div>
-            {errors.isExistingClient && <p className={errorCls}>{errors.isExistingClient}</p>}
+            <SegmentedRadio
+              name="isExistingClient"
+              value={form.isExistingClient === null ? null : form.isExistingClient ? 'yes' : 'no'}
+              options={[
+                { value: 'yes', label: 'Yes' },
+                { value: 'no', label: 'No' },
+              ]}
+              onChange={(v) => set('isExistingClient', v === 'yes')}
+            />
+            {errors.isExistingClient && <p className={obError}>{errors.isExistingClient}</p>}
 
             {/* Customer ID field (shown only when Yes is selected) */}
             {form.isExistingClient === true && (
               <div className="mt-4">
-                <label className={labelCls}>
-                  TerePay Customer ID <span className="text-danger">*</span>
+                <label className={obLabel}>
+                  TerePay Customer ID <span className="text-danger-text">*</span>
                 </label>
                 <input
                   type="text"
@@ -251,41 +230,41 @@ export default function KycProfilePage() {
                     setErrors((prev) => ({ ...prev, customerId: undefined }));
                   }}
                   placeholder="e.g. TERE001"
-                  className={inputCls + ' font-mono uppercase'}
+                  className={`${obField} font-tabular uppercase`}
                 />
-                <p className="mt-1 text-xs text-muted">
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
                   Your Customer ID was provided by TerePay. Enter it here to link your existing records.
                 </p>
-                {errors.customerId && <p className={errorCls}>{errors.customerId}</p>}
+                {errors.customerId && <p className={obError}>{errors.customerId}</p>}
               </div>
             )}
           </div>
 
           {/* ── Date of birth ───────────────────────────────────────────── */}
           <div>
-            <label className={labelCls}>
-              Date of birth <span className="text-danger">*</span>
+            <label className={obLabel}>
+              Date of birth <span className="text-danger-text">*</span>
             </label>
             <input
               type="date"
               value={form.dateOfBirth}
               onChange={(e) => set('dateOfBirth', e.target.value)}
               max={eighteenYearsAgo()}
-              className={inputCls}
+              className={obField}
             />
-            {errors.dateOfBirth && <p className={errorCls}>{errors.dateOfBirth}</p>}
+            {errors.dateOfBirth && <p className={obError}>{errors.dateOfBirth}</p>}
           </div>
 
           {/* ── Immigration status ──────────────────────────────────────── */}
           <div>
-            <label className={labelCls}>
-              Immigration status <span className="text-danger">*</span>
+            <label className={obLabel}>
+              Immigration status <span className="text-danger-text">*</span>
             </label>
             <div className="relative">
               <select
                 value={form.immigrationStatus}
                 onChange={(e) => set('immigrationStatus', e.target.value)}
-                className={selectCls}
+                className={obSelect}
               >
                 <option value="">Select status…</option>
                 <option value="citizen">Citizen</option>
@@ -296,7 +275,7 @@ export default function KycProfilePage() {
               </select>
               <ChevronIcon />
             </div>
-            {errors.immigrationStatus && <p className={errorCls}>{errors.immigrationStatus}</p>}
+            {errors.immigrationStatus && <p className={obError}>{errors.immigrationStatus}</p>}
           </div>
 
           {/* ── Visa Expiry Date (hidden for citizen / permanent resident) ── */}
@@ -304,16 +283,16 @@ export default function KycProfilePage() {
             form.immigrationStatus !== 'citizen' &&
             form.immigrationStatus !== 'permanent_resident' && (
             <div>
-              <label className={labelCls}>
-                Visa Expiry Date <span className="text-danger">*</span>
+              <label className={obLabel}>
+                Visa Expiry Date <span className="text-danger-text">*</span>
               </label>
               <input
                 type="date"
                 value={form.visaExpiryDate}
                 onChange={(e) => set('visaExpiryDate', e.target.value)}
-                className={inputCls}
+                className={obField}
               />
-              {errors.visaExpiryDate && <p className={errorCls}>{errors.visaExpiryDate}</p>}
+              {errors.visaExpiryDate && <p className={obError}>{errors.visaExpiryDate}</p>}
             </div>
           )}
 
@@ -329,14 +308,14 @@ export default function KycProfilePage() {
 
           {/* ── Time at address ─────────────────────────────────────────── */}
           <div>
-            <label className={labelCls}>
-              How long at this address? <span className="text-danger">*</span>
+            <label className={obLabel}>
+              How long at this address? <span className="text-danger-text">*</span>
             </label>
             <div className="relative">
               <select
                 value={form.timeAtAddress}
                 onChange={(e) => set('timeAtAddress', e.target.value)}
-                className={selectCls}
+                className={obSelect}
               >
                 <option value="">Select duration…</option>
                 <option value="lt_6mo">Less than 6 months</option>
@@ -347,51 +326,30 @@ export default function KycProfilePage() {
               </select>
               <ChevronIcon />
             </div>
-            {errors.timeAtAddress && <p className={errorCls}>{errors.timeAtAddress}</p>}
+            {errors.timeAtAddress && <p className={obError}>{errors.timeAtAddress}</p>}
           </div>
 
           {/* ── Housing status ──────────────────────────────────────────── */}
           <div>
-            <label className={labelCls}>
-              Housing status <span className="text-danger">*</span>
+            <label className={obLabel}>
+              Housing status <span className="text-danger-text">*</span>
             </label>
-            <div className="flex gap-3 flex-wrap">
-              {(['rent', 'own', 'flatmates'] as const).map((opt) => (
-                <label
-                  key={opt}
-                  className={[
-                    'flex-1 min-w-[100px] text-center py-2.5 px-4 rounded-xl border-2 text-sm font-medium cursor-pointer transition-colors capitalize',
-                    form.housingStatus === opt
-                      ? 'border-accent bg-[#FEF7E9] text-accent-2'
-                      : 'border-border text-muted hover:border-border',
-                  ].join(' ')}
-                >
-                  <input
-                    type="radio"
-                    name="housingStatus"
-                    value={opt}
-                    checked={form.housingStatus === opt}
-                    onChange={() => set('housingStatus', opt)}
-                    className="sr-only"
-                  />
-                  {opt.charAt(0).toUpperCase() + opt.slice(1)}
-                </label>
-              ))}
-            </div>
-            {errors.housingStatus && <p className={errorCls}>{errors.housingStatus}</p>}
+            <SegmentedRadio
+              name="housingStatus"
+              value={form.housingStatus || null}
+              options={[
+                { value: 'rent', label: 'Rent' },
+                { value: 'own', label: 'Own' },
+                { value: 'flatmates', label: 'Flatmates' },
+              ]}
+              onChange={(v) => set('housingStatus', v)}
+            />
+            {errors.housingStatus && <p className={obError}>{errors.housingStatus}</p>}
           </div>
 
-          {apiError && (
-            <div className="rounded-xl bg-danger-soft border border-danger/40 px-4 py-3 text-sm text-danger">
-              {apiError}
-            </div>
-          )}
+          {apiError && <div className={obAlert}>{apiError}</div>}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-accent hover:bg-accent-2 disabled:opacity-60 text-white font-semibold rounded-full py-3.5 transition-colors mt-2"
-          >
+          <button type="submit" disabled={loading} className={`${obPrimaryBtn} mt-2`}>
             {loading ? 'Saving…' : 'Continue'}
           </button>
         </form>
@@ -409,10 +367,8 @@ function eighteenYearsAgo(): string {
 
 function ChevronIcon() {
   return (
-    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted/70">
-      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-      </svg>
+    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">
+      <Icons.ChevronDown size={18} />
     </span>
   );
 }
