@@ -46,9 +46,10 @@ export default function LoanCalculatorCard() {
         />
       </div>
 
-      <p className="mt-4 text-[12.5px] text-muted">
-        {LOAN_INSTALMENTS} fortnightly payments over 8 weeks · Includes establishment fee of {fmtNZD(r.fee)}.
-        Final terms confirmed after assessment.
+      <p className="mt-4 text-[12.5px] text-[var(--text-muted)] leading-relaxed">
+        {LOAN_INSTALMENTS} fortnightly payments over 8 weeks. All loans are charged interest;
+        includes an establishment fee of {fmtNZD(r.fee)}. Applications are subject to approval and
+        affordability checks — final terms confirmed after assessment.
       </p>
 
       <div className="mt-5">

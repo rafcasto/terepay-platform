@@ -20,7 +20,6 @@ export default function ScreenPaid({ app, applicationId }: Props) {
       <Hero
         state="paid"
         eyebrow={`Loan ${refNum}`}
-        emoji="🎉"
         title="Loan fully repaid"
         subtitle="Thanks for repaying on time. You're all squared up."
         pill={

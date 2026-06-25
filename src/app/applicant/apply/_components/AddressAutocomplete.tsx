@@ -19,9 +19,9 @@ interface ParsedAddress {
 }
 
 const inputCls =
-  'w-full px-3 h-11 border border-border rounded-xl text-sm focus:ring-2 focus:ring-accent focus:border-accent focus:outline-none transition-colors bg-surface text-text placeholder:text-muted/70';
-const labelCls = 'block text-sm font-semibold text-text mb-1.5';
-const errorCls = 'mt-1.5 text-xs text-danger font-medium';
+  'w-full px-3 h-11 border border-border-default rounded-xl text-sm focus:ring-2 focus:ring-[var(--focus-ring)] focus:border-brand focus:outline-none transition-colors bg-surface-card text-ink-strong placeholder:text-[var(--text-disabled)]';
+const labelCls = 'block text-sm font-semibold text-ink-strong mb-1.5';
+const errorCls = 'mt-1.5 text-xs text-danger-text font-medium';
 
 interface Props {
   /** Formatted display address to show in the search box on initial load (from profile pre-population). */
@@ -156,11 +156,11 @@ export default function AddressAutocomplete({ initialDisplayAddress }: Props) {
       {!isManual && (
         <div ref={containerRef} className="relative">
           <label className={labelCls}>
-            Residential Address <span className="text-danger">*</span>
+            Residential Address <span className="text-danger-text">*</span>
           </label>
 
           <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted/70 pointer-events-none">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-disabled)] pointer-events-none">
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
               </svg>
@@ -180,7 +180,7 @@ export default function AddressAutocomplete({ initialDisplayAddress }: Props) {
             />
             {isLoading && (
               <span className="absolute right-3 top-1/2 -translate-y-1/2">
-                <svg className="h-4 w-4 animate-spin text-muted/70" fill="none" viewBox="0 0 24 24">
+                <svg className="h-4 w-4 animate-spin text-[var(--text-disabled)]" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
@@ -193,15 +193,15 @@ export default function AddressAutocomplete({ initialDisplayAddress }: Props) {
             <ul
               id={listboxId}
               role="listbox"
-              className="absolute z-50 mt-1 w-full bg-white border border-border rounded-lg shadow-lg overflow-hidden"
+              className="absolute z-50 mt-1 w-full bg-surface-card border border-border-default rounded-lg shadow-lg overflow-hidden"
             >
               {suggestions.length === 0 ? (
-                <li className="px-4 py-3 text-sm text-muted">
+                <li className="px-4 py-3 text-sm text-[var(--text-muted)]">
                   No results found.{' '}
                   <button
                     type="button"
                     onClick={switchToManual}
-                    className="text-accent-2 underline hover:no-underline"
+                    className="text-brand-text underline hover:no-underline"
                   >
                     Enter manually
                   </button>
@@ -213,7 +213,7 @@ export default function AddressAutocomplete({ initialDisplayAddress }: Props) {
                     role="option"
                     aria-selected={false}
                     onMouseDown={() => handleSelect(s)}
-                    className="px-4 py-2.5 text-sm text-gray-800 hover:bg-accent-soft cursor-pointer border-b border-border-2 last:border-0"
+                    className="px-4 py-2.5 text-sm text-ink-strong hover:bg-brand-soft cursor-pointer border-b border-border-subtle last:border-0"
                   >
                     <span className="block truncate">{s.description}</span>
                   </li>
@@ -235,7 +235,7 @@ export default function AddressAutocomplete({ initialDisplayAddress }: Props) {
         {/* Street address */}
         <div>
           <label className={labelCls}>
-            Street Address <span className="text-danger">*</span>
+            Street Address <span className="text-danger-text">*</span>
           </label>
           <input
             {...register('personalInfo.address')}
@@ -259,7 +259,7 @@ export default function AddressAutocomplete({ initialDisplayAddress }: Props) {
           </div>
           <div>
             <label className={labelCls}>
-              City / Town <span className="text-danger">*</span>
+              City / Town <span className="text-danger-text">*</span>
             </label>
             <input
               {...register('personalInfo.city')}
@@ -275,7 +275,7 @@ export default function AddressAutocomplete({ initialDisplayAddress }: Props) {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className={labelCls}>
-              Post Code <span className="text-danger">*</span>
+              Post Code <span className="text-danger-text">*</span>
             </label>
             <input
               {...register('personalInfo.postCode')}
@@ -294,7 +294,7 @@ export default function AddressAutocomplete({ initialDisplayAddress }: Props) {
           <button
             type="button"
             onClick={switchToSearch}
-            className="text-accent-2 hover:underline"
+            className="text-brand-text hover:underline"
           >
             Search for address instead
           </button>
@@ -302,7 +302,7 @@ export default function AddressAutocomplete({ initialDisplayAddress }: Props) {
           <button
             type="button"
             onClick={switchToManual}
-            className="text-muted hover:text-text hover:underline"
+            className="text-[var(--text-muted)] hover:text-ink-strong hover:underline"
           >
             Can&apos;t find your address? Enter manually
           </button>

@@ -66,7 +66,7 @@ export default function ScreenApproved({ app, status, applicationId, isExistingC
 
   return (
     <div className="space-y-5">
-      <Hero state="approved" eyebrow={`Application ${refNum}`} pill={pill} emoji="✅" title={title} subtitle={subtitle}>
+      <Hero state="approved" eyebrow={`Application ${refNum}`} pill={pill} title={title} subtitle={subtitle}>
         <HeroBalance amount={approvedAmount} />
         <div className="mt-4">
           <StatGrid

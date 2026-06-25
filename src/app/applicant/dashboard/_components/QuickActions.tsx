@@ -108,7 +108,7 @@ export default function QuickActions({ state, pendingAppId }: QuickActionsProps)
 
   return (
     <section className="space-y-2.5">
-      <p className="text-[11.5px] font-semibold tracking-[0.08em] text-muted uppercase">
+      <p className="text-[11.5px] font-display font-semibold tracking-[0.08em] text-brand-text uppercase">
         Quick actions
       </p>
       {items.map((it) => (

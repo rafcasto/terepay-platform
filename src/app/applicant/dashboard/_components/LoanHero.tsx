@@ -83,7 +83,6 @@ export default function LoanHero({ data, firstName }: { data: DashboardHeroData;
       <Hero
         state="paid"
         eyebrow="Loan complete"
-        emoji="🎉"
         title={`Loan repaid${firstName ? `, ${firstName}` : ''}`}
         subtitle="Thanks for repaying on time. You're all set."
         pill={
@@ -110,7 +109,6 @@ export default function LoanHero({ data, firstName }: { data: DashboardHeroData;
       <Hero
         state="approved"
         eyebrow="Loan approved"
-        emoji="✅"
         title="Your loan is approved"
         subtitle="Review your offer and one-tap accept on the loan tracker."
         pill={
@@ -143,7 +141,6 @@ export default function LoanHero({ data, firstName }: { data: DashboardHeroData;
     return (
       <Hero
         eyebrow="Application in review"
-        emoji="🔎"
         title="We're processing your loan"
         subtitle="A lender is reviewing your application. We'll notify you when there's an update."
         pill={
@@ -172,7 +169,6 @@ export default function LoanHero({ data, firstName }: { data: DashboardHeroData;
       <Hero
         state="rejected"
         eyebrow="Application outcome"
-        emoji="😕"
         title="We couldn't approve this time"
         subtitle="Don't worry — you can review the details and try again when you're ready."
         pill={
@@ -195,7 +191,6 @@ export default function LoanHero({ data, firstName }: { data: DashboardHeroData;
   return (
     <Hero
       eyebrow="No active loan"
-      emoji="✨"
       title="Start a TerePay loan"
       subtitle="Borrow $200 – $2,000 · 8 weeks · 4 fortnightly instalments."
     >

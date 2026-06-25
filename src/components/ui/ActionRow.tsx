@@ -14,11 +14,11 @@ interface ActionRowProps {
 }
 
 const iconTones = {
-  amber: 'bg-accent-soft text-accent-2',
-  info: 'bg-info-soft text-info',
-  muted: 'bg-surface-2 text-muted',
-  success: 'bg-success-soft text-success',
-  danger: 'bg-danger-soft text-danger',
+  amber: 'bg-brand-soft text-brand-text',
+  info: 'bg-info-soft-ds text-info-text',
+  muted: 'bg-surface-sunken text-[var(--text-muted)]',
+  success: 'bg-success-soft-ds text-success-text',
+  danger: 'bg-danger-soft-ds text-danger-text',
 };
 
 export function ActionRow({
@@ -38,17 +38,17 @@ export function ActionRow({
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <p className="text-[14.5px] font-semibold text-text">{title}</p>
+          <p className="text-[14.5px] font-semibold text-ink-strong">{title}</p>
           {badge}
         </div>
-        {subtitle && <p className="text-xs text-muted mt-0.5">{subtitle}</p>}
+        {subtitle && <p className="text-xs text-[var(--text-muted)] mt-0.5">{subtitle}</p>}
       </div>
-      <ChevronRight size={16} className="shrink-0 text-muted/60 group-hover:text-accent-2 transition-colors" />
+      <ChevronRight size={16} className="shrink-0 text-[var(--text-disabled)] group-hover:text-brand-text transition-colors" />
     </>
   );
 
   const classes =
-    'group flex items-center gap-4 bg-surface rounded-2xl px-4 py-3.5 border border-border hover:border-accent/60 hover:shadow-soft transition-all duration-150 hover:-translate-y-0.5';
+    'group flex items-center gap-4 bg-surface-card rounded-card px-4 py-3.5 border border-border-default hover:border-brand/50 hover:shadow-md transition-all duration-150 hover:-translate-y-0.5';
 
   if (href && !disabled) {
     return (
@@ -62,7 +62,7 @@ export function ActionRow({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`${classes} w-full text-left disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:border-border`}
+      className={`${classes} w-full text-left disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:border-border-default`}
     >
       {inner}
     </button>

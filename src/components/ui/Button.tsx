@@ -5,17 +5,19 @@ type Variant = 'primary' | 'secondary' | 'ghost-light' | 'danger';
 type Size = 'md' | 'lg' | 'sm';
 
 const base =
-  'inline-flex items-center justify-center gap-2 font-semibold rounded-xl transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2';
+  'inline-flex items-center justify-center gap-2 font-semibold rounded-xl transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2';
 
 const variants: Record<Variant, string> = {
+  // Accessible brand CTA — --orange-700 passes AA with white text (gold did not)
   primary:
-    'bg-accent text-white shadow-[0_2px_8px_rgba(245,166,35,0.25)] hover:bg-accent-2 hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(245,166,35,0.35)] active:translate-y-0',
+    'bg-[var(--orange-700)] text-white shadow-[var(--shadow-md)] hover:bg-[var(--orange-800)] hover:-translate-y-0.5 active:translate-y-0',
   secondary:
-    'bg-surface text-text border border-border hover:bg-surface-2 hover:-translate-y-0.5',
+    'bg-surface-card text-ink-strong border border-border-default hover:bg-surface-sunken hover:-translate-y-0.5',
+  // For use on dark / navy surfaces (e.g. Hero)
   'ghost-light':
     'bg-white/10 text-white border border-white/15 hover:bg-white/15',
   danger:
-    'bg-danger text-white hover:bg-red-700 hover:-translate-y-0.5',
+    'bg-[var(--danger-500)] text-white hover:bg-[var(--danger-700)] hover:-translate-y-0.5',
 };
 
 const sizes: Record<Size, string> = {

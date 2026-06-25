@@ -31,7 +31,6 @@ export default function ScreenRejected({ app, status, applicationId }: Props) {
       <Hero
         state="rejected"
         eyebrow={`Application ${refNum}`}
-        emoji={isOfferDeclined ? '👋' : '😕'}
         title={title}
         subtitle={subtitle}
         pill={

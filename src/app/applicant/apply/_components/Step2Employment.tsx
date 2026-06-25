@@ -5,17 +5,17 @@ import { useFormContext, useWatch } from 'react-hook-form';
 import type { TerepayApplicationInput } from '@/lib/validation/schemas';
 
 const inputCls =
-  'w-full px-3 h-11 border border-border rounded-xl text-sm focus:ring-2 focus:ring-accent focus:border-accent focus:outline-none transition-colors bg-surface text-text placeholder:text-muted/70';
+  'w-full px-3 h-11 border border-border-default rounded-xl text-sm focus:ring-2 focus:ring-[var(--focus-ring)] focus:border-brand focus:outline-none transition-colors bg-surface-card text-ink-strong placeholder:text-[var(--text-disabled)]';
 const selectCls = inputCls + ' appearance-none';
-const labelCls = 'block text-sm font-semibold text-text mb-1.5';
-const errorCls = 'mt-1.5 text-xs text-danger font-medium';
+const labelCls = 'block text-sm font-semibold text-ink-strong mb-1.5';
+const errorCls = 'mt-1.5 text-xs text-danger-text font-medium';
 
 const NzdInput = React.forwardRef<
   HTMLInputElement,
   { name: string } & React.InputHTMLAttributes<HTMLInputElement>
 >(({ name, ...props }, ref) => (
   <div className="relative">
-    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted/70 select-none">
+    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[var(--text-disabled)] select-none">
       $
     </span>
     <input
@@ -24,7 +24,7 @@ const NzdInput = React.forwardRef<
       type="number"
       min={0}
       step="0.01"
-      className="w-full pl-6 pr-3 py-2.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-accent focus:border-accent focus:outline-none transition-colors bg-white"
+      className="w-full pl-6 pr-3 py-2.5 border border-border-default rounded-lg text-sm focus:ring-2 focus:ring-[var(--focus-ring)] focus:border-brand focus:outline-none transition-colors bg-surface-card"
       {...props}
     />
   </div>
@@ -49,14 +49,14 @@ export default function Step2Employment() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-text">Employment &amp; Income</h2>
-        <p className="text-sm text-muted mt-1">Tell us about your current employment and fortnightly earnings.</p>
+        <h2 className="text-xl font-bold text-ink-strong">Employment &amp; Income</h2>
+        <p className="text-sm text-[var(--text-muted)] mt-1">Tell us about your current employment and fortnightly earnings.</p>
       </div>
 
       {/* Employer details */}
       <div>
         <label className={labelCls}>
-          Employer Name <span className="text-danger">*</span>
+          Employer Name <span className="text-danger-text">*</span>
         </label>
         <input
           {...register('employment.employerName')}
@@ -68,7 +68,7 @@ export default function Step2Employment() {
 
       <div>
         <label className={labelCls}>
-          Employer Address <span className="text-danger">*</span>
+          Employer Address <span className="text-danger-text">*</span>
         </label>
         <input
           {...register('employment.employerAddress')}
@@ -82,7 +82,7 @@ export default function Step2Employment() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className={labelCls}>
-            Occupation / Job Title <span className="text-danger">*</span>
+            Occupation / Job Title <span className="text-danger-text">*</span>
           </label>
           <input
             {...register('employment.occupation')}
@@ -93,7 +93,7 @@ export default function Step2Employment() {
         </div>
         <div>
           <label className={labelCls}>
-            Hours per Week <span className="text-danger">*</span>
+            Hours per Week <span className="text-danger-text">*</span>
           </label>
           <input
             type="number"
@@ -111,7 +111,7 @@ export default function Step2Employment() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className={labelCls}>
-            Employment Status <span className="text-danger">*</span>
+            Employment Status <span className="text-danger-text">*</span>
           </label>
           <select {...register('employment.employmentStatus')} className={selectCls}>
             <option value="">Select…</option>
@@ -124,7 +124,7 @@ export default function Step2Employment() {
         </div>
         <div>
           <label className={labelCls}>
-            Time at Current Employer <span className="text-danger">*</span>
+            Time at Current Employer <span className="text-danger-text">*</span>
           </label>
           <input
             {...register('employment.timeAtEmployer')}
@@ -146,8 +146,8 @@ export default function Step2Employment() {
       </div>
 
       {/* Income table */}
-      <div className="bg-surface-2 rounded-xl border border-border p-4 space-y-3">
-        <h3 className="text-sm font-semibold text-gray-800">
+      <div className="bg-surface-sunken rounded-xl border border-border-default p-4 space-y-3">
+        <h3 className="text-sm font-semibold text-ink-strong">
           Fortnightly Income (NZD)
         </h3>
 
@@ -172,7 +172,7 @@ export default function Step2Employment() {
           ].map(({ label, field }) => (
             <div key={field} className="flex items-center gap-3">
               <span
-                className="text-sm text-muted flex-1"
+                className="text-sm text-[var(--text-muted)] flex-1"
                 dangerouslySetInnerHTML={{ __html: label }}
               />
               <div className="w-36">
@@ -197,11 +197,11 @@ export default function Step2Employment() {
         </div>
 
         {/* Total */}
-        <div className="flex items-center gap-3 pt-2 border-t border-border">
-          <span className="text-sm font-semibold text-gray-800 flex-1">
+        <div className="flex items-center gap-3 pt-2 border-t border-border-default">
+          <span className="text-sm font-semibold text-ink-strong flex-1">
             Total Fortnightly Income
           </span>
-          <span className="w-36 px-3 py-2 bg-[#FEF7E9] text-accent-2 font-bold text-sm rounded-lg text-right">
+          <span className="w-36 px-3 py-2 bg-brand-soft text-brand-text font-bold text-sm rounded-lg text-right">
             ${total.toFixed(2)}
           </span>
         </div>
