@@ -34,16 +34,17 @@ export default async function ApplicantApplicationsPage() {
   const customerId: string | undefined = userSnap.data()?.customerId;
 
   const [ownSnap, offlineSnap] = await Promise.all([
+    // No orderBy here — the merged list is sorted in memory below, which
+    // avoids the need for composite indexes (notably for the offlineCustomerId
+    // query, whose index does not exist).
     db
       .collection('loanApplications')
       .where('applicantId', '==', decoded.uid)
-      .orderBy('timeline.createdAt', 'desc')
       .get(),
     customerId
       ? db
           .collection('loanApplications')
           .where('offlineCustomerId', '==', customerId)
-          .orderBy('timeline.createdAt', 'desc')
           .get()
       : Promise.resolve(null),
   ]);
