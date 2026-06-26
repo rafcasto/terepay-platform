@@ -78,7 +78,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     if ((err as { code?: number })?.code === 404) {
       return errorResponse(new AppError('NOT_FOUND', 404, 'Document is no longer available in storage'));
     }
-    console.error('[applications/kyc-documents] view failed:', err instanceof Error ? err.message : String(err));
+    const detail = err instanceof Error ? err.message : String(err);
+    console.error('[applications/kyc-documents] view failed:', detail);
+    // Surface the underlying reason outside production to aid debugging.
+    if (process.env.NEXT_PUBLIC_ENVIRONMENT !== 'production') {
+      return errorResponse(new AppError('DOWNLOAD_FAILED', 502, `Download failed: ${detail}`));
+    }
     return internalError();
   }
 }

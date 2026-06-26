@@ -13,6 +13,34 @@ type AuditEntry = {
   userAgent?: string;
 };
 
+/** True only for plain objects (`{}`), never class instances like Timestamp/FieldValue. */
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (value === null || typeof value !== 'object') return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
+/**
+ * Recursively drop `undefined` values — Firestore rejects them and would
+ * otherwise fail the whole audit write. Firestore sentinels and special
+ * types (Timestamp, FieldValue, GeoPoint, …) have non-plain prototypes and
+ * are left untouched.
+ */
+function stripUndefined<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map((v) => stripUndefined(v)) as unknown as T;
+  }
+  if (isPlainObject(value)) {
+    const out: Record<string, unknown> = {};
+    for (const [key, v] of Object.entries(value)) {
+      if (v === undefined) continue;
+      out[key] = stripUndefined(v);
+    }
+    return out as unknown as T;
+  }
+  return value;
+}
+
 /**
  * Write an audit log entry. Never throws — a failed audit write must not
  * block or surface errors to the end user.
@@ -20,7 +48,7 @@ type AuditEntry = {
 export async function auditLog(entry: AuditEntry): Promise<void> {
   try {
     await adminDb.collection('auditLogs').add({
-      ...entry,
+      ...stripUndefined(entry),
       timestamp: FieldValue.serverTimestamp(),
     });
   } catch (err) {

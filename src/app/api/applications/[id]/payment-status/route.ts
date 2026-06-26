@@ -140,7 +140,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         mandateId: consent.mandateId,
         countComplete,
         providerRevoked,
-        reconciledCount: needsWrite ? finalPayments.filter((p) => p.status === 'success').length : undefined,
+        ...(needsWrite
+          ? { reconciledCount: finalPayments.filter((p) => p.status === 'success').length }
+          : {}),
       },
     });
 
