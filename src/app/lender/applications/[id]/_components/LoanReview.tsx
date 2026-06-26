@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { DocumentStatus, ScheduledPayment } from '@/types/application';
 import ConsoleIcon, { type ConsoleIconName } from '@/components/lender/ConsoleIcon';
@@ -14,7 +14,7 @@ import ScheduledPaymentsPanel from '../ScheduledPaymentsPanel';
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-export type ReportItem = { fileName: string; uploadedAt: string; uploadedBy: string };
+export type ReportItem = { id: string; fileName: string; uploadedAt: string; uploadedBy: string };
 
 export type ReviewData = {
   applicationId: string;
@@ -747,7 +747,7 @@ function MessagesTab({ data }: { data: ReviewData }) {
 // ---------------------------------------------------------------------------
 // KYC + Credit cards (mocked, greyed)
 // ---------------------------------------------------------------------------
-function ReportList({ reports }: { reports: ReportItem[] }) {
+function ReportList({ reports, applicationId }: { reports: ReportItem[]; applicationId: string }) {
   if (reports.length === 0) {
     return (
       <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--border-default)] bg-white/70 p-4 text-sm text-[var(--text-muted)]">
@@ -757,9 +757,9 @@ function ReportList({ reports }: { reports: ReportItem[] }) {
   }
   return (
     <ul className="space-y-2">
-      {reports.map((r, i) => (
+      {reports.map((r) => (
         <li
-          key={`${r.fileName}-${i}`}
+          key={r.id}
           className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-white p-3"
         >
           <div className="flex min-w-0 items-center gap-2.5">
@@ -775,16 +775,15 @@ function ReportList({ reports }: { reports: ReportItem[] }) {
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <ConsolePill tone="success">On file</ConsolePill>
-            <button
-              type="button"
-              disabled
-              aria-disabled="true"
-              title="In-app report viewer not yet available"
-              className="inline-flex cursor-not-allowed items-center gap-1 rounded-[8px] border border-[var(--border-default)] bg-white px-2 py-1 text-xs font-semibold text-[var(--text-muted)] opacity-60"
+            <a
+              href={`/api/applications/${applicationId}/reports/${r.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 rounded-[8px] border border-[var(--border-default)] bg-white px-2 py-1 text-xs font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--surface-sunken)]"
             >
               <ConsoleIcon name="search" size={14} />
               View
-            </button>
+            </a>
           </div>
         </li>
       ))}
@@ -792,27 +791,83 @@ function ReportList({ reports }: { reports: ReportItem[] }) {
   );
 }
 
-function UploadHint({ label }: { label: string }) {
+function ReportUploader({
+  applicationId,
+  provider,
+  providerLabel,
+  canUpload,
+}: {
+  applicationId: string;
+  provider: 'datazoo' | 'centrix';
+  providerLabel: string;
+  canUpload: boolean;
+}) {
+  const router = useRouter();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setUploading(true);
+    setError(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('provider', provider);
+      const res = await fetch(`/api/applications/${applicationId}/reports`, { method: 'POST', body: fd });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error?.message ?? 'Upload failed');
+      }
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  if (!canUpload) {
+    return (
+      <p className="mt-4 text-xs text-[var(--text-muted)]">
+        Claim this application to upload a {providerLabel} report. Reports are stored on the
+        customer&apos;s profile and reused across future applications.
+      </p>
+    );
+  }
+
   return (
-    <>
+    <div className="mt-4">
+      <input
+        ref={inputRef}
+        type="file"
+        accept="application/pdf,image/png,image/jpeg"
+        className="hidden"
+        onChange={onFile}
+      />
       <button
         type="button"
-        disabled
-        aria-disabled="true"
-        title="Report upload is not yet connected"
-        className="mt-4 inline-flex cursor-not-allowed items-center gap-1.5 rounded-[10px] border border-[var(--border-default)] bg-white px-3 py-1.5 text-sm font-semibold text-[var(--text-muted)] opacity-60"
+        onClick={() => inputRef.current?.click()}
+        disabled={uploading}
+        className="inline-flex items-center gap-1.5 rounded-[10px] bg-[var(--ink-800)] px-3 py-1.5 text-sm font-semibold text-white transition-[filter] hover:brightness-110 disabled:opacity-50"
       >
         <ConsoleIcon name="upload" size={16} />
-        {label}
+        {uploading ? 'Uploading…' : `Upload ${providerLabel} report`}
       </button>
+      {error && <p className="mt-2 text-xs text-[var(--danger-700)]">{error}</p>}
       <p className="mt-2 text-xs text-[var(--text-muted)]">
-        Stored on the customer&apos;s profile and reused across future loan applications. Upload is not yet connected.
+        PDF, JPEG or PNG up to 10 MB. Stored on the customer&apos;s profile and reused across future
+        applications.
       </p>
-    </>
+    </div>
   );
 }
 
 function KycCard({ data, full = false }: { data: ReviewData; full?: boolean }) {
+  void full;
   const reports = data.kyc.reports;
   const verified = reports.length > 0;
   return (
@@ -821,20 +876,22 @@ function KycCard({ data, full = false }: { data: ReviewData; full?: boolean }) {
       icon="shield"
       muted={!verified}
       action={
-        <div className="flex items-center gap-2">
-          <ConsolePill tone={verified ? 'success' : 'warning'} dot>
-            {verified ? 'Verified' : 'Not verified'}
-          </ConsolePill>
-          {!verified && full && <MockBadge />}
-        </div>
+        <ConsolePill tone={verified ? 'success' : 'warning'} dot>
+          {verified ? 'Verified' : 'Not verified'}
+        </ConsolePill>
       }
     >
       <p className="mb-4 text-sm text-[var(--text-muted)]">
         Run the identity check in DataZoo and upload the report here. It is stored on the borrower&apos;s
         profile and reused across their future loan applications.
       </p>
-      <ReportList reports={reports} />
-      <UploadHint label="Upload DataZoo report (PDF)" />
+      <ReportList reports={reports} applicationId={data.applicationId} />
+      <ReportUploader
+        applicationId={data.applicationId}
+        provider="datazoo"
+        providerLabel="DataZoo"
+        canUpload={data.isAssigned}
+      />
     </Card>
   );
 }
@@ -850,20 +907,22 @@ function CreditCard({ data, full = false }: { data: ReviewData; full?: boolean }
       icon="trending"
       muted={!hasReport}
       action={
-        <div className="flex items-center gap-2">
-          <ConsolePill tone={hasReport ? 'success' : 'warning'} dot>
-            {hasReport ? 'Report on file' : 'No report'}
-          </ConsolePill>
-          {!hasReport && full && <MockBadge />}
-        </div>
+        <ConsolePill tone={hasReport ? 'success' : 'warning'} dot>
+          {hasReport ? 'Report on file' : 'No report'}
+        </ConsolePill>
       }
     >
       <p className="mb-4 text-sm text-[var(--text-muted)]">
         Pull the credit report in Centrix and upload it here. It is stored on the borrower&apos;s profile
         and reused across their future loan applications.
       </p>
-      <ReportList reports={reports} />
-      <UploadHint label="Upload Centrix report (PDF)" />
+      <ReportList reports={reports} applicationId={data.applicationId} />
+      <ReportUploader
+        applicationId={data.applicationId}
+        provider="centrix"
+        providerLabel="Centrix"
+        canUpload={data.isAssigned}
+      />
 
       {full && (
         <div className="mt-5 border-t border-[var(--border-subtle)] pt-5">

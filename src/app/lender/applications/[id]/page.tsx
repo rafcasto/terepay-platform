@@ -149,7 +149,7 @@ export default async function LenderApplicationDetailPage({
   // ---- Lender-uploaded reports (stored on the customer profile) ----------
   // DataZoo (KYC) and Centrix (credit) reports are uploaded by the lender and
   // kept on the borrower's profile so they carry across future applications.
-  type ReportItem = { fileName: string; uploadedAt: string; uploadedBy: string };
+  type ReportItem = { id: string; fileName: string; uploadedAt: string; uploadedBy: string };
   const datazooReports: ReportItem[] = [];
   const centrixReports: ReportItem[] = [];
   if (app.applicantId) {
@@ -162,6 +162,7 @@ export default async function LenderApplicationDetailPage({
       repSnap.forEach((doc) => {
         const r = doc.data();
         const item: ReportItem = {
+          id: doc.id,
           fileName: (r.fileName as string) ?? 'Report',
           uploadedAt: fmtDate(r.uploadedAt as TS),
           uploadedBy: (r.uploadedByName as string) ?? 'Lender',
