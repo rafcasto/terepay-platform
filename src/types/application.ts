@@ -92,6 +92,10 @@ export interface ScheduledPayment {
   completedAt?: Timestamp;          // when payment.status.success confirmed
   failedAt?: Timestamp;
   failureReason?: string;
+  /** Last time we attempted to schedule this instalment with Qippay (POST /v1/setpay). */
+  lastAttemptAt?: Timestamp;
+  /** How many times we have attempted to schedule this instalment with Qippay. */
+  scheduleAttempts?: number;
   retryCount: number;               // incremented on each setpay.status.retry event
 }
 
