@@ -176,6 +176,7 @@ export default async function LenderApplicationDetailPage({
   };
   const datazooReports: ReportItem[] = [];
   const centrixReports: ReportItem[] = [];
+  const affordabilityReports: ReportItem[] = [];
   const borrowerKycDocuments: BorrowerKycDoc[] = [];
 
   // Identity documents the applicant uploaded with their application.
@@ -208,6 +209,7 @@ export default async function LenderApplicationDetailPage({
         };
         if (r.provider === 'datazoo') datazooReports.push(item);
         else if (r.provider === 'centrix') centrixReports.push(item);
+        else if (r.provider === 'affordability') affordabilityReports.push(item);
       });
       // Identity evidence captured during onboarding (if any).
       const onboardingDocs = kycDocsSnap.data()?.documents;
@@ -335,6 +337,7 @@ export default async function LenderApplicationDetailPage({
   };
   const credit = {
     reports: centrixReports,
+    affordabilityReports,
     score: 643,
     band: 'Fair',
     min: 380,

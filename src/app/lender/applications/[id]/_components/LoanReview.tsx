@@ -85,6 +85,7 @@ export type ReviewData = {
   };
   credit: {
     reports: ReportItem[];
+    affordabilityReports: ReportItem[];
     score: number;
     band: string;
     min: number;
@@ -803,7 +804,7 @@ function ReportUploader({
   canUpload,
 }: {
   applicationId: string;
-  provider: 'datazoo' | 'centrix';
+  provider: 'datazoo' | 'centrix' | 'affordability';
   providerLabel: string;
   canUpload: boolean;
 }) {
@@ -983,31 +984,54 @@ function KycCard({ data, full = false }: { data: ReviewData; full?: boolean }) {
 
 function CreditCard({ data, full = false }: { data: ReviewData; full?: boolean }) {
   const c = data.credit;
-  const reports = c.reports;
-  const hasReport = reports.length > 0;
+  const creditReports = c.reports;
+  const affordabilityReports = c.affordabilityReports;
+  const bothOnFile = creditReports.length > 0 && affordabilityReports.length > 0;
+  const anyReport = creditReports.length > 0 || affordabilityReports.length > 0;
   const pct = Math.max(0, Math.min(1, (c.score - c.min) / (c.max - c.min)));
   return (
     <Card
-      title="Credit — Centrix"
+      title="Credit reports"
       icon="trending"
-      muted={!hasReport}
+      muted={!anyReport}
       action={
-        <ConsolePill tone={hasReport ? 'success' : 'warning'} dot>
-          {hasReport ? 'Report on file' : 'No report'}
+        <ConsolePill tone={bothOnFile ? 'success' : 'warning'} dot>
+          {bothOnFile ? 'Reports on file' : anyReport ? 'Partly on file' : 'Reports needed'}
         </ConsolePill>
       }
     >
       <p className="mb-4 text-sm text-[var(--text-muted)]">
-        Pull the credit report in Centrix and upload it here. It is stored on the borrower&apos;s profile
-        and reused across their future loan applications.
+        Upload the borrower&apos;s credit and affordability reports here. They are stored on the
+        borrower&apos;s profile and reused across their future loan applications.
       </p>
-      <ReportList reports={reports} applicationId={data.applicationId} />
-      <ReportUploader
-        applicationId={data.applicationId}
-        provider="centrix"
-        providerLabel="Centrix"
-        canUpload={data.isAssigned}
-      />
+
+      <div className="space-y-5">
+        <div>
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">
+            Comprehensive credit report
+          </p>
+          <ReportList reports={creditReports} applicationId={data.applicationId} />
+          <ReportUploader
+            applicationId={data.applicationId}
+            provider="centrix"
+            providerLabel="Comprehensive credit"
+            canUpload={data.isAssigned}
+          />
+        </div>
+
+        <div className="border-t border-[var(--border-subtle)] pt-5">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">
+            Affordability report
+          </p>
+          <ReportList reports={affordabilityReports} applicationId={data.applicationId} />
+          <ReportUploader
+            applicationId={data.applicationId}
+            provider="affordability"
+            providerLabel="Affordability"
+            canUpload={data.isAssigned}
+          />
+        </div>
+      </div>
 
       {full && (
         <div className="mt-5 border-t border-[var(--border-subtle)] pt-5">
