@@ -80,7 +80,7 @@ export type ReviewData = {
   kyc: {
     borrowerStatusLabel: string;
     borrowerStatusTone: PillTone;
-    borrowerDocuments: { fileId: string; label: string; fileName: string; uploadedAt: string; status: string }[];
+    borrowerDocuments: { label: string; fileName: string; uploadedAt: string; status: string; downloadUrl: string }[];
     reports: ReportItem[];
   };
   credit: {
@@ -889,13 +889,7 @@ const onboardingDocStatusLabel = (st: string) =>
         ? 'Rejected'
         : st;
 
-function BorrowerKycList({
-  docs,
-  applicationId,
-}: {
-  docs: ReviewData['kyc']['borrowerDocuments'];
-  applicationId: string;
-}) {
+function BorrowerKycList({ docs }: { docs: ReviewData['kyc']['borrowerDocuments'] }) {
   if (docs.length === 0) {
     return (
       <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--border-default)] bg-white/70 p-4 text-sm text-[var(--text-muted)]">
@@ -907,7 +901,7 @@ function BorrowerKycList({
     <ul className="space-y-2">
       {docs.map((d, i) => (
         <li
-          key={`${d.fileId}-${i}`}
+          key={`${d.fileName}-${i}`}
           className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-white p-3"
         >
           <div className="flex min-w-0 items-center gap-2.5">
@@ -926,7 +920,7 @@ function BorrowerKycList({
               {onboardingDocStatusLabel(d.status)}
             </ConsolePill>
             <a
-              href={`/api/applications/${applicationId}/kyc-documents/${d.fileId}`}
+              href={d.downloadUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 rounded-[8px] border border-[var(--border-default)] bg-white px-2 py-1 text-xs font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--surface-sunken)]"
@@ -963,7 +957,7 @@ function KycCard({ data, full = false }: { data: ReviewData; full?: boolean }) {
           </p>
           <ConsolePill tone={k.borrowerStatusTone}>{k.borrowerStatusLabel}</ConsolePill>
         </div>
-        <BorrowerKycList docs={k.borrowerDocuments} applicationId={data.applicationId} />
+        <BorrowerKycList docs={k.borrowerDocuments} />
       </div>
 
       {/* Lender-run DataZoo identity check */}
