@@ -76,11 +76,8 @@ export type ReviewData = {
   };
   decisionInput: { requestedAmount: number; assessedAmount?: number };
   kyc: {
-    status: string;
-    statusLabel: string;
-    statusTone: PillTone;
-    submittedAt: string;
-    documents: { label: string; fileName: string; uploadedAt: string; status: string }[];
+    verified: boolean;
+    documents: { label: string; fileName: string; uploadedAt: string }[];
   };
   credit: {
     score: number;
@@ -751,89 +748,67 @@ function MessagesTab({ data }: { data: ReviewData }) {
 // ---------------------------------------------------------------------------
 // KYC + Credit cards (mocked, greyed)
 // ---------------------------------------------------------------------------
-const KYC_DOC_TONE: Record<string, PillTone> = {
-  pending_review: 'warning',
-  pending: 'warning',
-  accepted: 'success',
-  approved: 'success',
-  verified: 'success',
-  rejected: 'danger',
-};
-
-const kycDocStatusLabel = (st: string) =>
-  st === 'pending_review' || st === 'pending'
-    ? 'Pending review'
-    : st === 'accepted' || st === 'approved' || st === 'verified'
-      ? 'Verified'
-      : st === 'rejected'
-        ? 'Rejected'
-        : st;
-
 function KycCard({ data, full = false }: { data: ReviewData; full?: boolean }) {
   const k = data.kyc;
   return (
     <Card
-      title="KYC & verification"
+      title="KYC verification"
       icon="shield"
+      muted
       action={
-        <ConsolePill tone={k.statusTone} dot>
-          {k.statusLabel}
-        </ConsolePill>
+        <div className="flex items-center gap-2">
+          <ConsolePill tone={k.verified ? 'success' : 'warning'} dot>
+            {k.verified ? 'Verified' : 'Not verified'}
+          </ConsolePill>
+          {full && <MockBadge />}
+        </div>
       }
     >
-      <p className="mb-3 text-xs text-[var(--text-muted)]">
-        KYC is verified manually. The evidence document is attached to the borrower&apos;s profile
-        {k.submittedAt !== '\u2014' && <> · submitted {k.submittedAt}</>}.
+      <p className="mb-4 text-sm text-[var(--text-muted)]">
+        KYC is performed by the lender and the evidence document is attached to the borrower&apos;s
+        profile, then reused across their applications. The borrower&apos;s journey is unchanged.
       </p>
 
       {k.documents.length === 0 ? (
-        <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--border-default)] bg-[var(--slate-50)] p-4 text-sm text-[var(--text-muted)]">
-          No KYC evidence document attached to the profile yet.
+        <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--border-default)] bg-white/60 p-4 text-sm text-[var(--text-muted)]">
+          No KYC evidence document attached yet.
         </div>
       ) : (
-        <ul className="space-y-2">
+        <ul className="space-y-2" aria-hidden="true">
           {k.documents.map((doc, i) => (
             <li
               key={`${doc.fileName}-${i}`}
-              className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] bg-[var(--slate-50)] p-3"
+              className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-white/60 p-3 opacity-70"
             >
               <div className="flex min-w-0 items-center gap-2.5">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-white text-[var(--text-muted)]">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-[var(--slate-100)] text-[var(--slate-400)]">
                   <ConsoleIcon name="fileText" size={16} />
                 </span>
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-[var(--text-body)]">{doc.label}</p>
+                  <p className="truncate text-sm font-semibold text-[var(--text-muted)]">{doc.label}</p>
                   <p className="truncate text-xs text-[var(--text-muted)]">
                     {doc.fileName} · Attached {doc.uploadedAt}
                   </p>
                 </div>
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                <ConsolePill tone={KYC_DOC_TONE[doc.status] ?? 'neutral'}>
-                  {kycDocStatusLabel(doc.status)}
-                </ConsolePill>
-                <button
-                  type="button"
-                  disabled
-                  aria-disabled="true"
-                  title="In-app document viewer not yet available"
-                  className="inline-flex cursor-not-allowed items-center gap-1 rounded-[8px] border border-[var(--border-default)] bg-white px-2 py-1 text-xs font-semibold text-[var(--text-muted)] opacity-60"
-                >
-                  <ConsoleIcon name="search" size={14} />
-                  View
-                </button>
               </div>
             </li>
           ))}
         </ul>
       )}
 
-      {full && (
-        <p className="mt-4 text-xs text-[var(--text-muted)]">
-          KYC documents are stored securely in Google Drive. In-app evidence viewing and lender sign-off
-          are not yet connected.
-        </p>
-      )}
+      <button
+        type="button"
+        disabled
+        aria-disabled="true"
+        title="Lender KYC capture is not yet connected"
+        className="mt-4 inline-flex cursor-not-allowed items-center gap-1.5 rounded-[10px] border border-[var(--border-default)] bg-white px-3 py-1.5 text-sm font-semibold text-[var(--text-muted)] opacity-60"
+      >
+        <ConsoleIcon name="shield" size={16} />
+        Verify KYC &amp; attach document
+      </button>
+      <p className="mt-2 text-xs text-[var(--text-muted)]">
+        Lender KYC capture is not yet connected. This panel is a placeholder.
+      </p>
     </Card>
   );
 }

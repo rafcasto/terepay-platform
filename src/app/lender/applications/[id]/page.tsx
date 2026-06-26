@@ -55,37 +55,6 @@ const DOC_LABEL: Record<DocumentType, string> = {
   other: 'Document',
 };
 
-const KYC_DOC_LABEL: Record<string, string> = {
-  nz_passport: 'NZ Passport',
-  passport: 'Passport',
-  nz_drivers_licence: 'NZ Driver Licence',
-  drivers_licence: 'NZ Driver Licence',
-  proof_of_address: 'Proof of address',
-  visa: 'Visa document',
-  birth_certificate: 'Birth certificate',
-  selfie: 'Selfie / liveness photo',
-};
-
-const kycDocLabel = (t?: string) =>
-  (t && KYC_DOC_LABEL[t]) ||
-  (t ? t.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : 'Document');
-
-const KYC_STATUS_LABEL: Record<string, string> = {
-  not_started: 'Not started',
-  in_progress: 'In progress',
-  submitted: 'Submitted — awaiting review',
-  approved: 'Verified',
-  rejected: 'Rejected',
-};
-
-const KYC_STATUS_TONE: Record<string, PillTone> = {
-  not_started: 'neutral',
-  in_progress: 'warning',
-  submitted: 'info',
-  approved: 'success',
-  rejected: 'danger',
-};
-
 const VISA_LABEL: Record<string, string> = {
   work_visa: 'Work visa',
   resident_visa: 'Resident visa',
@@ -177,28 +146,6 @@ export default async function LenderApplicationDetailPage({
   const debts = app.existingDebts;
   const isAssigned = app.assignedLenderId === decoded.uid;
 
-  // ---- Borrower KYC (manual verification, attached to the profile) -------
-  // KYC status lives on the user doc; the evidence documents are uploaded to
-  // Google Drive with metadata in users/{uid}/applicantProfile/documents.
-  let kycStatusRaw = 'not_started';
-  let kycDocs: { docType?: string; fileName?: string; uploadedAt?: TS; status?: string }[] = [];
-  let kycSubmittedAt: TS;
-  if (app.applicantId) {
-    try {
-      const userRef = db.collection('users').doc(app.applicantId);
-      const [userSnap, kycDocsSnap] = await Promise.all([
-        userRef.get(),
-        userRef.collection('applicantProfile').doc('documents').get(),
-      ]);
-      kycStatusRaw = (userSnap.data()?.kycStatus as string) ?? 'not_started';
-      kycSubmittedAt = userSnap.data()?.kycSubmittedAt as TS;
-      const docsData = kycDocsSnap.data()?.documents;
-      if (Array.isArray(docsData)) kycDocs = docsData as typeof kycDocs;
-    } catch {
-      // Best-effort — KYC panel will show "not started" if the read fails.
-    }
-  }
-
   const name = pi ? `${pi.firstName ?? ''} ${pi.lastName ?? ''}`.trim() : '';
   const monthlyIncome = typeof fin?.monthlyIncome === 'number' ? fin.monthlyIncome : null;
   const monthlyExpenses = typeof fin?.monthlyExpenses === 'number' ? fin.monthlyExpenses : null;
@@ -287,17 +234,13 @@ export default async function LenderApplicationDetailPage({
   // ---- Mocked panels (no backing endpoint/data yet) ---------------------
   // KYC verification and Centrix credit assessment are not yet integrated.
   // These are rendered greyed-out and clearly labelled as sample data.
+  // KYC is performed by the lender and the evidence document is attached to
+  // the borrower's profile — the borrower's journey is unchanged. There is no
+  // lender KYC-capture endpoint yet, so this renders as a not-yet-connected
+  // placeholder.
   const kyc = {
-    status: kycStatusRaw,
-    statusLabel: KYC_STATUS_LABEL[kycStatusRaw] ?? kycStatusRaw,
-    statusTone: KYC_STATUS_TONE[kycStatusRaw] ?? ('neutral' as PillTone),
-    submittedAt: fmtDate(kycSubmittedAt),
-    documents: kycDocs.map((d) => ({
-      label: kycDocLabel(d.docType),
-      fileName: d.fileName ?? '—',
-      uploadedAt: fmtDate(d.uploadedAt as TS),
-      status: d.status ?? 'pending_review',
-    })),
+    verified: false,
+    documents: [] as { label: string; fileName: string; uploadedAt: string }[],
   };
   const credit = {
     score: 643,
