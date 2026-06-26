@@ -55,6 +55,22 @@ const DOC_LABEL: Record<DocumentType, string> = {
   other: 'Document',
 };
 
+const KYC_DOC_LABEL: Record<string, string> = {
+  nz_passport: 'NZ Passport',
+  passport: 'Passport',
+  nz_drivers_licence: 'NZ Driver Licence',
+  drivers_licence: 'NZ Driver Licence',
+  proof_of_address: 'Proof of address',
+  visa: 'Visa document',
+  birth_certificate: 'Birth certificate',
+  selfie: 'Selfie / liveness photo',
+};
+
+const kycDocLabel = (t?: string) =>
+  (t && KYC_DOC_LABEL[t]) ||
+  (t ? t.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : 'Document');
+
+
 const VISA_LABEL: Record<string, string> = {
   work_visa: 'Work visa',
   resident_visa: 'Resident visa',
@@ -150,15 +166,37 @@ export default async function LenderApplicationDetailPage({
   // DataZoo (KYC) and Centrix (credit) reports are uploaded by the lender and
   // kept on the borrower's profile so they carry across future applications.
   type ReportItem = { id: string; fileName: string; uploadedAt: string; uploadedBy: string };
+  type BorrowerKycDoc = {
+    label: string;
+    fileName: string;
+    uploadedAt: string;
+    status: string;
+    downloadUrl: string;
+  };
   const datazooReports: ReportItem[] = [];
   const centrixReports: ReportItem[] = [];
+  const borrowerKycDocuments: BorrowerKycDoc[] = [];
+
+  // Identity documents the applicant uploaded with their application.
+  const IDENTITY_TYPES = new Set<DocumentType>(['passport', 'drivers_licence', 'visa']);
+  for (const d of app.documents ?? []) {
+    if (!IDENTITY_TYPES.has(d.type)) continue;
+    borrowerKycDocuments.push({
+      label: DOC_LABEL[d.type] ?? 'Identity document',
+      fileName: d.fileName,
+      uploadedAt: fmtDate(d.uploadedAt as TS),
+      status: d.status,
+      downloadUrl: `/api/applications/${id}/documents/${d.documentId}`,
+    });
+  }
+
   if (app.applicantId) {
     try {
-      const repSnap = await db
-        .collection('users')
-        .doc(app.applicantId)
-        .collection('lenderReports')
-        .get();
+      const userRef = db.collection('users').doc(app.applicantId);
+      const [repSnap, kycDocsSnap] = await Promise.all([
+        userRef.collection('lenderReports').get(),
+        userRef.collection('applicantProfile').doc('documents').get(),
+      ]);
       repSnap.forEach((doc) => {
         const r = doc.data();
         const item: ReportItem = {
@@ -170,10 +208,32 @@ export default async function LenderApplicationDetailPage({
         if (r.provider === 'datazoo') datazooReports.push(item);
         else if (r.provider === 'centrix') centrixReports.push(item);
       });
+      // Identity evidence captured during onboarding (if any).
+      const onboardingDocs = kycDocsSnap.data()?.documents;
+      if (Array.isArray(onboardingDocs)) {
+        for (const d of onboardingDocs as Array<Record<string, unknown>>) {
+          if (!d.driveFileId) continue;
+          borrowerKycDocuments.push({
+            label: kycDocLabel(d.docType as string | undefined),
+            fileName: (d.fileName as string) ?? 'Document',
+            uploadedAt: fmtDate(d.uploadedAt as TS),
+            status: (d.status as string) ?? 'pending_review',
+            downloadUrl: `/api/applications/${id}/kyc-documents/${d.driveFileId as string}`,
+          });
+        }
+      }
     } catch {
-      // Best-effort — panels show an empty "no report on file" state on failure.
+      // Best-effort — panels show empty states on failure.
     }
   }
+
+  const borrowerKycCount = borrowerKycDocuments.length;
+  const borrowerAllAccepted =
+    borrowerKycCount > 0 && borrowerKycDocuments.every((d) => d.status === 'accepted');
+  const borrowerStatusLabel =
+    borrowerKycCount === 0 ? 'Not provided' : borrowerAllAccepted ? 'Verified' : 'Provided';
+  const borrowerStatusTone: PillTone =
+    borrowerKycCount === 0 ? 'neutral' : borrowerAllAccepted ? 'success' : 'info';
 
   const name = pi ? `${pi.firstName ?? ''} ${pi.lastName ?? ''}`.trim() : '';
   const monthlyIncome = typeof fin?.monthlyIncome === 'number' ? fin.monthlyIncome : null;
@@ -263,9 +323,15 @@ export default async function LenderApplicationDetailPage({
   // ---- Mocked panels (no backing endpoint/data yet) ---------------------
   // KYC verification and Centrix credit assessment are not yet integrated.
   // These are rendered greyed-out and clearly labelled as sample data.
-  // KYC: the lender runs the DataZoo identity check and uploads the report,
-  // which is stored on the customer profile and reused across applications.
-  const kyc = { reports: datazooReports };
+  // KYC: the borrower uploads identity evidence at onboarding (downloadable by
+  // the lender), and the lender runs the DataZoo identity check and uploads
+  // that report — both kept on the customer profile and reused across apps.
+  const kyc = {
+    borrowerStatusLabel,
+    borrowerStatusTone,
+    borrowerDocuments: borrowerKycDocuments,
+    reports: datazooReports,
+  };
   const credit = {
     reports: centrixReports,
     score: 643,
