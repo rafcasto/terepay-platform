@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from 'react';
 import type { ScheduledPayment } from '@/types/application';
+import ConsoleIcon from '@/components/lender/ConsoleIcon';
+import ConsolePill, { type PillTone } from '@/components/lender/ConsolePill';
 
 type Props = {
   applicationId: string;
@@ -10,14 +12,14 @@ type Props = {
 
 const STATUS_CONFIG: Record<
   ScheduledPayment['status'],
-  { label: string; bg: string; text: string }
+  { label: string; tone: PillTone }
 > = {
-  pending:   { label: 'Pending',   bg: 'bg-gray-100',   text: 'text-gray-600'   },
-  scheduled: { label: 'Scheduled', bg: 'bg-blue-100',   text: 'text-blue-700'   },
-  success:   { label: 'Paid',      bg: 'bg-green-100',  text: 'text-green-700'  },
-  retrying:  { label: 'Retrying',  bg: 'bg-amber-100',  text: 'text-amber-700'  },
-  failed:    { label: 'Failed',    bg: 'bg-red-100',    text: 'text-red-700'    },
-  cancelled: { label: 'Cancelled', bg: 'bg-gray-100',   text: 'text-gray-500'   },
+  pending:   { label: 'Pending',   tone: 'neutral' },
+  scheduled: { label: 'Scheduled', tone: 'info'    },
+  success:   { label: 'Paid',      tone: 'success' },
+  retrying:  { label: 'Retrying',  tone: 'warning' },
+  failed:    { label: 'Failed',    tone: 'danger'  },
+  cancelled: { label: 'Cancelled', tone: 'neutral' },
 };
 
 const fmtNzd = (cents: number) =>
@@ -58,29 +60,34 @@ export default function ScheduledPaymentsPanel({
   const failedCount = payments.filter((p) => p.status === 'failed').length;
 
   return (
-    <section className="bg-white rounded-xl border border-gray-200 p-5">
-      <div className="flex items-center justify-between mb-4">
+    <section className="rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-white p-5 shadow-[var(--shadow-xs)]">
+      <div className="mb-4 flex items-center justify-between gap-3">
         <div>
-          <h2 className="font-semibold text-gray-900">Scheduled Repayments</h2>
-          <p className="text-xs text-gray-400 mt-0.5">
+          <h2 className="flex items-center gap-2 font-display text-[15px] font-bold text-[var(--text-strong)]">
+            <span className="flex h-7 w-7 items-center justify-center rounded-[8px] bg-[var(--orange-50)] text-[var(--orange-700)]">
+              <ConsoleIcon name="wallet" size={16} />
+            </span>
+            Scheduled Repayments
+          </h2>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
             {paidCount} of {payments.length} paid
             {failedCount > 0 && (
-              <span className="ml-2 text-red-500 font-medium">· {failedCount} failed</span>
+              <span className="ml-2 font-semibold text-[var(--danger-700)]">· {failedCount} failed</span>
             )}
           </p>
         </div>
         <div className="flex items-center gap-2">
           {lastChecked && (
-            <span className="text-xs text-gray-400">Checked {lastChecked}</span>
+            <span className="text-xs text-[var(--text-muted)]">Checked {lastChecked}</span>
           )}
           <button
             onClick={handleCheckStatus}
             disabled={isPending}
-            className="px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+            className="rounded-[10px] border border-[var(--border-default)] bg-white px-3 py-1.5 text-xs font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--surface-sunken)] disabled:opacity-50"
           >
             {isPending ? (
               <span className="flex items-center gap-1.5">
-                <span className="h-3 w-3 rounded-full border-2 border-gray-400 border-t-transparent animate-spin" />
+                <span className="h-3 w-3 animate-spin rounded-full border-2 border-[var(--slate-400)] border-t-transparent" />
                 Checking…
               </span>
             ) : (
@@ -91,21 +98,21 @@ export default function ScheduledPaymentsPanel({
       </div>
 
       {error && (
-        <p className="text-xs text-red-600 mb-3">{error}</p>
+        <p className="mb-3 text-xs text-[var(--danger-700)]">{error}</p>
       )}
 
       {payments.length === 0 ? (
-        <p className="text-sm text-gray-400">No payments scheduled yet.</p>
+        <p className="text-sm text-[var(--text-muted)]">No payments scheduled yet.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="border-b border-gray-100">
-                <th className="py-2 text-left font-medium text-gray-500">#</th>
-                <th className="py-2 text-left font-medium text-gray-500">Due Date</th>
-                <th className="py-2 text-right font-medium text-gray-500">Amount</th>
-                <th className="py-2 text-center font-medium text-gray-500">Status</th>
-                <th className="py-2 text-right font-medium text-gray-500 hidden sm:table-cell">
+              <tr className="border-b border-[var(--border-subtle)]">
+                <th className="py-2 text-left text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">#</th>
+                <th className="py-2 text-left text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">Due Date</th>
+                <th className="py-2 text-right text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">Amount</th>
+                <th className="py-2 text-center text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">Status</th>
+                <th className="hidden py-2 text-right text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)] sm:table-cell">
                   Qippay ID
                 </th>
               </tr>
@@ -114,29 +121,27 @@ export default function ScheduledPaymentsPanel({
               {payments.map((p) => {
                 const cfg = STATUS_CONFIG[p.status] ?? STATUS_CONFIG.pending;
                 return (
-                  <tr key={p.installmentNumber} className="border-b border-gray-50">
-                    <td className="py-2 text-gray-500">{p.installmentNumber}</td>
-                    <td className="py-2 text-gray-700">{p.dueDate}</td>
-                    <td className="py-2 text-right font-medium text-gray-900">
+                  <tr key={p.installmentNumber} className="border-b border-[var(--border-subtle)] last:border-b-0">
+                    <td className="py-2 text-[var(--text-muted)]">{p.installmentNumber}</td>
+                    <td className="py-2 text-[var(--text-body)]">{p.dueDate}</td>
+                    <td className="py-2 text-right font-mono font-semibold tabular-nums text-[var(--text-strong)]">
                       {fmtNzd(p.amountCents)}
                     </td>
                     <td className="py-2 text-center">
-                      <span
-                        className={`inline-block text-xs px-2 py-0.5 rounded-full font-medium ${cfg.bg} ${cfg.text}`}
-                      >
+                      <ConsolePill tone={cfg.tone}>
                         {cfg.label}
                         {p.status === 'retrying' && p.retryCount > 0 && (
                           <span className="ml-1 opacity-70">×{p.retryCount}</span>
                         )}
-                      </span>
+                      </ConsolePill>
                     </td>
-                    <td className="py-2 text-right text-gray-400 font-mono hidden sm:table-cell">
+                    <td className="hidden py-2 text-right font-mono text-[var(--text-muted)] sm:table-cell">
                       {p.qippayPaymentId ? (
                         <span title={p.qippayPaymentId}>
                           {p.qippayPaymentId.slice(0, 14)}…
                         </span>
                       ) : (
-                        <span className="text-gray-300">—</span>
+                        <span className="text-[var(--slate-400)]">—</span>
                       )}
                     </td>
                   </tr>

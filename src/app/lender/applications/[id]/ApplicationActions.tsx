@@ -55,14 +55,16 @@ export default function ApplicationActions({
   return (
     <div className="space-y-3">
       {error && (
-        <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>
+        <div className="rounded-[var(--radius-md)] border border-[var(--danger-700)]/25 bg-[var(--danger-50)] px-3 py-2 text-sm text-[var(--danger-700)]">
+          {error}
+        </div>
       )}
 
       {status === 'pending_review' && (
         <button
           onClick={() => post('claim')}
           disabled={loading}
-          className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium text-sm hover:bg-indigo-700 disabled:opacity-50"
+          className="w-full rounded-[10px] bg-[var(--orange-500)] px-4 py-2.5 text-sm font-semibold text-[var(--ink-900)] transition-[filter] hover:brightness-105 disabled:opacity-50"
         >
           {loading ? 'Claiming…' : 'Claim Application'}
         </button>
