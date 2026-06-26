@@ -87,6 +87,7 @@ export default async function ApplicantDashboard() {
         totalPaid: summary.totalPaid,
         nextPaymentDate: summary.nextPaymentDate ?? new Date().toISOString(),
         isDelinquent: !fullyPaid && summary.isDelinquent,
+        applicationId: recentApp.id,
       },
     };
   } else if (loanDoc) {
@@ -109,6 +110,7 @@ export default async function ApplicantDashboard() {
         totalPaid: loanDoc.totalPaid as number,
         nextPaymentDate,
         isDelinquent: loanDoc.status === 'delinquent',
+        applicationId: loanDoc.applicationId as string | undefined,
       },
     };
   } else if (recentApp?.status) {
