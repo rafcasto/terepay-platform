@@ -1,15 +1,19 @@
 import { Hero, HeroBalance, Pill, ProgressBar, ScheduleRow, StatGrid, Icons } from '@/components/ui';
 import { fmtNZD, fmtDate } from '@/lib/loan/format';
-import type { LoanApplication, AnyApplicationStatus } from '@/types/application';
+import type { LoanApplication, AnyApplicationStatus, ScheduledPayment } from '@/types/application';
 import { SectionCard, Field } from './shared';
 
 interface Props {
   app: LoanApplication & Record<string, unknown>;
   status: AnyApplicationStatus;
   applicationId: string;
+  /** Live Qippay payment status per instalment (post-disbursement source of truth). */
+  scheduledPayments?: ScheduledPayment[];
 }
 
-export default function ScreenActive({ app, status, applicationId }: Props) {
+type RowStatus = 'paid' | 'next' | 'upcoming' | 'overdue';
+
+export default function ScreenActive({ app, status, applicationId, scheduledPayments = [] }: Props) {
   const ld = app.loanDetails;
   const repayment = app.repaymentSchedule;
   const refNum = (app.referenceNumber as string | undefined) ?? `#${applicationId.slice(0, 8)}`;
@@ -18,22 +22,41 @@ export default function ScreenActive({ app, status, applicationId }: Props) {
 
   const total = repayment?.totalRepayment ?? 0;
   const installments = repayment?.installments ?? [];
+
+  // Overlay live Qippay status (scheduledPayments) onto the static schedule.
+  const liveByNumber = new Map(scheduledPayments.map((p) => [p.installmentNumber, p]));
+  const isPaid = (n: number, fallback?: string) =>
+    liveByNumber.get(n)?.status === 'success' || fallback === 'paid';
+  const isFailed = (n: number, fallback?: string) => {
+    const live = liveByNumber.get(n)?.status;
+    return live === 'failed' || live === 'retrying' || fallback === 'overdue';
+  };
+
   const paidAmount = installments
-    .filter((i) => i.status === 'paid')
+    .filter((i) => isPaid(i.installmentNumber, i.status))
     .reduce((sum, i) => sum + (i.amount ?? 0), 0);
   const remaining = total - paidAmount;
   const repaidPct = total > 0 ? Math.round((paidAmount / total) * 100) : 0;
 
-  const upcoming = installments.find((i) => i.status === 'scheduled');
-  const overdue = installments.find((i) => i.status === 'overdue');
-  const next = overdue ?? upcoming;
+  // First unpaid instalment that is overdue, else the first still-scheduled one.
+  const next =
+    installments.find((i) => isFailed(i.installmentNumber, i.status) && !isPaid(i.installmentNumber, i.status)) ??
+    installments.find((i) => !isPaid(i.installmentNumber, i.status));
+  const nextOverdue = next ? isFailed(next.installmentNumber, next.status) : false;
+
+  const rowStatus = (n: number, fallback?: string, isNext?: boolean): RowStatus => {
+    if (isPaid(n, fallback)) return 'paid';
+    if (isFailed(n, fallback)) return 'overdue';
+    if (isNext) return 'next';
+    return 'upcoming';
+  };
 
   return (
     <div className="space-y-5">
       <Hero
         eyebrow={`Loan ${refNum}`}
         pill={
-          overdue ? (
+          nextOverdue ? (
             <Pill tone="danger" pulse onInk>
               Overdue
             </Pill>
@@ -59,7 +82,7 @@ export default function ScreenActive({ app, status, applicationId }: Props) {
           <StatGrid
             stats={[
               {
-                label: next ? (overdue ? 'Overdue payment' : 'Next payment') : 'Status',
+                label: next ? (nextOverdue ? 'Overdue payment' : 'Next payment') : 'Status',
                 value: next ? fmtNZD(next.amount) : 'Up to date',
               },
               {
@@ -77,18 +100,15 @@ export default function ScreenActive({ app, status, applicationId }: Props) {
             Each instalment is auto-debited from your bank on its due date — no action needed.
           </p>
           <div className="divide-y divide-border-2">
-            {installments.map((i) => {
-              const tone = i.status === 'paid' ? 'paid' : i.status === 'overdue' ? 'overdue' : i === next ? 'next' : 'upcoming';
-              return (
-                <ScheduleRow
-                  key={i.installmentNumber}
-                  date={i.dueDate}
-                  label={`Instalment ${i.installmentNumber}`}
-                  amount={fmtNZD(i.amount)}
-                  status={tone}
-                />
-              );
-            })}
+            {installments.map((i) => (
+              <ScheduleRow
+                key={i.installmentNumber}
+                date={i.dueDate}
+                label={`Instalment ${i.installmentNumber}`}
+                amount={fmtNZD(i.amount)}
+                status={rowStatus(i.installmentNumber, i.status, i === next)}
+              />
+            ))}
           </div>
           <div className="mt-4 flex items-baseline justify-between pt-3 border-t border-border-2">
             <span className="text-[11.5px] font-semibold tracking-[0.06em] uppercase text-muted">

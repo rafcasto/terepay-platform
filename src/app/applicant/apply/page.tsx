@@ -354,7 +354,7 @@ function ApplyPageInner() {
   return (
     <div className="min-h-screen bg-[var(--surface-page)]">
       <FormProvider {...methods}>
-        <div className="max-w-2xl mx-auto px-4 py-8 pb-12 screen-in">
+        <div className="max-w-[880px] mx-auto px-4 py-8 pb-12 screen-in">
           {serverError && (
             <Card className="mb-6 border-[var(--danger-500)]/40 bg-danger-soft-ds">
               <p className="text-sm text-danger-text font-medium">{serverError}</p>
