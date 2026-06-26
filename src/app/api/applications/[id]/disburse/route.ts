@@ -6,11 +6,9 @@ import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { auditLog, getClientIp } from '@/lib/utils/audit';
 import { FieldValue } from 'firebase-admin/firestore';
 import { ZodError } from 'zod';
-import {
-  schedulePayment,
-  getBeneficiaryId,
-} from '@/lib/qippay/setpay-client';
-import type { PaymentConsent, ScheduledPayment } from '@/types/application';
+import { scheduleInstallments } from '@/lib/qippay/schedule-installments';
+import { createLoanRecord } from '@/lib/loan/loan-record';
+import type { PaymentConsent } from '@/types/application';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,11 +21,12 @@ type RouteParams = { params: Promise<{ id: string }> };
  * application. Idempotent: re-running on an already-disbursed application
  * returns the existing values.
  *
- * After a successful disbursement, all fortnightly instalments are submitted
- * to Qippay (POST /v1/setpay) with their future due dates. Each instalment
- * is tracked in `scheduledPayments`. If Qippay scheduling fails for any
- * instalment, that instalment is stored as `status: 'pending'` so it can be
- * retried — the disbursement itself is not rolled back.
+ * After a successful disbursement we attempt to schedule the fortnightly
+ * instalments with Qippay (see `scheduleInstallments`). SetPay only accepts
+ * instalments whose period is currently open, so any it can't lodge yet stay
+ * `pending` and are retried by the daily cron / the lender's manual trigger —
+ * the disbursement itself is never rolled back. Finally a canonical `loans`
+ * record is created for the portfolio + statement surfaces.
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   const ip = getClientIp(request);
@@ -57,7 +56,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           disbursedAmount: appData.loanDetails?.disbursedAmount ?? 0,
           alreadyDisbursed: true,
           paymentConsent: null as PaymentConsent | null,
-          applicationShortId: id.slice(0, 12),
         };
       }
 
@@ -147,7 +145,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         applicationFee,
         isOverride,
         paymentConsent: consent ?? null,
-        applicationShortId: id.slice(0, 12),
       };
     });
 
@@ -167,113 +164,25 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         ipAddress: ip,
       });
 
-      // ── Auto-schedule instalments with Qippay ──────────────────────────────
-      // For applications that went through the new Qippay consent flow, submit
-      // each instalment to POST /v1/setpay immediately after disbursement.
-      // Instalments with a due date in the past are skipped (they can't be
-      // scheduled). If Qippay is unreachable, the instalment is recorded as
-      // `pending` so an operator can retry.
-      const consent = result.paymentConsent;
-      const installments = consent?.scheduleSummary?.installments ?? [];
-
-      if (consent?.mandateId && installments.length > 0) {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        let beneficiaryId = '';
-        try {
-          beneficiaryId = getBeneficiaryId();
-        } catch {
-          // Not configured — skip scheduling, store all as pending
-        }
-
-        const scheduledPayments: ScheduledPayment[] = await Promise.all(
-          installments.map(async (inst, i): Promise<ScheduledPayment> => {
-            const installmentNumber = i + 1;
-            const dueDate = new Date(inst.dueDate);
-
-            // Skip past-due dates
-            if (dueDate <= today) {
-              return {
-                installmentNumber,
-                dueDate: inst.dueDate,
-                amountCents: inst.amountCents,
-                status: 'pending',
-                retryCount: 0,
-              };
-            }
-
-            if (!beneficiaryId) {
-              return {
-                installmentNumber,
-                dueDate: inst.dueDate,
-                amountCents: inst.amountCents,
-                status: 'pending',
-                retryCount: 0,
-              };
-            }
-
-            try {
-              const scheduled = await schedulePayment({
-                epcId: consent.mandateId,
-                beneficiaryId,
-                amountCents: inst.amountCents,
-                scheduledFor: `${inst.dueDate}T00:00:00.000Z`,
-                statementParticulars: 'TerePay',
-                statementCode: `Inst${installmentNumber}`,
-                statementReference: result.applicationShortId,
-              });
-
-              return {
-                installmentNumber,
-                dueDate: inst.dueDate,
-                amountCents: inst.amountCents,
-                qippayPaymentId: scheduled.paymentId,
-                status: 'scheduled',
-                retryCount: 0,
-              };
-            } catch (err) {
-              console.error(
-                `[disburse] Failed to schedule instalment ${installmentNumber} with Qippay`,
-                err,
-              );
-              return {
-                installmentNumber,
-                dueDate: inst.dueDate,
-                amountCents: inst.amountCents,
-                status: 'pending',
-                retryCount: 0,
-              };
-            }
-          }),
-        );
-
-        await adminDb
-          .collection('loanApplications')
-          .doc(id)
-          .update({
-            scheduledPayments,
-            'timeline.updatedAt': FieldValue.serverTimestamp(),
-          });
-
-        const scheduledCount = scheduledPayments.filter((p) => p.status === 'scheduled').length;
-        const pendingCount = scheduledPayments.filter((p) => p.status === 'pending').length;
-
-        await auditLog({
-          userId: auth.uid,
-          action: 'setpay_payments_scheduled',
-          targetId: id,
-          targetType: 'application',
-          outcome: 'success',
-          changes: {
-            mandateId: consent.mandateId,
-            totalInstallments: installments.length,
-            scheduledCount,
-            pendingCount,
-          },
-          ipAddress: ip,
-        });
+      // ── Schedule instalments with Qippay ───────────────────────────────────
+      // Lodges what SetPay will accept now; anything it won't yet (future
+      // rolling periods) stays `pending` and is picked up by the daily cron or
+      // the lender's manual "Schedule pending" action. Best-effort — never
+      // rolls back the committed disbursement.
+      try {
+        await scheduleInstallments({ applicationId: id, actor: auth.uid, ip });
+      } catch (err) {
+        console.error('[disburse] Initial instalment scheduling failed', err);
       }
+
+      // ── Create the canonical loan record (portfolio + statements) ──────────
+      await createLoanRecord({
+        applicationId: id,
+        lenderId: auth.uid,
+        disbursedAmount: result.disbursedAmount,
+        consent: result.paymentConsent,
+        ip,
+      });
     }
 
     return NextResponse.json({

@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic';
 import { withAuth } from '@/lib/auth/middleware';
 import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { auditLog, getClientIp } from '@/lib/utils/audit';
+import { hasOutstandingLoan } from '@/lib/loan/outstanding-loan';
 import { FieldValue } from 'firebase-admin/firestore';
 
 type RouteParams = { params: Promise<{ id: string }> };
@@ -43,6 +44,24 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
     if (data.status !== 'draft') {
       throw new AppError('BAD_REQUEST', 400, 'Only draft applications can be submitted');
+    }
+
+    // Single-active-loan rule: a borrower can't request a new loan while an
+    // existing one is still outstanding (not fully repaid).
+    if (await hasOutstandingLoan(auth.uid)) {
+      await auditLog({
+        userId: auth.uid,
+        action: 'application_submit_blocked_active_loan',
+        targetId: id,
+        targetType: 'application',
+        outcome: 'failure',
+        ipAddress: ip,
+      });
+      throw new AppError(
+        'ACTIVE_LOAN_EXISTS',
+        409,
+        'You already have an active loan. Please repay it in full before applying for another.',
+      );
     }
 
     const referenceNumber = data.referenceNumber || await generateReference();

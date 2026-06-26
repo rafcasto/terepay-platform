@@ -7,6 +7,7 @@ import { createApplicationSchema, terepayApplicationSchema, draftApplicationSche
 import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { auditLog, getClientIp } from '@/lib/utils/audit';
 import { defaultLimiter, checkRateLimit } from '@/lib/rate-limit/limiter';
+import { hasOutstandingLoan } from '@/lib/loan/outstanding-loan';
 import { FieldValue } from 'firebase-admin/firestore';
 import { ZodError, z } from 'zod';
 import { randomUUID } from 'crypto';
@@ -198,6 +199,25 @@ export async function POST(request: NextRequest) {
     if (!liveUser.emailVerified) {
       return errorResponse(
         new AppError('FORBIDDEN', 403, 'Please verify your email address before submitting a loan application.'),
+      );
+    }
+
+    // Single-active-loan rule: don't let a borrower start a new application while
+    // an existing loan is still outstanding (not fully repaid).
+    if (await hasOutstandingLoan(uid)) {
+      await auditLog({
+        userId: uid,
+        action: 'application_create_blocked_active_loan',
+        targetType: 'application',
+        outcome: 'failure',
+        ipAddress: ip,
+      });
+      return errorResponse(
+        new AppError(
+          'ACTIVE_LOAN_EXISTS',
+          409,
+          'You already have an active loan. Please repay it in full before applying for another.',
+        ),
       );
     }
 
