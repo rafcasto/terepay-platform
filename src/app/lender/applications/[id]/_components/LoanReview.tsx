@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { DocumentStatus, ScheduledPayment } from '@/types/application';
 import ConsoleIcon, { type ConsoleIconName } from '@/components/lender/ConsoleIcon';
@@ -14,6 +14,8 @@ import ScheduledPaymentsPanel from '../ScheduledPaymentsPanel';
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
+export type ReportItem = { id: string; fileName: string; uploadedAt: string; uploadedBy: string };
+
 export type ReviewData = {
   applicationId: string;
   status: string;
@@ -75,14 +77,9 @@ export type ReviewData = {
     consentActivatedAt?: string;
   };
   decisionInput: { requestedAmount: number; assessedAmount?: number };
-  kyc: {
-    status: string;
-    statusLabel: string;
-    statusTone: PillTone;
-    submittedAt: string;
-    documents: { label: string; fileName: string; uploadedAt: string; status: string }[];
-  };
+  kyc: { reports: ReportItem[] };
   credit: {
+    reports: ReportItem[];
     score: number;
     band: string;
     min: number;
@@ -91,7 +88,6 @@ export type ReviewData = {
     enquiries: number;
     utilisation: string;
     dti: string;
-    pulled: string;
   };
 };
 
@@ -751,138 +747,216 @@ function MessagesTab({ data }: { data: ReviewData }) {
 // ---------------------------------------------------------------------------
 // KYC + Credit cards (mocked, greyed)
 // ---------------------------------------------------------------------------
-const KYC_DOC_TONE: Record<string, PillTone> = {
-  pending_review: 'warning',
-  pending: 'warning',
-  accepted: 'success',
-  approved: 'success',
-  verified: 'success',
-  rejected: 'danger',
-};
+function ReportList({ reports, applicationId }: { reports: ReportItem[]; applicationId: string }) {
+  if (reports.length === 0) {
+    return (
+      <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--border-default)] bg-white/70 p-4 text-sm text-[var(--text-muted)]">
+        No report on file yet.
+      </div>
+    );
+  }
+  return (
+    <ul className="space-y-2">
+      {reports.map((r) => (
+        <li
+          key={r.id}
+          className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-white p-3"
+        >
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-[var(--slate-100)] text-[var(--text-muted)]">
+              <ConsoleIcon name="fileText" size={16} />
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-[var(--text-body)]">{r.fileName}</p>
+              <p className="truncate text-xs text-[var(--text-muted)]">
+                Uploaded by {r.uploadedBy} · {r.uploadedAt}
+              </p>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <ConsolePill tone="success">On file</ConsolePill>
+            <a
+              href={`/api/applications/${applicationId}/reports/${r.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 rounded-[8px] border border-[var(--border-default)] bg-white px-2 py-1 text-xs font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--surface-sunken)]"
+            >
+              <ConsoleIcon name="search" size={14} />
+              View
+            </a>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
-const kycDocStatusLabel = (st: string) =>
-  st === 'pending_review' || st === 'pending'
-    ? 'Pending review'
-    : st === 'accepted' || st === 'approved' || st === 'verified'
-      ? 'Verified'
-      : st === 'rejected'
-        ? 'Rejected'
-        : st;
+function ReportUploader({
+  applicationId,
+  provider,
+  providerLabel,
+  canUpload,
+}: {
+  applicationId: string;
+  provider: 'datazoo' | 'centrix';
+  providerLabel: string;
+  canUpload: boolean;
+}) {
+  const router = useRouter();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setUploading(true);
+    setError(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('provider', provider);
+      const res = await fetch(`/api/applications/${applicationId}/reports`, { method: 'POST', body: fd });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error?.message ?? 'Upload failed');
+      }
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  if (!canUpload) {
+    return (
+      <p className="mt-4 text-xs text-[var(--text-muted)]">
+        Claim this application to upload a {providerLabel} report. Reports are stored on the
+        customer&apos;s profile and reused across future applications.
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-4">
+      <input
+        ref={inputRef}
+        type="file"
+        accept="application/pdf,image/png,image/jpeg"
+        className="hidden"
+        onChange={onFile}
+      />
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        disabled={uploading}
+        className="inline-flex items-center gap-1.5 rounded-[10px] bg-[var(--ink-800)] px-3 py-1.5 text-sm font-semibold text-white transition-[filter] hover:brightness-110 disabled:opacity-50"
+      >
+        <ConsoleIcon name="upload" size={16} />
+        {uploading ? 'Uploading…' : `Upload ${providerLabel} report`}
+      </button>
+      {error && <p className="mt-2 text-xs text-[var(--danger-700)]">{error}</p>}
+      <p className="mt-2 text-xs text-[var(--text-muted)]">
+        PDF, JPEG or PNG up to 10 MB. Stored on the customer&apos;s profile and reused across future
+        applications.
+      </p>
+    </div>
+  );
+}
 
 function KycCard({ data, full = false }: { data: ReviewData; full?: boolean }) {
-  const k = data.kyc;
+  void full;
+  const reports = data.kyc.reports;
+  const verified = reports.length > 0;
   return (
     <Card
-      title="KYC & verification"
+      title="KYC — DataZoo"
       icon="shield"
+      muted={!verified}
       action={
-        <ConsolePill tone={k.statusTone} dot>
-          {k.statusLabel}
+        <ConsolePill tone={verified ? 'success' : 'warning'} dot>
+          {verified ? 'Verified' : 'Not verified'}
         </ConsolePill>
       }
     >
-      <p className="mb-3 text-xs text-[var(--text-muted)]">
-        KYC is verified manually. The evidence document is attached to the borrower&apos;s profile
-        {k.submittedAt !== '\u2014' && <> · submitted {k.submittedAt}</>}.
+      <p className="mb-4 text-sm text-[var(--text-muted)]">
+        Run the identity check in DataZoo and upload the report here. It is stored on the borrower&apos;s
+        profile and reused across their future loan applications.
       </p>
-
-      {k.documents.length === 0 ? (
-        <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--border-default)] bg-[var(--slate-50)] p-4 text-sm text-[var(--text-muted)]">
-          No KYC evidence document attached to the profile yet.
-        </div>
-      ) : (
-        <ul className="space-y-2">
-          {k.documents.map((doc, i) => (
-            <li
-              key={`${doc.fileName}-${i}`}
-              className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] bg-[var(--slate-50)] p-3"
-            >
-              <div className="flex min-w-0 items-center gap-2.5">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-white text-[var(--text-muted)]">
-                  <ConsoleIcon name="fileText" size={16} />
-                </span>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-[var(--text-body)]">{doc.label}</p>
-                  <p className="truncate text-xs text-[var(--text-muted)]">
-                    {doc.fileName} · Attached {doc.uploadedAt}
-                  </p>
-                </div>
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                <ConsolePill tone={KYC_DOC_TONE[doc.status] ?? 'neutral'}>
-                  {kycDocStatusLabel(doc.status)}
-                </ConsolePill>
-                <button
-                  type="button"
-                  disabled
-                  aria-disabled="true"
-                  title="In-app document viewer not yet available"
-                  className="inline-flex cursor-not-allowed items-center gap-1 rounded-[8px] border border-[var(--border-default)] bg-white px-2 py-1 text-xs font-semibold text-[var(--text-muted)] opacity-60"
-                >
-                  <ConsoleIcon name="search" size={14} />
-                  View
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {full && (
-        <p className="mt-4 text-xs text-[var(--text-muted)]">
-          KYC documents are stored securely in Google Drive. In-app evidence viewing and lender sign-off
-          are not yet connected.
-        </p>
-      )}
+      <ReportList reports={reports} applicationId={data.applicationId} />
+      <ReportUploader
+        applicationId={data.applicationId}
+        provider="datazoo"
+        providerLabel="DataZoo"
+        canUpload={data.isAssigned}
+      />
     </Card>
   );
 }
 
 function CreditCard({ data, full = false }: { data: ReviewData; full?: boolean }) {
   const c = data.credit;
+  const reports = c.reports;
+  const hasReport = reports.length > 0;
   const pct = Math.max(0, Math.min(1, (c.score - c.min) / (c.max - c.min)));
   return (
     <Card
-      title="Credit assessment"
+      title="Credit — Centrix"
       icon="trending"
-      muted
+      muted={!hasReport}
       action={
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-[var(--text-muted)]">Centrix · {c.pulled}</span>
-          {full && <MockBadge />}
-        </div>
+        <ConsolePill tone={hasReport ? 'success' : 'warning'} dot>
+          {hasReport ? 'Report on file' : 'No report'}
+        </ConsolePill>
       }
     >
-      <div className="opacity-70" aria-hidden="true">
-        <div className="flex items-end gap-3">
-          <span className="font-mono text-4xl font-bold tabular-nums text-[var(--text-muted)]">{c.score}</span>
-          <span className="mb-1 text-sm font-semibold text-[var(--text-muted)]">{c.band}</span>
-        </div>
-        <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-[var(--slate-100)]">
-          <div className="h-full rounded-full bg-[var(--orange-400)]" style={{ width: `${pct * 100}%` }} />
-        </div>
-        <div className="mt-1 flex justify-between text-[11px] text-[var(--slate-400)]">
-          <span>{c.min}</span>
-          <span>{c.max}</span>
-        </div>
-
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {[
-            { label: 'Defaults', value: String(c.defaults) },
-            { label: 'Credit enquiries (6m)', value: String(c.enquiries) },
-            { label: 'Credit utilisation', value: c.utilisation },
-            { label: 'Debt-to-income', value: c.dti },
-          ].map((m) => (
-            <div key={m.label} className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-white/60 p-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">{m.label}</p>
-              <p className="mt-0.5 font-semibold text-[var(--text-muted)]">{m.value}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-      <p className="mt-4 text-xs text-[var(--text-muted)]">
-        Centrix credit bureau is not yet connected. Sample data shown for layout only.
+      <p className="mb-4 text-sm text-[var(--text-muted)]">
+        Pull the credit report in Centrix and upload it here. It is stored on the borrower&apos;s profile
+        and reused across their future loan applications.
       </p>
+      <ReportList reports={reports} applicationId={data.applicationId} />
+      <ReportUploader
+        applicationId={data.applicationId}
+        provider="centrix"
+        providerLabel="Centrix"
+        canUpload={data.isAssigned}
+      />
+
+      {full && (
+        <div className="mt-5 border-t border-[var(--border-subtle)] pt-5">
+          <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">
+            Summary — sample, populated from the uploaded report
+          </p>
+          <div className="opacity-70" aria-hidden="true">
+            <div className="flex items-end gap-3">
+              <span className="font-mono text-4xl font-bold tabular-nums text-[var(--text-muted)]">{c.score}</span>
+              <span className="mb-1 text-sm font-semibold text-[var(--text-muted)]">{c.band}</span>
+            </div>
+            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-[var(--slate-100)]">
+              <div className="h-full rounded-full bg-[var(--orange-400)]" style={{ width: `${pct * 100}%` }} />
+            </div>
+            <div className="mt-1 flex justify-between text-[11px] text-[var(--slate-400)]">
+              <span>{c.min}</span>
+              <span>{c.max}</span>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {[
+                { label: 'Defaults', value: String(c.defaults) },
+                { label: 'Credit enquiries (6m)', value: String(c.enquiries) },
+                { label: 'Credit utilisation', value: c.utilisation },
+                { label: 'Debt-to-income', value: c.dti },
+              ].map((m) => (
+                <div key={m.label} className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-white/60 p-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">{m.label}</p>
+                  <p className="mt-0.5 font-semibold text-[var(--text-muted)]">{m.value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </Card>
   );
 }
