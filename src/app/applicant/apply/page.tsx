@@ -259,7 +259,7 @@ function ApplyPageInner() {
       if (!res.ok) {
         const code = (body.error?.code ?? '') as string;
         let errorMessage: string;
-        if (code === 'FORBIDDEN') {
+        if (code === 'FORBIDDEN' || code === 'ACTIVE_LOAN_EXISTS') {
           errorMessage = body.error.message;
         } else if (code === 'RATE_LIMITED') {
           errorMessage = 'Too many requests. Please wait a moment and try again.';

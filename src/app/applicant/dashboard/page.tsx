@@ -72,8 +72,26 @@ export default async function ApplicantDashboard() {
   let state: LoanDisplayState = 'new';
   let heroData: DashboardHeroData = { state: 'new' };
 
-  if (loanDoc) {
-    // Dedicated loans-collection record (seeded / future flows).
+  if (recentApp && (isLiveLoanStatus(recentApp.status) || isClosedLoanStatus(recentApp.status))) {
+    // Derive the live loan from the application — the source of truth for the
+    // schedule and balance (scheduledPayments is kept current by the Qippay
+    // webhook). This makes a disbursed loan show its real remaining balance and
+    // stops the dashboard from inviting a second loan while one is outstanding.
+    const summary = deriveLoanSummary(recentApp);
+    const fullyPaid = isClosedLoanStatus(recentApp.status) || summary.isFullyPaid;
+    state = fullyPaid ? 'paid' : 'active';
+    heroData = {
+      state,
+      loan: {
+        remainingBalance: summary.remainingBalance,
+        totalPaid: summary.totalPaid,
+        nextPaymentDate: summary.nextPaymentDate ?? new Date().toISOString(),
+        isDelinquent: !fullyPaid && summary.isDelinquent,
+      },
+    };
+  } else if (loanDoc) {
+    // Fallback: a dedicated loans-collection record with no live application
+    // (e.g. seeded data).
     if (loanDoc.status === 'closed_repaid') {
       state = 'paid';
     } else {
@@ -91,22 +109,6 @@ export default async function ApplicantDashboard() {
         totalPaid: loanDoc.totalPaid as number,
         nextPaymentDate,
         isDelinquent: loanDoc.status === 'delinquent',
-      },
-    };
-  } else if (recentApp && (isLiveLoanStatus(recentApp.status) || isClosedLoanStatus(recentApp.status))) {
-    // No loans-collection record: derive the live loan from the application.
-    // This is what makes a disbursed loan show its real remaining balance and
-    // stops the dashboard from inviting a second loan while one is outstanding.
-    const summary = deriveLoanSummary(recentApp);
-    const fullyPaid = isClosedLoanStatus(recentApp.status) || summary.isFullyPaid;
-    state = fullyPaid ? 'paid' : 'active';
-    heroData = {
-      state,
-      loan: {
-        remainingBalance: summary.remainingBalance,
-        totalPaid: summary.totalPaid,
-        nextPaymentDate: summary.nextPaymentDate ?? new Date().toISOString(),
-        isDelinquent: !fullyPaid && summary.isDelinquent,
       },
     };
   } else if (recentApp?.status) {

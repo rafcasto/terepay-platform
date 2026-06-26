@@ -10,6 +10,7 @@ import {
   schedulePayment,
   getBeneficiaryId,
 } from '@/lib/qippay/setpay-client';
+import { createLoanRecord } from '@/lib/loan/loan-record';
 import type { PaymentConsent, ScheduledPayment } from '@/types/application';
 
 export const dynamic = 'force-dynamic';
@@ -27,7 +28,8 @@ type RouteParams = { params: Promise<{ id: string }> };
  * to Qippay (POST /v1/setpay) with their future due dates. Each instalment
  * is tracked in `scheduledPayments`. If Qippay scheduling fails for any
  * instalment, that instalment is stored as `status: 'pending'` so it can be
- * retried — the disbursement itself is not rolled back.
+ * retried — the disbursement itself is not rolled back. Finally a canonical
+ * `loans` record is created for the portfolio + statement surfaces.
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   const ip = getClientIp(request);
@@ -274,6 +276,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           ipAddress: ip,
         });
       }
+
+      // ── Create the canonical loan record (portfolio + statements) ──────────
+      await createLoanRecord({
+        applicationId: id,
+        lenderId: auth.uid,
+        disbursedAmount: result.disbursedAmount,
+        consent: result.paymentConsent,
+        ip,
+      });
     }
 
     return NextResponse.json({
