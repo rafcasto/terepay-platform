@@ -55,7 +55,6 @@ const byLabel = (label: string): ApplicantNavItem => {
 // drawer still exposes the full nav (Profile, Help & support, etc.).
 export const APPLICANT_TABS: ApplicantNavItem[] = [
   byLabel('Account'),
-  byLabel('Applications'),
   byLabel('Repayments'),
   byLabel('Documents'),
 ];
