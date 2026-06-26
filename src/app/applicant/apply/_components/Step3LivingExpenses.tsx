@@ -206,7 +206,7 @@ export default function Step3LivingExpenses() {
                   <label className="block text-xs font-medium text-[var(--text-muted)] mb-1">Frequency</label>
                   <select
                     {...register(`livingExpenses.subscriptionDetails.${sub}.frequency`)}
-                    className={selectCls + ' h-auto py-2 text-xs'}
+                    className={selectCls + ' h-auto py-2'}
                   >
                     {FREQ_OPTIONS.map((o) => (
                       <option key={o.value} value={o.value}>

@@ -224,6 +224,7 @@ export const terepayApplicationSchema = z.object({
     employmentStatus: z.enum(['permanent', 'fixed_term', 'casual', 'part_time'], { message: 'Select an employment status' }),
     timeAtEmployer: z.string().min(1, 'Required'),
     previousEmployer: z.string().optional(),
+    previousEmployerPeriod: z.string().optional(),
     income: z.object({
       salaryBeforeTax: currencyField,
       salaryAfterTax: currencyField,
@@ -231,7 +232,15 @@ export const terepayApplicationSchema = z.object({
       otherIncome: currencyField,
       otherIncomeDescription: z.string().optional(),
     }),
-  }),
+  })
+    .refine(
+      (val) => val.timeAtEmployer !== 'Less than 6 months' || !!val.previousEmployer?.trim(),
+      { path: ['previousEmployer'], message: 'Add your previous employer' },
+    )
+    .refine(
+      (val) => val.timeAtEmployer !== 'Less than 6 months' || !!val.previousEmployerPeriod?.trim(),
+      { path: ['previousEmployerPeriod'], message: 'Select how long you were there' },
+    ),
 
   // ── Section 3: Living Expenses ──────────────────────────────────────────
   livingExpenses: z.object({

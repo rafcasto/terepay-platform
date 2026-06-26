@@ -10,6 +10,16 @@ const selectCls = inputCls + ' appearance-none';
 const labelCls = 'block text-sm font-semibold text-ink-strong mb-1.5';
 const errorCls = 'mt-1.5 text-xs text-danger-text font-medium';
 
+// Duration options, mirroring the "How long at this address?" field. We store the
+// human-readable label (not a code) so the lender view and PDF render it directly.
+const DURATION_OPTIONS = [
+  'Less than 6 months',
+  '6–12 months',
+  '1–2 years',
+  '2–5 years',
+  '5+ years',
+];
+
 const NzdInput = React.forwardRef<
   HTMLInputElement,
   { name: string } & React.InputHTMLAttributes<HTMLInputElement>
@@ -22,8 +32,10 @@ const NzdInput = React.forwardRef<
       ref={ref}
       name={name}
       type="number"
+      inputMode="decimal"
       min={0}
       step="0.01"
+      onFocus={(ev) => ev.currentTarget.select()}
       className="w-full pl-6 pr-3 py-2.5 border border-border-default rounded-lg text-sm focus:ring-2 focus:ring-[var(--focus-ring)] focus:border-brand focus:outline-none transition-colors bg-surface-card"
       {...props}
     />
@@ -41,6 +53,9 @@ export default function Step2Employment() {
   const e = errors.employment;
 
   const income = useWatch({ control, name: 'employment.income' });
+  const timeAtEmployer = useWatch({ control, name: 'employment.timeAtEmployer' });
+  const isNewJob = timeAtEmployer === 'Less than 6 months';
+
   const total =
     (income?.salaryAfterTax ?? 0) +
     (income?.winz ?? 0) +
@@ -97,9 +112,11 @@ export default function Step2Employment() {
           </label>
           <input
             type="number"
+            inputMode="numeric"
             min={1}
             max={168}
             {...register('employment.hoursPerWeek', { valueAsNumber: true })}
+            onFocus={(ev) => ev.currentTarget.select()}
             className={inputCls}
             placeholder="40"
           />
@@ -126,24 +143,54 @@ export default function Step2Employment() {
           <label className={labelCls}>
             Time at Current Employer <span className="text-danger-text">*</span>
           </label>
-          <input
-            {...register('employment.timeAtEmployer')}
-            className={inputCls}
-            placeholder="e.g. 1 year 3 months"
-          />
+          <select {...register('employment.timeAtEmployer')} className={selectCls}>
+            <option value="">Select…</option>
+            {DURATION_OPTIONS.map((d) => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
+          </select>
           {e?.timeAtEmployer && <p className={errorCls}>{e.timeAtEmployer.message}</p>}
         </div>
       </div>
 
-      {/* Previous employer */}
-      <div>
-        <label className={labelCls}>Previous Employer (if less than 6 months)</label>
-        <input
-          {...register('employment.previousEmployer')}
-          className={inputCls}
-          placeholder="Leave blank if not applicable"
-        />
-      </div>
+      {/* Previous employer — only required when under 6 months at current employer */}
+      {isNewJob && (
+        <div className="rounded-xl border border-border-default bg-surface-sunken p-4 space-y-4">
+          <div>
+            <h3 className="text-sm font-semibold text-ink-strong">Previous employer</h3>
+            <p className="text-xs text-[var(--text-muted)] mt-0.5">
+              You&apos;ve been at your current job under 6 months — tell us where you worked before.
+            </p>
+          </div>
+          <div>
+            <label className={labelCls}>
+              Previous Employer Name <span className="text-danger-text">*</span>
+            </label>
+            <input
+              {...register('employment.previousEmployer')}
+              className={inputCls}
+              placeholder="Previous Company Ltd"
+            />
+            {e?.previousEmployer && <p className={errorCls}>{e.previousEmployer.message}</p>}
+          </div>
+          <div>
+            <label className={labelCls}>
+              Time at Previous Employer <span className="text-danger-text">*</span>
+            </label>
+            <select {...register('employment.previousEmployerPeriod')} className={selectCls}>
+              <option value="">Select…</option>
+              {DURATION_OPTIONS.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+            {e?.previousEmployerPeriod && <p className={errorCls}>{e.previousEmployerPeriod.message}</p>}
+          </div>
+        </div>
+      )}
 
       {/* Income table */}
       <div className="bg-surface-sunken rounded-xl border border-border-default p-4 space-y-3">

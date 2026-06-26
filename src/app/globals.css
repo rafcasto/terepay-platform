@@ -414,6 +414,13 @@ img { max-width: 100%; display: block; }
   border-radius: 0;
 }
 
+/* Native select option lists inherit the control font-size on some platforms.
+   Keep selects at 16px on small screens so option text stays legible and iOS
+   doesn't zoom the page on focus. */
+@media (max-width: 640px) {
+  select { font-size: 16px !important; }
+}
+
 /* ==========================================================================
    Component animations
    ========================================================================== */

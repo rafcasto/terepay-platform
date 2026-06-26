@@ -490,6 +490,7 @@ export interface TerePayEmployment {
   employmentStatus: 'permanent' | 'fixed_term' | 'casual' | 'part_time';
   timeAtEmployer: string;
   previousEmployer?: string;
+  previousEmployerPeriod?: string;
   income: {
     salaryBeforeTax: number;
     salaryAfterTax: number;
