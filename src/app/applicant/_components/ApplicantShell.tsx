@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { TopBar } from '@/components/ui';
 import UserDrawer from './UserDrawer';
 import ApplicantSidebar from './ApplicantSidebar';
+import BottomTabBar from './BottomTabBar';
 
 export default function ApplicantShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -40,6 +41,9 @@ export default function ApplicantShell({ children }: { children: ReactNode }) {
         onClose={() => setDrawerOpen(false)}
         user={user}
       />
+
+      {/* Mobile: fixed bottom tab bar */}
+      <BottomTabBar />
     </div>
   );
 }
