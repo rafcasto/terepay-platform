@@ -73,9 +73,6 @@ export default function ScreenPaid({ app, applicationId }: Props) {
         </p>
         <div className="flex flex-wrap gap-3">
           <ButtonLink href="/applicant/apply">Start a new loan</ButtonLink>
-          <ButtonLink href="/applicant/applications" variant="secondary">
-            View loan history
-          </ButtonLink>
         </div>
       </SectionCard>
     </div>

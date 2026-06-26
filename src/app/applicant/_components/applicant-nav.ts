@@ -27,13 +27,6 @@ export const APPLICANT_NAV: ApplicantNavItem[] = [
     match: '/applicant/dashboard',
   },
   {
-    label: 'Applications',
-    description: 'Past and active applications',
-    Icon: Icons.History,
-    href: '/applicant/applications',
-    match: '/applicant/applications',
-  },
-  {
     label: 'Profile',
     description: 'Edit your personal details',
     Icon: Icons.User,
