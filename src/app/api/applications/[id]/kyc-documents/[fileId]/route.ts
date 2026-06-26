@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth/middleware';
 import { adminDb } from '@/lib/firebase/admin';
-import { getDriveClient } from '@/lib/gdrive/client';
+import { getDriveClient, downloadDriveFile } from '@/lib/gdrive/client';
 import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { auditLog, getClientIp } from '@/lib/utils/audit';
 import { checkRateLimit, defaultLimiter } from '@/lib/rate-limit/limiter';
@@ -50,15 +50,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const match = stored.find((d) => d.driveFileId === fileId);
     if (!match) throw new AppError('NOT_FOUND', 404, 'Document not found for this borrower');
 
-    const mimeType = match.mimeType ?? 'application/octet-stream';
     const fileName = (match.fileName ?? 'kyc-document').replace(/[/\\:*?"<>|]/g, '_');
 
     const drive = getDriveClient();
-    const driveRes = await drive.files.get(
-      { fileId, alt: 'media', supportsAllDrives: true },
-      { responseType: 'arraybuffer' },
-    );
-    const data = Buffer.from(driveRes.data as ArrayBuffer);
+    const { buffer: data, mimeType } = await downloadDriveFile(drive, fileId);
 
     await auditLog({
       userId: auth.uid,
@@ -80,7 +75,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     });
   } catch (err) {
     if (err instanceof AppError) return errorResponse(err);
-    console.error('[applications/kyc-documents] view failed');
+    if ((err as { code?: number })?.code === 404) {
+      return errorResponse(new AppError('NOT_FOUND', 404, 'Document is no longer available in storage'));
+    }
+    console.error('[applications/kyc-documents] view failed:', err instanceof Error ? err.message : String(err));
     return internalError();
   }
 }

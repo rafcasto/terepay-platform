@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth/middleware';
 import { adminDb } from '@/lib/firebase/admin';
-import { getDriveClient } from '@/lib/gdrive/client';
+import { getDriveClient, downloadDriveFile } from '@/lib/gdrive/client';
 import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { auditLog, getClientIp } from '@/lib/utils/audit';
 import { checkRateLimit, defaultLimiter } from '@/lib/rate-limit/limiter';
@@ -42,15 +42,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const rep = repSnap.data()!;
     const driveFileId = rep.driveFileId as string | undefined;
     if (!driveFileId) throw new AppError('NOT_FOUND', 404, 'Report file is missing');
-    const mimeType = (rep.mimeType as string) ?? 'application/octet-stream';
     const fileName = (rep.fileName as string) ?? 'report';
 
     const drive = getDriveClient();
-    const driveRes = await drive.files.get(
-      { fileId: driveFileId, alt: 'media', supportsAllDrives: true },
-      { responseType: 'arraybuffer' },
-    );
-    const data = Buffer.from(driveRes.data as ArrayBuffer);
+    const { buffer: data, mimeType } = await downloadDriveFile(drive, driveFileId);
 
     await auditLog({
       userId: auth.uid,
@@ -72,7 +67,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     });
   } catch (err) {
     if (err instanceof AppError) return errorResponse(err);
-    console.error('[applications/reports] view failed');
+    if ((err as { code?: number })?.code === 404) {
+      return errorResponse(new AppError('NOT_FOUND', 404, 'Report is no longer available in storage'));
+    }
+    console.error('[applications/reports] view failed:', err instanceof Error ? err.message : String(err));
     return internalError();
   }
 }
