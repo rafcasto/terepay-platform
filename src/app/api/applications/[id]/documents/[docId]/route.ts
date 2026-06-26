@@ -8,7 +8,7 @@ import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { auditLog, getClientIp } from '@/lib/utils/audit';
 import { FieldValue } from 'firebase-admin/firestore';
 import { ZodError } from 'zod';
-import { getDriveClient, downloadDriveFile } from '@/lib/gdrive/client';
+import { getDriveClient, downloadDriveFile, inlineContentDisposition } from '@/lib/gdrive/client';
 import { checkRateLimit, defaultLimiter } from '@/lib/rate-limit/limiter';
 
 type RouteParams = { params: Promise<{ id: string; docId: string }> };
@@ -115,7 +115,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       status: 200,
       headers: {
         'Content-Type': mimeType,
-        'Content-Disposition': `inline; filename="${fileName}"`,
+        'Content-Disposition': inlineContentDisposition(fileName),
         'Cache-Control': 'private, no-store',
       },
     });

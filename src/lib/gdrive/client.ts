@@ -120,3 +120,16 @@ export async function downloadDriveFile(
   ) as ArrayBuffer;
   return { buffer: arrayBuffer, mimeType };
 }
+
+/**
+ * Build a header-safe `Content-Disposition: inline` value.
+ * HTTP header values must be Latin-1 (bytes ≤ 255). Filenames can contain
+ * characters above that (e.g. U+202F narrow no-break space), which throws when
+ * setting the header — so we provide an ASCII-only `filename` plus an RFC 5987
+ * `filename*` (UTF-8 percent-encoded) for clients that support Unicode names.
+ */
+export function inlineContentDisposition(fileName: string): string {
+  const asciiName =
+    (fileName || 'file').normalize('NFKD').replace(/[^\x20-\x7E]/g, '_').replace(/["\\]/g, '_') || 'file';
+  return `inline; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(fileName || 'file')}`;
+}
