@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
 // Max file size: 10 MB
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png']);
-const PROVIDERS = new Set(['datazoo', 'centrix']);
+const PROVIDERS = new Set(['datazoo', 'centrix', 'affordability']);
 
 type RouteParams = { params: Promise<{ id: string }> };
 
