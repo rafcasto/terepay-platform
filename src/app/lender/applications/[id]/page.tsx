@@ -146,6 +146,34 @@ export default async function LenderApplicationDetailPage({
   const debts = app.existingDebts;
   const isAssigned = app.assignedLenderId === decoded.uid;
 
+  // ---- Lender-uploaded reports (stored on the customer profile) ----------
+  // DataZoo (KYC) and Centrix (credit) reports are uploaded by the lender and
+  // kept on the borrower's profile so they carry across future applications.
+  type ReportItem = { fileName: string; uploadedAt: string; uploadedBy: string };
+  const datazooReports: ReportItem[] = [];
+  const centrixReports: ReportItem[] = [];
+  if (app.applicantId) {
+    try {
+      const repSnap = await db
+        .collection('users')
+        .doc(app.applicantId)
+        .collection('lenderReports')
+        .get();
+      repSnap.forEach((doc) => {
+        const r = doc.data();
+        const item: ReportItem = {
+          fileName: (r.fileName as string) ?? 'Report',
+          uploadedAt: fmtDate(r.uploadedAt as TS),
+          uploadedBy: (r.uploadedByName as string) ?? 'Lender',
+        };
+        if (r.provider === 'datazoo') datazooReports.push(item);
+        else if (r.provider === 'centrix') centrixReports.push(item);
+      });
+    } catch {
+      // Best-effort — panels show an empty "no report on file" state on failure.
+    }
+  }
+
   const name = pi ? `${pi.firstName ?? ''} ${pi.lastName ?? ''}`.trim() : '';
   const monthlyIncome = typeof fin?.monthlyIncome === 'number' ? fin.monthlyIncome : null;
   const monthlyExpenses = typeof fin?.monthlyExpenses === 'number' ? fin.monthlyExpenses : null;
@@ -234,15 +262,11 @@ export default async function LenderApplicationDetailPage({
   // ---- Mocked panels (no backing endpoint/data yet) ---------------------
   // KYC verification and Centrix credit assessment are not yet integrated.
   // These are rendered greyed-out and clearly labelled as sample data.
-  // KYC is performed by the lender and the evidence document is attached to
-  // the borrower's profile — the borrower's journey is unchanged. There is no
-  // lender KYC-capture endpoint yet, so this renders as a not-yet-connected
-  // placeholder.
-  const kyc = {
-    verified: false,
-    documents: [] as { label: string; fileName: string; uploadedAt: string }[],
-  };
+  // KYC: the lender runs the DataZoo identity check and uploads the report,
+  // which is stored on the customer profile and reused across applications.
+  const kyc = { reports: datazooReports };
   const credit = {
+    reports: centrixReports,
     score: 643,
     band: 'Fair',
     min: 380,
@@ -251,7 +275,6 @@ export default async function LenderApplicationDetailPage({
     enquiries: 2,
     utilisation: '38%',
     dti: typeof fin?.debtToIncomeRatio === 'number' ? `${Math.round(fin.debtToIncomeRatio)}%` : '27%',
-    pulled: 'sample',
   };
 
   const data: ReviewData = {

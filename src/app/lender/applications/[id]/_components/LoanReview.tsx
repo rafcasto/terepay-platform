@@ -14,6 +14,8 @@ import ScheduledPaymentsPanel from '../ScheduledPaymentsPanel';
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
+export type ReportItem = { fileName: string; uploadedAt: string; uploadedBy: string };
+
 export type ReviewData = {
   applicationId: string;
   status: string;
@@ -75,11 +77,9 @@ export type ReviewData = {
     consentActivatedAt?: string;
   };
   decisionInput: { requestedAmount: number; assessedAmount?: number };
-  kyc: {
-    verified: boolean;
-    documents: { label: string; fileName: string; uploadedAt: string }[];
-  };
+  kyc: { reports: ReportItem[] };
   credit: {
+    reports: ReportItem[];
     score: number;
     band: string;
     min: number;
@@ -88,7 +88,6 @@ export type ReviewData = {
     enquiries: number;
     utilisation: string;
     dti: string;
-    pulled: string;
   };
 };
 
@@ -748,116 +747,157 @@ function MessagesTab({ data }: { data: ReviewData }) {
 // ---------------------------------------------------------------------------
 // KYC + Credit cards (mocked, greyed)
 // ---------------------------------------------------------------------------
-function KycCard({ data, full = false }: { data: ReviewData; full?: boolean }) {
-  const k = data.kyc;
+function ReportList({ reports }: { reports: ReportItem[] }) {
+  if (reports.length === 0) {
+    return (
+      <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--border-default)] bg-white/70 p-4 text-sm text-[var(--text-muted)]">
+        No report on file yet.
+      </div>
+    );
+  }
   return (
-    <Card
-      title="KYC verification"
-      icon="shield"
-      muted
-      action={
-        <div className="flex items-center gap-2">
-          <ConsolePill tone={k.verified ? 'success' : 'warning'} dot>
-            {k.verified ? 'Verified' : 'Not verified'}
-          </ConsolePill>
-          {full && <MockBadge />}
-        </div>
-      }
-    >
-      <p className="mb-4 text-sm text-[var(--text-muted)]">
-        KYC is performed by the lender and the evidence document is attached to the borrower&apos;s
-        profile, then reused across their applications. The borrower&apos;s journey is unchanged.
-      </p>
-
-      {k.documents.length === 0 ? (
-        <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--border-default)] bg-white/60 p-4 text-sm text-[var(--text-muted)]">
-          No KYC evidence document attached yet.
-        </div>
-      ) : (
-        <ul className="space-y-2" aria-hidden="true">
-          {k.documents.map((doc, i) => (
-            <li
-              key={`${doc.fileName}-${i}`}
-              className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-white/60 p-3 opacity-70"
+    <ul className="space-y-2">
+      {reports.map((r, i) => (
+        <li
+          key={`${r.fileName}-${i}`}
+          className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-white p-3"
+        >
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-[var(--slate-100)] text-[var(--text-muted)]">
+              <ConsoleIcon name="fileText" size={16} />
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-[var(--text-body)]">{r.fileName}</p>
+              <p className="truncate text-xs text-[var(--text-muted)]">
+                Uploaded by {r.uploadedBy} · {r.uploadedAt}
+              </p>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <ConsolePill tone="success">On file</ConsolePill>
+            <button
+              type="button"
+              disabled
+              aria-disabled="true"
+              title="In-app report viewer not yet available"
+              className="inline-flex cursor-not-allowed items-center gap-1 rounded-[8px] border border-[var(--border-default)] bg-white px-2 py-1 text-xs font-semibold text-[var(--text-muted)] opacity-60"
             >
-              <div className="flex min-w-0 items-center gap-2.5">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-[var(--slate-100)] text-[var(--slate-400)]">
-                  <ConsoleIcon name="fileText" size={16} />
-                </span>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-[var(--text-muted)]">{doc.label}</p>
-                  <p className="truncate text-xs text-[var(--text-muted)]">
-                    {doc.fileName} · Attached {doc.uploadedAt}
-                  </p>
-                </div>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+              <ConsoleIcon name="search" size={14} />
+              View
+            </button>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
+function UploadHint({ label }: { label: string }) {
+  return (
+    <>
       <button
         type="button"
         disabled
         aria-disabled="true"
-        title="Lender KYC capture is not yet connected"
+        title="Report upload is not yet connected"
         className="mt-4 inline-flex cursor-not-allowed items-center gap-1.5 rounded-[10px] border border-[var(--border-default)] bg-white px-3 py-1.5 text-sm font-semibold text-[var(--text-muted)] opacity-60"
       >
-        <ConsoleIcon name="shield" size={16} />
-        Verify KYC &amp; attach document
+        <ConsoleIcon name="upload" size={16} />
+        {label}
       </button>
       <p className="mt-2 text-xs text-[var(--text-muted)]">
-        Lender KYC capture is not yet connected. This panel is a placeholder.
+        Stored on the customer&apos;s profile and reused across future loan applications. Upload is not yet connected.
       </p>
+    </>
+  );
+}
+
+function KycCard({ data, full = false }: { data: ReviewData; full?: boolean }) {
+  const reports = data.kyc.reports;
+  const verified = reports.length > 0;
+  return (
+    <Card
+      title="KYC — DataZoo"
+      icon="shield"
+      muted={!verified}
+      action={
+        <div className="flex items-center gap-2">
+          <ConsolePill tone={verified ? 'success' : 'warning'} dot>
+            {verified ? 'Verified' : 'Not verified'}
+          </ConsolePill>
+          {!verified && full && <MockBadge />}
+        </div>
+      }
+    >
+      <p className="mb-4 text-sm text-[var(--text-muted)]">
+        Run the identity check in DataZoo and upload the report here. It is stored on the borrower&apos;s
+        profile and reused across their future loan applications.
+      </p>
+      <ReportList reports={reports} />
+      <UploadHint label="Upload DataZoo report (PDF)" />
     </Card>
   );
 }
 
 function CreditCard({ data, full = false }: { data: ReviewData; full?: boolean }) {
   const c = data.credit;
+  const reports = c.reports;
+  const hasReport = reports.length > 0;
   const pct = Math.max(0, Math.min(1, (c.score - c.min) / (c.max - c.min)));
   return (
     <Card
-      title="Credit assessment"
+      title="Credit — Centrix"
       icon="trending"
-      muted
+      muted={!hasReport}
       action={
         <div className="flex items-center gap-2">
-          <span className="text-xs text-[var(--text-muted)]">Centrix · {c.pulled}</span>
-          {full && <MockBadge />}
+          <ConsolePill tone={hasReport ? 'success' : 'warning'} dot>
+            {hasReport ? 'Report on file' : 'No report'}
+          </ConsolePill>
+          {!hasReport && full && <MockBadge />}
         </div>
       }
     >
-      <div className="opacity-70" aria-hidden="true">
-        <div className="flex items-end gap-3">
-          <span className="font-mono text-4xl font-bold tabular-nums text-[var(--text-muted)]">{c.score}</span>
-          <span className="mb-1 text-sm font-semibold text-[var(--text-muted)]">{c.band}</span>
-        </div>
-        <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-[var(--slate-100)]">
-          <div className="h-full rounded-full bg-[var(--orange-400)]" style={{ width: `${pct * 100}%` }} />
-        </div>
-        <div className="mt-1 flex justify-between text-[11px] text-[var(--slate-400)]">
-          <span>{c.min}</span>
-          <span>{c.max}</span>
-        </div>
-
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {[
-            { label: 'Defaults', value: String(c.defaults) },
-            { label: 'Credit enquiries (6m)', value: String(c.enquiries) },
-            { label: 'Credit utilisation', value: c.utilisation },
-            { label: 'Debt-to-income', value: c.dti },
-          ].map((m) => (
-            <div key={m.label} className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-white/60 p-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">{m.label}</p>
-              <p className="mt-0.5 font-semibold text-[var(--text-muted)]">{m.value}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-      <p className="mt-4 text-xs text-[var(--text-muted)]">
-        Centrix credit bureau is not yet connected. Sample data shown for layout only.
+      <p className="mb-4 text-sm text-[var(--text-muted)]">
+        Pull the credit report in Centrix and upload it here. It is stored on the borrower&apos;s profile
+        and reused across their future loan applications.
       </p>
+      <ReportList reports={reports} />
+      <UploadHint label="Upload Centrix report (PDF)" />
+
+      {full && (
+        <div className="mt-5 border-t border-[var(--border-subtle)] pt-5">
+          <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">
+            Summary — sample, populated from the uploaded report
+          </p>
+          <div className="opacity-70" aria-hidden="true">
+            <div className="flex items-end gap-3">
+              <span className="font-mono text-4xl font-bold tabular-nums text-[var(--text-muted)]">{c.score}</span>
+              <span className="mb-1 text-sm font-semibold text-[var(--text-muted)]">{c.band}</span>
+            </div>
+            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-[var(--slate-100)]">
+              <div className="h-full rounded-full bg-[var(--orange-400)]" style={{ width: `${pct * 100}%` }} />
+            </div>
+            <div className="mt-1 flex justify-between text-[11px] text-[var(--slate-400)]">
+              <span>{c.min}</span>
+              <span>{c.max}</span>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {[
+                { label: 'Defaults', value: String(c.defaults) },
+                { label: 'Credit enquiries (6m)', value: String(c.enquiries) },
+                { label: 'Credit utilisation', value: c.utilisation },
+                { label: 'Debt-to-income', value: c.dti },
+              ].map((m) => (
+                <div key={m.label} className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-white/60 p-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">{m.label}</p>
+                  <p className="mt-0.5 font-semibold text-[var(--text-muted)]">{m.value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </Card>
   );
 }
