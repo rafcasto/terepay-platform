@@ -549,7 +549,7 @@ export interface TerePayBankDetails {
   bankName: string;
   accountHolderName: string;
   accountNumber: string; // store encrypted in production
-  paymentMethod: 'direct_debit' | 'bank_transfer';
+  paymentMethod?: 'direct_debit' | 'bank_transfer';
 }
 
 export interface TerePayReferences {

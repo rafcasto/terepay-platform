@@ -19,9 +19,9 @@ export default function Step6BankDetails() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-ink-strong">Bank Account &amp; Repayment</h2>
+        <h2 className="text-xl font-bold text-ink-strong">Bank Account</h2>
         <p className="text-sm text-[var(--text-muted)] mt-1">
-          Provide the account you would like loan funds deposited into and repayments deducted from.
+          Provide the account where you&apos;d like your loan funds deposited.
         </p>
       </div>
 
@@ -31,8 +31,8 @@ export default function Step6BankDetails() {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
         </svg>
         <p className="text-xs text-[var(--info-700)]">
-          Your bank details are stored securely and used solely for loan disbursement and repayment
-          collection. We never share this information with third parties.
+          Your bank details are stored securely and used solely to deposit your loan funds. We never share
+          this information with third parties.
         </p>
       </div>
 
@@ -66,6 +66,7 @@ export default function Step6BankDetails() {
         </label>
         <input
           {...register('bankDetails.accountNumber')}
+          inputMode="numeric"
           className={inputCls}
           placeholder="XX-XXXX-XXXXXXX-XX"
         />
@@ -73,42 +74,6 @@ export default function Step6BankDetails() {
           NZ format: 02-0100-0000000-00
         </p>
         {e?.accountNumber && <p className={errorCls}>{e.accountNumber.message}</p>}
-      </div>
-
-      {/* Payment method */}
-      <div>
-        <label className={labelCls}>
-          Preferred Repayment Method <span className="text-danger-text">*</span>
-        </label>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
-          {[
-            {
-              value: 'direct_debit',
-              title: 'Direct Debit',
-              description: 'Automatically deducted on payment due dates. Recommended.',
-            },
-            {
-              value: 'bank_transfer',
-              title: 'Bank Transfer',
-              description: 'Manual transfer to TerePay on each due date.',
-            },
-          ].map((opt) => (
-            <label key={opt.value} className="relative cursor-pointer">
-              <input
-                type="radio"
-                value={opt.value}
-                {...register('bankDetails.paymentMethod')}
-                className="peer sr-only"
-              />
-              <div className="p-4 border-2 border-border-default rounded-xl peer-checked:border-brand peer-checked:bg-brand-soft transition-colors">
-                <p className="font-semibold text-sm text-ink-strong">{opt.title}</p>
-                <p className="text-xs text-[var(--text-muted)] mt-1">{opt.description}</p>
-              </div>
-              <div className="absolute top-3 right-3 w-4 h-4 rounded-full border-2 border-border-default peer-checked:border-brand peer-checked:bg-[var(--orange-700)] transition-colors" />
-            </label>
-          ))}
-        </div>
-        {e?.paymentMethod && <p className={errorCls}>{e.paymentMethod.message}</p>}
       </div>
     </div>
   );

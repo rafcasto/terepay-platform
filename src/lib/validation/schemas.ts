@@ -326,7 +326,7 @@ export const terepayApplicationSchema = z.object({
     bankName: z.string().min(1, 'Bank name is required'),
     accountHolderName: z.string().min(1, 'Account holder name is required'),
     accountNumber: z.string().min(1, 'Account number is required'),
-    paymentMethod: z.enum(['direct_debit', 'bank_transfer'], { message: 'Select a payment method' }),
+    paymentMethod: z.enum(['direct_debit', 'bank_transfer']).optional(),
   }),
 
   // ── Section 7: References (optional) ───────────────────────────────────
