@@ -175,6 +175,25 @@ export function deriveLoanSummary(app: LoanSummarySource): ActiveLoanSummary {
   };
 }
 
+/**
+ * Strip Firestore `Timestamp` fields (`scheduledAt`, `completedAt`, `failedAt`,
+ * `lastAttemptAt`) so the instalment array can be safely passed from a Server
+ * Component to a Client Component — Timestamps are class instances and Next.js
+ * refuses to serialise them across that boundary.
+ */
+export function toPlainScheduledPayments(payments: ScheduledPayment[]): ScheduledPayment[] {
+  return payments.map((p) => ({
+    installmentNumber: p.installmentNumber,
+    dueDate: p.dueDate,
+    amountCents: p.amountCents,
+    status: p.status,
+    retryCount: p.retryCount,
+    ...(p.qippayPaymentId ? { qippayPaymentId: p.qippayPaymentId } : {}),
+    ...(p.failureReason ? { failureReason: p.failureReason } : {}),
+    ...(p.scheduleAttempts !== undefined ? { scheduleAttempts: p.scheduleAttempts } : {}),
+  }));
+}
+
 /** True when the application represents a disbursed loan still being repaid. */
 export function isLiveLoanStatus(status: AnyApplicationStatus | string | undefined): boolean {
   return status !== undefined && LIVE_LOAN_STATUSES.has(status);
