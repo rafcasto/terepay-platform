@@ -30,7 +30,7 @@ export default function ScreenApproved({ app, status, applicationId, isExistingC
   const pc = app.paymentConsent as PaymentConsent | undefined;
   const consentActive = pc?.status === 'active';
 
-  let title = 'Your loan is approved 🎉';
+  let title = 'Your loan is approved';
   let subtitle = 'Review the offer below, then accept to continue.';
   let pill: React.ReactNode = (
     <Pill tone="success" pulse onInk>
