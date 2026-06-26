@@ -123,6 +123,7 @@ function ApplyPageInner() {
     router.replace(`/applicant/apply?step=${currentStep}`, { scroll: false });
   }, [currentStep, router]);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [justSaved, setJustSaved] = useState(false);
 
   const methods = useForm<TerepayApplicationInput>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -218,9 +219,21 @@ function ApplyPageInner() {
     const valid = await trigger(fields as any);
     if (valid) {
       // Best-effort background save — does not block navigation
-      saveDraftStep(currentStep).catch(() => {});
+      saveDraftStep(currentStep)
+        .then(() => {
+          setJustSaved(true);
+          window.setTimeout(() => setJustSaved(false), 2500);
+        })
+        .catch(() => {});
       setCurrentStep((s) => s + 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      // Bring the first validation error into view (errors render as <p> in the card)
+      requestAnimationFrame(() => {
+        document
+          .querySelector('p.text-danger-text')
+          ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
     }
   };
 
@@ -365,24 +378,43 @@ function ApplyPageInner() {
             <StepComponent />
           </Card>
 
-          <div className="mt-6 flex flex-col gap-3">
-            {isLastStep ? (
-              <Button type="button" onClick={handleSubmit(onSubmit)} disabled={isSubmitting} size="lg" fullWidth>
-                {isSubmitting ? 'Submitting…' : 'Submit application'}
-              </Button>
-            ) : (
-              <Button type="button" onClick={handleNext} size="lg" fullWidth>
-                Continue
-              </Button>
-            )}
-            <button
-              type="button"
-              onClick={handleBack}
-              className="w-full py-3 text-sm font-semibold text-[var(--text-muted)] hover:text-ink-strong transition-colors flex items-center justify-center gap-1.5"
-            >
-              <Icons.ArrowLeft size={16} />
-              {currentStep === 0 ? 'Back to dashboard' : 'Back'}
-            </button>
+          {/* Action bar — sticks to the bottom of the viewport on mobile so the
+              primary action is always reachable on long steps. */}
+          <div className="mt-6 sticky bottom-0 z-10 -mx-4 px-4 py-3 border-t border-border-default bg-[var(--surface-page)]/95 backdrop-blur sm:static sm:mx-0 sm:px-0 sm:py-0 sm:border-0 sm:bg-transparent sm:backdrop-blur-none">
+            <div className="flex flex-col gap-2">
+              {isLastStep ? (
+                <Button type="button" onClick={handleSubmit(onSubmit)} disabled={isSubmitting} size="lg" fullWidth>
+                  {isSubmitting ? 'Submitting…' : 'Submit application'}
+                </Button>
+              ) : (
+                <Button type="button" onClick={handleNext} size="lg" fullWidth>
+                  Continue
+                </Button>
+              )}
+
+              <div className="flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={handleBack}
+                  className="py-2 text-sm font-semibold text-[var(--text-muted)] hover:text-ink-strong transition-colors flex items-center gap-1.5"
+                >
+                  <Icons.ArrowLeft size={16} />
+                  {currentStep === 0 ? 'Back to dashboard' : 'Back'}
+                </button>
+
+                <span
+                  aria-live="polite"
+                  className={`flex items-center gap-1.5 text-xs font-medium text-[var(--text-muted)] transition-opacity duration-200 ${justSaved ? 'opacity-100' : 'opacity-0'}`}
+                >
+                  <Icons.Check size={14} className="text-[var(--success-700)]" />
+                  Draft saved
+                </span>
+              </div>
+
+              <p className="text-center sm:text-left text-[11.5px] text-[var(--text-muted)]">
+                Your progress is saved automatically — you can leave and come back anytime.
+              </p>
+            </div>
           </div>
         </div>
       </FormProvider>

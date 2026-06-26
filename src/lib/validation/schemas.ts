@@ -298,8 +298,8 @@ export const terepayApplicationSchema = z.object({
   loanRequest: z.object({
     requestedAmount: z
       .number({ message: 'Enter an amount' })
-      .min(100, 'Minimum loan amount is $100')
-      .max(50000, 'Maximum loan amount is $50,000'),
+      .min(200, 'Minimum loan amount is $200')
+      .max(2000, 'Maximum loan amount is $2,000'),
     purpose: z.enum(LOAN_PURPOSE_VALUES, { message: 'Please select a purpose' }),
     purposeDescription: z.string().min(10, 'Please provide at least 10 characters').max(1000),
     primaryIncomeSource: z.string().min(1, 'Required'),
