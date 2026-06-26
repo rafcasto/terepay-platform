@@ -2,9 +2,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { Icons } from '@/components/ui';
 import { APPLICANT_TABS } from './applicant-nav';
 
-export default function BottomTabBar() {
+const TAB_BASE =
+  'flex-1 min-h-[52px] flex flex-col items-center justify-center gap-1 rounded-xl px-1 py-1.5 transition-colors';
+
+export default function BottomTabBar({ onMore }: { onMore: () => void }) {
   const pathname = usePathname() ?? '';
 
   return (
@@ -30,16 +34,13 @@ export default function BottomTabBar() {
           </>
         );
 
-        const base =
-          'flex-1 min-h-[52px] flex flex-col items-center justify-center gap-1 rounded-xl px-1 py-1.5 transition-colors';
-
         if (tab.href) {
           return (
             <Link
               key={tab.label}
               href={tab.href}
               aria-current={isActive ? 'page' : undefined}
-              className={`${base} ${isActive ? 'text-brand-text' : 'text-muted hover:text-text'}`}
+              className={`${TAB_BASE} ${isActive ? 'text-brand-text' : 'text-muted hover:text-text'}`}
             >
               {inner}
             </Link>
@@ -47,15 +48,22 @@ export default function BottomTabBar() {
         }
 
         return (
-          <div
-            key={tab.label}
-            aria-disabled="true"
-            className={`${base} text-muted/55 cursor-default`}
-          >
+          <div key={tab.label} aria-disabled="true" className={`${TAB_BASE} text-muted/55 cursor-default`}>
             {inner}
           </div>
         );
       })}
+
+      {/* More — opens the full menu drawer */}
+      <button
+        type="button"
+        onClick={onMore}
+        aria-label="More menu"
+        className={`${TAB_BASE} text-muted hover:text-text`}
+      >
+        <Icons.Menu size={23} />
+        <span className="text-[11px] font-semibold tracking-[0.01em]">More</span>
+      </button>
     </nav>
   );
 }

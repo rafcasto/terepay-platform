@@ -8,6 +8,7 @@ import { TopBar } from '@/components/ui';
 import UserDrawer from './UserDrawer';
 import ApplicantSidebar from './ApplicantSidebar';
 import BottomTabBar from './BottomTabBar';
+import NotificationBell from './NotificationBell';
 
 export default function ApplicantShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -28,9 +29,9 @@ export default function ApplicantShell({ children }: { children: ReactNode }) {
       <ApplicantSidebar user={user} />
 
       <div className="flex-1 min-w-0 flex flex-col">
-        {/* Mobile: top bar + hamburger drawer */}
+        {/* Mobile: top bar with notifications (menu lives in the bottom "More" tab) */}
         <div className="lg:hidden">
-          <TopBar onMenuClick={() => setDrawerOpen(true)} />
+          <TopBar right={<NotificationBell />} />
         </div>
 
         <main className="flex-1 screen-in">{children}</main>
@@ -42,8 +43,8 @@ export default function ApplicantShell({ children }: { children: ReactNode }) {
         user={user}
       />
 
-      {/* Mobile: fixed bottom tab bar */}
-      <BottomTabBar />
+      {/* Mobile: fixed bottom tab bar (last item opens the full menu) */}
+      <BottomTabBar onMore={() => setDrawerOpen(true)} />
     </div>
   );
 }
