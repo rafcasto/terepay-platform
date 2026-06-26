@@ -86,3 +86,37 @@ export async function uploadBufferToDrive(
 
   return { fileId: uploaded.data.id!, fileName: uploaded.data.name! };
 }
+
+/**
+ * Download a Drive file's bytes as a Buffer using the streaming response
+ * (robust across runtimes — avoids responseType:'arraybuffer' ambiguity).
+ * Returns the buffer and the file's mime type.
+ */
+export async function downloadDriveFile(
+  drive: ReturnType<typeof google.drive>,
+  fileId: string,
+): Promise<{ buffer: ArrayBuffer; mimeType: string }> {
+  const meta = await drive.files.get({
+    fileId,
+    fields: 'mimeType',
+    supportsAllDrives: true,
+  });
+  const mimeType = meta.data.mimeType ?? 'application/octet-stream';
+
+  const res = await drive.files.get(
+    { fileId, alt: 'media', supportsAllDrives: true },
+    { responseType: 'stream' },
+  );
+
+  const stream = res.data as unknown as AsyncIterable<Buffer>;
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) {
+    chunks.push(chunk);
+  }
+  const merged = Buffer.concat(chunks);
+  const arrayBuffer = merged.buffer.slice(
+    merged.byteOffset,
+    merged.byteOffset + merged.byteLength,
+  ) as ArrayBuffer;
+  return { buffer: arrayBuffer, mimeType };
+}

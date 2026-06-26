@@ -8,7 +8,7 @@ import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { auditLog, getClientIp } from '@/lib/utils/audit';
 import { FieldValue } from 'firebase-admin/firestore';
 import { ZodError } from 'zod';
-import { getDriveClient } from '@/lib/gdrive/client';
+import { getDriveClient, downloadDriveFile } from '@/lib/gdrive/client';
 import { checkRateLimit, defaultLimiter } from '@/lib/rate-limit/limiter';
 
 type RouteParams = { params: Promise<{ id: string; docId: string }> };
@@ -99,13 +99,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const fileName = ((match.fileName as string) ?? 'document').replace(/[/\\:*?"<>|]/g, '_');
 
     const drive = getDriveClient();
-    const meta = await drive.files.get({ fileId: docId, fields: 'mimeType', supportsAllDrives: true });
-    const mimeType = (meta.data.mimeType as string) ?? 'application/octet-stream';
-    const driveRes = await drive.files.get(
-      { fileId: docId, alt: 'media', supportsAllDrives: true },
-      { responseType: 'arraybuffer' },
-    );
-    const data = Buffer.from(driveRes.data as ArrayBuffer);
+    const { buffer: data, mimeType } = await downloadDriveFile(drive, docId);
 
     await auditLog({
       userId: auth.uid,
@@ -127,7 +121,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     });
   } catch (err) {
     if (err instanceof AppError) return errorResponse(err);
-    console.error('[applications/documents] view failed');
+    if ((err as { code?: number })?.code === 404) {
+      return errorResponse(new AppError('NOT_FOUND', 404, 'Document is no longer available in storage'));
+    }
+    console.error('[applications/documents] view failed:', err instanceof Error ? err.message : String(err));
     return internalError();
   }
 }
