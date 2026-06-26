@@ -26,73 +26,55 @@ export default function Step4ExpenseVerification({
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-gray-900">Expense Verification &amp; Adjustments</h2>
-        <p className="text-sm text-gray-500 mt-1">All amounts in NZD per fortnight.</p>
+        <h2 className="font-display text-xl font-bold text-[var(--text-strong)]">Expense Verification &amp; Adjustments</h2>
+        <p className="mt-1 text-sm text-[var(--text-muted)]">All amounts in NZD per fortnight.</p>
       </div>
 
       {/* Info banner */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-        <p className="text-sm font-semibold text-blue-800 mb-2">Important:</p>
-        <ul className="list-disc list-inside space-y-1 text-sm text-blue-700">
+      <div className="rounded-[var(--radius-lg)] border border-[var(--info-700)]/20 bg-[var(--info-50)] p-4">
+        <p className="mb-2 text-sm font-semibold text-[var(--info-700)]">Important:</p>
+        <ul className="list-inside list-disc space-y-1 text-sm text-[var(--info-700)]">
           <li>Use benchmarks when borrower&apos;s stated expenses seem unrealistically low</li>
           <li>Final amount = MAX(Centrix Amount, Benchmark) + Adjustment</li>
           <li>Document all adjustments in the Notes column</li>
         </ul>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+      <div className="overflow-x-auto rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-white shadow-[var(--shadow-xs)]">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-gray-200 bg-gray-50">
-              <th className="py-3 px-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide min-w-[200px]">
-                Expense Category
-              </th>
-              <th className="py-3 px-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide min-w-[110px]">
-                Centrix Amount
-              </th>
-              <th className="py-3 px-3 text-right text-xs font-semibold text-amber-600 uppercase tracking-wide min-w-[100px]">
+            <tr className="border-b border-[var(--border-default)] bg-[var(--slate-50)]">
+              <th className={`${thCls} min-w-[200px] text-left`}>Expense Category</th>
+              <th className={`${thCls} min-w-[110px] text-right`}>Centrix Amount</th>
+              <th className="min-w-[100px] px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-[var(--warning-700)]">
                 Benchmark
               </th>
-              <th className="py-3 px-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide min-w-[100px]">
-                Adjustment
-              </th>
-              <th className="py-3 px-3 text-right text-xs font-semibold text-[#0D1B2A] uppercase tracking-wide bg-blue-50 min-w-[110px]">
+              <th className={`${thCls} min-w-[100px] text-right`}>Adjustment</th>
+              <th className="min-w-[110px] bg-[var(--orange-50)] px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-[var(--orange-700)]">
                 Final Amount
               </th>
-              <th className="py-3 px-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide min-w-[130px]">
-                Notes/Reason
-              </th>
+              <th className={`${thCls} min-w-[130px] text-left`}>Notes/Reason</th>
             </tr>
           </thead>
           <tbody>
             <SectionHeader label="Non-Discretionary Expenses" />
             {ndRows.map((row) => (
-              <ExpenseRowTr
-                key={row.category}
-                row={row}
-                index={expenseRows.indexOf(row)}
-                onUpdate={onUpdate}
-              />
+              <ExpenseRowTr key={row.category} row={row} index={expenseRows.indexOf(row)} onUpdate={onUpdate} />
             ))}
             <SectionHeader label="Discretionary Expenses" />
             {discRows.map((row) => (
-              <ExpenseRowTr
-                key={row.category}
-                row={row}
-                index={expenseRows.indexOf(row)}
-                onUpdate={onUpdate}
-              />
+              <ExpenseRowTr key={row.category} row={row} index={expenseRows.indexOf(row)} onUpdate={onUpdate} />
             ))}
           </tbody>
           <tfoot>
-            <tr className="bg-[#0D1B2A]">
-              <td colSpan={4} className="py-3 px-4 text-right font-bold text-white text-sm uppercase tracking-wide">
+            <tr className="bg-[var(--ink-900)]">
+              <td colSpan={4} className="px-4 py-3 text-right text-sm font-bold uppercase tracking-wide text-white">
                 Total Fortnightly Expenses
               </td>
-              <td className="py-3 px-3 text-right font-bold text-[#F5A523] text-base bg-[#0D1B2A]">
+              <td className="bg-[var(--ink-900)] px-3 py-3 text-right font-mono text-base font-bold tabular-nums text-[var(--orange-400)]">
                 {fmt(totalExpenses)}
               </td>
-              <td className="bg-[#0D1B2A]" />
+              <td className="bg-[var(--ink-900)]" />
             </tr>
           </tfoot>
         </table>
@@ -112,8 +94,8 @@ export default function Step4ExpenseVerification({
 
 function SectionHeader({ label }: { label: string }) {
   return (
-    <tr className="bg-gray-50/80 border-t border-gray-200">
-      <td colSpan={6} className="py-2 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">
+    <tr className="border-t border-[var(--border-default)] bg-[var(--slate-50)]">
+      <td colSpan={6} className="px-4 py-2 text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
         {label}
       </td>
     </tr>
@@ -136,14 +118,14 @@ function ExpenseRowTr({
   return (
     <tr
       className={[
-        'border-b border-gray-50 hover:bg-gray-50/50 transition-colors',
-        benchmarkActive ? 'bg-amber-50/40' : '',
+        'border-b border-[var(--border-subtle)] transition-colors hover:bg-[var(--slate-50)]',
+        benchmarkActive ? 'bg-[var(--warning-50)]/50' : '',
       ].join(' ')}
     >
-      <td className="py-2.5 px-4 font-medium text-gray-700 text-sm">{displayName}</td>
+      <td className="px-4 py-2.5 text-sm font-medium text-[var(--text-body)]">{displayName}</td>
 
       {/* Centrix */}
-      <td className="py-2.5 px-3">
+      <td className="px-3 py-2.5">
         <div className="flex justify-end">
           <input
             type="number"
@@ -152,34 +134,28 @@ function ExpenseRowTr({
             value={row.centrixAmount || ''}
             onChange={(e) => onUpdate(index, 'centrixAmount', parseFloat(e.target.value) || 0)}
             placeholder="0.00"
-            className="w-24 text-xs text-right border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#0D1B2A]/30 bg-white"
+            className={numCls}
           />
         </div>
       </td>
 
       {/* Benchmark */}
-      <td className="py-2.5 px-3">
+      <td className="px-3 py-2.5">
         {hasBenchmark ? (
           <div className="flex items-center justify-end gap-1">
             <span
               className={[
-                'text-sm font-semibold px-2 py-1 rounded',
+                'rounded px-2 py-1 text-sm font-semibold',
                 benchmarkActive
-                  ? 'bg-amber-100 text-amber-800'
-                  : 'bg-gray-100 text-gray-600',
+                  ? 'bg-[var(--warning-50)] text-[var(--warning-700)]'
+                  : 'bg-[var(--slate-100)] text-[var(--text-muted)]',
               ].join(' ')}
             >
               {row.benchmarkAmount.toFixed(0)}
             </span>
             {benchmarkActive && (
-              <span title="Benchmark exceeds Centrix — benchmark is being used">
-                <svg
-                  className="h-4 w-4 text-amber-500"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth={2}
-                  stroke="currentColor"
-                >
+              <span title="Benchmark exceeds Centrix — benchmark is being used" className="text-[var(--warning-700)]">
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor">
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -190,12 +166,12 @@ function ExpenseRowTr({
             )}
           </div>
         ) : (
-          <span className="block text-xs text-gray-400 text-right pr-2">N/A</span>
+          <span className="block pr-2 text-right text-xs text-[var(--slate-400)]">N/A</span>
         )}
       </td>
 
       {/* Adjustment */}
-      <td className="py-2.5 px-3">
+      <td className="px-3 py-2.5">
         <div className="flex justify-end">
           <input
             type="number"
@@ -203,31 +179,36 @@ function ExpenseRowTr({
             value={row.adjustment || ''}
             onChange={(e) => onUpdate(index, 'adjustment', parseFloat(e.target.value) || 0)}
             placeholder="0.00"
-            className="w-24 text-xs text-right border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#0D1B2A]/30 bg-white"
+            className={numCls}
           />
         </div>
       </td>
 
       {/* Final */}
-      <td className="py-2.5 px-3 text-right font-bold text-[#0D1B2A] bg-blue-50">
+      <td className="bg-[var(--orange-50)] px-3 py-2.5 text-right font-mono font-bold tabular-nums text-[var(--text-strong)]">
         {fmt(row.finalAmount)}
       </td>
 
       {/* Notes */}
-      <td className="py-2.5 px-3">
+      <td className="px-3 py-2.5">
         <input
           type="text"
           value={row.adjustmentReason}
           onChange={(e) => onUpdate(index, 'adjustmentReason', e.target.value)}
           placeholder="Notes/Reason"
-          className="w-full text-xs border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#0D1B2A]/30 bg-white"
+          className={noteCls}
         />
       </td>
     </tr>
   );
 }
 
+const thCls = 'px-3 py-3 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]';
+const numCls =
+  'w-24 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-white px-2 py-1.5 text-right text-xs text-[var(--text-body)] focus:border-[var(--orange-400)] focus:outline-none focus:ring-1 focus:ring-[var(--orange-400)]';
+const noteCls =
+  'w-full rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-white px-2 py-1.5 text-xs text-[var(--text-body)] focus:border-[var(--orange-400)] focus:outline-none focus:ring-1 focus:ring-[var(--orange-400)]';
 const nextBtnCls =
-  'px-6 py-2.5 bg-[#0D1B2A] text-white rounded-lg text-sm font-semibold hover:bg-[#1a2f4a] transition-colors';
+  'rounded-[10px] bg-[var(--ink-800)] px-6 py-2.5 text-sm font-semibold text-white transition-[filter] hover:brightness-110';
 const backBtnCls =
-  'px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-50 transition-colors';
+  'rounded-[10px] border border-[var(--border-default)] px-6 py-2.5 text-sm font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--surface-sunken)]';
