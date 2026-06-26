@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth/middleware';
 import { adminDb } from '@/lib/firebase/admin';
-import { getDriveClient, downloadDriveFile } from '@/lib/gdrive/client';
+import { getDriveClient, downloadDriveFile, inlineContentDisposition } from '@/lib/gdrive/client';
 import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { auditLog, getClientIp } from '@/lib/utils/audit';
 import { checkRateLimit, defaultLimiter } from '@/lib/rate-limit/limiter';
@@ -69,7 +69,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       status: 200,
       headers: {
         'Content-Type': mimeType,
-        'Content-Disposition': `inline; filename="${fileName}"`,
+        'Content-Disposition': inlineContentDisposition(fileName),
         'Cache-Control': 'private, no-store',
       },
     });
