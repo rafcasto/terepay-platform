@@ -77,6 +77,12 @@ export default function DisburseForm({
     }
   };
 
+  const errorBox = error && (
+    <div className="rounded-[var(--radius-md)] border border-[var(--danger-700)]/25 bg-[var(--danger-50)] px-3 py-2 text-sm text-[var(--danger-700)]">
+      {error}
+    </div>
+  );
+
   if (!open) {
     if (consentGated) {
       const failedConsent =
@@ -85,30 +91,26 @@ export default function DisburseForm({
         consentStatus === 'cancelled';
       return (
         <div className="space-y-3">
-          <div className="bg-amber-50 border border-amber-300 rounded-lg p-4 text-sm text-amber-800">
-            <p className="font-semibold mb-1">Bank authorisation required</p>
+          <div className="rounded-[var(--radius-md)] border border-[var(--warning-700)]/30 bg-[var(--warning-50)] p-4 text-sm text-[var(--warning-700)]">
+            <p className="mb-1 font-semibold">Bank authorisation required</p>
             <p>
               The applicant has not completed their Qippay SetPay mandate.
               Disbursement is locked until the mandate is active.
             </p>
-            <p className="mt-2 text-xs text-amber-700">
+            <p className="mt-2 text-xs">
               Mandate status: <span className="font-mono">{consentStatus ?? 'not_started'}</span>
             </p>
           </div>
           <button
             onClick={refreshConsent}
             disabled={refreshing}
-            className="w-full px-4 py-2 bg-white border border-amber-400 text-amber-800 rounded-lg font-medium text-sm hover:bg-amber-50 disabled:opacity-50"
+            className="w-full rounded-[10px] border border-[var(--warning-700)]/40 bg-white px-4 py-2 text-sm font-semibold text-[var(--warning-700)] transition-colors hover:bg-[var(--warning-50)] disabled:opacity-50"
           >
             {refreshing ? 'Refreshing…' : 'Refresh status'}
           </button>
-          {error && (
-            <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-              {error}
-            </div>
-          )}
+          {errorBox}
           {failedConsent && (
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-[var(--text-muted)]">
               The applicant can retry from their application page.
             </p>
           )}
@@ -118,18 +120,18 @@ export default function DisburseForm({
     return (
       <div className="space-y-3">
         {consentStatus === 'active' && (
-          <div className="flex items-center justify-between gap-3 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 text-xs">
-            <span className="font-medium text-emerald-800">
-              ✓ Bank authorisation complete
+          <div className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--success-700)]/25 bg-[var(--success-50)] px-3 py-2 text-xs">
+            <span className="font-semibold text-[var(--success-700)]">
+              Bank authorisation complete
             </span>
             {consentActivatedAt && consentActivatedAt !== '—' && (
-              <span className="text-emerald-700">{consentActivatedAt}</span>
+              <span className="text-[var(--success-700)]">{consentActivatedAt}</span>
             )}
           </div>
         )}
         <button
           onClick={() => setOpen(true)}
-          className="w-full px-4 py-2 bg-emerald-600 text-white rounded-lg font-medium text-sm hover:bg-emerald-700"
+          className="w-full rounded-[10px] bg-[var(--success-700)] px-4 py-2.5 text-sm font-semibold text-white transition-[filter] hover:brightness-110"
         >
           Mark as Disbursed
         </button>
@@ -138,25 +140,25 @@ export default function DisburseForm({
   }
 
   return (
-    <div className="space-y-3 bg-emerald-50 border border-emerald-200 rounded-lg p-4">
-      <h3 className="text-sm font-semibold text-emerald-900">Confirm Disbursement</h3>
+    <div className="space-y-3 rounded-[var(--radius-md)] border border-[var(--success-700)]/25 bg-[var(--success-50)] p-4">
+      <h3 className="font-display text-sm font-bold text-[var(--success-700)]">Confirm Disbursement</h3>
       <dl className="grid grid-cols-2 gap-2 text-sm">
-        <dt className="text-gray-600">Approved</dt>
-        <dd className="text-right font-medium text-gray-900">{fmt(approvedAmount)}</dd>
-        <dt className="text-gray-600">Application fee</dt>
-        <dd className="text-right font-medium text-gray-900">- {fmt(applicationFee)}</dd>
-        <dt className="text-gray-600 border-t border-emerald-200 pt-1.5 mt-1">Default disbursement</dt>
-        <dd className="text-right font-medium text-gray-900 border-t border-emerald-200 pt-1.5 mt-1">
+        <dt className="text-[var(--text-muted)]">Approved</dt>
+        <dd className="text-right font-mono font-semibold tabular-nums text-[var(--text-strong)]">{fmt(approvedAmount)}</dd>
+        <dt className="text-[var(--text-muted)]">Application fee</dt>
+        <dd className="text-right font-mono font-semibold tabular-nums text-[var(--text-strong)]">- {fmt(applicationFee)}</dd>
+        <dt className="mt-1 border-t border-[var(--success-700)]/20 pt-1.5 text-[var(--text-muted)]">Default disbursement</dt>
+        <dd className="mt-1 border-t border-[var(--success-700)]/20 pt-1.5 text-right font-mono font-semibold tabular-nums text-[var(--text-strong)]">
           {fmt(defaultAmount)}
         </dd>
       </dl>
 
       <div>
-        <label className="block text-xs font-medium text-gray-600 mb-1 uppercase tracking-wide">
+        <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">
           Disbursement Amount
         </label>
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-600">$</span>
+          <span className="text-sm text-[var(--text-muted)]">$</span>
           <input
             type="number"
             min={0}
@@ -164,42 +166,38 @@ export default function DisburseForm({
             step={0.01}
             value={Number.isFinite(amount) ? amount : ''}
             onChange={(e) => setAmount(Number(e.target.value))}
-            className="w-40 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            className="w-40 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-white px-3 py-2 text-sm text-[var(--text-body)] focus:border-[var(--orange-400)] focus:outline-none focus:ring-2 focus:ring-[var(--orange-400)]"
           />
           {isOverride && !overCap && !tooLow && (
-            <span className="text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-1">
+            <span className="rounded-full border border-[var(--warning-700)]/25 bg-[var(--warning-50)] px-2.5 py-1 text-xs font-semibold text-[var(--warning-700)]">
               Override
             </span>
           )}
         </div>
         {overCap && (
-          <p className="mt-1 text-xs text-red-600">
+          <p className="mt-1 text-xs text-[var(--danger-700)]">
             Cannot exceed the approved amount of {fmt(approvedAmount)}.
           </p>
         )}
         {tooLow && (
-          <p className="mt-1 text-xs text-red-600">Disbursement amount must be greater than $0.</p>
+          <p className="mt-1 text-xs text-[var(--danger-700)]">Disbursement amount must be greater than $0.</p>
         )}
       </div>
 
-      {error && (
-        <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-          {error}
-        </div>
-      )}
+      {errorBox}
 
       <div className="flex items-center gap-3">
         <button
           onClick={submit}
           disabled={loading || overCap || tooLow}
-          className="px-4 py-2 bg-emerald-600 text-white rounded-lg font-medium text-sm hover:bg-emerald-700 disabled:opacity-50"
+          className="rounded-[10px] bg-[var(--success-700)] px-4 py-2 text-sm font-semibold text-white transition-[filter] hover:brightness-110 disabled:opacity-50"
         >
           {loading ? 'Disbursing…' : `Confirm Disbursement of ${fmt(amount)}`}
         </button>
         <button
           onClick={() => setOpen(false)}
           disabled={loading}
-          className="px-4 py-2 text-sm text-gray-600 hover:underline disabled:opacity-50"
+          className="px-4 py-2 text-sm text-[var(--text-muted)] hover:underline disabled:opacity-50"
         >
           Cancel
         </button>

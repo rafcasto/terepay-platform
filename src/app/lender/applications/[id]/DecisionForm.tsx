@@ -23,6 +23,12 @@ const MIN_APPROVED_AMOUNT = 200;
 const fmtNzd = (n: number) =>
   new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD', maximumFractionDigits: 0 }).format(n);
 
+const inputClass =
+  'w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-white px-3 py-2 text-sm text-[var(--text-body)] focus:border-[var(--orange-400)] focus:outline-none focus:ring-2 focus:ring-[var(--orange-400)]';
+
+const labelClass =
+  'mb-1 block text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]';
+
 export default function DecisionForm({
   applicationId,
   affordabilityStatus,
@@ -89,42 +95,44 @@ export default function DecisionForm({
   return (
     <div className="space-y-4">
       {!affordabilityComplete && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">
-          ⚠ Affordability assessment must be completed before making a decision.
+        <div className="rounded-[var(--radius-md)] border border-[var(--warning-700)]/20 bg-[var(--warning-50)] px-4 py-3 text-sm text-[var(--warning-700)]">
+          Affordability assessment must be completed before making a decision.
         </div>
       )}
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">{error}</div>
+        <div className="rounded-[var(--radius-md)] border border-[var(--danger-700)]/25 bg-[var(--danger-50)] px-4 py-3 text-sm text-[var(--danger-700)]">
+          {error}
+        </div>
       )}
 
       <div className="flex gap-3">
         <button
           onClick={() => setAction('approve')}
-          className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium border transition-colors ${
+          className={`flex-1 rounded-[10px] border px-4 py-2 text-sm font-semibold transition-colors ${
             action === 'approve'
-              ? 'bg-green-600 text-white border-green-600'
-              : 'border-green-600 text-green-700 hover:bg-green-50'
+              ? 'border-[var(--success-700)] bg-[var(--success-700)] text-white'
+              : 'border-[var(--success-700)]/40 text-[var(--success-700)] hover:bg-[var(--success-50)]'
           }`}
         >
-          ✓ Approve
+          Approve
         </button>
         <button
           onClick={() => setAction('decline')}
-          className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium border transition-colors ${
+          className={`flex-1 rounded-[10px] border px-4 py-2 text-sm font-semibold transition-colors ${
             action === 'decline'
-              ? 'bg-red-600 text-white border-red-600'
-              : 'border-red-600 text-red-700 hover:bg-red-50'
+              ? 'border-[var(--danger-700)] bg-[var(--danger-700)] text-white'
+              : 'border-[var(--danger-700)]/40 text-[var(--danger-700)] hover:bg-[var(--danger-50)]'
           }`}
         >
-          ✗ Decline
+          Decline
         </button>
       </div>
 
       {action === 'approve' && (
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1 uppercase tracking-wide">
-            Approved amount (NZD) <span className="text-red-500">*</span>
+          <label className={labelClass}>
+            Approved amount (NZD) <span className="text-[var(--danger-700)]">*</span>
           </label>
           <input
             type="number"
@@ -133,9 +141,9 @@ export default function DecisionForm({
             min={MIN_APPROVED_AMOUNT}
             max={requestedAmount}
             step={50}
-            className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className={inputClass}
           />
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
             Requested: {fmtNzd(requestedAmount)}
             {typeof assessedAmount === 'number' && assessedAmount !== requestedAmount && (
               <> · Assessed: {fmtNzd(assessedAmount)}</>
@@ -143,12 +151,12 @@ export default function DecisionForm({
             {' '}· Allowed range: {fmtNzd(MIN_APPROVED_AMOUNT)} – {fmtNzd(requestedAmount)}
           </p>
           {Number.isFinite(approvedAmount) && approvedAmount < requestedAmount && approvedAmount >= MIN_APPROVED_AMOUNT && (
-            <p className="mt-1 text-xs text-amber-700">
+            <p className="mt-1 text-xs text-[var(--warning-700)]">
               Approving {fmtNzd(approvedAmount)} of {fmtNzd(requestedAmount)} requested — the applicant will need to accept the revised offer.
             </p>
           )}
           {approvedAmountInvalid && (
-            <p className="mt-1 text-xs text-red-600">
+            <p className="mt-1 text-xs text-[var(--danger-700)]">
               Amount must be between {fmtNzd(MIN_APPROVED_AMOUNT)} and {fmtNzd(requestedAmount)}.
             </p>
           )}
@@ -157,15 +165,15 @@ export default function DecisionForm({
 
       {action === 'decline' && (
         <div>
-          <p className="text-xs font-medium text-gray-600 mb-2 uppercase tracking-wide">Decline Reasons (select all that apply)</p>
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">Decline Reasons (select all that apply)</p>
           <div className="grid grid-cols-2 gap-2">
             {STANDARD_DECLINE_REASONS.map((r) => (
-              <label key={r} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+              <label key={r} className="flex cursor-pointer items-center gap-2 text-sm text-[var(--text-body)]">
                 <input
                   type="checkbox"
                   checked={selectedReasons.includes(r)}
                   onChange={() => toggleReason(r)}
-                  className="rounded border-gray-300 text-indigo-600"
+                  className="rounded border-[var(--border-default)] text-[var(--orange-500)] focus:ring-[var(--orange-400)]"
                 />
                 {r}
               </label>
@@ -177,23 +185,25 @@ export default function DecisionForm({
       {action && (
         <>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1 uppercase tracking-wide">
-              {action === 'approve' ? 'Approval' : 'Decline'} Rationale <span className="text-red-500">*</span>
+            <label className={labelClass}>
+              {action === 'approve' ? 'Approval' : 'Decline'} Rationale <span className="text-[var(--danger-700)]">*</span>
             </label>
             <textarea
               value={rationale}
               onChange={(e) => setRationale(e.target.value)}
               placeholder={`Document the reason for ${action === 'approve' ? 'approving' : 'declining'} this application…`}
               rows={4}
-              className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+              className={`${inputClass} resize-none`}
             />
           </div>
 
           <button
             onClick={submit}
             disabled={loading || !rationale.trim() || !affordabilityComplete || approvedAmountInvalid || (action === 'decline' && selectedReasons.length === 0)}
-            className={`w-full py-2 px-4 rounded-lg text-sm font-semibold text-white transition-colors disabled:opacity-50 ${
-              action === 'approve' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'
+            className={`w-full rounded-[10px] px-4 py-2.5 text-sm font-semibold text-white transition-colors disabled:opacity-50 ${
+              action === 'approve'
+                ? 'bg-[var(--success-700)] hover:brightness-110'
+                : 'bg-[var(--danger-700)] hover:brightness-110'
             }`}
           >
             {loading ? 'Processing…' : `Confirm ${action === 'approve' ? 'Approval' : 'Decline'}`}

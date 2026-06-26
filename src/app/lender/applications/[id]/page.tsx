@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { getAdminDb, verifySessionOrIdToken } from '@/lib/firebase/admin';
 import type { LoanApplication } from '@/types/application';
 import type { ScheduledPayment } from '@/types/application';
+import ConsoleIcon, { type ConsoleIconName } from '@/components/lender/ConsoleIcon';
+import ConsolePill, { type PillTone } from '@/components/lender/ConsolePill';
 import ApplicationActions from './ApplicationActions';
 import AddNoteForm from './AddNoteForm';
 import DecisionForm from './DecisionForm';
@@ -33,29 +35,64 @@ const STATUS_LABELS: Record<string, string> = {
   expired: 'Expired',
 };
 
-const STATUS_COLOR: Record<string, string> = {
-  draft: 'bg-gray-100 text-gray-600',
-  pending_review: 'bg-amber-100 text-amber-800',
-  under_assessment: 'bg-blue-100 text-blue-800',
-  waiting_for_docs: 'bg-orange-100 text-orange-800',
-  credit_check: 'bg-purple-100 text-purple-800',
-  approved: 'bg-green-100 text-green-700',
-  loan_accepted: 'bg-emerald-100 text-emerald-700',
-  awaiting_payment_consent: 'bg-amber-100 text-amber-800',
-  offer_declined: 'bg-amber-100 text-amber-800',
-  disbursed: 'bg-emerald-100 text-emerald-700',
-  active: 'bg-teal-100 text-teal-700',
-  closed_repaid: 'bg-gray-100 text-gray-600',
-  declined: 'bg-red-100 text-red-700',
-  withdrawn: 'bg-gray-100 text-gray-500',
-  expired: 'bg-gray-100 text-gray-500',
+const STATUS_TONE: Record<string, PillTone> = {
+  draft: 'neutral',
+  pending_review: 'info',
+  under_assessment: 'warning',
+  waiting_for_docs: 'warning',
+  credit_check: 'info',
+  approved: 'success',
+  loan_accepted: 'success',
+  awaiting_payment_consent: 'warning',
+  offer_declined: 'neutral',
+  disbursed: 'success',
+  active: 'success',
+  closed_repaid: 'neutral',
+  declined: 'danger',
+  withdrawn: 'neutral',
+  expired: 'neutral',
 };
+
+function Section({
+  title,
+  icon,
+  action,
+  children,
+  className = '',
+}: {
+  title: string;
+  icon?: ConsoleIconName;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <section
+      className={`rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-white p-5 shadow-[var(--shadow-xs)] ${className}`}
+    >
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h2 className="flex items-center gap-2 font-display text-[15px] font-bold text-[var(--text-strong)]">
+          {icon && (
+            <span className="flex h-7 w-7 items-center justify-center rounded-[8px] bg-[var(--orange-50)] text-[var(--orange-700)]">
+              <ConsoleIcon name={icon} size={16} />
+            </span>
+          )}
+          {title}
+        </h2>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
+}
 
 function Field({ label, value }: { label: string; value?: string | number | null }) {
   return (
     <div>
-      <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide">{label}</dt>
-      <dd className="mt-1 text-sm text-gray-900 break-words">{value ?? '—'}</dd>
+      <dt className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">
+        {label}
+      </dt>
+      <dd className="mt-1 break-words text-sm text-[var(--text-body)]">{value ?? '—'}</dd>
     </div>
   );
 }
@@ -133,33 +170,34 @@ export default async function LenderApplicationDetailPage({
   const isAssigned = app.assignedLenderId === decoded.uid;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-5">
-
+    <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+      <div className="space-y-5">
         {/* Header */}
         <div>
-          <Link href="/lender/applications" className="text-sm text-indigo-600 hover:underline">
-            ← Applications Queue
+          <Link
+            href="/lender/applications"
+            className="inline-flex items-center gap-1 text-sm font-medium text-[var(--text-muted)] transition-colors hover:text-[var(--orange-700)]"
+          >
+            <ConsoleIcon name="chevLeft" size={16} />
+            Applications Queue
           </Link>
-          <div className="flex items-start justify-between gap-4 mt-2">
+          <div className="mt-2 flex items-start justify-between gap-4">
             <div>
-              <h1 className="text-xl font-bold text-gray-900 font-mono">
+              <h1 className="font-mono text-xl font-bold tracking-tight text-[var(--text-strong)]">
                 {app.referenceNumber ?? id}
               </h1>
               {pi && (
-                <p className="text-gray-600 text-sm mt-0.5">
+                <p className="mt-0.5 text-sm text-[var(--text-muted)]">
                   {pi.firstName} {pi.lastName} · {pi.email} · {pi.phone}
                 </p>
               )}
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <span className={`text-xs font-semibold px-3 py-1 rounded-full ${STATUS_COLOR[status] ?? 'bg-gray-100 text-gray-600'}`}>
+            <div className="flex shrink-0 items-center gap-2">
+              <ConsolePill tone={STATUS_TONE[status] ?? 'neutral'} dot>
                 {STATUS_LABELS[status] ?? status}
-              </span>
+              </ConsolePill>
               {app.affordabilityStatus === 'complete' && (
-                <span className="text-xs px-2 py-0.5 bg-green-50 text-green-700 rounded-full border border-green-200 font-medium">
-                  Affordability ✓
-                </span>
+                <ConsolePill tone="success">Affordability ✓</ConsolePill>
               )}
             </div>
           </div>
@@ -188,45 +226,45 @@ export default async function LenderApplicationDetailPage({
         />
 
         {/* Loan Summary */}
-        <section className="bg-white rounded-xl border border-gray-200 p-5">
-          <h2 className="font-semibold text-gray-900 mb-4">Loan Details</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 text-center mb-4 bg-indigo-50 rounded-xl p-4">
-            <div>
-              <p className="text-xs text-indigo-500 font-medium">Requested</p>
-              <p className="font-bold text-indigo-900">{fmt(ld?.requestedAmount)}</p>
+        <Section title="Loan Details" icon="wallet">
+          <div className="mb-4 grid grid-cols-2 gap-px overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--border-subtle)] sm:grid-cols-5">
+            <div className="bg-[var(--slate-50)] p-4 text-center">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">Requested</p>
+              <p className="mt-1 font-mono font-bold tabular-nums text-[var(--text-strong)]">{fmt(ld?.requestedAmount)}</p>
             </div>
-            <div>
-              <p className="text-xs text-indigo-500 font-medium">Rate</p>
-              <p className="font-bold text-indigo-900">4.7% / 8 wks</p>
+            <div className="bg-[var(--slate-50)] p-4 text-center">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">Rate</p>
+              <p className="mt-1 font-semibold text-[var(--text-strong)]">4.7% / 8 wks</p>
             </div>
-            <div>
-              <p className="text-xs text-indigo-500 font-medium">Repayments</p>
-              <p className="font-bold text-indigo-900">4 × fortnightly</p>
+            <div className="bg-[var(--slate-50)] p-4 text-center">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">Repayments</p>
+              <p className="mt-1 font-semibold text-[var(--text-strong)]">4 × fortnightly</p>
             </div>
-            <div>
-              <p className="text-xs text-indigo-500 font-medium">Application Fee</p>
+            <div className="bg-[var(--slate-50)] p-4 text-center">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">Application Fee</p>
               {ld?.applicationFee !== undefined ? (
-                <p className="font-bold text-indigo-900">{fmt(ld.applicationFee)}</p>
+                <p className="mt-1 font-mono font-bold tabular-nums text-[var(--text-strong)]">{fmt(ld.applicationFee)}</p>
               ) : (
                 <>
-                  <p className="font-bold text-indigo-900">
+                  <p className="mt-1 font-mono font-bold tabular-nums text-[var(--text-strong)]">
                     {fmt(computeApplicationFee(app.isExistingCustomer))}
                   </p>
-                  <p className="text-[10px] text-indigo-500 font-medium uppercase tracking-wide">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">
                     Estimated
                   </p>
                 </>
               )}
             </div>
-            <div>
-              <p className="text-xs text-indigo-500 font-medium">Purpose</p>
-              <p className="font-bold text-indigo-900 text-sm">{loanPurposeLabel(ld?.loanPurpose)}</p>
+            <div className="col-span-2 bg-[var(--slate-50)] p-4 text-center sm:col-span-1">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">Purpose</p>
+              <p className="mt-1 text-sm font-semibold text-[var(--text-strong)]">{loanPurposeLabel(ld?.loanPurpose)}</p>
             </div>
           </div>
           {ld?.purposeDescription && (
-            <p className="text-sm text-gray-600 mt-2">{ld.purposeDescription}</p>
+            <p className="text-sm text-[var(--text-body)]">{ld.purposeDescription}</p>
           )}
-        </section>
+          <p className="mt-3 text-xs text-[var(--text-muted)]">All loans are charged interest (see rate above).</p>
+        </Section>
 
         {/* Scheduled Repayments — visible once loan is disbursed */}
         {PAYMENT_STATUSES.has(status) && (
@@ -238,9 +276,8 @@ export default async function LenderApplicationDetailPage({
 
         {/* Personal Info */}
         {pi && (
-          <section className="bg-white rounded-xl border border-gray-200 p-5">
-            <h2 className="font-semibold text-gray-900 mb-4">Personal Information</h2>
-            <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          <Section title="Personal Information" icon="user">
+            <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
               <Field label="Date of Birth" value={pi.dateOfBirth} />
               <Field label="Address" value={`${pi.address}, ${pi.city} ${pi.postCode}`} />
               <Field label="Time at Address" value={pi.timeAtAddress} />
@@ -255,14 +292,13 @@ export default async function LenderApplicationDetailPage({
                 initialValue={Boolean(app.isExistingCustomer)}
               />
             </dl>
-          </section>
+          </Section>
         )}
 
         {/* Employment */}
         {emp && (
-          <section className="bg-white rounded-xl border border-gray-200 p-5">
-            <h2 className="font-semibold text-gray-900 mb-4">Employment</h2>
-            <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          <Section title="Employment" icon="users">
+            <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
               <Field label="Employer" value={emp.employerName} />
               <Field label="Occupation" value={emp.occupation} />
               <Field label="Status" value={emp?.employmentStatus?.replace(/_/g, ' ')} />
@@ -272,14 +308,13 @@ export default async function LenderApplicationDetailPage({
               <Field label="WINZ" value={fmt(emp.income?.winz)} />
               <Field label="Other Income" value={fmt(emp.income?.otherIncome)} />
             </dl>
-          </section>
+          </Section>
         )}
 
         {/* Living Expenses Summary */}
         {expenses && (
-          <section className="bg-white rounded-xl border border-gray-200 p-5">
-            <h2 className="font-semibold text-gray-900 mb-4">Stated Living Expenses (Fortnightly)</h2>
-            <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          <Section title="Stated Living Expenses (Fortnightly)" icon="sliders">
+            <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
               {expenses.nonDiscretionary && Object.entries(expenses.nonDiscretionary)
                 .filter(([, v]) => v > 0)
                 .map(([k, v]) => <Field key={k} label={k.replace(/([A-Z])/g, ' $1').trim()} value={fmt(v)} />)}
@@ -291,105 +326,154 @@ export default async function LenderApplicationDetailPage({
                 </>
               )}
             </dl>
-          </section>
+          </Section>
         )}
 
         {/* Existing Debts */}
         {debts && (
-          <section className="bg-white rounded-xl border border-gray-200 p-5">
-            <h2 className="font-semibold text-gray-900 mb-4">Existing Debts</h2>
-            <dl className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <Section title="Existing Debts" icon="trending">
+            <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
               {(Object.entries(debts) as [string, { totalOwed: number; fortnightlyPayment: number }][])
                 .filter(([k, v]) => k !== 'debtPurposeDescription' && !Array.isArray(v) && v?.totalOwed > 0)
                 .map(([k, v]) => (
                   <div key={k}>
-                    <dt className="text-xs font-medium text-gray-500 uppercase">{k.replace(/([A-Z])/g, ' $1').trim()}</dt>
-                    <dd className="text-sm text-gray-900 mt-0.5">Owed: {fmt(v.totalOwed)}</dd>
-                    <dd className="text-xs text-gray-500">Fortnightly: {fmt(v.fortnightlyPayment)}</dd>
+                    <dt className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">{k.replace(/([A-Z])/g, ' $1').trim()}</dt>
+                    <dd className="mt-1 text-sm text-[var(--text-body)]">Owed: {fmt(v.totalOwed)}</dd>
+                    <dd className="text-xs text-[var(--text-muted)]">Fortnightly: {fmt(v.fortnightlyPayment)}</dd>
                   </div>
                 ))}
             </dl>
-          </section>
+          </Section>
         )}
 
-        {/* Assessment Checklist */}
-        <section className="bg-white rounded-xl border border-gray-200 p-5">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold text-gray-900">Affordability Assessment</h2>
-            {isAssigned && ['under_assessment', 'waiting_for_docs', 'credit_check'].includes(status) && (
-              <Link
-                href={`/lender/applications/${id}/affordability`}
-                className="text-sm text-indigo-600 hover:underline font-medium"
-              >
-                {app.affordabilityStatus === 'complete' ? 'Re-assess →' : 'Start Assessment →'}
-              </Link>
-            )}
-            {app.affordabilityStatus === 'complete' && (
-              <a
-                href={`/api/applications/${id}/affordability/pdf`}
-                download
-                className="inline-flex items-center gap-1.5 text-sm text-white bg-orange-600 hover:bg-orange-700 px-3 py-1.5 rounded-lg font-medium transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
-                </svg>
-                Download Assessment PDF
-              </a>
-            )}
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
-            <div className={`rounded-lg p-3 ${app.affordabilityStatus === 'complete' ? 'bg-green-50 text-green-700' : 'bg-gray-50 text-gray-500'}`}>
-              <p className="font-medium">Status</p>
-              <p className="mt-0.5 capitalize">{app.affordabilityStatus?.replace(/_/g, ' ') ?? 'Not started'}</p>
+        {/* Affordability Assessment */}
+        <Section
+          title="Affordability Assessment"
+          icon="shield"
+          action={
+            <div className="flex items-center gap-3">
+              {isAssigned && ['under_assessment', 'waiting_for_docs', 'credit_check'].includes(status) && (
+                <Link
+                  href={`/lender/applications/${id}/affordability`}
+                  className="text-sm font-semibold text-[var(--orange-700)] hover:underline"
+                >
+                  {app.affordabilityStatus === 'complete' ? 'Re-assess →' : 'Start Assessment →'}
+                </Link>
+              )}
+              {app.affordabilityStatus === 'complete' && (
+                <a
+                  href={`/api/applications/${id}/affordability/pdf`}
+                  download
+                  className="inline-flex items-center gap-1.5 rounded-[10px] bg-[var(--orange-500)] px-3 py-1.5 text-sm font-semibold text-[var(--ink-900)] transition-[filter] hover:brightness-105"
+                >
+                  <ConsoleIcon name="download" size={16} />
+                  Assessment PDF
+                </a>
+              )}
             </div>
-            <div className="rounded-lg p-3 bg-gray-50 text-gray-600">
-              <p className="font-medium text-gray-500 text-xs">Assessments</p>
-              <p className="mt-0.5 font-semibold text-gray-900">{app.affordabilityAssessmentIds?.length ?? 0}</p>
+          }
+        >
+          <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
+            <div
+              className={`rounded-[var(--radius-md)] p-3 ${
+                app.affordabilityStatus === 'complete'
+                  ? 'bg-[var(--success-50)] text-[var(--success-700)]'
+                  : 'bg-[var(--slate-50)] text-[var(--text-muted)]'
+              }`}
+            >
+              <p className="text-[11px] font-semibold uppercase tracking-[0.04em] opacity-80">Status</p>
+              <p className="mt-0.5 font-semibold capitalize">{app.affordabilityStatus?.replace(/_/g, ' ') ?? 'Not started'}</p>
+            </div>
+            <div className="rounded-[var(--radius-md)] bg-[var(--slate-50)] p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">Assessments</p>
+              <p className="mt-0.5 font-semibold text-[var(--text-strong)]">{app.affordabilityAssessmentIds?.length ?? 0}</p>
             </div>
           </div>
+        </Section>
+
+        {/* Credit & Identity Checks — MOCKED: no credit-bureau endpoint/component
+            exists yet. Rendered disabled and greyed out per design intent. */}
+        <section className="relative overflow-hidden rounded-[var(--radius-lg)] border border-dashed border-[var(--border-default)] bg-[var(--slate-50)] p-5">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h2 className="flex items-center gap-2 font-display text-[15px] font-bold text-[var(--text-muted)]">
+              <span className="flex h-7 w-7 items-center justify-center rounded-[8px] bg-[var(--slate-100)] text-[var(--slate-400)]">
+                <ConsoleIcon name="shield" size={16} />
+              </span>
+              Credit &amp; Identity Checks
+            </h2>
+            <ConsolePill tone="neutral">Not connected</ConsolePill>
+          </div>
+          <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3" aria-hidden="true">
+            {[
+              { label: 'Credit Bureau (Centrix)', value: 'Not run' },
+              { label: 'Identity Verification', value: 'Not run' },
+              { label: 'Bank Transaction Analysis', value: 'Not run' },
+              { label: 'AML / PEP Screening', value: 'Not run' },
+            ].map((c) => (
+              <div key={c.label} className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-white/60 p-3 opacity-60">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">{c.label}</p>
+                <p className="mt-0.5 font-semibold text-[var(--slate-400)]">{c.value}</p>
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            disabled
+            aria-disabled="true"
+            className="mt-4 inline-flex cursor-not-allowed items-center gap-1.5 rounded-[10px] border border-[var(--border-default)] bg-white px-3 py-1.5 text-sm font-semibold text-[var(--text-muted)] opacity-60"
+          >
+            <ConsoleIcon name="search" size={16} />
+            Run checks
+          </button>
+          <p className="mt-2 text-xs text-[var(--text-muted)]">
+            Credit-bureau and identity integrations are not yet connected. This panel is a placeholder.
+          </p>
         </section>
 
         {/* Documents */}
         {(docs.length > 0 || docRequest) && (
-          <section className="bg-white rounded-xl border border-gray-200 p-5">
-            <h2 className="font-semibold text-gray-900 mb-4">Documents</h2>
+          <Section title="Documents" icon="inbox">
             {docRequest?.requiredDocuments && (
-              <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-4 text-sm text-orange-800">
-                <p className="font-medium mb-1">Required Documents Requested:</p>
-                <ul className="list-disc list-inside space-y-0.5">
+              <div className="mb-4 rounded-[var(--radius-md)] border border-[var(--warning-700)]/20 bg-[var(--warning-50)] p-3 text-sm text-[var(--warning-700)]">
+                <p className="mb-1 font-semibold">Required Documents Requested:</p>
+                <ul className="list-inside list-disc space-y-0.5">
                   {docRequest.requiredDocuments.map((d) => <li key={d}>{d}</li>)}
                 </ul>
-                {docRequest.message && <p className="mt-2 text-orange-700 text-xs">{docRequest.message}</p>}
+                {docRequest.message && <p className="mt-2 text-xs">{docRequest.message}</p>}
               </div>
             )}
             {docs.length > 0 ? (
               <ul className="space-y-2">
                 {docs.map((doc) => (
-                  <li key={doc.documentId} className="flex items-center justify-between gap-3 text-sm bg-gray-50 rounded-lg p-3">
+                  <li key={doc.documentId} className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] bg-[var(--slate-50)] p-3 text-sm">
                     <div className="min-w-0">
-                      <p className="font-medium text-gray-800 truncate">{doc.fileName}</p>
-                      <p className="text-xs text-gray-400">{doc.type} · Uploaded {fmtTs(doc.uploadedAt as Parameters<typeof fmtTs>[0])}</p>
+                      <p className="truncate font-semibold text-[var(--text-body)]">{doc.fileName}</p>
+                      <p className="text-xs text-[var(--text-muted)]">{doc.type} · Uploaded {fmtTs(doc.uploadedAt as Parameters<typeof fmtTs>[0])}</p>
                     </div>
-                    <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full font-medium ${
-                      doc.status === 'accepted' ? 'bg-green-100 text-green-700' :
-                      doc.status === 'rejected' ? 'bg-red-100 text-red-700' :
-                      'bg-gray-100 text-gray-500'
-                    }`}>
+                    <ConsolePill
+                      tone={
+                        doc.status === 'accepted' ? 'success' :
+                        doc.status === 'rejected' ? 'danger' : 'neutral'
+                      }
+                    >
                       {doc.status}
-                    </span>
+                    </ConsolePill>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-gray-400">No documents uploaded yet.</p>
+              <p className="text-sm text-[var(--text-muted)]">No documents uploaded yet.</p>
             )}
-          </section>
+          </Section>
         )}
 
         {/* Applicant declined the offer */}
         {status === 'offer_declined' && app.applicantRejection && (
-          <section className="rounded-xl border bg-amber-50 border-amber-200 p-5">
-            <h2 className="font-semibold mb-3 text-amber-900">⚠ Applicant Declined Offer</h2>
+          <section className="rounded-[var(--radius-lg)] border border-[var(--warning-700)]/25 bg-[var(--warning-50)] p-5 shadow-[var(--shadow-xs)]">
+            <h2 className="mb-3 flex items-center gap-2 font-display text-[15px] font-bold text-[var(--warning-700)]">
+              <ConsoleIcon name="alert" size={16} />
+              Applicant Declined Offer
+            </h2>
             <dl className="grid grid-cols-2 gap-4 text-sm">
               <Field
                 label="Declined At"
@@ -404,9 +488,19 @@ export default async function LenderApplicationDetailPage({
 
         {/* Decision */}
         {decision ? (
-          <section className={`rounded-xl border p-5 ${decision.action === 'approved' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-            <h2 className={`font-semibold mb-3 ${decision.action === 'approved' ? 'text-green-800' : 'text-red-800'}`}>
-              {decision.action === 'approved' ? '✓ Approved' : '✗ Declined'}
+          <section
+            className={`rounded-[var(--radius-lg)] border p-5 shadow-[var(--shadow-xs)] ${
+              decision.action === 'approved'
+                ? 'border-[var(--success-700)]/25 bg-[var(--success-50)]'
+                : 'border-[var(--danger-700)]/25 bg-[var(--danger-50)]'
+            }`}
+          >
+            <h2
+              className={`mb-3 font-display text-[15px] font-bold ${
+                decision.action === 'approved' ? 'text-[var(--success-700)]' : 'text-[var(--danger-700)]'
+              }`}
+            >
+              {decision.action === 'approved' ? 'Approved' : 'Declined'}
             </h2>
             <dl className="grid grid-cols-2 gap-4 text-sm">
               {decision.approvedAmount && <Field label="Approved Amount" value={fmt(decision.approvedAmount)} />}
@@ -414,8 +508,8 @@ export default async function LenderApplicationDetailPage({
               <div className="col-span-2"><Field label="Rationale" value={decision.rationale} /></div>
               {decision.declineReasons && decision.declineReasons.length > 0 && (
                 <div className="col-span-2">
-                  <dt className="text-xs font-medium text-gray-500 uppercase mb-1">Decline Reasons</dt>
-                  <ul className="list-disc list-inside text-sm text-red-700 space-y-0.5">
+                  <dt className="mb-1 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">Decline Reasons</dt>
+                  <ul className="list-inside list-disc space-y-0.5 text-sm text-[var(--danger-700)]">
                     {decision.declineReasons.map((r) => <li key={r}>{r}</li>)}
                   </ul>
                 </div>
@@ -423,29 +517,27 @@ export default async function LenderApplicationDetailPage({
             </dl>
           </section>
         ) : isAssigned && ['under_assessment', 'waiting_for_docs', 'credit_check'].includes(status) ? (
-          <section className="bg-white rounded-xl border border-gray-200 p-5">
-            <h2 className="font-semibold text-gray-900 mb-4">Make Decision</h2>
+          <Section title="Make Decision" icon="shield">
             <DecisionForm
               applicationId={id}
               affordabilityStatus={app.affordabilityStatus}
               requestedAmount={ld?.requestedAmount ?? 0}
               assessedAmount={ld?.assessedAmount}
             />
-          </section>
+          </Section>
         ) : null}
 
         {/* Internal Notes */}
-        <section className="bg-white rounded-xl border border-gray-200 p-5">
-          <h2 className="font-semibold text-gray-900 mb-4">Internal Notes ({notes.length})</h2>
+        <Section title={`Internal Notes (${notes.length})`} icon="user">
           {notes.length > 0 && (
-            <ul className="space-y-3 mb-4">
+            <ul className="mb-4 space-y-3">
               {[...notes].reverse().map((note) => (
-                <li key={note.noteId} className="bg-gray-50 rounded-lg p-3">
-                  <div className="flex items-center justify-between gap-2 mb-1">
-                    <span className="text-xs font-medium text-gray-700">{note.lenderName}</span>
-                    <span className="text-xs text-gray-400">{fmtTs(note.createdAt as Parameters<typeof fmtTs>[0])}</span>
+                <li key={note.noteId} className="rounded-[var(--radius-md)] bg-[var(--slate-50)] p-3">
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-[var(--text-body)]">{note.lenderName}</span>
+                    <span className="text-xs text-[var(--text-muted)]">{fmtTs(note.createdAt as Parameters<typeof fmtTs>[0])}</span>
                   </div>
-                  <p className="text-sm text-gray-800 whitespace-pre-wrap">{note.text}</p>
+                  <p className="whitespace-pre-wrap text-sm text-[var(--text-body)]">{note.text}</p>
                 </li>
               ))}
             </ul>
@@ -453,23 +545,21 @@ export default async function LenderApplicationDetailPage({
           {isAssigned && (
             <AddNoteForm applicationId={id} />
           )}
-        </section>
+        </Section>
 
         {/* Timeline */}
-        <section className="bg-white rounded-xl border border-gray-200 p-5">
-          <h2 className="font-semibold text-gray-900 mb-4">Timeline</h2>
+        <Section title="Timeline" icon="clock">
           <div className="space-y-2">
             {Object.entries(timeline ?? {}).map(([key, val]) => (
               <div key={key} className="flex items-center justify-between text-sm">
-                <span className="text-gray-500 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</span>
-                <span className="text-gray-800 font-mono text-xs">
+                <span className="capitalize text-[var(--text-muted)]">{key.replace(/([A-Z])/g, ' $1').trim()}</span>
+                <span className="font-mono text-xs text-[var(--text-body)]">
                   {fmtTs(val as Parameters<typeof fmtTs>[0])}
                 </span>
               </div>
             ))}
           </div>
-        </section>
-
+        </Section>
       </div>
     </div>
   );
