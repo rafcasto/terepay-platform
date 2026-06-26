@@ -77,7 +77,12 @@ export type ReviewData = {
     consentActivatedAt?: string;
   };
   decisionInput: { requestedAmount: number; assessedAmount?: number };
-  kyc: { reports: ReportItem[] };
+  kyc: {
+    borrowerStatusLabel: string;
+    borrowerStatusTone: PillTone;
+    borrowerDocuments: { fileId: string; label: string; fileName: string; uploadedAt: string; status: string }[];
+    reports: ReportItem[];
+  };
   credit: {
     reports: ReportItem[];
     score: number;
@@ -866,32 +871,118 @@ function ReportUploader({
   );
 }
 
+const ONBOARDING_DOC_TONE: Record<string, PillTone> = {
+  pending_review: 'warning',
+  pending: 'warning',
+  accepted: 'success',
+  approved: 'success',
+  verified: 'success',
+  rejected: 'danger',
+};
+
+const onboardingDocStatusLabel = (st: string) =>
+  st === 'pending_review' || st === 'pending'
+    ? 'Pending review'
+    : st === 'accepted' || st === 'approved' || st === 'verified'
+      ? 'Verified'
+      : st === 'rejected'
+        ? 'Rejected'
+        : st;
+
+function BorrowerKycList({
+  docs,
+  applicationId,
+}: {
+  docs: ReviewData['kyc']['borrowerDocuments'];
+  applicationId: string;
+}) {
+  if (docs.length === 0) {
+    return (
+      <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--border-default)] bg-white/70 p-4 text-sm text-[var(--text-muted)]">
+        No identity documents were uploaded by the borrower at onboarding.
+      </div>
+    );
+  }
+  return (
+    <ul className="space-y-2">
+      {docs.map((d, i) => (
+        <li
+          key={`${d.fileId}-${i}`}
+          className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-white p-3"
+        >
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-[var(--slate-100)] text-[var(--text-muted)]">
+              <ConsoleIcon name="fileText" size={16} />
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-[var(--text-body)]">{d.label}</p>
+              <p className="truncate text-xs text-[var(--text-muted)]">
+                {d.fileName} · Uploaded {d.uploadedAt}
+              </p>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <ConsolePill tone={ONBOARDING_DOC_TONE[d.status] ?? 'neutral'}>
+              {onboardingDocStatusLabel(d.status)}
+            </ConsolePill>
+            <a
+              href={`/api/applications/${applicationId}/kyc-documents/${d.fileId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 rounded-[8px] border border-[var(--border-default)] bg-white px-2 py-1 text-xs font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--surface-sunken)]"
+            >
+              <ConsoleIcon name="download" size={14} />
+              Download
+            </a>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function KycCard({ data, full = false }: { data: ReviewData; full?: boolean }) {
   void full;
-  const reports = data.kyc.reports;
-  const verified = reports.length > 0;
+  const k = data.kyc;
+  const dzVerified = k.reports.length > 0;
   return (
     <Card
-      title="KYC — DataZoo"
+      title="KYC verification"
       icon="shield"
-      muted={!verified}
       action={
-        <ConsolePill tone={verified ? 'success' : 'warning'} dot>
-          {verified ? 'Verified' : 'Not verified'}
+        <ConsolePill tone={dzVerified ? 'success' : 'warning'} dot>
+          {dzVerified ? 'DataZoo verified' : 'DataZoo pending'}
         </ConsolePill>
       }
     >
-      <p className="mb-4 text-sm text-[var(--text-muted)]">
-        Run the identity check in DataZoo and upload the report here. It is stored on the borrower&apos;s
-        profile and reused across their future loan applications.
-      </p>
-      <ReportList reports={reports} applicationId={data.applicationId} />
-      <ReportUploader
-        applicationId={data.applicationId}
-        provider="datazoo"
-        providerLabel="DataZoo"
-        canUpload={data.isAssigned}
-      />
+      {/* Borrower-provided onboarding evidence (downloadable by the lender) */}
+      <div className="mb-5">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">
+            Borrower identity documents (uploaded at onboarding)
+          </p>
+          <ConsolePill tone={k.borrowerStatusTone}>{k.borrowerStatusLabel}</ConsolePill>
+        </div>
+        <BorrowerKycList docs={k.borrowerDocuments} applicationId={data.applicationId} />
+      </div>
+
+      {/* Lender-run DataZoo identity check */}
+      <div className="border-t border-[var(--border-subtle)] pt-5">
+        <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">
+          DataZoo identity check (lender)
+        </p>
+        <p className="mb-3 text-sm text-[var(--text-muted)]">
+          Run the identity check in DataZoo and upload the report. It is stored on the borrower&apos;s
+          profile and reused across their future loan applications.
+        </p>
+        <ReportList reports={k.reports} applicationId={data.applicationId} />
+        <ReportUploader
+          applicationId={data.applicationId}
+          provider="datazoo"
+          providerLabel="DataZoo"
+          canUpload={data.isAssigned}
+        />
+      </div>
     </Card>
   );
 }
