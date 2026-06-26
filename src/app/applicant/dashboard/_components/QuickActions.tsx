@@ -32,6 +32,23 @@ export default function QuickActions({ state, pendingAppId }: QuickActionsProps)
         tone: 'muted',
       },
     );
+  } else if (state === 'draft') {
+    items.push(
+      {
+        href: '/applicant/apply',
+        title: 'Continue your application',
+        subtitle: 'Pick up where you left off and submit',
+        icon: <Icons.Card size={20} />,
+        tone: 'amber',
+      },
+      {
+        href: '/applicant/profile',
+        title: 'Update your profile',
+        subtitle: 'Keep your details current for faster approvals',
+        icon: <Icons.User size={20} />,
+        tone: 'info',
+      },
+    );
   } else if (state === 'review' || state === 'approved') {
     if (pendingAppId) {
       items.push({

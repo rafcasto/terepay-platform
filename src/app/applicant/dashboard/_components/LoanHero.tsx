@@ -11,7 +11,7 @@ export type DashboardHeroData = {
     nextPaymentDate: string;
     isDelinquent?: boolean;
   };
-  // review / approved / rejected
+  // draft / review / approved / rejected
   application?: {
     id: string;
     referenceNumber?: string;
@@ -100,6 +100,37 @@ export default function LoanHero({ data, firstName }: { data: DashboardHeroData;
             columns={2}
           />
         </div>
+      </Hero>
+    );
+  }
+
+  if (data.state === 'draft') {
+    const requested = data.application?.requestedAmount;
+    return (
+      <Hero
+        eyebrow="Application in progress"
+        title="Finish your application"
+        subtitle="You've started a loan application but haven't submitted it yet. Pick up right where you left off — it only takes a few minutes."
+        pill={
+          <Pill tone="amber" pulse onInk>
+            Not submitted
+          </Pill>
+        }
+      >
+        {requested ? (
+          <StatGrid
+            stats={[{ label: 'Requested', value: fmtNZD(requested) }]}
+            columns={2}
+          />
+        ) : null}
+        <div className="mt-5">
+          <ButtonLink href="/applicant/apply" fullWidth>
+            Continue your application
+          </ButtonLink>
+        </div>
+        <p className="mt-3 text-[12px] text-white/60">
+          All loans are charged interest and fees. Applications can be declined.
+        </p>
       </Hero>
     );
   }
