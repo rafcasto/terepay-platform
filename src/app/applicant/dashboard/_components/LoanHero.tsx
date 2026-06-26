@@ -10,6 +10,8 @@ export type DashboardHeroData = {
     totalPaid: number;
     nextPaymentDate: string;
     isDelinquent?: boolean;
+    /** Active loan's application id — links straight to its repayment schedule. */
+    applicationId?: string;
   };
   // draft / review / approved / rejected
   application?: {
@@ -23,7 +25,7 @@ export type DashboardHeroData = {
 
 export default function LoanHero({ data, firstName }: { data: DashboardHeroData; firstName?: string | null }) {
   if (data.state === 'active' && data.loan) {
-    const { remainingBalance, totalPaid, nextPaymentDate, isDelinquent } = data.loan;
+    const { remainingBalance, totalPaid, nextPaymentDate, isDelinquent, applicationId } = data.loan;
     const total = totalPaid + remainingBalance;
     const repaidPct = total > 0 ? Math.round((totalPaid / total) * 100) : 0;
     const dleft = daysUntil(nextPaymentDate);
@@ -69,11 +71,13 @@ export default function LoanHero({ data, firstName }: { data: DashboardHeroData;
             Next payment in {dleft === 0 ? 'today' : `${dleft} day${dleft === 1 ? '' : 's'}`}.
           </p>
         )}
-        <div className="mt-5">
-          <ButtonLink href="/applicant/applications" variant="ghost-light" fullWidth>
-            View account balance
-          </ButtonLink>
-        </div>
+        {applicationId && (
+          <div className="mt-5">
+            <ButtonLink href={`/applicant/applications/${applicationId}`} variant="ghost-light" fullWidth>
+              View repayment schedule
+            </ButtonLink>
+          </div>
+        )}
       </Hero>
     );
   }
