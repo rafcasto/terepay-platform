@@ -12,6 +12,7 @@ export const dynamic = 'force-dynamic';
 
 const DISPLAY_TONE: Record<LoanDisplayState, Parameters<typeof Pill>[0]['tone']> = {
   new: 'muted',
+  draft: 'amber',
   review: 'amber',
   approved: 'success',
   rejected: 'danger',
@@ -95,10 +96,12 @@ export default async function ApplicantApplicationsPage() {
             const tone = DISPLAY_TONE[display];
             const ref = (a.referenceNumber as string | undefined) ?? `#${(appDoc.id as string).slice(0, 8)}`;
             const createdAt = (a.timeline as Record<string, unknown>)?.createdAt as Parameters<typeof toDate>[0];
+            const isDraft = display === 'draft';
+            const href = isDraft ? '/applicant/apply' : `/applicant/applications/${appDoc.id}`;
             return (
               <Link
                 key={appDoc.id}
-                href={`/applicant/applications/${appDoc.id}`}
+                href={href}
                 className="group block bg-surface rounded-2xl border border-border hover:border-accent/60 hover:shadow-soft transition-all hover:-translate-y-0.5 p-5"
               >
                 <div className="flex items-start justify-between gap-3 mb-3">
@@ -116,7 +119,7 @@ export default async function ApplicantApplicationsPage() {
                   </Pill>
                 </div>
                 <div className="flex items-center justify-end gap-1 text-sm font-semibold text-accent-2 group-hover:gap-2 transition-all">
-                  View details <Icons.ChevronRight size={16} />
+                  {isDraft ? 'Continue application' : 'View details'} <Icons.ChevronRight size={16} />
                 </div>
               </Link>
             );

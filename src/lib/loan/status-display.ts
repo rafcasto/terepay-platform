@@ -1,9 +1,10 @@
 import type { AnyApplicationStatus } from '@/types/application';
 
-// One of the six display states defined in the design handoff.
+// Display states defined in the design handoff.
 // All concrete LMS application statuses map to exactly one of these.
 export type LoanDisplayState =
   | 'new'
+  | 'draft'
   | 'review'
   | 'approved'
   | 'rejected'
@@ -11,8 +12,11 @@ export type LoanDisplayState =
   | 'paid';
 
 const STATE_BY_STATUS: Record<string, LoanDisplayState> = {
-  // review — application accepted and being processed
-  draft: 'review',
+  // draft — application started but not yet submitted by the applicant.
+  // The CTA must take the user back to finish the application, not the tracker.
+  draft: 'draft',
+
+  // review — application submitted and being processed
   pending_review: 'review',
   under_assessment: 'review',
   waiting_for_docs: 'review',
