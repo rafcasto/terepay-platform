@@ -49,6 +49,10 @@ const PRIVACY_DECLARATIONS = [
   },
 ];
 
+type DeclarationKey =
+  | (typeof DECLARATIONS)[number]['key']
+  | (typeof PRIVACY_DECLARATIONS)[number]['key'];
+
 export default function Step8Declarations() {
   const {
     register,
@@ -68,6 +72,20 @@ export default function Step8Declarations() {
   const fortnightlyPayment = totalRepayable / 4;
   const customerLabel = isExisting ? 'existing customer' : 'new customer';
 
+  const renderDeclaration = (decl: { key: DeclarationKey; text: string }) => (
+    <div key={decl.key}>
+      <label className="flex items-start gap-3 cursor-pointer">
+        <input
+          type="checkbox"
+          {...register(`declarations.${decl.key}`)}
+          className="mt-0.5 h-4 w-4 rounded border-border-default text-brand-text focus:ring-[var(--focus-ring)] shrink-0"
+        />
+        <span className="text-sm text-ink-strong leading-relaxed">{decl.text}</span>
+      </label>
+      {e?.[decl.key] && <p className={errorCls + ' ml-7'}>{e[decl.key]?.message}</p>}
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       <div>
@@ -83,7 +101,7 @@ export default function Step8Declarations() {
         <h3 className="text-xs font-bold text-brand-text uppercase tracking-wide">
           Fees &amp; Repayment Summary
         </h3>
-        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-sm text-[#1C2740]">
+        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-sm text-ink-strong">
           <div className="flex justify-between sm:block">
             <dt className="text-[var(--text-muted)]">Requested amount</dt>
             <dd className="font-semibold sm:mt-0.5">${principal.toFixed(2)}</dd>
@@ -118,23 +136,7 @@ export default function Step8Declarations() {
       {/* Individual declarations */}
       <div className="space-y-4">
         <h3 className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wide">Declarations</h3>
-        {DECLARATIONS.map((decl) => (
-          <label key={decl.key} className="flex items-start gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              {...register(`declarations.${decl.key}`)}
-              className="mt-0.5 h-4 w-4 rounded border-border-default text-brand-text focus:ring-[var(--focus-ring)] shrink-0"
-            />
-            <span className="text-sm text-ink-strong leading-relaxed">{decl.text}</span>
-          </label>
-        ))}
-        {DECLARATIONS.map((decl) =>
-          e?.[decl.key] ? (
-            <p key={decl.key + '-err'} className={errorCls + ' -mt-2'}>
-              {e[decl.key]?.message}
-            </p>
-          ) : null,
-        )}
+        {DECLARATIONS.map(renderDeclaration)}
       </div>
 
       {/* Privacy and credit reporting */}
@@ -142,19 +144,7 @@ export default function Step8Declarations() {
         <h3 className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wide">
           Privacy Policy &amp; Credit Reporting Consent
         </h3>
-        {PRIVACY_DECLARATIONS.map((decl) => (
-          <div key={decl.key}>
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                {...register(`declarations.${decl.key}`)}
-                className="mt-0.5 h-4 w-4 rounded border-border-default text-brand-text focus:ring-[var(--focus-ring)] shrink-0"
-              />
-              <span className="text-sm text-ink-strong leading-relaxed">{decl.text}</span>
-            </label>
-            {e?.[decl.key] && <p className={errorCls + ' ml-7'}>{e[decl.key]?.message}</p>}
-          </div>
-        ))}
+        {PRIVACY_DECLARATIONS.map(renderDeclaration)}
       </div>
 
       {/* Footer branding */}
