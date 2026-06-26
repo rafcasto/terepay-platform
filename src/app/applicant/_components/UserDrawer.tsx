@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { Icons, Pill } from '@/components/ui';
-import type { ReactElement } from 'react';
+import { APPLICANT_NAV } from './applicant-nav';
 
 type DrawerUser = {
   firstName: string;
@@ -16,25 +16,6 @@ interface UserDrawerProps {
   onClose: () => void;
   user: DrawerUser;
 }
-
-type NavItem = {
-  label: string;
-  description: string;
-  icon: ReactElement;
-  /** Implemented destination. When omitted the item renders as a "Soon" placeholder. */
-  href?: string;
-};
-
-// Borrower nav (matches the design handoff). Items without an `href` are
-// placeholders for views that aren't built yet — shown disabled with a "Soon" tag.
-const NAV_ITEMS: NavItem[] = [
-  { label: 'Account', description: 'Your loan and dashboard', icon: <Icons.Wallet size={18} />, href: '/applicant/dashboard' },
-  { label: 'Applications', description: 'Past and active applications', icon: <Icons.History size={18} />, href: '/applicant/applications' },
-  { label: 'Profile', description: 'Edit your personal details', icon: <Icons.User size={18} />, href: '/applicant/profile' },
-  { label: 'Repayments', description: 'Schedule and payment history', icon: <Icons.Calendar size={18} /> },
-  { label: 'Documents', description: 'Agreement, disclosure & statements', icon: <Icons.File size={18} /> },
-  { label: 'Help & support', description: 'Questions about your loan or account', icon: <Icons.HelpCircle size={18} /> },
-];
 
 export default function UserDrawer({ isOpen, onClose, user }: UserDrawerProps) {
   if (!isOpen) return null;
@@ -88,7 +69,7 @@ export default function UserDrawer({ isOpen, onClose, user }: UserDrawerProps) {
 
         {/* Nav items */}
         <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-1">
-          {NAV_ITEMS.map((item) =>
+          {APPLICANT_NAV.map((item) =>
             item.href ? (
               <Link
                 key={item.label}
@@ -96,7 +77,7 @@ export default function UserDrawer({ isOpen, onClose, user }: UserDrawerProps) {
                 onClick={onClose}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-text hover:bg-surface-2 transition-colors"
               >
-                <span className="shrink-0 text-muted/70">{item.icon}</span>
+                <item.Icon size={18} className="shrink-0 text-muted/70" />
                 <div className="min-w-0">
                   <p className="font-medium">{item.label}</p>
                   <p className="text-xs text-muted/70 truncate">{item.description}</p>
@@ -108,7 +89,7 @@ export default function UserDrawer({ isOpen, onClose, user }: UserDrawerProps) {
                 aria-disabled="true"
                 className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm opacity-55 cursor-default"
               >
-                <span className="shrink-0 text-muted/70">{item.icon}</span>
+                <item.Icon size={18} className="shrink-0 text-muted/70" />
                 <div className="min-w-0 flex-1">
                   <p className="font-medium text-text">{item.label}</p>
                   <p className="text-xs text-muted/70 truncate">{item.description}</p>

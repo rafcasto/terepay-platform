@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { TopBar } from '@/components/ui';
 import UserDrawer from './UserDrawer';
+import ApplicantSidebar from './ApplicantSidebar';
 
 export default function ApplicantShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -21,10 +22,18 @@ export default function ApplicantShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-bg flex flex-col">
-      <TopBar onMenuClick={() => setDrawerOpen(true)} />
+    <div className="min-h-screen bg-bg flex">
+      {/* Desktop: persistent sidebar nav */}
+      <ApplicantSidebar user={user} />
 
-      <main className="flex-1 overflow-auto screen-in">{children}</main>
+      <div className="flex-1 min-w-0 flex flex-col">
+        {/* Mobile: top bar + hamburger drawer */}
+        <div className="lg:hidden">
+          <TopBar onMenuClick={() => setDrawerOpen(true)} />
+        </div>
+
+        <main className="flex-1 screen-in">{children}</main>
+      </div>
 
       <UserDrawer
         isOpen={drawerOpen}
