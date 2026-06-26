@@ -3,7 +3,11 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
 import { auditLog } from '@/lib/utils/audit';
 import { getQippayWebhookConfig } from '@/lib/qippay/webhook-config';
-import { verifyWebhookSignature, WEBHOOK_SIG_HEADER } from '@/lib/qippay/verify-webhook';
+import {
+  verifyWebhookSignature,
+  WEBHOOK_SIG_HEADER,
+  WEBHOOK_TIMESTAMP_HEADER,
+} from '@/lib/qippay/verify-webhook';
 import { getDetailedConsentStatus } from '@/lib/qippay/setpay-client';
 import { syncLoanRecord } from '@/lib/loan/loan-record';
 
@@ -39,7 +43,8 @@ export async function POST(request: NextRequest) {
   // 3. Verify signature — return 401 if invalid so Qippay knows something is wrong
   if (config.webhookSecret) {
     const sig = request.headers.get(WEBHOOK_SIG_HEADER);
-    if (!verifyWebhookSignature(rawBody, sig, config.webhookSecret)) {
+    const timestamp = request.headers.get(WEBHOOK_TIMESTAMP_HEADER);
+    if (!verifyWebhookSignature(rawBody, sig, config.webhookSecret, timestamp)) {
       console.warn('[webhooks/qippay] Invalid signature — rejecting request');
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
     }
