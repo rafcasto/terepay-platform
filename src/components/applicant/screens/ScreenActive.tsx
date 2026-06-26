@@ -1,6 +1,7 @@
 import { Hero, HeroBalance, Pill, ProgressBar, ScheduleRow, StatGrid, Icons } from '@/components/ui';
 import { fmtNZD, fmtDate } from '@/lib/loan/format';
 import type { LoanApplication, AnyApplicationStatus, ScheduledPayment } from '@/types/application';
+import { deriveLoanSummary, type DerivedInstallmentStatus } from '@/lib/loan/active-loan';
 import { SectionCard, Field } from './shared';
 
 interface Props {
@@ -13,43 +14,34 @@ interface Props {
 
 type RowStatus = 'paid' | 'next' | 'upcoming' | 'overdue';
 
+function rowStatusFor(status: DerivedInstallmentStatus, isNext: boolean): RowStatus {
+  if (status === 'paid') return 'paid';
+  if (status === 'overdue' || status === 'failed' || status === 'retrying') return 'overdue';
+  if (isNext) return 'next';
+  return 'upcoming';
+}
+
 export default function ScreenActive({ app, status, applicationId, scheduledPayments = [] }: Props) {
   const ld = app.loanDetails;
-  const repayment = app.repaymentSchedule;
   const refNum = (app.referenceNumber as string | undefined) ?? `#${applicationId.slice(0, 8)}`;
   const isDisbursed = status === 'disbursed';
   const loanId = (app as Record<string, unknown>).loanId as string | undefined;
 
-  const total = repayment?.totalRepayment ?? 0;
-  const installments = repayment?.installments ?? [];
+  // Single source of truth: merges live Qippay statuses (scheduledPayments),
+  // the bank-authorised schedule (paymentConsent.scheduleSummary), and the
+  // legacy repaymentSchedule field — so the balance and the instalment list are
+  // always populated once a loan is disbursed.
+  const summary = deriveLoanSummary({ ...app, scheduledPayments });
+  const installments = summary.installments;
+  const total = summary.totalRepayable;
+  const remaining = summary.remainingBalance;
+  const repaidPct = total > 0 ? Math.round((summary.totalPaid / total) * 100) : 0;
 
-  // Overlay live Qippay status (scheduledPayments) onto the static schedule.
-  const liveByNumber = new Map(scheduledPayments.map((p) => [p.installmentNumber, p]));
-  const isPaid = (n: number, fallback?: string) =>
-    liveByNumber.get(n)?.status === 'success' || fallback === 'paid';
-  const isFailed = (n: number, fallback?: string) => {
-    const live = liveByNumber.get(n)?.status;
-    return live === 'failed' || live === 'retrying' || fallback === 'overdue';
-  };
-
-  const paidAmount = installments
-    .filter((i) => isPaid(i.installmentNumber, i.status))
-    .reduce((sum, i) => sum + (i.amount ?? 0), 0);
-  const remaining = total - paidAmount;
-  const repaidPct = total > 0 ? Math.round((paidAmount / total) * 100) : 0;
-
-  // First unpaid instalment that is overdue, else the first still-scheduled one.
+  // The next instalment still owing drives the "Next payment" stat.
   const next =
-    installments.find((i) => isFailed(i.installmentNumber, i.status) && !isPaid(i.installmentNumber, i.status)) ??
-    installments.find((i) => !isPaid(i.installmentNumber, i.status));
-  const nextOverdue = next ? isFailed(next.installmentNumber, next.status) : false;
-
-  const rowStatus = (n: number, fallback?: string, isNext?: boolean): RowStatus => {
-    if (isPaid(n, fallback)) return 'paid';
-    if (isFailed(n, fallback)) return 'overdue';
-    if (isNext) return 'next';
-    return 'upcoming';
-  };
+    installments.find((i) => i.status === 'overdue' || i.status === 'failed') ??
+    installments.find((i) => i.status !== 'paid' && i.status !== 'cancelled');
+  const nextOverdue = next ? next.status === 'overdue' || next.status === 'failed' : false;
 
   return (
     <div className="space-y-5">
@@ -106,7 +98,7 @@ export default function ScreenActive({ app, status, applicationId, scheduledPaym
                 date={i.dueDate}
                 label={`Instalment ${i.installmentNumber}`}
                 amount={fmtNZD(i.amount)}
-                status={rowStatus(i.installmentNumber, i.status, i === next)}
+                status={rowStatusFor(i.status, i === next)}
               />
             ))}
           </div>
