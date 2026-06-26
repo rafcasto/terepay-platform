@@ -41,9 +41,6 @@ export default function ScreenRejected({ app, status, applicationId }: Props) {
       >
         <div className="flex flex-wrap gap-3">
           <ButtonLink href="/applicant/apply">Apply again</ButtonLink>
-          <ButtonLink href="/applicant/applications" variant="ghost-light">
-            See application history
-          </ButtonLink>
         </div>
       </Hero>
 
