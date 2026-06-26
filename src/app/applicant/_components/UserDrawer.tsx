@@ -1,6 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
+import { Icons, Pill } from '@/components/ui';
+import { APPLICANT_NAV } from './applicant-nav';
 
 type DrawerUser = {
   firstName: string;
@@ -36,16 +39,20 @@ export default function UserDrawer({ isOpen, onClose, user }: UserDrawerProps) {
       <div className="fixed top-0 right-0 z-50 h-full w-72 bg-white flex flex-col shadow-xl">
         {/* Drawer header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border-2">
-          <span className="text-lg font-bold text-accent">TerePay</span>
+          <Image
+            src="/brand/terepay-wordmark.png"
+            alt="TerePay"
+            width={720}
+            height={216}
+            className="h-5 w-auto"
+          />
           <button
             type="button"
             onClick={onClose}
             aria-label="Close menu"
             className="p-1.5 rounded-md text-muted hover:bg-surface-2 transition-colors"
           >
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-              <path d="M2 2l14 14M16 2L2 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-            </svg>
+            <Icons.X size={18} />
           </button>
         </div>
 
@@ -61,35 +68,36 @@ export default function UserDrawer({ isOpen, onClose, user }: UserDrawerProps) {
         </div>
 
         {/* Nav items */}
-        <nav className="flex-1 px-3 py-3 space-y-1">
-          <Link
-            href="/applicant/profile"
-            onClick={onClose}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-text hover:bg-surface-2 transition-colors"
-          >
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true" className="shrink-0 text-muted/70">
-              <circle cx="9" cy="6" r="3.25" stroke="currentColor" strokeWidth="1.5" />
-              <path d="M2.5 15.5c0-3.314 2.91-6 6.5-6s6.5 2.686 6.5 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-            <div>
-              <p className="font-medium">Profile</p>
-              <p className="text-xs text-muted/70">Edit your personal details</p>
-            </div>
-          </Link>
-
-          <button
-            type="button"
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-text hover:bg-surface-2 transition-colors text-left"
-          >
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true" className="shrink-0 text-muted/70">
-              <path d="M2 3.5h14a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1Z" stroke="currentColor" strokeWidth="1.5" />
-              <path d="M1 6.5l7.447 4.724a1 1 0 0 0 1.106 0L17 6.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-            <div>
-              <p className="font-medium">Contact Support</p>
-              <p className="text-xs text-muted/70">Chat with our team</p>
-            </div>
-          </button>
+        <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-1">
+          {APPLICANT_NAV.map((item) =>
+            item.href ? (
+              <Link
+                key={item.label}
+                href={item.href}
+                onClick={onClose}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-text hover:bg-surface-2 transition-colors"
+              >
+                <item.Icon size={18} className="shrink-0 text-muted/70" />
+                <div className="min-w-0">
+                  <p className="font-medium">{item.label}</p>
+                  <p className="text-xs text-muted/70 truncate">{item.description}</p>
+                </div>
+              </Link>
+            ) : (
+              <div
+                key={item.label}
+                aria-disabled="true"
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm opacity-55 cursor-default"
+              >
+                <item.Icon size={18} className="shrink-0 text-muted/70" />
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-text">{item.label}</p>
+                  <p className="text-xs text-muted/70 truncate">{item.description}</p>
+                </div>
+                <Pill tone="muted">Soon</Pill>
+              </div>
+            )
+          )}
         </nav>
 
         {/* Sign out */}
