@@ -6,6 +6,7 @@ import type { PillTone } from '@/components/lender/ConsolePill';
 import { loanPurposeLabel } from '@/lib/constants/loan-purposes';
 import { computeApplicationFee } from '@/lib/constants/fees';
 import { reconcileConsent } from '@/lib/qippay/reconcile-consent';
+import { toPlainScheduledPayments } from '@/lib/loan/active-loan';
 import LoanReview, { type ReviewData } from './_components/LoanReview';
 
 export const dynamic = 'force-dynamic';
@@ -395,7 +396,7 @@ export default async function LenderApplicationDetailPage({
     applicantRejection,
     payments: {
       show: PAYMENT_STATUSES.has(status),
-      scheduled: (app.scheduledPayments ?? []) as ScheduledPayment[],
+      scheduled: toPlainScheduledPayments((app.scheduledPayments ?? []) as ScheduledPayment[]),
     },
     disburse,
     decisionInput: {
