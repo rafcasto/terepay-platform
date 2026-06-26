@@ -22,6 +22,39 @@ async function getLenderName(lenderUid: string): Promise<string> {
   return `${d.firstName ?? ''} ${d.lastName ?? ''}`.trim() || 'Lender';
 }
 
+function Gate({
+  id,
+  tone,
+  title,
+  children,
+}: {
+  id: string;
+  tone: 'danger' | 'warning';
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[var(--surface-page)] p-8">
+      <div className="max-w-sm text-center">
+        <p
+          className={`font-display text-base font-bold ${
+            tone === 'danger' ? 'text-[var(--danger-700)]' : 'text-[var(--warning-700)]'
+          }`}
+        >
+          {title}
+        </p>
+        <p className="mt-1 text-sm text-[var(--text-muted)]">{children}</p>
+        <Link
+          href={`/lender/applications/${id}`}
+          className="mt-4 inline-block text-sm font-semibold text-[var(--orange-700)] hover:underline"
+        >
+          Back to application
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 export default async function AffordabilityPage(props: {
   params: Promise<{ id: string }>;
 }) {
@@ -50,33 +83,19 @@ export default async function AffordabilityPage(props: {
   // Only the assigned lender can run affordability
   if (application.assignedLenderId !== lenderUid) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-8">
-        <div className="text-center">
-          <p className="font-semibold text-red-700">Access denied.</p>
-          <p className="text-sm text-gray-600 mt-1">Only the assigned lender can complete this affordability assessment.</p>
-          <Link href={`/lender/applications/${id}`} className="text-indigo-600 underline text-sm mt-4 inline-block">
-            Back to application
-          </Link>
-        </div>
-      </div>
+      <Gate id={id} tone="danger" title="Access denied">
+        Only the assigned lender can complete this affordability assessment.
+      </Gate>
     );
   }
 
   const allowedStatuses = ['under_assessment', 'waiting_for_docs', 'credit_check'];
   if (!allowedStatuses.includes(application.status)) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-8">
-        <div className="text-center">
-          <p className="font-semibold text-amber-700">Assessment not available</p>
-          <p className="text-sm text-gray-600 mt-1">
-            Status must be <em>under_assessment</em>, <em>waiting_for_docs</em>, or <em>credit_check</em>.
-            Current: <strong>{application.status}</strong>
-          </p>
-          <Link href={`/lender/applications/${id}`} className="text-indigo-600 underline text-sm mt-4 inline-block">
-            Back to application
-          </Link>
-        </div>
-      </div>
+      <Gate id={id} tone="warning" title="Assessment not available">
+        Status must be <em>under_assessment</em>, <em>waiting_for_docs</em>, or <em>credit_check</em>.
+        Current: <strong>{application.status}</strong>
+      </Gate>
     );
   }
 

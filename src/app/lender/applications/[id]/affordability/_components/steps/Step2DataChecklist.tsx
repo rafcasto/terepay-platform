@@ -25,23 +25,23 @@ export default function Step2DataChecklist({
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-gray-900">Data Collection Checklist</h2>
-        <p className="text-sm text-gray-500 mt-1">
+        <h2 className="font-display text-xl font-bold text-[var(--text-strong)]">Data Collection Checklist</h2>
+        <p className="mt-1 text-sm text-[var(--text-muted)]">
           Verify all documents and data before proceeding with income verification.
         </p>
       </div>
 
       {/* Validation errors */}
       {validationErrors && validationErrors.length > 0 && (
-        <div className="bg-red-50 border border-red-300 rounded-xl p-4">
-          <p className="text-sm font-semibold text-red-800 mb-2">Please complete all required items before proceeding:</p>
-          <ul className="list-disc list-inside space-y-1 text-sm text-red-700">
+        <div className="rounded-[var(--radius-lg)] border border-[var(--danger-700)]/30 bg-[var(--danger-50)] p-4">
+          <p className="mb-2 text-sm font-semibold text-[var(--danger-700)]">Please complete all required items before proceeding:</p>
+          <ul className="list-inside list-disc space-y-1 text-sm text-[var(--danger-700)]">
             {validationErrors.map((e) => <li key={e}>{e}</li>)}
           </ul>
         </div>
       )}
 
-      <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
+      <div className="divide-y divide-[var(--border-subtle)] rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-white shadow-[var(--shadow-xs)]">
         {/* 1. Centrix Report */}
         <ChecklistItem
           checked={checklist.centrixReportObtained}
@@ -65,13 +65,13 @@ export default function Step2DataChecklist({
               First transaction date verified (90+ days required)
               {daysOfData > 0 && (
                 <span
-                  className={`ml-2 text-xs font-semibold px-1.5 py-0.5 rounded-full ${
+                  className={`ml-2 rounded-full px-1.5 py-0.5 text-xs font-semibold ${
                     hasEnoughData
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-red-100 text-red-700'
+                      ? 'bg-[var(--success-50)] text-[var(--success-700)]'
+                      : 'bg-[var(--danger-50)] text-[var(--danger-700)]'
                   }`}
                 >
-                  {daysOfData} days — {hasEnoughData ? 'OK ✓' : 'INSUFFICIENT ✗'}
+                  {daysOfData} days — {hasEnoughData ? 'OK' : 'INSUFFICIENT'}
                 </span>
               )}
             </span>
@@ -157,14 +157,14 @@ function ChecklistItem({
 }) {
   return (
     <div className="p-5">
-      <label className="flex items-start gap-3 cursor-pointer">
+      <label className="flex cursor-pointer items-start gap-3">
         <input
           type="checkbox"
           checked={checked}
           onChange={(e) => onChange(e.target.checked)}
-          className="mt-0.5 h-4 w-4 rounded border-gray-300 text-[#0D1B2A] focus:ring-[#0D1B2A] shrink-0"
+          className="mt-0.5 h-4 w-4 shrink-0 rounded border-[var(--border-default)] text-[var(--orange-500)] focus:ring-[var(--orange-400)]"
         />
-        <span className="text-sm font-medium text-gray-800">{label}</span>
+        <span className="text-sm font-medium text-[var(--text-body)]">{label}</span>
       </label>
       {children && <div className="mt-2 pl-7">{children}</div>}
     </div>
@@ -172,8 +172,8 @@ function ChecklistItem({
 }
 
 const inputCls =
-  'w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0D1B2A]/30 bg-gray-50 text-gray-800';
+  'w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-white px-3 py-2 text-sm text-[var(--text-body)] focus:border-[var(--orange-400)] focus:outline-none focus:ring-2 focus:ring-[var(--orange-400)]';
 const nextBtnCls =
-  'px-6 py-2.5 bg-[#0D1B2A] text-white rounded-lg text-sm font-semibold hover:bg-[#1a2f4a] transition-colors';
+  'rounded-[10px] bg-[var(--ink-800)] px-6 py-2.5 text-sm font-semibold text-white transition-[filter] hover:brightness-110';
 const backBtnCls =
-  'px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-50 transition-colors';
+  'rounded-[10px] border border-[var(--border-default)] px-6 py-2.5 text-sm font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--surface-sunken)]';

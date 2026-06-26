@@ -207,7 +207,7 @@ export default function AffordabilityForm({
   if (daysOfData > 0 && daysOfData < 90)
     hardDeclines.push('< 90 days of transaction data');
   if (surplus <= 0)
-    hardDeclines.push('Surplus \u2264 $0 \u2014 not affordable');
+    hardDeclines.push('Surplus ≤ $0 — not affordable');
   if (checklist.visaExpiryDate) {
     const loanEnd = new Date();
     loanEnd.setDate(loanEnd.getDate() + 56 + 90);
@@ -285,57 +285,59 @@ export default function AffordabilityForm({
   };
 
   return (
-    <div className="min-h-screen flex flex-col sm:flex-row">
+    <div className="flex min-h-screen flex-col sm:flex-row">
       {/* Left brand / step panel */}
-      <aside className="hidden sm:flex flex-col w-72 lg:w-80 bg-[#0D1B2A] shrink-0 px-8 py-10">
+      <aside className="hidden w-72 shrink-0 flex-col bg-[var(--ink-950)] px-8 py-10 sm:flex lg:w-80">
         <div className="mb-10">
-          <span className="text-2xl font-bold text-[#F5A523] tracking-tight">TerePay</span>
-          <p className="text-xs text-white/40 mt-1">Affordability Assessment</p>
+          <span className="font-display text-2xl font-bold tracking-[-0.01em] text-white">
+            Tere<span className="text-[var(--orange-500)]">Pay</span>
+          </span>
+          <p className="mt-1 text-xs text-white/40">Affordability assessment</p>
         </div>
 
         <AffordabilityStepTracker currentStep={currentStep} />
 
-        <div className="mt-auto pt-10 flex flex-col gap-4">
+        <div className="mt-auto flex flex-col gap-4 pt-10">
           <Link
             href={`/lender/applications/${applicationId}`}
-            className="flex items-center gap-2 text-sm text-white/50 hover:text-white/80 transition-colors"
+            className="flex items-center gap-2 text-sm text-white/50 transition-colors hover:text-white/80"
           >
-            <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
             </svg>
-            Back to Application
+            Back to application
           </Link>
-          <p className="text-xs text-white/30 leading-relaxed">
+          <p className="text-xs leading-relaxed text-white/30">
             Assessment data is stored securely. Compliant with NZ CCCFA 2003.
           </p>
         </div>
       </aside>
 
       {/* Right content panel */}
-      <div className="flex-1 flex flex-col min-h-screen sm:min-h-0">
+      <div className="flex min-h-screen flex-1 flex-col sm:min-h-0">
         {/* Mobile top bar */}
-        <header className="sm:hidden sticky top-0 z-20 bg-[#0D1B2A] px-4 h-12 flex items-center justify-between shrink-0">
+        <header className="sticky top-0 z-20 flex h-12 shrink-0 items-center justify-between bg-[var(--ink-950)] px-4 sm:hidden">
           <Link
             href={`/lender/applications/${applicationId}`}
-            className="flex items-center gap-1.5 text-white/70 hover:text-white transition-colors"
+            className="flex items-center gap-1.5 text-white/70 transition-colors hover:text-white"
           >
-            <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
             </svg>
             <span className="text-sm">Back</span>
           </Link>
-          <span className="text-sm font-semibold text-white">Affordability Assessment</span>
+          <span className="text-sm font-semibold text-white">Affordability assessment</span>
           <span className="text-xs text-white/50">{currentStep + 1}/5</span>
         </header>
 
         {/* Mobile step progress */}
-        <div className="sm:hidden bg-[#0D1B2A] pb-2">
+        <div className="bg-[var(--ink-950)] pb-2 sm:hidden">
           <AffordabilityStepTracker currentStep={currentStep} />
         </div>
 
         {/* Scrollable content */}
-        <div className="flex-1 overflow-y-auto bg-gray-50">
-          <div className="max-w-5xl mx-auto px-4 sm:px-8 py-8 pb-24 sm:pb-12">
+        <div className="flex-1 overflow-y-auto bg-[var(--surface-page)]">
+          <div className="mx-auto max-w-5xl px-4 py-8 pb-24 sm:px-8 sm:pb-12">
             {currentStep === 0 && (
               <Step1CustomerInfo
                 customerName={customerName}

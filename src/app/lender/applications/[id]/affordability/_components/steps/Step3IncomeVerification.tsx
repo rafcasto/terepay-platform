@@ -23,93 +23,73 @@ export default function Step3IncomeVerification({
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-gray-900">Income Verification</h2>
-        <p className="text-sm text-gray-500 mt-1">
+        <h2 className="font-display text-xl font-bold text-[var(--text-strong)]">Income Verification</h2>
+        <p className="mt-1 text-sm text-[var(--text-muted)]">
           All amounts in NZD per fortnight. Verify income with payslips and bank statements.
         </p>
       </div>
 
       {/* Validation errors */}
       {validationErrors && validationErrors.length > 0 && (
-        <div className="bg-red-50 border border-red-300 rounded-xl p-4">
-          <p className="text-sm font-semibold text-red-800 mb-2">Please resolve the following before proceeding:</p>
-          <ul className="list-disc list-inside space-y-1 text-sm text-red-700">
+        <div className="rounded-[var(--radius-lg)] border border-[var(--danger-700)]/30 bg-[var(--danger-50)] p-4">
+          <p className="mb-2 text-sm font-semibold text-[var(--danger-700)]">Please resolve the following before proceeding:</p>
+          <ul className="list-inside list-disc space-y-1 text-sm text-[var(--danger-700)]">
             {validationErrors.map((e) => <li key={e}>{e}</li>)}
           </ul>
         </div>
       )}
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+      <div className="overflow-x-auto rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-white shadow-[var(--shadow-xs)]">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-gray-200 bg-gray-50">
-              <th className="py-3 px-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide min-w-[160px]">
-                Income Source
-              </th>
-              <th className="py-3 px-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide min-w-[110px]">
-                Centrix Amount
-              </th>
-              <th className="py-3 px-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide min-w-[110px]">
-                Verified Amount
-              </th>
-              <th className="py-3 px-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide min-w-[100px]">
-                Adjustment
-              </th>
-              <th className="py-3 px-3 text-right text-xs font-semibold text-[#0D1B2A] uppercase tracking-wide bg-blue-50 min-w-[110px]">
+            <tr className="border-b border-[var(--border-default)] bg-[var(--slate-50)]">
+              <th className={`${thCls} min-w-[160px] text-left`}>Income Source</th>
+              <th className={`${thCls} min-w-[110px] text-right`}>Centrix Amount</th>
+              <th className={`${thCls} min-w-[110px] text-right`}>Verified Amount</th>
+              <th className={`${thCls} min-w-[100px] text-right`}>Adjustment</th>
+              <th className="min-w-[110px] bg-[var(--orange-50)] px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-[var(--orange-700)]">
                 Final Amount
               </th>
-              <th className="py-3 px-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide min-w-[130px]">
-                Notes
-              </th>
+              <th className={`${thCls} min-w-[130px] text-left`}>Notes</th>
             </tr>
           </thead>
           <tbody>
             {incomeRows.map((row, i) => (
-              <tr key={row.category} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
-                <td className="py-3 px-4 font-medium text-gray-700">{row.category}</td>
-                <td className="py-3 px-3">
-                  <NumInput
-                    value={row.centrixAmount}
-                    onChange={(v) => onUpdate(i, 'centrixAmount', v)}
-                  />
+              <tr key={row.category} className="border-b border-[var(--border-subtle)] transition-colors hover:bg-[var(--slate-50)]">
+                <td className="px-4 py-3 font-medium text-[var(--text-body)]">{row.category}</td>
+                <td className="px-3 py-3">
+                  <NumInput value={row.centrixAmount} onChange={(v) => onUpdate(i, 'centrixAmount', v)} />
                 </td>
-                <td className="py-3 px-3">
-                  <NumInput
-                    value={row.verifiedAmount}
-                    onChange={(v) => onUpdate(i, 'verifiedAmount', v)}
-                  />
+                <td className="px-3 py-3">
+                  <NumInput value={row.verifiedAmount} onChange={(v) => onUpdate(i, 'verifiedAmount', v)} />
                 </td>
-                <td className="py-3 px-3">
-                  <NumInput
-                    value={row.adjustment}
-                    onChange={(v) => onUpdate(i, 'adjustment', v)}
-                    allowNegative
-                  />
+                <td className="px-3 py-3">
+                  <NumInput value={row.adjustment} onChange={(v) => onUpdate(i, 'adjustment', v)} allowNegative />
                 </td>
-                <td className="py-3 px-3 text-right font-bold text-[#0D1B2A] bg-blue-50">
+                <td className="bg-[var(--orange-50)] px-3 py-3 text-right font-mono font-bold tabular-nums text-[var(--text-strong)]">
                   {fmt(row.finalAmount)}
                 </td>
-                <td className="py-3 px-3">
+                <td className="px-3 py-3">
                   <input
                     type="text"
                     value={row.adjustmentReason}
                     onChange={(e) => onUpdate(i, 'adjustmentReason', e.target.value)}
                     placeholder="Notes"
-                    className="w-full text-xs border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#0D1B2A]/30 bg-white"
+                    className={noteCls}
                   />
                 </td>
               </tr>
             ))}
           </tbody>
           <tfoot>
-            <tr className="bg-[#0D1B2A]">
-              <td colSpan={4} className="py-3 px-4 text-right font-bold text-white text-sm uppercase tracking-wide">
+            <tr className="bg-[var(--ink-900)]">
+              <td colSpan={4} className="px-4 py-3 text-right text-sm font-bold uppercase tracking-wide text-white">
                 Total Fortnightly Income
               </td>
-              <td className="py-3 px-3 text-right font-bold text-[#F5A523] text-base bg-[#0D1B2A]">
+              <td className="bg-[var(--ink-900)] px-3 py-3 text-right font-mono text-base font-bold tabular-nums text-[var(--orange-400)]">
                 {fmt(totalIncome)}
               </td>
-              <td className="bg-[#0D1B2A]" />
+              <td className="bg-[var(--ink-900)]" />
             </tr>
           </tfoot>
         </table>
@@ -144,14 +124,17 @@ function NumInput({
         step="0.01"
         value={value || ''}
         onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
-        className="w-24 text-xs text-right border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#0D1B2A]/30 bg-white"
+        className="w-24 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-white px-2 py-1.5 text-right text-xs text-[var(--text-body)] focus:border-[var(--orange-400)] focus:outline-none focus:ring-1 focus:ring-[var(--orange-400)]"
         placeholder="0.00"
       />
     </div>
   );
 }
 
+const thCls = 'px-3 py-3 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]';
+const noteCls =
+  'w-full rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-white px-2 py-1.5 text-xs text-[var(--text-body)] focus:border-[var(--orange-400)] focus:outline-none focus:ring-1 focus:ring-[var(--orange-400)]';
 const nextBtnCls =
-  'px-6 py-2.5 bg-[#0D1B2A] text-white rounded-lg text-sm font-semibold hover:bg-[#1a2f4a] transition-colors';
+  'rounded-[10px] bg-[var(--ink-800)] px-6 py-2.5 text-sm font-semibold text-white transition-[filter] hover:brightness-110';
 const backBtnCls =
-  'px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-50 transition-colors';
+  'rounded-[10px] border border-[var(--border-default)] px-6 py-2.5 text-sm font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--surface-sunken)]';
