@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server';
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
 import { auditLog } from '@/lib/utils/audit';
 import { getQippayWebhookConfig } from '@/lib/qippay/webhook-config';
@@ -165,7 +165,9 @@ async function handlePaymentSuccess(epcId: string): Promise<void> {
       const num = p.installmentNumber as number;
       if (num <= countComplete && p.status !== 'success') {
         changed = true;
-        return { ...p, status: 'success', completedAt: FieldValue.serverTimestamp() };
+        // Timestamp.now(), not FieldValue.serverTimestamp() — sentinels are
+        // rejected inside array elements by Firestore.
+        return { ...p, status: 'success', completedAt: Timestamp.now() };
       }
       return p;
     });
@@ -257,7 +259,7 @@ async function handlePaymentFailure(epcId: string): Promise<void> {
         return {
           ...p,
           status: 'failed',
-          failedAt: FieldValue.serverTimestamp(),
+          failedAt: Timestamp.now(),
           failureReason: 'setpay.status.failure — max retries exceeded',
         };
       }
