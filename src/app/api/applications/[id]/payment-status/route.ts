@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server';
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
 import { withAuth } from '@/lib/auth/middleware';
 import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
@@ -102,7 +102,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         }
         if (p.installmentNumber <= countComplete && (p.status === 'scheduled' || p.status === 'retrying')) {
           needsWrite = true;
-          return { ...p, status: 'success' as const, completedAt: FieldValue.serverTimestamp() };
+          // Timestamp.now(), not FieldValue.serverTimestamp() — sentinels are
+          // rejected inside array elements by Firestore.
+          return { ...p, status: 'success' as const, completedAt: Timestamp.now() };
         }
         return p;
       });
