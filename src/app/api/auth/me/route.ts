@@ -1,8 +1,8 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { adminAuth, adminDb, verifySessionOrIdToken } from '@/lib/firebase/admin';
+import { normalizeRoles } from '@/lib/auth/roles';
 
 export const dynamic = 'force-dynamic';
-import { internalError } from '@/lib/utils/api-error';
 
 /**
  * GET /api/auth/me
@@ -42,6 +42,10 @@ export async function GET(request: NextRequest) {
         .catch(() => {/* non-critical */});
     }
 
+    // Roles: prefer the Firestore document (authoritative, updated by admin),
+    // then fall back to the token claims, then to the single `role`.
+    const roles = normalizeRoles(data.role, data.roles ?? decoded.roles);
+
     return NextResponse.json({
       user: {
         uid: decoded.uid,
@@ -49,6 +53,7 @@ export async function GET(request: NextRequest) {
         firstName: data.firstName,
         lastName: data.lastName,
         role: data.role,
+        roles,
         profileComplete: data.profileComplete,
         kycStatus: data.kycStatus ?? 'not_started',
         phoneVerified: data.phoneVerified ?? false,

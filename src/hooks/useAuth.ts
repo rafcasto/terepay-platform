@@ -8,13 +8,17 @@ import {
   type User as FirebaseUser,
 } from 'firebase/auth';
 import { clientAuth } from '@/lib/firebase/client';
+import type { UserRole } from '@/types/user';
 
 type AppUser = {
   uid: string;
   email: string;
   firstName: string;
   lastName: string;
-  role: 'applicant' | 'lender' | 'admin';
+  /** Primary role (default portal). */
+  role: UserRole;
+  /** Full set of roles held by this user (always includes `role`). */
+  roles: UserRole[];
   profileComplete: boolean;
   emailVerified: boolean;
   isExistingCustomer?: boolean;

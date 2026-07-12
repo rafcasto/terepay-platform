@@ -1,6 +1,9 @@
 import Link from 'next/link';
+import { DEFAULT_CONTENT, type ContentSectionValues } from '@/types/content';
 
-export default function HeroSection() {
+export default function HeroSection({ content }: { content?: ContentSectionValues }) {
+  const c = { ...DEFAULT_CONTENT['landing.hero'], ...(content ?? {}) };
+
   const badges = [
     {
       icon: (
@@ -8,8 +11,8 @@ export default function HeroSection() {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
         </svg>
       ),
-      label: 'Fast Approval',
-      sub: 'Decisions in 24 hours',
+      label: c.badge1Label,
+      sub: c.badge1Sub,
     },
     {
       icon: (
@@ -22,8 +25,8 @@ export default function HeroSection() {
           />
         </svg>
       ),
-      label: 'Responsible Lending',
-      sub: 'We lend what you can repay',
+      label: c.badge2Label,
+      sub: c.badge2Sub,
     },
     {
       icon: (
@@ -36,8 +39,8 @@ export default function HeroSection() {
           />
         </svg>
       ),
-      label: 'Transparent Terms',
-      sub: 'No hidden fees ever',
+      label: c.badge3Label,
+      sub: c.badge3Sub,
     },
   ];
 
@@ -45,30 +48,30 @@ export default function HeroSection() {
     <section className="bg-gradient-to-br from-[#FEF7E9] via-white to-white py-20 md:py-32 px-6">
       <div className="max-w-6xl mx-auto text-center">
         <span className="inline-block mb-4 px-4 py-1.5 text-xs font-semibold tracking-widest uppercase text-[#F5A523] bg-[#F5A523]/10 rounded-full">
-          New Zealand&apos;s Community Lender
+          {c.badge}
         </span>
         <h1 className="text-4xl md:text-6xl font-extrabold text-[#0D1B2A] leading-tight max-w-3xl mx-auto">
-          Borrow Now,{' '}
-          <span className="text-[#F5A523]">Pay Later</span>{' '}
-          with TerePay
+          {c.titleLead}{' '}
+          <span className="text-[#F5A523]">{c.titleHighlight}</span>{' '}
+          {c.titleTail}
         </h1>
         <p className="mt-6 text-lg md:text-xl text-gray-500 max-w-2xl mx-auto leading-relaxed">
-          Experience the flexibility of accessing funds when you need them the most while managing your finances.
+          {c.subtitle}
         </p>
-        <p className="mt-2 text-sm text-gray-400">All loans are charged interest — see our rates below.</p>
+        <p className="mt-2 text-sm text-gray-400">{c.disclaimer}</p>
 
         <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
           <Link
             href="/auth/signup"
             className="px-8 py-4 bg-[#F5A523] text-white font-bold rounded-xl hover:bg-[#E08B00] transition-colors shadow-lg shadow-[#F5A523]/25 text-base"
           >
-            Ready To Borrow?
+            {c.primaryCta}
           </Link>
           <Link
             href="/auth/login"
             className="px-8 py-4 border-2 border-[#0D1B2A] text-[#0D1B2A] font-bold rounded-xl hover:bg-[#0D1B2A] hover:text-white transition-colors text-base"
           >
-            Sign In
+            {c.secondaryCta}
           </Link>
         </div>
 

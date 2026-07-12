@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
 import MobileBottomNav from '@/components/shared/MobileBottomNav';
 import ConsoleIcon, { type ConsoleIconName } from '@/components/lender/ConsoleIcon';
+import RoleSwitcher from '@/components/shared/RoleSwitcher';
 
 type NavItem = { href: string; label: string; icon: ConsoleIconName };
 
@@ -54,11 +55,14 @@ export default function LenderShell({ children }: { children: ReactNode }) {
           </span>
           <span className="text-xs font-medium text-[#7f91a6]">Lender</span>
         </div>
-        <form action="/api/auth/logout" method="POST">
-          <button type="submit" className="text-sm text-[#aab8c8] transition-colors hover:text-white">
-            Sign out
-          </button>
-        </form>
+        <div className="flex items-center gap-2">
+          <RoleSwitcher variant="dark" />
+          <form action="/api/auth/logout" method="POST">
+            <button type="submit" className="text-sm text-[#aab8c8] transition-colors hover:text-white">
+              Sign out
+            </button>
+          </form>
+        </div>
       </header>
 
       <div className="flex flex-1">
@@ -169,6 +173,8 @@ export default function LenderShell({ children }: { children: ReactNode }) {
             </label>
 
             <div className="flex-1" />
+
+            <RoleSwitcher />
 
             <button
               type="button"

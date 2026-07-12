@@ -18,7 +18,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
   try {
-    const auth = await withAuth(request, ['admin']);
+    const auth = await withAuth(request, ['admin', 'content_editor']);
     await checkRateLimit(defaultLimiter, auth.uid);
 
     const { id } = await params;
@@ -54,7 +54,7 @@ export async function PATCH(
       return errorResponse(new AppError('RATE_LIMITED', 429, 'Too many requests.'));
     }
 
-    const auth = await withAuth(request, ['admin']);
+    const auth = await withAuth(request, ['admin', 'content_editor']);
     uid = auth.uid;
 
     const { id } = await params;
@@ -121,7 +121,7 @@ export async function DELETE(
       return errorResponse(new AppError('RATE_LIMITED', 429, 'Too many requests.'));
     }
 
-    const auth = await withAuth(request, ['admin']);
+    const auth = await withAuth(request, ['admin', 'content_editor']);
     uid = auth.uid;
 
     const { id } = await params;

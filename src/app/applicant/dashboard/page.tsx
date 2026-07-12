@@ -13,6 +13,8 @@ import type { LoanApplication } from '@/types/application';
 import LoanHero, { type DashboardHeroData } from './_components/LoanHero';
 import LoanCalculatorCard from './_components/LoanCalculatorCard';
 import QuickActions from './_components/QuickActions';
+import { getContentSection } from '@/lib/content/site-content';
+import { DEFAULT_CONTENT } from '@/types/content';
 
 function getGreeting(): string {
   const hour = new Date().getUTCHours();
@@ -129,17 +131,18 @@ export default async function ApplicantDashboard() {
 
   const greeting = getGreeting();
   const firstName = (user?.firstName as string | undefined) ?? null;
+  const content = { ...DEFAULT_CONTENT['borrower.dashboard'], ...(await getContentSection('borrower.dashboard')) };
 
   return (
     <div className="px-4 sm:px-5 pt-6 pb-20 max-w-[540px] mx-auto space-y-5">
       <div>
-        <p className="text-sm text-muted">{greeting} 👋</p>
+        <p className="text-sm text-muted">{greeting} {content.greetingSuffix}</p>
         <h1 className="mt-0.5 text-[26px] font-bold tracking-tight text-text">
-          Welcome back{firstName ? `, ${firstName}` : ''}
+          {content.welcomeTitle}{firstName ? `, ${firstName}` : ''}
         </h1>
       </div>
 
-      <LoanHero data={heroData} firstName={firstName} />
+      <LoanHero data={heroData} firstName={firstName} content={content} />
 
       {/* The loan calculator only invites a new loan when the borrower has no
           outstanding loan. While a loan is active it stays hidden so a second
@@ -149,7 +152,7 @@ export default async function ApplicantDashboard() {
       <QuickActions state={state} pendingAppId={recentApp?.id ?? null} />
 
       <p className="pt-2 text-center text-[12.5px] text-muted">
-        Need help? Email{' '}
+        {content.helpText}{' '}
         <a href="mailto:support@terepay.co.nz" className="font-semibold text-accent-2 hover:underline">
           support@terepay.co.nz
         </a>

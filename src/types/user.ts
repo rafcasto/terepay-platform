@@ -1,6 +1,6 @@
 import type { Timestamp } from 'firebase-admin/firestore';
 
-export type UserRole = 'applicant' | 'lender' | 'admin';
+export type UserRole = 'applicant' | 'lender' | 'admin' | 'content_editor';
 export type UserStatus = 'active' | 'suspended' | 'inactive';
 export type KycStatus = 'not_started' | 'in_progress' | 'submitted' | 'approved' | 'rejected';
 export type ImmigrationStatus = 'student' | 'work_visa' | 'resident' | 'permanent_resident' | 'citizen';
@@ -20,7 +20,14 @@ export interface User {
   email: string;
   firstName: string;
   lastName: string;
+  /** Primary role — drives default portal landing and legacy single-role checks. */
   role: UserRole;
+  /**
+   * Full set of roles granted to this user. A user may hold more than one
+   * (e.g. `['lender', 'content_editor']`). When absent, treat as `[role]`.
+   * Kept in sync with the Firebase custom claim `roles`.
+   */
+  roles?: UserRole[];
   profileComplete: boolean;
   kycStatus: KycStatus;
   status: UserStatus;
