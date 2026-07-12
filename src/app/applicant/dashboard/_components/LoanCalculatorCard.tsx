@@ -4,10 +4,12 @@ import { useState } from 'react';
 import { Card, CardHeader, RangeSlider, QuickAmounts, StatGrid, ButtonLink } from '@/components/ui';
 import { computeRepayment, LOAN_MIN, LOAN_MAX, LOAN_INSTALMENTS } from '@/lib/loan/status-display';
 import { fmtNZD, fmtNZDCompact } from '@/lib/loan/format';
+import { DEFAULT_CONTENT, type ContentSectionValues } from '@/types/content';
 
 const QUICK = [300, 500, 1000, 1500, 2000];
 
-export default function LoanCalculatorCard() {
+export default function LoanCalculatorCard({ content }: { content?: ContentSectionValues }) {
+  const c = { ...DEFAULT_CONTENT['borrower.dashboard'], ...(content ?? {}) };
   const [amount, setAmount] = useState(500);
   const r = computeRepayment(amount);
 
@@ -48,8 +50,7 @@ export default function LoanCalculatorCard() {
 
       <p className="mt-4 text-[12.5px] text-[var(--text-muted)] leading-relaxed">
         {LOAN_INSTALMENTS} fortnightly payments over 8 weeks. All loans are charged interest;
-        includes an establishment fee of {fmtNZD(r.fee)}. Applications are subject to approval and
-        affordability checks — final terms confirmed after assessment.
+        includes an establishment fee of {fmtNZD(r.fee)}. {c.calculatorDisclaimer}
       </p>
 
       <div className="mt-5">

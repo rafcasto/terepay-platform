@@ -1,11 +1,16 @@
 import { type NextRequest } from 'next/server';
 import { verifySessionOrIdToken } from '@/lib/firebase/admin';
 import { AppError } from '@/lib/utils/api-error';
+import type { UserRole } from '@/types/user';
+import { rolesFromClaims, hasAnyRole } from '@/lib/auth/roles';
 
 export type AuthResult = {
   uid: string;
   email: string;
-  role: 'applicant' | 'lender' | 'admin';
+  /** Primary role (backward compatible). */
+  role: UserRole;
+  /** Full set of roles the user holds. Always contains `role`. */
+  roles: UserRole[];
   emailVerified: boolean;
 };
 
@@ -13,11 +18,12 @@ export type AuthResult = {
  * Verify the Firebase session cookie and extract the authenticated user.
  * Throws `AppError` (401 or 403) on failure — catch and return `errorResponse()`.
  *
- * @param allowedRoles  Optional whitelist of roles. Omit to allow any role.
+ * @param allowedRoles  Optional whitelist of roles. Access is granted if the
+ *                      user holds *any* of these roles. Omit to allow any role.
  */
 export async function withAuth(
   request: NextRequest,
-  allowedRoles?: ('applicant' | 'lender' | 'admin')[],
+  allowedRoles?: UserRole[],
 ): Promise<AuthResult> {
   const sessionCookie = request.cookies.get('__session')?.value;
 
@@ -32,11 +38,18 @@ export async function withAuth(
     throw new AppError('AUTH_EXPIRED', 401, 'Session expired or invalid');
   }
 
-  const role = decoded.role as 'applicant' | 'lender' | 'admin';
+  const roles = rolesFromClaims({ role: decoded.role, roles: decoded.roles });
+  const role = (decoded.role as UserRole) ?? roles[0];
 
-  if (allowedRoles && !allowedRoles.includes(role)) {
+  if (allowedRoles && !hasAnyRole(roles, allowedRoles)) {
     throw new AppError('FORBIDDEN', 403, 'You do not have permission to access this resource');
   }
 
-  return { uid: decoded.uid, email: decoded.email ?? '', role, emailVerified: decoded.email_verified ?? false };
+  return {
+    uid: decoded.uid,
+    email: decoded.email ?? '',
+    role,
+    roles,
+    emailVerified: decoded.email_verified ?? false,
+  };
 }

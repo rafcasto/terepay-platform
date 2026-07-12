@@ -13,6 +13,7 @@ import {
 import { LOAN_MIN, LOAN_MAX } from '@/lib/loan/status-display';
 import { RangeSlider, QuickAmounts } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
+import { useApplyContent } from './ApplyContentContext';
 
 const inputCls =
   'w-full px-3 h-11 border border-border-default rounded-xl text-sm focus:ring-2 focus:ring-[var(--focus-ring)] focus:border-brand focus:outline-none transition-colors bg-surface-card text-ink-strong placeholder:text-[var(--text-disabled)]';
@@ -42,6 +43,7 @@ export default function Step5LoanRequest() {
     formState: { errors },
   } = useFormContext<TerepayApplicationInput>();
   const { user } = useAuth();
+  const applyContent = useApplyContent();
 
   const e = errors.loanRequest;
   const isPEP = useWatch({ control, name: 'loanRequest.isPEP' });
@@ -135,7 +137,7 @@ export default function Step5LoanRequest() {
           <p className="text-xs text-[var(--text-muted)]">
             You&apos;ll receive{' '}
             <span className="font-semibold text-ink-strong">${amountReceived.toFixed(2)}</span> after the ${estFee}{' '}
-            application fee is deducted. All loans are charged interest and fees.
+            application fee is deducted. {applyContent.chargedInterestNote}
           </p>
         </div>
       )}

@@ -4,6 +4,7 @@ import { verifySessionOrIdToken, getAdminDb } from '@/lib/firebase/admin';
 import Link from 'next/link';
 import { Pill, Icons } from '@/components/ui';
 import { obPrimaryBtn } from './_components/onboarding-styles';
+import { getContentSection } from '@/lib/content/site-content';
 
 export default async function OnboardingIntroPage() {
   const cookieStore = await cookies();
@@ -20,6 +21,8 @@ export default async function OnboardingIntroPage() {
   ]);
   const userData = userSnap.data();
   if (userData?.profileComplete) redirect('/applicant/dashboard');
+
+  const disclaimers = await getContentSection('onboarding.disclaimers');
 
   let nextStep = '/applicant/onboarding/verify-email';
   if (userData?.emailVerified && !userData?.phoneVerified) {
@@ -85,8 +88,7 @@ export default async function OnboardingIntroPage() {
         </Link>
 
         <p className="mt-4 text-xs text-[var(--text-muted)] text-center leading-relaxed">
-          Applications are subject to approval and affordability checks. All loans are charged
-          interest — see full terms before you apply.
+          {disclaimers.approvalDisclaimer}
         </p>
       </div>
     </div>

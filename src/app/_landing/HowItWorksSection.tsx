@@ -1,20 +1,12 @@
-export default function HowItWorksSection() {
+import { DEFAULT_CONTENT, type ContentSectionValues } from '@/types/content';
+
+export default function HowItWorksSection({ content }: { content?: ContentSectionValues }) {
+  const c = { ...DEFAULT_CONTENT['landing.howItWorks'], ...(content ?? {}) };
+
   const steps = [
-    {
-      number: '01',
-      title: 'Apply Online',
-      body: 'Complete our quick and simple application form from any device. It only takes a few minutes.',
-    },
-    {
-      number: '02',
-      title: 'Get Approved',
-      body: 'We assess your application as a responsible lender and provide a decision within 24 hours.',
-    },
-    {
-      number: '03',
-      title: 'Receive Funds',
-      body: 'Once approved, funds are transferred directly into your bank account — fast and hassle-free.',
-    },
+    { number: '01', title: c.step1Title, body: c.step1Body },
+    { number: '02', title: c.step2Title, body: c.step2Body },
+    { number: '03', title: c.step3Title, body: c.step3Body },
   ];
 
   return (
@@ -22,12 +14,11 @@ export default function HowItWorksSection() {
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-14">
           <span className="text-xs font-semibold tracking-widest uppercase text-[#F5A523]">
-            Simple Process
+            {c.eyebrow}
           </span>
-          <h2 className="mt-2 text-3xl md:text-4xl font-extrabold text-[#0D1B2A]">How It Works</h2>
+          <h2 className="mt-2 text-3xl md:text-4xl font-extrabold text-[#0D1B2A]">{c.heading}</h2>
           <p className="mt-4 text-gray-500 max-w-xl mx-auto">
-            Getting a TerePay loan is quick and straightforward — three steps stand between you and the
-            funds you need.
+            {c.intro}
           </p>
         </div>
 

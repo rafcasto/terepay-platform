@@ -6,36 +6,45 @@ import { adminCreateLenderSchema } from '@/lib/validation/schemas';
 import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { auditLog, getClientIp } from '@/lib/utils/audit';
 import { defaultLimiter, checkRateLimit } from '@/lib/rate-limit/limiter';
+import { normalizeRoles } from '@/lib/auth/roles';
 import { FieldValue } from 'firebase-admin/firestore';
+import type { UserRole } from '@/types/user';
 
 export const dynamic = 'force-dynamic';
 
-// GET /api/admin/users — list all lender users
+const STAFF_ROLES: UserRole[] = ['lender', 'content_editor'];
+
+// GET /api/admin/users — list all staff users (lenders + content editors).
 export async function GET(request: NextRequest): Promise<Response> {
   try {
     const auth = await withAuth(request, ['admin']);
     await checkRateLimit(defaultLimiter, auth.uid);
 
+    // `where in` + `orderBy` on a different field needs a composite index; keep
+    // it index-free by filtering on the primary role and sorting in memory.
     const snap = await adminDb
       .collection('users')
-      .where('role', '==', 'lender')
-      .orderBy('createdAt', 'desc')
-      .limit(100)
+      .where('role', 'in', STAFF_ROLES)
+      .limit(200)
       .get();
 
-    const users = snap.docs.map((doc) => {
-      const d = doc.data();
-      return {
-        uid: d.uid,
-        email: d.email,
-        firstName: d.firstName,
-        lastName: d.lastName,
-        status: d.status,
-        profileComplete: d.profileComplete,
-        createdAt: d.createdAt?.toMillis?.() ?? null,
-        lastLoginAt: d.lastLoginAt?.toMillis?.() ?? null,
-      };
-    });
+    const users = snap.docs
+      .map((doc) => {
+        const d = doc.data();
+        return {
+          uid: d.uid,
+          email: d.email,
+          firstName: d.firstName,
+          lastName: d.lastName,
+          role: d.role as UserRole,
+          roles: normalizeRoles(d.role, d.roles),
+          status: d.status,
+          profileComplete: d.profileComplete,
+          createdAt: d.createdAt?.toMillis?.() ?? null,
+          lastLoginAt: d.lastLoginAt?.toMillis?.() ?? null,
+        };
+      })
+      .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
 
     return NextResponse.json({ data: users });
   } catch (err) {
@@ -44,7 +53,7 @@ export async function GET(request: NextRequest): Promise<Response> {
   }
 }
 
-// POST /api/admin/users — create a new lender account
+// POST /api/admin/users — create a new staff account (lender / content editor).
 export async function POST(request: NextRequest): Promise<Response> {
   const ip = getClientIp(request);
   let uid = 'unknown';
@@ -59,10 +68,14 @@ export async function POST(request: NextRequest): Promise<Response> {
     uid = auth.uid;
 
     const body = await request.json();
-    const { email, password, firstName, lastName } = adminCreateLenderSchema.parse(body);
+    const { email, password, firstName, lastName, roles } = adminCreateLenderSchema.parse(body);
+
+    const grantedRoles = normalizeRoles(undefined, roles);
+    // Prefer lender as the primary role when granted (keeps existing lender
+    // routing/behaviour), otherwise the first granted role.
+    const primary: UserRole = grantedRoles.includes('lender') ? 'lender' : grantedRoles[0];
 
     // Check if user already exists in Firebase Auth
-
     try {
       const existing = await adminAuth.getUserByEmail(email);
       return errorResponse(new AppError('CONFLICT', 409, `User with email ${existing.email} already exists`));
@@ -80,8 +93,8 @@ export async function POST(request: NextRequest): Promise<Response> {
     });
     const newUid = newUser.uid;
 
-    // Set lender role claim — force ID token refresh on next login
-    await adminAuth.setCustomUserClaims(newUid, { role: 'lender' });
+    // Set role claims — force ID token refresh on next login
+    await adminAuth.setCustomUserClaims(newUid, { role: primary, roles: grantedRoles });
 
     // Create Firestore user document
     const now = FieldValue.serverTimestamp();
@@ -90,7 +103,8 @@ export async function POST(request: NextRequest): Promise<Response> {
       email: email.toLowerCase().trim(),
       firstName,
       lastName,
-      role: 'lender',
+      role: primary,
+      roles: grantedRoles,
       status: 'active',
       profileComplete: false,
       kycStatus: 'not_started',
@@ -102,11 +116,11 @@ export async function POST(request: NextRequest): Promise<Response> {
 
     await auditLog({
       userId: auth.uid,
-      action: 'admin_create_lender',
+      action: 'admin_create_staff_user',
       targetId: newUid,
       targetType: 'users',
       outcome: 'success',
-      changes: { email, firstName, lastName },
+      changes: { email, firstName, lastName, roles: grantedRoles },
       ipAddress: ip,
       userAgent: request.headers.get('user-agent') ?? '',
     });
@@ -120,7 +134,7 @@ export async function POST(request: NextRequest): Promise<Response> {
 
     await auditLog({
       userId: uid,
-      action: 'admin_create_lender',
+      action: 'admin_create_staff_user',
       targetType: 'users',
       outcome: 'failure',
       errorDetail: err instanceof Error ? err.message : 'unknown',

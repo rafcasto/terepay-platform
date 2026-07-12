@@ -1,6 +1,7 @@
 import { Hero, HeroBalance, Pill, ProgressBar, StatGrid, ButtonLink, Confetti } from '@/components/ui';
 import { fmtDate, fmtNZD, daysUntil } from '@/lib/loan/format';
 import type { LoanDisplayState } from '@/lib/loan/status-display';
+import { DEFAULT_CONTENT, type ContentSectionValues } from '@/types/content';
 
 export type DashboardHeroData = {
   state: LoanDisplayState;
@@ -23,7 +24,16 @@ export type DashboardHeroData = {
   };
 };
 
-export default function LoanHero({ data, firstName }: { data: DashboardHeroData; firstName?: string | null }) {
+export default function LoanHero({
+  data,
+  firstName,
+  content,
+}: {
+  data: DashboardHeroData;
+  firstName?: string | null;
+  content?: ContentSectionValues;
+}) {
+  const c = { ...DEFAULT_CONTENT['borrower.dashboard'], ...(content ?? {}) };
   if (data.state === 'active' && data.loan) {
     const { remainingBalance, totalPaid, nextPaymentDate, isDelinquent, applicationId } = data.loan;
     const total = totalPaid + remainingBalance;
@@ -133,7 +143,7 @@ export default function LoanHero({ data, firstName }: { data: DashboardHeroData;
           </ButtonLink>
         </div>
         <p className="mt-3 text-[12px] text-white/60">
-          All loans are charged interest and fees. Applications can be declined.
+          {c.draftDisclaimer}
         </p>
       </Hero>
     );
@@ -225,12 +235,12 @@ export default function LoanHero({ data, firstName }: { data: DashboardHeroData;
   // state === 'new'
   return (
     <Hero
-      eyebrow="No active loan"
-      title="Start a TerePay loan"
-      subtitle="Borrow $200 – $2,000 · 8 weeks · 4 fortnightly instalments."
+      eyebrow={c.newEyebrow}
+      title={c.newTitle}
+      subtitle={c.newSubtitle}
     >
       <ButtonLink href="/applicant/apply" fullWidth>
-        Apply for a loan
+        {c.newCta}
       </ButtonLink>
     </Hero>
   );

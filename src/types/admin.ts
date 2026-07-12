@@ -1,4 +1,5 @@
 import type { Timestamp } from 'firebase-admin/firestore';
+import type { UserRole } from '@/types/user';
 
 // ---------------------------------------------------------------------------
 // Site Settings
@@ -150,6 +151,10 @@ export interface AdminLenderView {
   email: string;
   firstName: string;
   lastName: string;
+  /** Primary role. */
+  role: UserRole;
+  /** Full set of roles held (always includes `role`). */
+  roles: UserRole[];
   status: 'active' | 'suspended' | 'inactive';
   profileComplete: boolean;
   createdAt?: Timestamp;

@@ -6,6 +6,8 @@ import { redirect } from 'next/navigation';
 import { getAdminDb, verifySessionOrIdToken } from '@/lib/firebase/admin';
 import { Icons } from '@/components/ui';
 import LoanStepTracker from './_components/LoanStepTracker';
+import { getContentSection } from '@/lib/content/site-content';
+import { ApplyContentProvider } from './_components/ApplyContentContext';
 
 const TERMINAL_STATUSES = new Set([
   'declined', 'withdrawn', 'expired', 'closed_repaid', 'offer_declined',
@@ -17,6 +19,10 @@ interface Props {
 }
 
 export default async function ApplyLayout({ children }: Props) {
+  const [compliance, applyDisclaimers] = await Promise.all([
+    getContentSection('borrower.compliance'),
+    getContentSection('apply.disclaimers'),
+  ]);
   const cookieStore = await cookies();
   const session = cookieStore.get('__session')?.value;
   if (session) {
@@ -69,7 +75,7 @@ export default async function ApplyLayout({ children }: Props) {
           <div className="flex items-start gap-2.5 text-white/55">
             <Icons.ShieldCheck size={18} className="shrink-0 mt-0.5 text-[var(--gold-300)]" />
             <p className="text-xs leading-relaxed">
-              Your information is encrypted and stored securely. We comply with the NZ Privacy Act 2020.
+              {compliance.privacyNote}
             </p>
           </div>
         </div>
@@ -100,7 +106,9 @@ export default async function ApplyLayout({ children }: Props) {
           <LoanStepTracker />
         </div>
 
-        <main className="flex-1 overflow-auto">{children}</main>
+        <main className="flex-1 overflow-auto">
+          <ApplyContentProvider value={applyDisclaimers}>{children}</ApplyContentProvider>
+        </main>
       </div>
     </div>
   );

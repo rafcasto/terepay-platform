@@ -484,12 +484,23 @@ export const adminCreateLenderSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters'),
   firstName: z.string().min(1, 'First name is required').max(50),
   lastName: z.string().min(1, 'Last name is required').max(50),
+  // Staff roles to grant. Defaults to lender for backward compatibility.
+  roles: z.array(z.enum(['lender', 'content_editor'])).min(1).max(2).default(['lender']),
 });
 
 export const adminUpdateLenderSchema = z.object({
   firstName: z.string().min(1).max(50).optional(),
   lastName: z.string().min(1).max(50).optional(),
   status: z.enum(['active', 'suspended', 'inactive']).optional(),
+  roles: z.array(z.enum(['lender', 'content_editor'])).min(1).max(2).optional(),
+});
+
+export const adminUpdateUserRolesSchema = z.object({
+  // Assignable staff roles. Admin can grant any combination of these.
+  roles: z
+    .array(z.enum(['lender', 'content_editor']))
+    .min(1, 'A staff user must keep at least one role')
+    .max(2),
 });
 
 export const adminSiteSettingsSchema = z.object({
@@ -541,6 +552,7 @@ export const adminEmailTemplatePatchSchema = adminEmailTemplateSchema.partial();
 
 export type AdminCreateLenderInput = z.infer<typeof adminCreateLenderSchema>;
 export type AdminUpdateLenderInput = z.infer<typeof adminUpdateLenderSchema>;
+export type AdminUpdateUserRolesInput = z.infer<typeof adminUpdateUserRolesSchema>;
 export type AdminSiteSettingsInput = z.infer<typeof adminSiteSettingsSchema>;
 export type AdminConfigInput = z.infer<typeof adminConfigSchema>;
 export type AdminReassignApplicationsInput = z.infer<typeof adminReassignApplicationsSchema>;

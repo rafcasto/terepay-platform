@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { getSiteSettings } from '@/lib/admin/site-settings';
+import { getContentSection } from '@/lib/content/site-content';
 import MaintenancePage from '@/components/shared/MaintenancePage';
 import Navbar from './_landing/Navbar';
 import HeroSection from './_landing/HeroSection';
@@ -36,18 +37,26 @@ export default async function Home() {
     return <MaintenancePage message={settings.maintenanceMessage} />;
   }
 
+  const [heroContent, faqContent, ctaContent, howItWorksContent, featuresContent] = await Promise.all([
+    getContentSection('landing.hero'),
+    getContentSection('landing.faq'),
+    getContentSection('landing.cta'),
+    getContentSection('landing.howItWorks'),
+    getContentSection('landing.features'),
+  ]);
+
   return (
     <div className="min-h-screen bg-white text-gray-900">
       <Navbar />
       <main>
-        <HeroSection />
-        <HowItWorksSection />
-        <FeaturesSection />
+        <HeroSection content={heroContent} />
+        <HowItWorksSection content={howItWorksContent} />
+        <FeaturesSection content={featuresContent} />
         <LoanSummaryCard />
         <PartnersSection />
         <TestimonialsSection />
-        <FAQSection />
-        <CTABanner />
+        <FAQSection content={faqContent} />
+        <CTABanner content={ctaContent} />
       </main>
       <Footer />
     </div>
