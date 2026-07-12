@@ -156,9 +156,13 @@ export interface EarlyRepayment {
   status: EarlyRepaymentStatus;
   /** Qippay PayBy payment id (`pmU_...`) from POST /v1/payment_initiation. */
   paymentId: string;
-  /** Qippay Hosted payment page URL the borrower is redirected to. */
+  /** Qippay Hosted payment page URL (fallback only — embedded flow is primary). */
   hostedUrl: string;
   beneficiaryId: string;
+  /** Embedded flow: bank the borrower selected (Qippay provider id). */
+  providerId?: string;
+  /** Embedded flow: how the bank approval was delivered ('CIBA' | 'redirect'). */
+  approvalMethod?: string;
   quote: EarlyRepaymentQuote;
   /** Records the borrower's acceptance of the advance-payment terms. */
   disclaimerAcceptedAt: Timestamp;

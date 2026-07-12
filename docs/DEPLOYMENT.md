@@ -48,6 +48,7 @@ QIPPAY_CLIENT_SECRET=<server-only bearer>
 QIPPAY_BENEFICIARY_ID=<TerePay beneficiary>
 QIPPAY_MODE=stub                              # 'stub' for local dev; 'live' once SetPay docs arrive
 QIPPAY_RETURN_BASE_URL=http://localhost:3000
+QIPPAY_PAYBY_APPROVE_PATH=/v1/approve_payment  # PayBy *Embedded* approve endpoint (early repayment) — CONFIRM against the PayBy Embedded spec; default is a best-guess
 ```
 
 **Production (set in Vercel Dashboard → Environment Variables):**
@@ -91,6 +92,7 @@ QIPPAY_RETURN_BASE_URL=https://terepay.com
 - `QIPPAY_MODE=stub` is hard-blocked when `NEXT_PUBLIC_ENVIRONMENT=production`. Setting `stub` in production raises an error at first call from `src/lib/qippay/setpay-client.ts`.
 - The success/failure URLs registered with Qippay must match `${QIPPAY_RETURN_BASE_URL}/applicant/applications/<id>/consent/return`. Vercel preview deploys use ephemeral hostnames — only test against live Qippay UAT from a stable host; preview QA should use `stub`.
 - `QIPPAY_BENEFICIARY_ID` resolves to TerePay's platform-wide Qippay merchant account (single beneficiary across all lenders).
+- **Early repayment uses Qippay PayBy in *embedded* mode** (bank picker + phone in-app, then CIBA push or a redirect straight to the bank — no Hosted proxy page). The PayBy Embedded approve endpoint is not in the PayBy Hosted spec (rev 9); `QIPPAY_PAYBY_APPROVE_PATH` overrides the assumed path `/v1/approve_payment`. **Confirm the real path/shape against the PayBy Embedded spec before `QIPPAY_MODE=live`.** Success/failure URLs for the redirect variant point at `${QIPPAY_RETURN_BASE_URL}/applicant/applications/<id>/early-repayment/return`.
 - `live` mode hits `POST /v1/enduring_initiation` and `GET /v1/enduring_initiation/{epcId}`. Per the SetPay Integrated v1.0 (rev 1) spec, we use the Hosted-style entry point — a single POST returns a `url` for the applicant's redirect, bypassing the explicit bank-selector / `/v1/approve_enduring` flow.
 - UAT test creds for the hosted page: `user01` / `password`. Three fictitious banks (Orange/Purple/Grey) each test a different approval flow.
 
