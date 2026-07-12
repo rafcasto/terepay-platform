@@ -66,19 +66,59 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const phoneForQippay = normaliseNzPhoneForQippay(body.phone);
 
-    const approval = await approvePayment({
-      paymentId: er.paymentId,
-      providerId: body.providerId,
-      phone: phoneForQippay,
-      ...(body.method ? { method: body.method } : {}),
-    });
+    // Attempt the embedded bank approval. The PayBy *Embedded* approve endpoint
+    // is not in the PayBy Hosted spec, so it may not be enabled on the account
+    // (Qippay returns 4xx). Rather than dead-end the borrower on an upstream
+    // error, fall back to this payment's Hosted page — we already hold its URL
+    // from payment_initiation — and let them approve there. The Hosted round
+    // trip returns to the same early-repayment return page and reconciles the
+    // same way, so settlement is identical.
+    let approval;
+    try {
+      approval = await approvePayment({
+        paymentId: er.paymentId,
+        providerId: body.providerId,
+        phone: phoneForQippay,
+      });
+    } catch (approveErr) {
+      if (!er.hostedUrl) throw approveErr;
+
+      await appRef.update({
+        'earlyRepayment.status': 'pending',
+        'earlyRepayment.approvalMethod': 'hosted_fallback',
+        'earlyRepayment.providerId': body.providerId,
+        'earlyRepayment.lastStatusFromProvider': 'embedded_unavailable',
+        'timeline.updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      await auditLog({
+        userId: auth.uid,
+        action: 'early_repayment_approve_hosted_fallback',
+        targetId: id,
+        targetType: 'application',
+        outcome: 'success',
+        ipAddress: ip,
+        errorDetail: approveErr instanceof Error ? approveErr.message : String(approveErr),
+        changes: { paymentId: er.paymentId, providerId: body.providerId },
+      });
+
+      return NextResponse.json({
+        data: { method: 'redirect', redirectUri: er.hostedUrl, fallback: true },
+      });
+    }
 
     // In stub mode there is no real redirect_uri — loop back to our return page
     // with stub=success so the existing reconciler recognises a round-trip.
     let effectiveRedirect = approval.redirectUri;
     if (!effectiveRedirect && approval.method === 'redirect') {
-      const base = getReturnBaseUrl();
-      effectiveRedirect = `${base}/applicant/applications/${id}/early-repayment/return?outcome=success&stub=success`;
+      // Prefer the payment's Hosted page (real hand-off); fall back to the stub
+      // success loop only when we have no Hosted URL (offline dev).
+      if (er.hostedUrl) {
+        effectiveRedirect = er.hostedUrl;
+      } else {
+        const base = getReturnBaseUrl();
+        effectiveRedirect = `${base}/applicant/applications/${id}/early-repayment/return?outcome=success&stub=success`;
+      }
     }
 
     await appRef.update({

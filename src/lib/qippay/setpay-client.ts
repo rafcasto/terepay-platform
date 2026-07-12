@@ -576,3 +576,29 @@ export async function getDetailedConsentStatus(
     periodStatus: (data.period_status ?? []).map((p) => mapOverallStatus(p)!),
   };
 }
+
+
+// --- Cancel an enduring consent -------------------------------------------
+// POST /v1/enduring_initiation/cancel (SetPay Integrated, rev 1, p.24).
+// Cancelling a consent ALSO cancels any payments previously scheduled against
+// it — "any payments previously scheduled will not be processed" (p.6). So a
+// single cancel call is enough to stop the recurring direct debit, including
+// instalments already lodged via POST /v1/setpay. Used when a loan is settled
+// early via PayBy so the borrower is not double-charged.
+
+export type SetPayCancelResult = {
+  id: string;
+  status: string; // upstream raw status, expected "cancelled"
+};
+
+export async function cancelEnduring(epcId: string): Promise<SetPayCancelResult> {
+  const env = readEnv();
+  if (env.mode === 'stub') {
+    return { id: epcId, status: 'cancelled' };
+  }
+  const data = await qippayFetch<{ id: string; status: string }>(
+    '/v1/enduring_initiation/cancel',
+    { method: 'POST', body: { epcId } },
+  );
+  return { id: data.id, status: data.status };
+}

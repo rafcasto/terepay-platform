@@ -28,12 +28,13 @@ type InitiateResponse = {
   data: {
     paymentId: string;
     hostedUrl?: string;
-    providers: Provider[];
+    embedded?: boolean;
+    providers?: Provider[];
     phoneHint?: string;
   };
 };
 
-type ApproveResponse = { data: { method: 'CIBA' | 'redirect'; redirectUri?: string } };
+type ApproveResponse = { data: { method: 'CIBA' | 'handoff' | 'redirect'; redirectUri?: string } };
 
 type Stage = 'summary' | 'review' | 'picking' | 'approving' | 'waiting_ciba';
 
@@ -89,11 +90,22 @@ export default function EarlyRepaymentCard({ applicationId, quote, status }: Pro
         return;
       }
       const data = (body as InitiateResponse).data;
-      setProviders(data.providers ?? []);
-      setProviderId(data.providers?.[0]?.id ?? '');
-      setPhone(data.phoneHint ?? '');
-      setHostedUrl(data.hostedUrl ?? '');
-      setStage('picking');
+      // Embedded in-app bank picker only when enabled and banks are available;
+      // otherwise use PayBy's supported Hosted flow — redirect to the payment
+      // page. The Hosted round-trip returns to our early-repayment return page.
+      if (data.embedded && (data.providers?.length ?? 0) > 0) {
+        setProviders(data.providers ?? []);
+        setProviderId(data.providers?.[0]?.id ?? '');
+        setPhone(data.phoneHint ?? '');
+        setHostedUrl(data.hostedUrl ?? '');
+        setStage('picking');
+        return;
+      }
+      if (data.hostedUrl) {
+        window.location.assign(data.hostedUrl);
+        return;
+      }
+      setError('Could not start the payment. Please try again.');
     } catch {
       setError('Network error. Please try again.');
     } finally {
@@ -123,7 +135,9 @@ export default function EarlyRepaymentCard({ applicationId, quote, status }: Pro
         return;
       }
       const data = (body as ApproveResponse).data;
-      if (data.method === 'CIBA') {
+      // CIBA (bank-app push) and handoff (complete on phone/QR) both resolve by
+      // polling the payment status; only 'redirect' sends the user to their bank.
+      if (data.method === 'CIBA' || data.method === 'handoff') {
         setStage('waiting_ciba');
         return;
       }
