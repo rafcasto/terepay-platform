@@ -65,6 +65,8 @@ export interface PaymentConsent {
   lastStatusFromProvider?: string;
   expiresAt?: Timestamp;
   failureReason?: string;
+  /** Why the mandate was cancelled, e.g. 'settled_early' after an early payoff. */
+  cancelledReason?: string;
   attempts: PaymentConsentAttempt[];
 }
 

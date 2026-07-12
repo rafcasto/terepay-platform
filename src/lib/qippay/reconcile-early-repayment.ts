@@ -2,12 +2,14 @@ import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
 import { auditLog } from '@/lib/utils/audit';
 import { getPaymentStatus, normalisePayByStatus, type GetPayByStatusOptions } from './payby-client';
+import { cancelEnduring } from './setpay-client';
 import { syncLoanRecord } from '@/lib/loan/loan-record';
 import { deriveLoanSummary } from '@/lib/loan/active-loan';
 import type {
   EarlyRepayment,
   EarlyRepaymentStatus,
   LoanApplication,
+  PaymentConsent,
   ScheduledPayment,
 } from '@/types/application';
 
@@ -115,6 +117,7 @@ export async function reconcileEarlyRepayment(params: {
   const normalised = normalisePayByStatus(upstream.status);
 
   let settled = false;
+  let consentToCancel: string | null = null;
 
   await adminDb.runTransaction(async (tx) => {
     const snap = await tx.get(appRef);
@@ -140,6 +143,17 @@ export async function reconcileEarlyRepayment(params: {
       updates.scheduledPayments = buildSettledSchedule(app);
       updates.status = 'closed_repaid';
       updates['timeline.closedAt'] = now;
+
+      // Stop the recurring SetPay direct debit so the borrower is not
+      // double-charged. Cancelling the consent also cancels any instalments
+      // already scheduled with Qippay — "any payments previously scheduled
+      // will not be processed" (SetPay Integrated rev 1, p.6).
+      const consent = app.paymentConsent as PaymentConsent | undefined;
+      if (consent?.mandateId && consent.status !== 'cancelled') {
+        updates['paymentConsent.status'] = 'cancelled';
+        updates['paymentConsent.cancelledReason'] = 'settled_early';
+        consentToCancel = consent.mandateId;
+      }
     } else if (normalised === 'expired' || normalised === 'failed' || normalised === 'cancelled') {
       updates['earlyRepayment.status'] = normalised;
       updates['earlyRepayment.failureReason'] = upstream.status;
@@ -151,6 +165,38 @@ export async function reconcileEarlyRepayment(params: {
   });
 
   if (settled) {
+    // Cancel the SetPay mandate upstream (best-effort). The local status was
+    // already flipped to 'cancelled' in the transaction so the scheduler's
+    // active-consent guard hard-stops future lodging even if this call fails.
+    if (consentToCancel) {
+      try {
+        const cancelRes = await cancelEnduring(consentToCancel);
+        await auditLog({
+          userId: callerUid,
+          action: 'early_repayment_consent_cancelled',
+          targetId: applicationId,
+          targetType: 'application',
+          outcome: 'success',
+          ipAddress,
+          changes: { mandateId: consentToCancel, providerStatus: cancelRes.status, caller },
+        });
+      } catch (err) {
+        // The recurring debit may still be live at Qippay — audit loudly so ops
+        // can cancel manually. Never throw: the payoff itself has succeeded.
+        console.error('[early-repayment] SetPay consent cancel failed', err);
+        await auditLog({
+          userId: callerUid,
+          action: 'early_repayment_consent_cancel_failed',
+          targetId: applicationId,
+          targetType: 'application',
+          outcome: 'failure',
+          ipAddress,
+          errorDetail: err instanceof Error ? err.message : String(err),
+          changes: { mandateId: consentToCancel, caller },
+        });
+      }
+    }
+
     // Best-effort: keep the canonical `loans` record in step (closed + zero balance).
     await syncLoanRecord(applicationId);
     await auditLog({
