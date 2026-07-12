@@ -1,8 +1,12 @@
-export default function FeaturesSection() {
+import { DEFAULT_CONTENT, type ContentSectionValues } from '@/types/content';
+
+export default function FeaturesSection({ content }: { content?: ContentSectionValues }) {
+  const c = { ...DEFAULT_CONTENT['landing.features'], ...(content ?? {}) };
+
   const features = [
     {
-      title: 'Fast Approval',
-      body: 'Submit your application and receive a lending decision in as little as 24 hours. We know time matters.',
+      title: c.feature1Title,
+      body: c.feature1Body,
       icon: (
         <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -10,8 +14,8 @@ export default function FeaturesSection() {
       ),
     },
     {
-      title: 'Transparent Terms',
-      body: 'Interest rate of 4.7% for the 8-week term, plus a $20 admin fee. No hidden charges — ever.',
+      title: c.feature2Title,
+      body: c.feature2Body,
       icon: (
         <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
@@ -24,8 +28,8 @@ export default function FeaturesSection() {
       ),
     },
     {
-      title: 'Responsible Lending',
-      body: 'We ensure every loan meets your needs and that you can repay comfortably without financial hardship.',
+      title: c.feature3Title,
+      body: c.feature3Body,
       icon: (
         <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
@@ -44,11 +48,11 @@ export default function FeaturesSection() {
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-14">
           <span className="text-xs font-semibold tracking-widest uppercase text-[#F5A523]">
-            Why TerePay
+            {c.eyebrow}
           </span>
-          <h2 className="mt-2 text-3xl md:text-4xl font-extrabold text-[#0D1B2A]">Built Around You</h2>
+          <h2 className="mt-2 text-3xl md:text-4xl font-extrabold text-[#0D1B2A]">{c.heading}</h2>
           <p className="mt-4 text-gray-500 max-w-xl mx-auto">
-            A lending experience designed with your needs in mind from start to finish.
+            {c.intro}
           </p>
         </div>
 

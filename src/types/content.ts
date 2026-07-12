@@ -119,6 +119,40 @@ export const CONTENT_SECTIONS: ContentSectionDef[] = [
     ],
   },
   {
+    key: 'landing.howItWorks',
+    group: 'landing',
+    label: 'Homepage — How it works',
+    description: 'The three-step "How It Works" section.',
+    fields: [
+      t('eyebrow', 'Eyebrow label'),
+      t('heading', 'Section heading'),
+      ta('intro', 'Intro paragraph'),
+      t('step1Title', 'Step 1 — title'),
+      ta('step1Body', 'Step 1 — description'),
+      t('step2Title', 'Step 2 — title'),
+      ta('step2Body', 'Step 2 — description'),
+      t('step3Title', 'Step 3 — title'),
+      ta('step3Body', 'Step 3 — description'),
+    ],
+  },
+  {
+    key: 'landing.features',
+    group: 'landing',
+    label: 'Homepage — Why TerePay',
+    description: 'The three feature cards ("Built Around You").',
+    fields: [
+      t('eyebrow', 'Eyebrow label'),
+      t('heading', 'Section heading'),
+      ta('intro', 'Intro paragraph'),
+      t('feature1Title', 'Feature 1 — title'),
+      ta('feature1Body', 'Feature 1 — description'),
+      t('feature2Title', 'Feature 2 — title'),
+      ta('feature2Body', 'Feature 2 — description'),
+      t('feature3Title', 'Feature 3 — title'),
+      ta('feature3Body', 'Feature 3 — description'),
+    ],
+  },
+  {
     key: 'borrower.dashboard',
     group: 'borrower',
     label: 'Borrower — Dashboard',
@@ -130,6 +164,12 @@ export const CONTENT_SECTIONS: ContentSectionDef[] = [
       t('newTitle', 'No-loan — title'),
       ta('newSubtitle', 'No-loan — subtitle'),
       t('newCta', 'No-loan — button label'),
+      ta('draftDisclaimer', 'Unsubmitted-application disclaimer', {
+        help: 'Compliance line shown when a borrower has an unsubmitted application.',
+      }),
+      ta('calculatorDisclaimer', 'Loan calculator disclaimer', {
+        help: 'Compliance line under the quick-estimate calculator.',
+      }),
       ta('helpText', 'Help footer text', { help: 'Shown above the support email link.' }),
     ],
   },
@@ -188,6 +228,31 @@ export const DEFAULT_CONTENT: Record<string, ContentSectionValues> = {
     q6: 'What if I have a question or need help?',
     a6: 'Our team is here to help. You can reach us by phone at +64 9 886 7158 or by email at info@terepay.com. We are happy to assist you through every step of the application process.',
   },
+  'landing.howItWorks': {
+    eyebrow: 'Simple Process',
+    heading: 'How It Works',
+    intro:
+      'Getting a TerePay loan is quick and straightforward — three steps stand between you and the funds you need.',
+    step1Title: 'Apply Online',
+    step1Body: 'Complete our quick and simple application form from any device. It only takes a few minutes.',
+    step2Title: 'Get Approved',
+    step2Body: 'We assess your application as a responsible lender and provide a decision within 24 hours.',
+    step3Title: 'Receive Funds',
+    step3Body: 'Once approved, funds are transferred directly into your bank account — fast and hassle-free.',
+  },
+  'landing.features': {
+    eyebrow: 'Why TerePay',
+    heading: 'Built Around You',
+    intro: 'A lending experience designed with your needs in mind from start to finish.',
+    feature1Title: 'Fast Approval',
+    feature1Body:
+      'Submit your application and receive a lending decision in as little as 24 hours. We know time matters.',
+    feature2Title: 'Transparent Terms',
+    feature2Body: 'Interest rate of 4.7% for the 8-week term, plus a $20 admin fee. No hidden charges — ever.',
+    feature3Title: 'Responsible Lending',
+    feature3Body:
+      'We ensure every loan meets your needs and that you can repay comfortably without financial hardship.',
+  },
   'borrower.dashboard': {
     greetingSuffix: '👋',
     welcomeTitle: 'Welcome back',
@@ -195,6 +260,9 @@ export const DEFAULT_CONTENT: Record<string, ContentSectionValues> = {
     newTitle: 'Start a TerePay loan',
     newSubtitle: 'Borrow $200 – $2,000 · 8 weeks · 4 fortnightly instalments.',
     newCta: 'Apply for a loan',
+    draftDisclaimer: 'All loans are charged interest and fees. Applications can be declined.',
+    calculatorDisclaimer:
+      'Applications are subject to approval and affordability checks — final terms confirmed after assessment.',
     helpText: 'Need help? Email',
   },
 };

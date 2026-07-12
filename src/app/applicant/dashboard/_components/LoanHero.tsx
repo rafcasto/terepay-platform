@@ -143,7 +143,7 @@ export default function LoanHero({
           </ButtonLink>
         </div>
         <p className="mt-3 text-[12px] text-white/60">
-          All loans are charged interest and fees. Applications can be declined.
+          {c.draftDisclaimer}
         </p>
       </Hero>
     );

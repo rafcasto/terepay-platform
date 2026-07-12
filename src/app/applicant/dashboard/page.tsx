@@ -147,7 +147,7 @@ export default async function ApplicantDashboard() {
       {/* The loan calculator only invites a new loan when the borrower has no
           outstanding loan. While a loan is active it stays hidden so a second
           loan can't be started until the current one is fully repaid. */}
-      {state === 'new' && <LoanCalculatorCard />}
+      {state === 'new' && <LoanCalculatorCard content={content} />}
 
       <QuickActions state={state} pendingAppId={recentApp?.id ?? null} />
 

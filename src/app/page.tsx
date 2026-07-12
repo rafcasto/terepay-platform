@@ -37,10 +37,12 @@ export default async function Home() {
     return <MaintenancePage message={settings.maintenanceMessage} />;
   }
 
-  const [heroContent, faqContent, ctaContent] = await Promise.all([
+  const [heroContent, faqContent, ctaContent, howItWorksContent, featuresContent] = await Promise.all([
     getContentSection('landing.hero'),
     getContentSection('landing.faq'),
     getContentSection('landing.cta'),
+    getContentSection('landing.howItWorks'),
+    getContentSection('landing.features'),
   ]);
 
   return (
@@ -48,8 +50,8 @@ export default async function Home() {
       <Navbar />
       <main>
         <HeroSection content={heroContent} />
-        <HowItWorksSection />
-        <FeaturesSection />
+        <HowItWorksSection content={howItWorksContent} />
+        <FeaturesSection content={featuresContent} />
         <LoanSummaryCard />
         <PartnersSection />
         <TestimonialsSection />
