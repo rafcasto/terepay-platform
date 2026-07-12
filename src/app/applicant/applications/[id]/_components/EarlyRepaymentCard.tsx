@@ -46,6 +46,7 @@ export default function EarlyRepaymentCard({ applicationId, quote, status }: Pro
   const [providers, setProviders] = useState<Provider[]>([]);
   const [providerId, setProviderId] = useState('');
   const [phone, setPhone] = useState('');
+  const [hostedUrl, setHostedUrl] = useState('');
 
   const inFlight = status === 'initiated' || status === 'pending';
 
@@ -91,6 +92,7 @@ export default function EarlyRepaymentCard({ applicationId, quote, status }: Pro
       setProviders(data.providers ?? []);
       setProviderId(data.providers?.[0]?.id ?? '');
       setPhone(data.phoneHint ?? '');
+      setHostedUrl(data.hostedUrl ?? '');
       setStage('picking');
     } catch {
       setError('Network error. Please try again.');
@@ -136,6 +138,12 @@ export default function EarlyRepaymentCard({ applicationId, quote, status }: Pro
     } finally {
       setLoading(false);
     }
+  };
+
+  // Fallback: hand off to the Qippay Hosted payment page (used when no banks
+  // are available for the embedded picker, or the embedded approve fails).
+  const goToHosted = () => {
+    if (hostedUrl) window.location.assign(hostedUrl);
   };
 
   return (
@@ -228,7 +236,35 @@ export default function EarlyRepaymentCard({ applicationId, quote, status }: Pro
         </div>
       )}
 
-      {(stage === 'picking' || stage === 'approving') && (
+      {(stage === 'picking' || stage === 'approving') && providers.length === 0 && (
+        <div className="mt-4 space-y-4">
+          <p className="text-sm text-muted">
+            {hostedUrl
+              ? 'Your bank isn’t available for in-app approval right now. You can still pay securely on our payment page.'
+              : 'No banks are available right now. Please try again shortly.'}
+          </p>
+
+          {error && <p className="text-sm text-danger font-medium">{error}</p>}
+
+          <div className="flex gap-2">
+            {hostedUrl ? (
+              <Button onClick={goToHosted} disabled={loading} fullWidth>
+                <Icons.ArrowRight size={16} />
+                {`Pay ${fmtNZD(quote.totalPayoff)} on the secure payment page`}
+              </Button>
+            ) : (
+              <Button onClick={handleStart} disabled={loading} fullWidth>
+                {loading ? 'Retrying…' : 'Try again'}
+              </Button>
+            )}
+            <Button variant="secondary" onClick={() => setStage('review')} disabled={loading}>
+              Back
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {(stage === 'picking' || stage === 'approving') && providers.length > 0 && (
         <div className="mt-4 space-y-4">
           <SelectField
             label="Your bank"
@@ -236,7 +272,6 @@ export default function EarlyRepaymentCard({ applicationId, quote, status }: Pro
             onChange={(e) => setProviderId(e.target.value)}
             disabled={loading}
           >
-            {providers.length === 0 && <option value="">(no banks available)</option>}
             {providers.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
@@ -268,6 +303,16 @@ export default function EarlyRepaymentCard({ applicationId, quote, status }: Pro
             You approve the payment securely with your own bank. Applications can be declined and terms
             apply.
           </p>
+          {hostedUrl && (
+            <button
+              type="button"
+              onClick={goToHosted}
+              disabled={loading}
+              className="text-xs font-semibold text-accent hover:underline disabled:opacity-50"
+            >
+              Having trouble? Pay on the secure payment page instead
+            </button>
+          )}
         </div>
       )}
 
