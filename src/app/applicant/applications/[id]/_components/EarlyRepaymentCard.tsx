@@ -8,6 +8,8 @@ import { SectionCard } from '@/components/applicant/screens/shared';
 
 export type EarlyRepaymentQuoteView = {
   outstandingBalance: number;
+  unearnedInterestRebate: number;
+  netOutstanding: number;
   prepaymentFee: number;
   totalPayoff: number;
 };
@@ -87,8 +89,20 @@ export default function EarlyRepaymentCard({ applicationId, quote, status }: Pro
           <div className="rounded-xl bg-surface-2 p-3.5">
             <dl className="space-y-2 text-sm">
               <div className="flex justify-between">
-                <dt className="text-muted">Remaining balance</dt>
+                <dt className="text-muted">Remaining instalments</dt>
                 <dd className="font-semibold text-text tabular-nums">{fmtNZD(quote.outstandingBalance)}</dd>
+              </div>
+              {quote.unearnedInterestRebate > 0 && (
+                <div className="flex justify-between">
+                  <dt className="text-muted">Less: unused interest refund</dt>
+                  <dd className="font-semibold text-success tabular-nums">
+                    −{fmtNZD(quote.unearnedInterestRebate)}
+                  </dd>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <dt className="text-muted">Balance to settle</dt>
+                <dd className="font-semibold text-text tabular-nums">{fmtNZD(quote.netOutstanding)}</dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-muted">Prepayment fee</dt>
@@ -104,13 +118,15 @@ export default function EarlyRepaymentCard({ applicationId, quote, status }: Pro
           <div className="rounded-xl border border-border-default p-3.5 text-[13px] leading-relaxed text-muted">
             <p className="font-semibold text-text mb-1">Advance-payment terms</p>
             <p>
-              By paying off early you agree to pay the remaining balance shown above plus a{' '}
-              <span className="font-semibold">{fmtNZD(quote.prepaymentFee)}</span> prepayment fee, which
-              covers the administrative cost of settling your loan ahead of schedule. This fee is
-              non-refundable. Once your payment is approved by your bank, your loan is settled in full,
-              your remaining scheduled instalments are cancelled, and no further payments are collected.
-              Interest already included in your instalments is not refunded. All loans are charged
-              interest.
+              By paying off early you agree to settle your loan today for{' '}
+              <span className="font-semibold">{fmtNZD(quote.totalPayoff)}</span>. This is the balance of
+              your remaining instalments, less a refund of interest not yet earned (
+              <span className="font-semibold">{fmtNZD(quote.unearnedInterestRebate)}</span>), plus a fixed{' '}
+              <span className="font-semibold">{fmtNZD(quote.prepaymentFee)}</span> prepayment fee that covers
+              the administrative cost of settling ahead of schedule. The prepayment fee is non-refundable.
+              Once your payment is approved by your bank, your loan is settled in full, your remaining
+              scheduled instalments are cancelled, and no further payments are collected. All loans are
+              charged interest.
             </p>
           </div>
 

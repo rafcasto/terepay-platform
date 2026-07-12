@@ -120,14 +120,35 @@ export type EarlyRepaymentStatus =
  */
 export interface EarlyRepaymentQuote {
   currency: 'NZD';
-  /** Outstanding balance settled: sum of not-yet-paid instalments. */
+  /** Gross outstanding: sum of not-yet-paid instalments (principal + interest). */
   outstandingBalanceCents: number;
+  /** Unearned interest refunded on early settlement. */
+  unearnedInterestRebateCents: number;
+  /** outstandingBalanceCents − unearnedInterestRebateCents. */
+  netOutstandingCents: number;
   /** Fixed prepayment/administrative fee (EARLY_REPAYMENT_FEE). */
   prepaymentFeeCents: number;
-  /** outstandingBalanceCents + prepaymentFeeCents — the amount charged via PayBy. */
+  /** netOutstandingCents + prepaymentFeeCents — the amount charged via PayBy. */
   totalPayoffCents: number;
   /** installmentNumbers this payoff clears. */
   installmentsCleared: number[];
+  /**
+   * Snapshot of the interest-rebate working at initiation time, retained for
+   * audit / dispute resolution. Mirrors EarlyPayoffBreakdown (amounts in NZD).
+   */
+  rebateBreakdown?: {
+    method: string;
+    totalInterest: number;
+    totalInstalments: number;
+    remainingInstalments: number;
+    grossFutureInterest: number;
+    termDays: number;
+    elapsedDays: number;
+    remainingDays: number;
+    loanStartDate: string;
+    finalDueDate: string;
+    settlementDate: string;
+  };
 }
 
 export interface EarlyRepayment {

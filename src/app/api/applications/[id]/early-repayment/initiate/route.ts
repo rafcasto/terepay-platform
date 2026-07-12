@@ -116,9 +116,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         quote: {
           currency: 'NZD',
           outstandingBalanceCents: payoff.outstandingBalanceCents,
+          unearnedInterestRebateCents: payoff.unearnedInterestRebateCents,
+          netOutstandingCents: payoff.netOutstandingCents,
           prepaymentFeeCents: payoff.prepaymentFeeCents,
           totalPayoffCents: payoff.totalPayoffCents,
           installmentsCleared: payoff.installmentsCleared,
+          rebateBreakdown: payoff.breakdown,
         },
         disclaimerAcceptedAt: now,
         disclaimerVersion: EARLY_REPAYMENT_DISCLAIMER_VERSION,
@@ -150,6 +153,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         changes: {
           paymentId: result.paymentId,
           totalPayoffCents: result.quote.totalPayoffCents,
+          outstandingBalanceCents: result.quote.outstandingBalanceCents,
+          unearnedInterestRebateCents: result.quote.unearnedInterestRebateCents,
           prepaymentFeeCents: result.quote.prepaymentFeeCents,
           disclaimerVersion: EARLY_REPAYMENT_DISCLAIMER_VERSION,
         },

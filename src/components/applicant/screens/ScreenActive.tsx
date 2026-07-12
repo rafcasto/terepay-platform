@@ -123,6 +123,8 @@ export default function ScreenActive({ app, status, applicationId, scheduledPaym
           applicationId={applicationId}
           quote={{
             outstandingBalance: payoff.outstandingBalance,
+            unearnedInterestRebate: payoff.unearnedInterestRebate,
+            netOutstanding: payoff.netOutstanding,
             prepaymentFee: payoff.prepaymentFee,
             totalPayoff: payoff.totalPayoff,
           }}
