@@ -163,15 +163,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       });
     }
 
-    // Embedded flow: the applicant selects their bank in our UI (no Hosted
-    // proxy page), so ship the bank list + a phone hint back with the payment.
-    const providers = await listProviders().catch(() => []);
+    // PayBy's documented flow is Hosted (redirect to the payment's `url`).
+    // The embedded in-app bank picker is only offered when explicitly enabled
+    // AND the PayBy Embedded approve endpoint has been confirmed — otherwise we
+    // ship no providers and the client hands off to the Hosted page.
+    const paybyEmbedded = process.env.QIPPAY_PAYBY_EMBEDDED === 'true';
+    const providers = paybyEmbedded ? await listProviders().catch(() => []) : [];
 
     return NextResponse.json({
       data: {
         paymentId: result.paymentId,
         hostedUrl: result.hostedUrl,
         quote: result.quote,
+        embedded: paybyEmbedded,
         providers,
         phoneHint: result.phoneHint,
       },

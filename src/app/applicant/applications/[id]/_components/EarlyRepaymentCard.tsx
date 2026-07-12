@@ -28,7 +28,8 @@ type InitiateResponse = {
   data: {
     paymentId: string;
     hostedUrl?: string;
-    providers: Provider[];
+    embedded?: boolean;
+    providers?: Provider[];
     phoneHint?: string;
   };
 };
@@ -89,11 +90,22 @@ export default function EarlyRepaymentCard({ applicationId, quote, status }: Pro
         return;
       }
       const data = (body as InitiateResponse).data;
-      setProviders(data.providers ?? []);
-      setProviderId(data.providers?.[0]?.id ?? '');
-      setPhone(data.phoneHint ?? '');
-      setHostedUrl(data.hostedUrl ?? '');
-      setStage('picking');
+      // Embedded in-app bank picker only when enabled and banks are available;
+      // otherwise use PayBy's supported Hosted flow — redirect to the payment
+      // page. The Hosted round-trip returns to our early-repayment return page.
+      if (data.embedded && (data.providers?.length ?? 0) > 0) {
+        setProviders(data.providers ?? []);
+        setProviderId(data.providers?.[0]?.id ?? '');
+        setPhone(data.phoneHint ?? '');
+        setHostedUrl(data.hostedUrl ?? '');
+        setStage('picking');
+        return;
+      }
+      if (data.hostedUrl) {
+        window.location.assign(data.hostedUrl);
+        return;
+      }
+      setError('Could not start the payment. Please try again.');
     } catch {
       setError('Network error. Please try again.');
     } finally {
