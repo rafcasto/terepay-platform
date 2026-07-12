@@ -111,22 +111,21 @@ export default function ScreenApproved({ app, status, applicationId, isExistingC
 
       {(() => {
         const round2 = (n: number) => Math.round(n * 100) / 100;
-        // Total amount of payments = principal + interest (the fee is deducted at
+        // Total amount to pay = principal + interest (the fee is deducted at
         // disbursement, not repaid via instalments). Total amount = that + fee.
-        const totalOfPayments = ld?.totalRepayment ?? round2(approvedAmount * (1 + LOAN_INTEREST_RATE));
-        const interest = round2(totalOfPayments - approvedAmount);
-        const totalAmount = round2(totalOfPayments + fee);
-        const fortnightly = ld?.fortnightlyPayment ?? round2(totalOfPayments / 4);
+        const totalToPay = ld?.totalRepayment ?? round2(approvedAmount * (1 + LOAN_INTEREST_RATE));
+        const interest = round2(totalToPay - approvedAmount);
+        const totalAmount = round2(totalToPay + fee);
+        const fortnightly = ld?.fortnightlyPayment ?? round2(totalToPay / 4);
         const ratePct = Math.round(LOAN_INTEREST_RATE * 1000) / 10; // 4.7
 
         const rows: Array<{ label: string; value: string; strong?: boolean }> = [
-          { label: 'Loan amount', value: fmtNZD(approvedAmount) },
+          { label: 'Approved loan amount', value: fmtNZD(approvedAmount) },
           { label: `Total interest charges (${ratePct}%)`, value: fmtNZD(interest) },
           { label: 'Application fee', value: fmtNZD(fee) },
           { label: 'Total amount', value: fmtNZD(totalAmount), strong: true },
-          { label: 'Total amount of payments', value: fmtNZD(totalOfPayments) },
-          { label: 'Requested amount', value: fmtNZD(ld?.requestedAmount) },
-          { label: 'Approved amount', value: fmtNZD(approvedAmount) },
+          { label: 'Loan disbursed', value: fmtNZD(payout) },
+          { label: 'Total amount to pay', value: fmtNZD(totalToPay), strong: true },
           { label: 'Fortnightly payment', value: fmtNZD(fortnightly) },
           { label: 'Term', value: '8 weeks · 4 fortnightly payments' },
         ];
