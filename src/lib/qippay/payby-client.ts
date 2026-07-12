@@ -1,5 +1,6 @@
+import { AppError } from '@/lib/utils/api-error';
 import { getMode } from './setpay-client';
-import { qippayFetch } from './http';
+import { qippayFetch, getQippayBaseUrl, getQippayClientSecret } from './http';
 import type { EarlyRepaymentStatus } from '@/types/application';
 
 // Qippay PayBy — Hosted (v1.0, rev 9 — July 2025). A one-off open-banking
@@ -147,71 +148,116 @@ export async function getPaymentStatus(
 }
 
 
-// --- Embedded flow ---------------------------------------------------------
-// The immersive alternative to the Hosted redirect: the customer picks their
-// bank + confirms their phone on OUR UI (via GET /v1/payment_providers, reused
-// from the SetPay client), then we approve the payment directly — the bank
-// either sends a CIBA push (we poll status) or returns a redirect straight to
-// the bank's app/website (no Qippay Hosted Payment Page in between).
-//
-// NOTE: the PayBy *Embedded* endpoints are NOT in the Hosted spec (rev 9),
-// which states Embedded is "not covered in this documentation". This mirrors
-// the SetPay embedded shape (`POST /v1/approve_enduring`). The endpoint path is
-// overridable via QIPPAY_PAYBY_APPROVE_PATH — CONFIRM against the PayBy
-// Embedded spec before going live. Stub mode is fully functional offline.
+// --- Embedded flow: POST /v1/pay ------------------------------------------
+// PayBy Embedded (rev 9, p.10-12). After payment_initiation, "continue" the
+// payment with the customer's selected bank + phone. The response `method`
+// determines the next step:
+//   - CIBA:     the bank pushed an approval to the customer's app  -> poll status
+//   - handoff:  approval must complete on a mobile device (QR/on-phone) -> poll
+//   - redirect: send the customer to redirect_uri (their bank) to approve
+// NOTE: /v1/pay returns a FLAT object ({ pmtId, method, redirect_uri, message })
+// rather than the { success, data } envelope used by payment_initiation, so we
+// parse it tolerantly. Path is overridable via QIPPAY_PAYBY_APPROVE_PATH.
 
-export type PayByApproveMethod = 'redirect' | 'phone' | 'login_hint_token' | 'username';
+export type PayByPayMethod = 'CIBA' | 'handoff' | 'redirect';
 
-export type PayByApproveInput = {
-  paymentId: string; // pmU_...
+export type PayByPayInput = {
+  paymentId: string; // pmU_... from payment_initiation
   providerId: string;
-  phone: string; // +64-XXXXXXXXX format
-  method?: PayByApproveMethod;
-  username?: string;
+  phone: string; // +[country-code]-[digits], no spaces
+  /** Set true only when the customer is certain to be on a mobile device. */
+  noHandoff?: boolean;
 };
 
-export type PayByApproveResponse = {
+export type PayByPayResponse = {
   paymentId?: string;
-  method: 'CIBA' | 'redirect' | string;
+  method: PayByPayMethod;
   redirectUri?: string;
   message?: string;
 };
 
-type ApprovePaymentResponse = {
-  paymentId?: string;
+type PayRawResponse = {
+  pmtId?: string;
   method?: string;
   redirect_uri?: string;
   message?: string;
 };
 
-function getApprovePath(): string {
-  return process.env.QIPPAY_PAYBY_APPROVE_PATH || '/v1/approve_payment';
+function getPayPath(): string {
+  return process.env.QIPPAY_PAYBY_APPROVE_PATH || '/v1/pay';
 }
 
-export async function approvePayment(input: PayByApproveInput): Promise<PayByApproveResponse> {
+function readMessage(json: unknown, fallback: string): string {
+  if (json && typeof json === 'object' && 'message' in json) {
+    const m = (json as { message?: unknown }).message;
+    if (typeof m === 'string' && m) return m;
+  }
+  return fallback;
+}
+
+export async function approvePayment(input: PayByPayInput): Promise<PayByPayResponse> {
   if (getMode() === 'stub') {
-    // Simulate a redirect-style approval; the route handler fills redirectUri
-    // with our success_url+stub=success so reconciliation works end-to-end.
+    // Loop back through our return page (route fills redirectUri) so the stub
+    // round-trip reconciles as a success without any bank interaction.
     return { method: 'redirect', redirectUri: '', message: 'stubbed redirect' };
   }
 
+  const baseUrl = getQippayBaseUrl();
+  const secret = getQippayClientSecret();
   const body: Record<string, unknown> = {
-    paymentId: input.paymentId,
+    pmtId: input.paymentId,
     provider_id: input.providerId,
     phone: input.phone,
   };
-  if (input.method) body.method = input.method;
-  if (input.username) body.username = input.username;
+  if (input.noHandoff !== undefined) body.noHandoff = input.noHandoff;
 
-  const data = await qippayFetch<ApprovePaymentResponse>(getApprovePath(), {
-    method: 'POST',
-    body,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${baseUrl}${getPayPath()}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${secret}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(8000),
+    });
+  } catch (err) {
+    throw new AppError('QIPPAY_UPSTREAM', 502, 'Bank payment service temporarily unavailable', {
+      cause: err instanceof Error ? err.message : String(err),
+    });
+  }
+
+  let json: unknown;
+  try {
+    json = await res.json();
+  } catch {
+    // non-JSON — fall through to status handling
+  }
+
+  if (!res.ok) {
+    const msg = readMessage(json, res.statusText || 'Qippay pay request failed');
+    if (res.status >= 500 || res.status === 0) {
+      throw new AppError('QIPPAY_UPSTREAM', 502, msg, { qippayStatus: res.status });
+    }
+    throw new AppError('QIPPAY_BAD_REQUEST', 502, msg, { qippayStatus: res.status });
+  }
+
+  // Tolerate both the documented flat shape and an enveloped { data } shape.
+  const raw: PayRawResponse =
+    json && typeof json === 'object' && 'data' in json && (json as { data?: unknown }).data
+      ? ((json as { data: PayRawResponse }).data)
+      : ((json as PayRawResponse) ?? {});
+
+  const rawMethod = (raw.method ?? '').toString().toLowerCase();
+  const method: PayByPayMethod =
+    rawMethod === 'ciba' ? 'CIBA' : rawMethod === 'handoff' ? 'handoff' : 'redirect';
 
   return {
-    paymentId: data.paymentId,
-    method: (data.method ?? '').toUpperCase() === 'CIBA' ? 'CIBA' : 'redirect',
-    redirectUri: data.redirect_uri || undefined,
-    message: data.message,
+    paymentId: raw.pmtId,
+    method,
+    redirectUri: raw.redirect_uri || undefined,
+    message: raw.message,
   };
 }

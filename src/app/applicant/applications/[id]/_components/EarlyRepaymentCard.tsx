@@ -34,7 +34,7 @@ type InitiateResponse = {
   };
 };
 
-type ApproveResponse = { data: { method: 'CIBA' | 'redirect'; redirectUri?: string } };
+type ApproveResponse = { data: { method: 'CIBA' | 'handoff' | 'redirect'; redirectUri?: string } };
 
 type Stage = 'summary' | 'review' | 'picking' | 'approving' | 'waiting_ciba';
 
@@ -135,7 +135,9 @@ export default function EarlyRepaymentCard({ applicationId, quote, status }: Pro
         return;
       }
       const data = (body as ApproveResponse).data;
-      if (data.method === 'CIBA') {
+      // CIBA (bank-app push) and handoff (complete on phone/QR) both resolve by
+      // polling the payment status; only 'redirect' sends the user to their bank.
+      if (data.method === 'CIBA' || data.method === 'handoff') {
         setStage('waiting_ciba');
         return;
       }

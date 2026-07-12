@@ -79,7 +79,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         paymentId: er.paymentId,
         providerId: body.providerId,
         phone: phoneForQippay,
-        ...(body.method ? { method: body.method } : {}),
       });
     } catch (approveErr) {
       if (!er.hostedUrl) throw approveErr;

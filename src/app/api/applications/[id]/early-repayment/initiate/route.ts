@@ -167,7 +167,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // The embedded in-app bank picker is only offered when explicitly enabled
     // AND the PayBy Embedded approve endpoint has been confirmed — otherwise we
     // ship no providers and the client hands off to the Hosted page.
-    const paybyEmbedded = process.env.QIPPAY_PAYBY_EMBEDDED === 'true';
+    // Embedded (in-app bank picker via POST /v1/pay) is the default; set
+    // QIPPAY_PAYBY_EMBEDDED=false to force the Hosted redirect flow instead.
+    const paybyEmbedded = process.env.QIPPAY_PAYBY_EMBEDDED !== 'false';
     const providers = paybyEmbedded ? await listProviders().catch(() => []) : [];
 
     return NextResponse.json({
