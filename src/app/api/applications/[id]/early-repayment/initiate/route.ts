@@ -7,7 +7,7 @@ import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { checkRateLimit, paymentLimiter } from '@/lib/rate-limit/limiter';
 import { auditLog, getClientIp } from '@/lib/utils/audit';
 import { initiatePayment } from '@/lib/qippay/payby-client';
-import { getBeneficiaryId, getReturnBaseUrl } from '@/lib/qippay/setpay-client';
+import { getBeneficiaryId, getReturnBaseUrl, listProviders } from '@/lib/qippay/setpay-client';
 import { computeEarlyPayoff } from '@/lib/loan/early-payoff';
 import { isLiveLoanStatus } from '@/lib/loan/active-loan';
 import { EARLY_REPAYMENT_DISCLAIMER_VERSION } from '@/lib/constants/fees';
@@ -79,6 +79,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           paymentId: existing.paymentId,
           hostedUrl: existing.hostedUrl,
           quote: existing.quote,
+          phoneHint: app.personalInfo?.phone,
         };
       }
 
@@ -139,6 +140,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         paymentId: payment.id,
         hostedUrl: payment.hostedUrl,
         quote: earlyRepayment.quote as EarlyRepayment['quote'],
+        phoneHint: app.personalInfo?.phone,
       };
     });
 
@@ -161,11 +163,17 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       });
     }
 
+    // Embedded flow: the applicant selects their bank in our UI (no Hosted
+    // proxy page), so ship the bank list + a phone hint back with the payment.
+    const providers = await listProviders().catch(() => []);
+
     return NextResponse.json({
       data: {
         paymentId: result.paymentId,
         hostedUrl: result.hostedUrl,
         quote: result.quote,
+        providers,
+        phoneHint: result.phoneHint,
       },
     });
   } catch (err) {

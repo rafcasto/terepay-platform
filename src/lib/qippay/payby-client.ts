@@ -145,3 +145,73 @@ export async function getPaymentStatus(
     expiresAt: data.expires_at,
   };
 }
+
+
+// --- Embedded flow ---------------------------------------------------------
+// The immersive alternative to the Hosted redirect: the customer picks their
+// bank + confirms their phone on OUR UI (via GET /v1/payment_providers, reused
+// from the SetPay client), then we approve the payment directly — the bank
+// either sends a CIBA push (we poll status) or returns a redirect straight to
+// the bank's app/website (no Qippay Hosted Payment Page in between).
+//
+// NOTE: the PayBy *Embedded* endpoints are NOT in the Hosted spec (rev 9),
+// which states Embedded is "not covered in this documentation". This mirrors
+// the SetPay embedded shape (`POST /v1/approve_enduring`). The endpoint path is
+// overridable via QIPPAY_PAYBY_APPROVE_PATH — CONFIRM against the PayBy
+// Embedded spec before going live. Stub mode is fully functional offline.
+
+export type PayByApproveMethod = 'redirect' | 'phone' | 'login_hint_token' | 'username';
+
+export type PayByApproveInput = {
+  paymentId: string; // pmU_...
+  providerId: string;
+  phone: string; // +64-XXXXXXXXX format
+  method?: PayByApproveMethod;
+  username?: string;
+};
+
+export type PayByApproveResponse = {
+  paymentId?: string;
+  method: 'CIBA' | 'redirect' | string;
+  redirectUri?: string;
+  message?: string;
+};
+
+type ApprovePaymentResponse = {
+  paymentId?: string;
+  method?: string;
+  redirect_uri?: string;
+  message?: string;
+};
+
+function getApprovePath(): string {
+  return process.env.QIPPAY_PAYBY_APPROVE_PATH || '/v1/approve_payment';
+}
+
+export async function approvePayment(input: PayByApproveInput): Promise<PayByApproveResponse> {
+  if (getMode() === 'stub') {
+    // Simulate a redirect-style approval; the route handler fills redirectUri
+    // with our success_url+stub=success so reconciliation works end-to-end.
+    return { method: 'redirect', redirectUri: '', message: 'stubbed redirect' };
+  }
+
+  const body: Record<string, unknown> = {
+    paymentId: input.paymentId,
+    provider_id: input.providerId,
+    phone: input.phone,
+  };
+  if (input.method) body.method = input.method;
+  if (input.username) body.username = input.username;
+
+  const data = await qippayFetch<ApprovePaymentResponse>(getApprovePath(), {
+    method: 'POST',
+    body,
+  });
+
+  return {
+    paymentId: data.paymentId,
+    method: (data.method ?? '').toUpperCase() === 'CIBA' ? 'CIBA' : 'redirect',
+    redirectUri: data.redirect_uri || undefined,
+    message: data.message,
+  };
+}
