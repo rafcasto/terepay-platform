@@ -155,3 +155,32 @@ export interface AdminLenderView {
   createdAt?: Timestamp;
   lastLoginAt?: Timestamp;
 }
+
+// ---------------------------------------------------------------------------
+// Payment Refresh Schedule
+// ---------------------------------------------------------------------------
+
+/**
+ * Controls the daily background sweep that re-checks every active-consent
+ * loan's scheduled payments against Qippay. The Vercel cron fires hourly; the
+ * handler only runs the sweep when the current Pacific/Auckland hour matches
+ * `refreshHourNzt` (and it hasn't already run for that NZT date).
+ */
+export interface PaymentRefreshSettings {
+  /** Master switch for the daily sweep. */
+  enabled: boolean;
+  /** Hour (0-23) in Pacific/Auckland time to run the sweep. 0 = midnight. */
+  refreshHourNzt: number;
+  /** NZT date (YYYY-MM-DD) the sweep last completed - used to dedupe. */
+  lastRunDateNzt?: string;
+  lastRunAt?: Timestamp;
+  /** Number of applications reconciled on the last run. */
+  lastRunCount?: number;
+  updatedAt?: Timestamp;
+  updatedBy?: string;
+}
+
+export const DEFAULT_PAYMENT_REFRESH_SETTINGS: PaymentRefreshSettings = {
+  enabled: true,
+  refreshHourNzt: 0, // midnight NZT
+};

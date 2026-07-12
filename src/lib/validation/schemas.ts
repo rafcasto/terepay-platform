@@ -546,3 +546,10 @@ export type AdminConfigInput = z.infer<typeof adminConfigSchema>;
 export type AdminReassignApplicationsInput = z.infer<typeof adminReassignApplicationsSchema>;
 export type AdminEmailTemplateInput = z.infer<typeof adminEmailTemplateSchema>;
 export type AdminEmailTemplatePatchInput = z.infer<typeof adminEmailTemplatePatchSchema>;
+
+export const adminPaymentRefreshSchema = z.object({
+  enabled: z.boolean().optional(),
+  refreshHourNzt: z.number().int().min(0).max(23).optional(),
+});
+
+export type AdminPaymentRefreshInput = z.infer<typeof adminPaymentRefreshSchema>;
