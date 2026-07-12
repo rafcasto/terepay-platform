@@ -173,6 +173,39 @@ export const CONTENT_SECTIONS: ContentSectionDef[] = [
       ta('helpText', 'Help footer text', { help: 'Shown above the support email link.' }),
     ],
   },
+  {
+    key: 'borrower.compliance',
+    group: 'borrower',
+    label: 'Compliance — Shared privacy note',
+    description: 'Privacy/security line shown in the onboarding and application side panels.',
+    fields: [
+      ta('privacyNote', 'Privacy & security note', {
+        help: 'Compliance: reflects NZ Privacy Act 2020. Shown during onboarding and application.',
+      }),
+    ],
+  },
+  {
+    key: 'onboarding.disclaimers',
+    group: 'borrower',
+    label: 'Onboarding — Disclaimer',
+    description: 'The disclaimer shown on the account-setup screen.',
+    fields: [
+      ta('approvalDisclaimer', 'Approval & interest disclaimer', {
+        help: 'Compliance: keep approval/affordability + interest visible.',
+      }),
+    ],
+  },
+  {
+    key: 'apply.disclaimers',
+    group: 'borrower',
+    label: 'Application — Disclaimer',
+    description: 'Compliance line shown with the repayment estimate in the loan application.',
+    fields: [
+      ta('chargedInterestNote', 'Charged-interest note', {
+        help: 'Compliance line under the repayment estimate. Loan figures stay computed automatically.',
+      }),
+    ],
+  },
 ];
 
 export const CONTENT_SECTION_KEYS = CONTENT_SECTIONS.map((s) => s.key);
@@ -264,6 +297,16 @@ export const DEFAULT_CONTENT: Record<string, ContentSectionValues> = {
     calculatorDisclaimer:
       'Applications are subject to approval and affordability checks — final terms confirmed after assessment.',
     helpText: 'Need help? Email',
+  },
+  'borrower.compliance': {
+    privacyNote: 'Your information is encrypted and stored securely. We comply with the NZ Privacy Act 2020.',
+  },
+  'onboarding.disclaimers': {
+    approvalDisclaimer:
+      'Applications are subject to approval and affordability checks. All loans are charged interest — see full terms before you apply.',
+  },
+  'apply.disclaimers': {
+    chargedInterestNote: 'All loans are charged interest and fees.',
   },
 };
 

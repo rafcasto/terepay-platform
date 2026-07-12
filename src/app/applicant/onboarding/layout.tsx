@@ -2,12 +2,14 @@ import type { ReactNode } from 'react';
 import Image from 'next/image';
 import OnboardingStepTracker from './_components/OnboardingStepTracker';
 import { Icons } from '@/components/ui';
+import { getContentSection } from '@/lib/content/site-content';
 
 interface Props {
   children: ReactNode;
 }
 
-export default function OnboardingLayout({ children }: Props) {
+export default async function OnboardingLayout({ children }: Props) {
+  const compliance = await getContentSection('borrower.compliance');
   return (
     <div className="min-h-screen flex flex-col sm:flex-row bg-[var(--surface-page)]">
       {/* ── Sidebar (desktop) — navy, institutional ──────────────────────── */}
@@ -32,7 +34,7 @@ export default function OnboardingLayout({ children }: Props) {
           <div className="flex items-start gap-2.5 text-white/55">
             <Icons.ShieldCheck size={18} className="shrink-0 mt-0.5 text-[var(--gold-300)]" />
             <p className="text-xs leading-relaxed">
-              Your information is encrypted and stored securely. We comply with the NZ Privacy Act 2020.
+              {compliance.privacyNote}
             </p>
           </div>
         </div>
