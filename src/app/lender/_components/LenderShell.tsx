@@ -13,7 +13,6 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/lender/applications', label: 'Applications', icon: 'inbox' },
   { href: '/lender/customers', label: 'Customers', icon: 'users' },
   { href: '/lender/portfolio', label: 'Portfolio', icon: 'wallet' },
-  { href: '/lender/settings', label: 'Settings', icon: 'sliders' },
   { href: '/lender/profile', label: 'Profile', icon: 'user' },
 ];
 
@@ -27,7 +26,6 @@ const CRUMBS: { match: (p: string) => boolean; t: string; sub: string }[] = [
   { match: (p) => p.startsWith('/lender/customers'), t: 'Customers', sub: 'Manage customer accounts' },
   { match: (p) => p.startsWith('/lender/portfolio'), t: 'Portfolio', sub: 'Active loans' },
   { match: (p) => p.startsWith('/lender/benchmarks'), t: 'Benchmarks', sub: 'Expense benchmark catalog' },
-  { match: (p) => p.startsWith('/lender/settings'), t: 'Settings', sub: 'Account & integrations' },
   { match: (p) => p.startsWith('/lender/profile'), t: 'Profile', sub: 'Your lender account' },
 ];
 

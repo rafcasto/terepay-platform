@@ -90,7 +90,7 @@ export default function QippayIntegrationCard() {
   const fetchConfig = async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const res = await fetch('/api/lender/integration/qippay');
+      const res = await fetch('/api/admin/integration/qippay');
       const body = await res.json();
       if (res.ok && body.data) {
         setConfig(body.data);
@@ -117,7 +117,7 @@ export default function QippayIntegrationCard() {
   const handleSaveMode = () => {
     setSaveError(null);
     startSaving(async () => {
-      const res = await fetch('/api/lender/integration/qippay', {
+      const res = await fetch('/api/admin/integration/qippay', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ paymentConfirmationMode: mode, webhookEnabled }),
@@ -136,7 +136,7 @@ export default function QippayIntegrationCard() {
     setSaveError(null);
     setSecretSaved(false);
     startSaving(async () => {
-      const res = await fetch('/api/lender/integration/qippay', {
+      const res = await fetch('/api/admin/integration/qippay', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ webhookSecret: secretInput.trim() }),

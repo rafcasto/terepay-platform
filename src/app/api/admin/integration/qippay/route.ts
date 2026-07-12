@@ -16,14 +16,44 @@ const MERCHANT_NAME = 'Terepay Neophile Limited';
 const RECEIVING_ACCOUNT = '02-0108-0900334-00';
 
 /**
- * GET /api/lender/integration/qippay
+ * Resolve the origin the webhook URL is built from.
  *
- * Returns Qippay connection status and configuration for the settings UI.
+ * QIPPAY_RETURN_BASE_URL must be a bare origin (e.g. `https://dev.terepay.com`).
+ * We defensively strip any path/query/hash so a misconfigured value like
+ * `https://host/applicant/dashboard` can't produce a webhook URL that 404s.
+ * Returns '' if the value is missing or unparseable (UI then shows an
+ * incomplete URL, signalling the env var needs fixing).
+ */
+function resolveReturnOrigin(): string {
+  const raw = (process.env.QIPPAY_RETURN_BASE_URL ?? '').trim();
+  if (!raw) return '';
+  try {
+    return new URL(raw).origin;
+  } catch {
+    // Fall back to a trimmed, path-stripped best effort for values without a
+    // scheme. Keep only scheme+host (everything before the first slash after
+    // an optional `scheme://`).
+    const withoutTrailingSlash = raw.replace(/\/+$/, '');
+    const match = withoutTrailingSlash.match(/^([a-z]+:\/\/)?([^/]+)/i);
+    if (match) {
+      console.warn(
+        '[admin/integration/qippay] QIPPAY_RETURN_BASE_URL is not a valid URL — using best-effort origin. Set it to a bare origin like https://dev.terepay.com',
+      );
+      return `${match[1] ?? ''}${match[2]}`;
+    }
+    return '';
+  }
+}
+
+/**
+ * GET /api/admin/integration/qippay
+ *
+ * Returns Qippay connection status and configuration for the admin settings UI.
  * The client secret is NEVER included in this response.
  */
 export async function GET(request: NextRequest) {
   try {
-    await withAuth(request, ['lender']);
+    await withAuth(request, ['admin']);
 
     const [displayConfig, banks] = await Promise.all([
       getQippayIntegrationDisplayConfig(),
@@ -32,8 +62,7 @@ export async function GET(request: NextRequest) {
 
     const mode = getMode();
     const baseUrl = process.env.QIPPAY_BASE_URL ?? '';
-    const returnBaseUrl = (process.env.QIPPAY_RETURN_BASE_URL ?? '').replace(/\/$/, '');
-    const webhookUrl = `${returnBaseUrl}/api/webhooks/qippay`;
+    const webhookUrl = `${resolveReturnOrigin()}/api/webhooks/qippay`;
 
     let beneficiaryId = '';
     try {
@@ -59,7 +88,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (err) {
     if (err instanceof AppError) return errorResponse(err);
-    console.error('[lender/integration/qippay GET] unexpected error', err);
+    console.error('[admin/integration/qippay GET] unexpected error', err);
     return internalError();
   }
 }
@@ -71,7 +100,7 @@ const patchSchema = z.object({
 });
 
 /**
- * PATCH /api/lender/integration/qippay
+ * PATCH /api/admin/integration/qippay
  *
  * Updates Qippay webhook configuration. The secret is encrypted before
  * being stored in Firestore — it is never echoed back in any response.
@@ -80,7 +109,7 @@ export async function PATCH(request: NextRequest) {
   const ip = getClientIp(request);
 
   try {
-    const auth = await withAuth(request, ['lender']);
+    const auth = await withAuth(request, ['admin']);
 
     const rawBody = await request.json().catch(() => ({}));
     const parsed = patchSchema.safeParse(rawBody);
@@ -118,7 +147,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ data: updatedDisplay });
   } catch (err) {
     if (err instanceof AppError) return errorResponse(err);
-    console.error('[lender/integration/qippay PATCH] unexpected error', err);
+    console.error('[admin/integration/qippay PATCH] unexpected error', err);
     return internalError();
   }
 }
