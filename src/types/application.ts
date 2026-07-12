@@ -99,6 +99,80 @@ export interface ScheduledPayment {
   retryCount: number;               // incremented on each setpay.status.retry event
 }
 
+// ---------------------------------------------------------------------------
+// Early Repayment (Qippay PayBy — one-off open-banking payment to settle the
+// loan ahead of its scheduled term). Distinct from the SetPay `paymentConsent`
+// mandate that gates disbursement: PayBy is a single Hosted payment the
+// borrower approves at their bank, used only for a voluntary advance payoff.
+// ---------------------------------------------------------------------------
+export type EarlyRepaymentStatus =
+  | 'not_started'
+  | 'initiated'   // PayBy payment created, borrower redirected to Hosted page
+  | 'pending'     // borrower reached their bank but hasn't approved yet
+  | 'paid'        // approved — loan settled in full
+  | 'expired'
+  | 'failed'
+  | 'cancelled';
+
+/**
+ * Snapshot of the payoff quote taken at initiation. All amounts in cents (NZD).
+ * Recomputed server-side at initiate time — never trusted from the client.
+ */
+export interface EarlyRepaymentQuote {
+  currency: 'NZD';
+  /** Gross outstanding: sum of not-yet-paid instalments (principal + interest). */
+  outstandingBalanceCents: number;
+  /** Unearned interest refunded on early settlement. */
+  unearnedInterestRebateCents: number;
+  /** outstandingBalanceCents − unearnedInterestRebateCents. */
+  netOutstandingCents: number;
+  /** Fixed prepayment/administrative fee (EARLY_REPAYMENT_FEE). */
+  prepaymentFeeCents: number;
+  /** netOutstandingCents + prepaymentFeeCents — the amount charged via PayBy. */
+  totalPayoffCents: number;
+  /** installmentNumbers this payoff clears. */
+  installmentsCleared: number[];
+  /**
+   * Snapshot of the interest-rebate working at initiation time, retained for
+   * audit / dispute resolution. Mirrors EarlyPayoffBreakdown (amounts in NZD).
+   */
+  rebateBreakdown?: {
+    method: string;
+    totalInterest: number;
+    totalInstalments: number;
+    remainingInstalments: number;
+    grossFutureInterest: number;
+    termDays: number;
+    elapsedDays: number;
+    remainingDays: number;
+    loanStartDate: string;
+    finalDueDate: string;
+    settlementDate: string;
+  };
+}
+
+export interface EarlyRepayment {
+  provider: 'qippay_payby';
+  status: EarlyRepaymentStatus;
+  /** Qippay PayBy payment id (`pmU_...`) from POST /v1/payment_initiation. */
+  paymentId: string;
+  /** Qippay Hosted payment page URL the borrower is redirected to. */
+  hostedUrl: string;
+  beneficiaryId: string;
+  quote: EarlyRepaymentQuote;
+  /** Records the borrower's acceptance of the advance-payment terms. */
+  disclaimerAcceptedAt: Timestamp;
+  disclaimerVersion: string;
+  initiatedAt: Timestamp;
+  initiatedBy: string;
+  paidAt?: Timestamp;
+  appliedAt?: Timestamp; // when instalments were cleared + loan closed
+  lastStatusCheckedAt?: Timestamp;
+  lastStatusFromProvider?: string;
+  expiresAt?: Timestamp;
+  failureReason?: string;
+}
+
 // Legacy statuses retained for backward-compat during migration
 export type LegacyApplicationStatus =
   | 'submitted'
@@ -447,6 +521,12 @@ export interface LoanApplication {
    * first schedules a payment. Updated by the webhook receiver or the manual poll route.
    */
   scheduledPayments?: ScheduledPayment[];
+
+  /**
+   * Voluntary early-repayment payoff via Qippay PayBy (one-off Hosted payment).
+   * Present once the borrower starts an advance payoff on a live loan.
+   */
+  earlyRepayment?: EarlyRepayment;
 
   // TerePay 8-section form data
   personalInfo?: TerePayPersonalInfo;

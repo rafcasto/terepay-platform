@@ -2,6 +2,9 @@ import { Hero, HeroBalance, Pill, ProgressBar, ScheduleRow, StatGrid, Icons } fr
 import { fmtNZD, fmtDate } from '@/lib/loan/format';
 import type { LoanApplication, AnyApplicationStatus, ScheduledPayment } from '@/types/application';
 import { deriveLoanSummary, type DerivedInstallmentStatus } from '@/lib/loan/active-loan';
+import { computeEarlyPayoff } from '@/lib/loan/early-payoff';
+import type { EarlyRepayment } from '@/types/application';
+import EarlyRepaymentCard from '@/app/applicant/applications/[id]/_components/EarlyRepaymentCard';
 import { SectionCard, Field } from './shared';
 
 interface Props {
@@ -36,6 +39,10 @@ export default function ScreenActive({ app, status, applicationId, scheduledPaym
   const total = summary.totalRepayable;
   const remaining = summary.remainingBalance;
   const repaidPct = total > 0 ? Math.round((summary.totalPaid / total) * 100) : 0;
+
+  // Voluntary early-payoff (Qippay PayBy): only offered while a balance remains.
+  const payoff = computeEarlyPayoff({ ...app, scheduledPayments });
+  const earlyRepaymentStatus = (app.earlyRepayment as EarlyRepayment | undefined)?.status;
 
   // The next instalment still owing drives the "Next payment" stat.
   const next =
@@ -109,6 +116,20 @@ export default function ScreenActive({ app, status, applicationId, scheduledPaym
             <span className="text-base font-bold tabular-nums">{fmtNZD(total)}</span>
           </div>
         </SectionCard>
+      )}
+
+      {payoff && (
+        <EarlyRepaymentCard
+          applicationId={applicationId}
+          quote={{
+            outstandingBalance: payoff.outstandingBalance,
+            unearnedInterestRebate: payoff.unearnedInterestRebate,
+            netOutstanding: payoff.netOutstanding,
+            prepaymentFee: payoff.prepaymentFee,
+            totalPayoff: payoff.totalPayoff,
+          }}
+          status={earlyRepaymentStatus}
+        />
       )}
 
       {loanId && (
