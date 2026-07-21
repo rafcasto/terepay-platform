@@ -88,6 +88,7 @@ export default function AdminUsersPage() {
       .finally(() => setLoading(false));
   };
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot data fetch on mount
   useEffect(() => { load(); }, []);
 
   const toggleRole = (
@@ -336,6 +337,7 @@ export default function AdminUsersPage() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-2">Roles</label>
+                {/* eslint-disable-next-line react-hooks/static-components -- presentational, reads only module constants + props */}
                 <RoleCheckboxes
                   selected={form.roles}
                   onToggle={(role) => setForm((p) => ({ ...p, roles: toggleRole(p.roles, role) }))}
@@ -402,6 +404,7 @@ export default function AdminUsersPage() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-2">Roles</label>
+                {/* eslint-disable-next-line react-hooks/static-components -- presentational, reads only module constants + props */}
                 <RoleCheckboxes
                   selected={editForm.roles}
                   onToggle={(role) => setEditForm((p) => ({ ...p, roles: toggleRole(p.roles, role) }))}

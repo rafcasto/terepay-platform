@@ -56,6 +56,7 @@ export default function VerifyMobilePage() {
       }
       if (data.bypassMode) setBypassMode(true);
       setStage('otp');
+      // eslint-disable-next-line react-hooks/immutability -- called from an async handler after send resolves; declared below, runtime-safe
       startCooldown();
     } catch {
       setError('Network error. Please check your connection.');

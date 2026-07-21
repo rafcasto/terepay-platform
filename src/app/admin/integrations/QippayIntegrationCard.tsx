@@ -105,6 +105,7 @@ export default function QippayIntegrationCard() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot data fetch on mount
     fetchConfig();
   }, []);
 

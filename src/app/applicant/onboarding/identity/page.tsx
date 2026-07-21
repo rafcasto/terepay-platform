@@ -133,6 +133,7 @@ export default function KycIdentityPage() {
 
   // Update primary doc label when radio changes (permanent residents only)
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- updates document labels when the selected primary doc type changes
     setSlots((prev) =>
       prev.map((s) =>
         s.docType === 'nz_id_primary'
