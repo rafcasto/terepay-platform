@@ -6,10 +6,20 @@ import { useRouter } from 'next/navigation';
 const fmt = (n: number) =>
   new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(n);
 
+/** Applicant's nominated deposit account — where disbursed funds are sent. */
+export type DisbursementBankDetails = {
+  bankName: string;
+  accountHolderName: string;
+  accountNumber: string;
+  paymentMethod?: 'direct_debit' | 'bank_transfer';
+};
+
 type Props = {
   applicationId: string;
   approvedAmount: number;
   applicationFee: number;
+  /** Applicant's nominated deposit account. Undefined if none is on file. */
+  bankDetails?: DisbursementBankDetails;
   /** Status of the Qippay SetPay mandate. Undefined for legacy `loan_accepted` applications that pre-date the consent gate. */
   consentStatus?: string;
   consentActivatedAt?: string;
@@ -19,6 +29,7 @@ export default function DisburseForm({
   applicationId,
   approvedAmount,
   applicationFee,
+  bankDetails,
   consentStatus,
   consentActivatedAt,
 }: Props) {
@@ -142,6 +153,42 @@ export default function DisburseForm({
   return (
     <div className="space-y-3 rounded-[var(--radius-md)] border border-[var(--success-700)]/25 bg-[var(--success-50)] p-4">
       <h3 className="font-display text-sm font-bold text-[var(--success-700)]">Confirm Disbursement</h3>
+
+      {/* Destination account — where the lender deposits the funds */}
+      {bankDetails ? (
+        <div className="rounded-[var(--radius-md)] border border-[var(--success-700)]/20 bg-white p-3">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">
+            Deposit to
+          </p>
+          <dl className="space-y-1 text-sm">
+            <div className="flex justify-between gap-3">
+              <dt className="text-[var(--text-muted)]">Account name</dt>
+              <dd className="text-right font-semibold text-[var(--text-strong)]">{bankDetails.accountHolderName}</dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-[var(--text-muted)]">Account number</dt>
+              <dd className="text-right font-mono font-semibold text-[var(--text-strong)]">{bankDetails.accountNumber}</dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-[var(--text-muted)]">Bank</dt>
+              <dd className="text-right text-[var(--text-body)]">{bankDetails.bankName}</dd>
+            </div>
+            {bankDetails.paymentMethod && (
+              <div className="flex justify-between gap-3">
+                <dt className="text-[var(--text-muted)]">Repayment method</dt>
+                <dd className="text-right capitalize text-[var(--text-body)]">
+                  {bankDetails.paymentMethod.replace(/_/g, ' ')}
+                </dd>
+              </div>
+            )}
+          </dl>
+        </div>
+      ) : (
+        <div className="rounded-[var(--radius-md)] border border-[var(--warning-700)]/30 bg-[var(--warning-50)] p-3 text-xs text-[var(--warning-700)]">
+          No bank account details are on file for this applicant. Confirm the destination account
+          through another channel before releasing funds.
+        </div>
+      )}
       <dl className="grid grid-cols-2 gap-2 text-sm">
         <dt className="text-[var(--text-muted)]">Approved</dt>
         <dd className="text-right font-mono font-semibold tabular-nums text-[var(--text-strong)]">{fmt(approvedAmount)}</dd>
