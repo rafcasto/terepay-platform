@@ -6,8 +6,25 @@ import { withAuth } from '@/lib/auth/middleware';
 import { patchProfileSchema } from '@/lib/validation/schemas';
 import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { FieldValue } from 'firebase-admin/firestore';
-import { decrypt } from '@/lib/encryption/crypto';
+import { encrypt, decrypt } from '@/lib/encryption/crypto';
+import { auditLog, getClientIp } from '@/lib/utils/audit';
 import { ZodError } from 'zod';
+
+/**
+ * Date of birth is stored encrypted (see /api/kyc/profile) in the
+ * `version:...` format. Older profile writes may have persisted it in
+ * plaintext, so only attempt to decrypt values that carry the version prefix.
+ * Returns `undefined` when a versioned payload can't be decrypted, so the
+ * caller can drop the field rather than leak an unreadable blob.
+ */
+function safeDecryptDob(value: unknown): unknown {
+  if (typeof value !== 'string' || !/^v\d+:/.test(value)) return value;
+  try {
+    return decrypt(value);
+  } catch {
+    return undefined;
+  }
+}
 
 /**
  * GET /api/users/profile
@@ -29,21 +46,18 @@ export async function GET(request: NextRequest) {
 
     if (!userSnap.exists) throw new AppError('NOT_FOUND', 404, 'User not found');
 
-    const merged = {
+    const merged: Record<string, unknown> = {
       id: userSnap.id,
       ...userSnap.data(),
       ...(profileSnap.exists ? profileSnap.data() : {}),
     };
 
-    // Decrypt the owner's own DOB (stored encrypted by the KYC step) so the
-    // client can prefill it. Guards for the plaintext form written elsewhere.
-    const m = merged as Record<string, unknown>;
-    if (typeof m.dateOfBirth === 'string' && /^v\d+:/.test(m.dateOfBirth)) {
-      try {
-        m.dateOfBirth = decrypt(m.dateOfBirth);
-      } catch {
-        delete m.dateOfBirth;
-      }
+    // Decrypt the owner's own DOB so the client can prefill it. Drop the field
+    // if a versioned payload can't be decrypted.
+    if (merged.dateOfBirth != null) {
+      const dob = safeDecryptDob(merged.dateOfBirth);
+      if (dob === undefined) delete merged.dateOfBirth;
+      else merged.dateOfBirth = dob;
     }
 
     return NextResponse.json({ data: merged, user: merged });
@@ -76,7 +90,7 @@ export async function PATCH(request: NextRequest) {
     const profileFields: Record<string, unknown> = { profileLastUpdatedAt: now };
     const phone = parsed.phone ?? parsed.phoneNumber;
     if (phone != null) profileFields.phone = phone;
-    if (parsed.dateOfBirth != null) profileFields.dateOfBirth = parsed.dateOfBirth;
+    if (parsed.dateOfBirth != null) profileFields.dateOfBirth = encrypt(parsed.dateOfBirth); // 🔒 PII
 
     // address can be a string (loan form) or object (profile settings page)
     if (typeof parsed.address === 'string') {
@@ -97,9 +111,13 @@ export async function PATCH(request: NextRequest) {
     if (parsed.timeAtAddress != null) profileFields.timeAtAddress = parsed.timeAtAddress;
     if (parsed.visaStatus != null) profileFields.visaStatus = parsed.visaStatus;
     if (parsed.visaExpiryDate != null) profileFields.visaExpiryDate = parsed.visaExpiryDate;
+    if (parsed.anniversaryDate != null) profileFields.anniversaryDate = parsed.anniversaryDate;
     if (parsed.householdType != null) profileFields.householdType = parsed.householdType;
     if (parsed.numberOfChildren != null) profileFields.numberOfChildren = parsed.numberOfChildren;
     if (parsed.numberOfDependents != null) profileFields.numberOfDependents = parsed.numberOfDependents;
+    if (parsed.occupation != null) profileFields.occupation = parsed.occupation;
+    if (parsed.employerName != null) profileFields.employerName = parsed.employerName;
+    if (parsed.employmentStatus != null) profileFields.employmentStatus = parsed.employmentStatus;
 
     const writes: Promise<unknown>[] = [
       adminDb.collection('users').doc(auth.uid).update(userFields),
@@ -117,6 +135,16 @@ export async function PATCH(request: NextRequest) {
     }
 
     await Promise.all(writes);
+
+    await auditLog({
+      userId: auth.uid,
+      action: 'update_profile',
+      targetType: 'user',
+      targetId: auth.uid,
+      outcome: 'success',
+      changes: { fields: Object.keys(parsed) },
+      ipAddress: getClientIp(request),
+    });
 
     return NextResponse.json({ status: 'ok' });
   } catch (err) {
