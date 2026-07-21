@@ -94,6 +94,7 @@ export default function AffordabilityForm({
   const hMult = HOUSEHOLD_MULTIPLIERS[householdType] ?? 1.0;
 
   const [currentStep, setCurrentStep] = useState(initialDraft?.currentStep ?? 0);
+  const [nowMs] = useState(() => Date.now());
 
   const [checklist, setChecklist] = useState<Checklist>(() =>
     initialDraft?.checklist
@@ -198,7 +199,7 @@ export default function AffordabilityForm({
 
   const daysOfData = checklist.firstTransactionDate
     ? Math.floor(
-        (Date.now() - new Date(checklist.firstTransactionDate).getTime()) /
+        (nowMs - new Date(checklist.firstTransactionDate).getTime()) /
           (1000 * 60 * 60 * 24),
       )
     : 0;

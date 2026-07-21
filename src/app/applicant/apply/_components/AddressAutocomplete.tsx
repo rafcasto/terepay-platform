@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useId } from 'react';
 import { useFormContext } from 'react-hook-form';
 import type { TerepayApplicationInput } from '@/lib/validation/schemas';
 
@@ -50,11 +50,12 @@ export default function AddressAutocomplete({ initialDisplayAddress }: Props) {
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const listboxId = useRef(`address-listbox-${Math.random().toString(36).slice(2)}`).current;
+  const listboxId = useId();
 
   // When a pre-populated address arrives (after profile fetch), show it in the search box
   useEffect(() => {
     if (initialDisplayAddress && !hasTyped) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs search box from async-arriving prop; intentional one-shot
       setQuery(initialDisplayAddress);
     }
   }, [initialDisplayAddress, hasTyped]);

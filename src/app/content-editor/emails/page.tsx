@@ -73,6 +73,7 @@ export default function AdminEmailTemplatesPage() {
       .finally(() => setLoading(false));
   };
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot data fetch on mount
   useEffect(() => { load(); }, []);
 
   const filteredTemplates =

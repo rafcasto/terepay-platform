@@ -15,7 +15,9 @@
     "seed:admin": "FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 ts-node --project tsconfig.scripts.json scripts/seed-admin.ts",
     "seed:admin:prod": "FIREBASE_AUTH_EMULATOR_HOST= FIRESTORE_EMULATOR_HOST= ts-node --project tsconfig.scripts.json scripts/seed-admin.ts",
     "verify:gdrive": "ts-node --project tsconfig.scripts.json scripts/verify-gdrive.ts",
-    "reset:counter:prod": "FIREBASE_AUTH_EMULATOR_HOST= FIRESTORE_EMULATOR_HOST= ts-node --project tsconfig.scripts.json scripts/reset-customer-counter.ts"
+    "reset:counter:prod": "FIREBASE_AUTH_EMULATOR_HOST= FIRESTORE_EMULATOR_HOST= ts-node --project tsconfig.scripts.json scripts/reset-customer-counter.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -25,11 +27,13 @@
     "@upstash/redis": "^1.36.3",
     "@vercel/edge-config": "^1.4.3",
     "@vercel/flags": "^3.1.1",
+    "decimal.js": "^10.6.0",
+    "docx": "^9.7.1",
     "dotenv": "^17.3.1",
     "firebase": "^12.10.0",
     "firebase-admin": "^13.7.0",
     "googleapis": "^171.4.0",
-    "next": "16.1.6",
+    "next": "^16.2.10",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-google-recaptcha-v3": "^1.11.0",
@@ -45,9 +49,10 @@
     "@types/react-dom": "^19",
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
-    "eslint-config-next": "16.1.6",
+    "eslint-config-next": "^16.2.10",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^2.1.9"
   }
 }
