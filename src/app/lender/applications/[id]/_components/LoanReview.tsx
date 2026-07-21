@@ -73,6 +73,12 @@ export type ReviewData = {
   disburse?: {
     approvedAmount: number;
     applicationFee: number;
+    bankDetails?: {
+      bankName: string;
+      accountHolderName: string;
+      accountNumber: string;
+      paymentMethod?: 'direct_debit' | 'bank_transfer';
+    };
     consentStatus?: string;
     consentActivatedAt?: string;
   };
@@ -505,6 +511,7 @@ function OverviewTab({ data }: { data: ReviewData }) {
             applicationId={data.applicationId}
             approvedAmount={data.disburse.approvedAmount}
             applicationFee={data.disburse.applicationFee}
+            bankDetails={data.disburse.bankDetails}
             consentStatus={data.disburse.consentStatus}
             consentActivatedAt={data.disburse.consentActivatedAt}
           />

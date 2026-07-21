@@ -315,6 +315,14 @@ export default async function LenderApplicationDetailPage({
       ? {
           approvedAmount: ld.approvedAmount,
           applicationFee: ld.applicationFee ?? 0,
+          bankDetails: app.bankDetails
+            ? {
+                bankName: app.bankDetails.bankName,
+                accountHolderName: app.bankDetails.accountHolderName,
+                accountNumber: app.bankDetails.accountNumber,
+                paymentMethod: app.bankDetails.paymentMethod,
+              }
+            : undefined,
           consentStatus:
             status === 'awaiting_payment_consent'
               ? (app.paymentConsent?.status ?? 'not_started')
