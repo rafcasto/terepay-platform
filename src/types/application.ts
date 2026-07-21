@@ -179,6 +179,55 @@ export interface EarlyRepayment {
   failureReason?: string;
 }
 
+// ---------------------------------------------------------------------------
+// Arrears — default fees + post-default interest assessed by the arrears engine
+// (src/lib/loan/arrears.ts), driven daily by the payment-refresh cron. Applies
+// only to loans stamped with `feePolicyVersion` (future loans).
+// ---------------------------------------------------------------------------
+export type FeeType = 'late_payment' | 'payment_default';
+
+/** A single default-fee charge. Append-only; `id` is the idempotency key. */
+export interface FeeAssessment {
+  /** Deterministic dedup key: `late:<installmentNumber>` or `default`. */
+  id: string;
+  type: FeeType;
+  amountCents: number;
+  /** Which instalment triggered the fee (late-payment fees only). */
+  installmentNumber?: number;
+  reason: string;
+  assessedAt: Timestamp;
+}
+
+/** Running post-default interest accrual state, recomputed each arrears run. */
+export interface ArrearsState {
+  /** Cumulative additional interest accrued on the overdue balance (cents). */
+  accruedInterestCents: number;
+  /** Daily rate applied (annual / 365), snapshotted for audit. */
+  dailyRate: number;
+  /** Earliest currently-overdue instalment due date (YYYY-MM-DD). */
+  earliestMissDate: string;
+  /** NZ calendar date the arrears engine last accrued interest (YYYY-MM-DD). */
+  lastAssessedDate: string;
+}
+
+/** Dunning-reminder stages sent to the borrower via email (Resend). */
+export type ReminderType =
+  | 'upcoming_payment'
+  | 'payment_missed'
+  | 'late_fee_warning'
+  | 'late_fee_charged'
+  | 'default_warning';
+
+/** Record of a reminder already sent, used to dedupe the sequence. */
+export interface SentReminder {
+  /** Dedup key: `<type>:<installmentNumber>`. */
+  key: string;
+  type: ReminderType;
+  installmentNumber?: number;
+  sentAt: Timestamp;
+  channel: 'email';
+}
+
 // Legacy statuses retained for backward-compat during migration
 export type LegacyApplicationStatus =
   | 'submitted'
@@ -533,6 +582,20 @@ export interface LoanApplication {
    * Present once the borrower starts an advance payoff on a live loan.
    */
   earlyRepayment?: EarlyRepayment;
+
+
+  /**
+   * Fee-policy version stamped at disbursement. Present only on loans disbursed
+   * under the arrears-fee policy (future loans); the arrears engine assesses
+   * fees + post-default interest only when this is set.
+   */
+  feePolicyVersion?: string;
+  /** Append-only ledger of default fees assessed by the arrears engine. */
+  feeAssessments?: FeeAssessment[];
+  /** Running post-default interest accrual state, recomputed daily. */
+  arrears?: ArrearsState;
+  /** Ledger of dunning reminders already sent (used to dedupe the sequence). */
+  reminders?: SentReminder[];
 
   // TerePay 8-section form data
   personalInfo?: TerePayPersonalInfo;

@@ -39,6 +39,15 @@ export type ScheduleInstallmentsResult = {
  *   - POST /api/applications/[id]/schedule-payments (manual retry),
  *   - GET /api/cron/schedule-payments (daily backfill).
  */
+/**
+ * Days Qippay will auto-retry a failed instalment (insufficient funds etc.).
+ * Retries land on the following calendar day, but ONLY while still inside the
+ * instalment's active fortnightly period (SetPay Integrated rev 1, p.6) — so a
+ * miss near the period boundary may get fewer than this many attempts. Our
+ * arrears engine + Resend reminders are the resolution flow Qippay recommends.
+ */
+const SETPAY_MAX_RETRY_DAYS = 4;
+
 export async function scheduleInstallments(opts: {
   applicationId: string;
   actor: string;
@@ -131,6 +140,7 @@ export async function scheduleInstallments(opts: {
         statementParticulars: 'TerePay',
         statementCode: `Inst${p.installmentNumber}`,
         statementReference: shortRef,
+        maxRetry: SETPAY_MAX_RETRY_DAYS,
       });
 
       // Success — drop any prior failureReason for a clean row.

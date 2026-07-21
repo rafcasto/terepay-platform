@@ -12,6 +12,55 @@ export const EARLY_REPAYMENT_FEE = 25;
 /** Version tag for the early-repayment disclaimer copy the borrower agrees to. */
 export const EARLY_REPAYMENT_DISCLAIMER_VERSION = '2026-07-v1';
 
+// ---------------------------------------------------------------------------
+// Default / arrears fees (NZD). Charged by the arrears engine on missed
+// instalments — see src/lib/loan/arrears.ts. Disclosed in the loan contract.
+// These apply ONLY to loans disbursed under FEE_POLICY_VERSION (future loans);
+// loans disbursed before this policy carry no stamp and are never assessed.
+// ---------------------------------------------------------------------------
+
+/** Late Payment Fee charged per missed instalment once the grace period lapses. */
+export const LATE_PAYMENT_FEE = 10;
+/**
+ * Calendar-day grace after an instalment's due date before the Late Payment
+ * Fee applies. Due 1 Aug + 3-day grace → paying on 1–4 Aug incurs no fee; the
+ * fee applies from 5 Aug (i.e. once daysPastDue > LATE_PAYMENT_GRACE_DAYS).
+ */
+export const LATE_PAYMENT_GRACE_DAYS = 3;
+/**
+ * Maximum total Late Payment Fees chargeable over the life of a loan. The
+ * TerePay product is 4 fortnightly instalments, so 4 × $10 = $40 is the cap.
+ */
+export const LATE_PAYMENT_FEE_MAX = 40;
+
+/**
+ * One-off Payment Default Fee, charged in addition to the Late Payment Fee when
+ * an instalment remains unpaid past the default grace period. Charged at most
+ * once over the life of a loan, even if further instalments are missed.
+ */
+export const PAYMENT_DEFAULT_FEE = 25;
+/** Calendar-day grace before the one-off Payment Default Fee applies. */
+export const PAYMENT_DEFAULT_GRACE_DAYS = 7;
+
+/**
+ * Fixed annual interest rate (49%). The flat LOAN_INTEREST_RATE (4.7% of the
+ * initial balance) is the effective rate baked into the fortnightly instalments
+ * of an on-time loan and remains the schedule for on-time repayment. This 49%
+ * p.a. figure is used only for **post-default daily accrual**: once an
+ * instalment is missed, additional interest accrues each day on the outstanding
+ * balance (daily-balance method) because the borrower still owes the money.
+ */
+export const ANNUAL_INTEREST_RATE = 0.49;
+/** Daily interest rate = annual / 365 (CCCFA daily-balance method). */
+export const DAILY_INTEREST_RATE = ANNUAL_INTEREST_RATE / 365;
+
+/**
+ * Version stamped on a loan at disbursement. The arrears engine assesses late /
+ * default fees and post-default interest ONLY for loans carrying this stamp, so
+ * the new fee policy applies to future loans only (never retroactively).
+ */
+export const FEE_POLICY_VERSION = '2026-07-v1';
+
 export function computeApplicationFee(isExistingCustomer: boolean | undefined | null): number {
   return isExistingCustomer ? APPLICATION_FEE_EXISTING : APPLICATION_FEE_NEW;
 }
