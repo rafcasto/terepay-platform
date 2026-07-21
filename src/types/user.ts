@@ -81,6 +81,15 @@ export interface ApplicantProfile {
   housingStatus?: HousingStatus;
   timeAtAddress?: TimeAtAddress;
   immigrationStatus?: ImmigrationStatus;
+  /** Visa category (e.g. work_visa, resident_visa) — surfaced on the profile page */
+  visaStatus?: string;
+  visaExpiryDate?: string;   // YYYY-MM-DD
+  anniversaryDate?: string;  // YYYY-MM-DD — TerePay customer anniversary
+  householdType?: string;
+  numberOfChildren?: number;
+  numberOfDependents?: number;
+  /** Occupation / job title as entered on the profile page */
+  occupation?: string;
   kycDocuments?: IdentityDocument[];
   profileLastUpdatedAt?: Timestamp;
   employmentStatus: 'employed' | 'self-employed' | 'unemployed' | 'retired';

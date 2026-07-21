@@ -118,9 +118,14 @@ export const patchProfileSchema = z.object({
   timeAtAddress: z.string().max(50).optional(),
   visaStatus: z.string().max(50).optional(),
   visaExpiryDate: z.string().optional(),
+  anniversaryDate: z.string().optional(),
   householdType: z.string().max(50).optional(),
   numberOfChildren: z.number().int().min(0).optional(),
   numberOfDependents: z.number().int().min(0).optional(),
+  // Employment fields (mirrored from the loan application, editable on the profile page)
+  occupation: z.string().max(120).optional(),
+  employerName: z.string().max(120).optional(),
+  employmentStatus: z.string().max(50).optional(),
 });
 
 export type PatchProfileInput = z.infer<typeof patchProfileSchema>;
