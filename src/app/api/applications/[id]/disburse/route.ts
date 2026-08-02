@@ -8,6 +8,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { ZodError } from 'zod';
 import { scheduleInstallments } from '@/lib/qippay/schedule-installments';
 import { createLoanRecord } from '@/lib/loan/loan-record';
+import { FEE_POLICY_VERSION } from '@/lib/constants/fees';
 import type { PaymentConsent } from '@/types/application';
 
 export const dynamic = 'force-dynamic';
@@ -125,6 +126,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
       tx.update(appRef, {
         status: 'disbursed',
+        // Stamp the current fee policy so the arrears engine assesses default
+        // fees + post-default interest on this loan (future loans only).
+        feePolicyVersion: FEE_POLICY_VERSION,
         'loanDetails.disbursedAmount': disbursedAmount,
         'loanDetails.disbursementDate': disbursementDate,
         'decision.disbursementDetails': {

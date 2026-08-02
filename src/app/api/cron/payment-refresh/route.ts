@@ -3,6 +3,7 @@ import { adminDb } from '@/lib/firebase/admin';
 import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { auditLog, getClientIp } from '@/lib/utils/audit';
 import { reconcilePaymentStatus } from '@/lib/qippay/reconcile-payments';
+import { assessArrearsForApplication } from '@/lib/loan/assess-arrears';
 import {
   getPaymentRefreshSettings,
   markPaymentRefreshRun,
@@ -24,6 +25,10 @@ const MAX_APPLICATIONS = 500;
  * admin-configured `refreshHourNzt` (default midnight) and it has not already
  * run for the current NZT date. This makes the schedule admin-editable at
  * runtime without redeploying, and is DST-safe.
+ *
+ * Each active loan is (1) reconciled against Qippay, then (2) run through the
+ * arrears engine — charging any now-due late/default fees, accruing
+ * post-default interest, and sending the due dunning reminders via Resend.
  *
  * Auth: Vercel Cron sends `Authorization: Bearer ${CRON_SECRET}`. We require
  * CRON_SECRET to be set and to match (fail-closed).
@@ -71,6 +76,9 @@ export async function GET(request: NextRequest): Promise<Response> {
     let processed = 0;
     let changed = 0;
     let errored = 0;
+    let feesAssessed = 0;
+    let remindersSent = 0;
+    let inArrears = 0;
 
     for (const doc of snap.docs) {
       try {
@@ -86,6 +94,23 @@ export async function GET(request: NextRequest): Promise<Response> {
         errored += 1;
         console.error('[cron/payment-refresh] failed to reconcile', doc.id, err);
       }
+
+      // Arrears assessment runs after reconciliation so fees/interest reflect
+      // the freshest payment state. Independent try/catch — an arrears failure
+      // never aborts the sweep. No-op for loans without a fee-policy stamp.
+      try {
+        const arrears = await assessArrearsForApplication({
+          applicationId: doc.id,
+          actor: CRON_ACTOR,
+          ip,
+        });
+        feesAssessed += arrears.newFeeCount;
+        remindersSent += arrears.remindersSent;
+        if (arrears.isInArrears) inArrears += 1;
+      } catch (err) {
+        errored += 1;
+        console.error('[cron/payment-refresh] failed to assess arrears', doc.id, err);
+      }
     }
 
     await markPaymentRefreshRun(dateNzt, processed);
@@ -97,11 +122,11 @@ export async function GET(request: NextRequest): Promise<Response> {
       targetType: 'systemConfig',
       outcome: errored > 0 ? 'failure' : 'success',
       ipAddress: ip,
-      changes: { dateNzt, hour, total: snap.size, processed, changed, errored },
+      changes: { dateNzt, hour, total: snap.size, processed, changed, errored, feesAssessed, remindersSent, inArrears },
     });
 
     return NextResponse.json({
-      data: { ran: true, dateNzt, hour, total: snap.size, processed, changed, errored },
+      data: { ran: true, dateNzt, hour, total: snap.size, processed, changed, errored, feesAssessed, remindersSent, inArrears },
     });
   } catch (err) {
     if (err instanceof AppError) return errorResponse(err);
