@@ -1,15 +1,28 @@
-import { EARLY_REPAYMENT_FEE, LOAN_INTEREST_RATE } from '@/lib/constants/fees';
+import { EARLY_REPAYMENT_FEE } from '@/lib/constants/fees';
 import { deriveLoanSummary, type LoanSummarySource } from './active-loan';
 import type { DerivedInstallmentStatus } from './active-loan';
 import type { LoanApplication } from '@/types/application';
+import { buildSchedule, payoffBasis, RATE_MODEL, type PayoffBasis } from './repayment';
 
 /**
- * The method used to rebate unearned interest on an early full repayment.
- * Pro-rata time-apportionment (straight-line by elapsed term). Documented in
- * docs/EARLY_REPAYMENT_INTEREST_REBATE.md — review with finance/legal before
- * production launch.
+ * Method used to price an early full repayment on the current (amortised)
+ * product: actuarial reducing balance — principal still owed plus interest
+ * accrued to the settlement date. Documented in
+ * docs/EARLY_REPAYMENT_INTEREST_REBATE.md.
  */
-export const INTEREST_REBATE_METHOD = 'pro_rata_time_apportionment' as const;
+export const INTEREST_REBATE_METHOD = 'actuarial_reducing_balance' as const;
+
+/**
+ * Method used for loans written before the amortised product (no
+ * `loanDetails.rateModel` stamp). Those contracts were priced on a flat 4.7%,
+ * so they keep the straight-line rebate they were sold under — a borrower is
+ * never re-based onto a method their contract did not disclose.
+ */
+export const LEGACY_INTEREST_REBATE_METHOD = 'pro_rata_time_apportionment' as const;
+
+export type InterestRebateMethod =
+  | typeof INTEREST_REBATE_METHOD
+  | typeof LEGACY_INTEREST_REBATE_METHOD;
 
 /**
  * The early-repayment payoff figure a borrower must pay to settle their loan in
@@ -19,17 +32,21 @@ export const INTEREST_REBATE_METHOD = 'pro_rata_time_apportionment' as const;
  * docs/EARLY_REPAYMENT_INTEREST_REBATE.md for the full write-up and worked
  * examples):
  *
- *   grossRemaining  = sum of not-yet-paid instalments (principal + interest)
- *   rebate          = unearned interest rebated on early settlement
- *                     = I × remainingDays / termDays   (pro-rata by time)
- *                       capped at the interest embedded in the remaining
- *                       instalments, so we never rebate interest already paid
- *   netOutstanding  = grossRemaining − rebate
- *                     ( = remaining principal + interest earned to settlement )
+ * Amortised loans (`loanDetails.rateModel === 'amortised_v1'`) settle on an
+ * ACTUARIAL reducing-balance basis, matching how the loan was priced:
+ *
+ *   netOutstanding  = outstandingPrincipal
+ *                     + outstandingPrincipal × dailyRate × daysSinceLastCharge
  *   totalPayoff     = netOutstanding + EARLY_REPAYMENT_FEE
  *
- * where I = total contractual interest on the loan
- *       ( = totalRepayment − approvedAmount = approvedAmount × LOAN_INTEREST_RATE ).
+ * Interest simply stops accruing at settlement, so nothing needs rebating; the
+ * `unearnedInterestRebate` field is reported as the difference between running
+ * the schedule to term and settling now, purely for disclosure.
+ *
+ * Legacy flat-rate loans keep the straight-line rebate they were sold under:
+ *
+ *   rebate          = I × remainingDays / termDays, capped at future interest
+ *   netOutstanding  = grossRemaining − rebate
  *
  * The borrower is charged the principal still owed, the interest that has
  * accrued up to the settlement date, and the disclosed prepayment fee. Future
@@ -37,7 +54,7 @@ export const INTEREST_REBATE_METHOD = 'pro_rata_time_apportionment' as const;
  * cents. Returns `null` when there is nothing left to pay off.
  */
 export interface EarlyPayoffBreakdown {
-  method: typeof INTEREST_REBATE_METHOD;
+  method: InterestRebateMethod;
   /** Total contractual interest charged over the life of the loan (NZD). */
   totalInterest: number;
   totalInstalments: number;
@@ -53,6 +70,14 @@ export interface EarlyPayoffBreakdown {
   loanStartDate: string; // YYYY-MM-DD
   finalDueDate: string; // YYYY-MM-DD
   settlementDate: string; // YYYY-MM-DD
+  /** Actuarial only: principal still owed at the settlement date (NZD). */
+  outstandingPrincipal?: number;
+  /** Actuarial only: interest accrued on that principal since the last charge. */
+  accruedInterest?: number;
+  /** Actuarial only: date interest has been charged up to. */
+  accrualFromDate?: string;
+  /** Actuarial only: days of accrual applied. */
+  accrualDays?: number;
 }
 
 export interface EarlyPayoffQuote {
@@ -134,7 +159,9 @@ function totalContractInterest(app: LoanSummarySource): number {
     return Math.max(0, round2(totalRepay - approved));
   }
   if (typeof approved === 'number') {
-    return Math.max(0, round2(approved * LOAN_INTEREST_RATE));
+    // No stored total (pre-pricing application): fall back to the amortised
+    // interest this loan would carry.
+    return Math.max(0, buildSchedule({ principal: approved, startDate: new Date() }).totalInterest);
   }
   return 0;
 }
@@ -176,16 +203,43 @@ export function computeEarlyPayoff(
   const elapsedDays = Math.min(Math.max(0, daysBetween(loanStartDate, settlementDate)), termDays);
   const remainingDays = termDays - elapsedDays;
 
-  // --- Unearned interest rebate -----------------------------------------
+  // --- Settlement basis --------------------------------------------------
   const totalInterest = totalContractInterest(app);
   // Interest embedded in the remaining instalments (flat/even allocation).
   const grossFutureInterest = round2((totalInterest * remainingInstalments) / totalInstalments);
-  // Pro-rata by remaining time, capped so we never rebate interest that has
-  // already been paid in earlier instalments.
-  const timeRebate = round2((totalInterest * remainingDays) / termDays);
-  const unearnedInterestRebate = Math.min(Math.max(0, timeRebate), grossFutureInterest);
 
-  const netOutstanding = Math.max(0, round2(grossRemaining - unearnedInterestRebate));
+  const approvedAmount = app.loanDetails?.approvedAmount;
+  const isAmortised = app.loanDetails?.rateModel === RATE_MODEL;
+
+  let method: InterestRebateMethod = LEGACY_INTEREST_REBATE_METHOD;
+  let unearnedInterestRebate: number;
+  let netOutstanding: number;
+  let actuarial: PayoffBasis | null = null;
+
+  if (isAmortised && typeof approvedAmount === 'number' && approvedAmount > 0) {
+    // Rebuild the amortisation this loan was priced on and settle against the
+    // principal actually outstanding — the basis the borrower contracted to.
+    const schedule = buildSchedule({
+      principal: approvedAmount,
+      startDate: loanStartDate,
+    });
+    const paidCount = totalInstalments - remainingInstalments;
+    actuarial = payoffBasis({ schedule, instalmentsPaid: paidCount, settlementDate });
+    method = INTEREST_REBATE_METHOD;
+    netOutstanding = Math.max(
+      0,
+      round2(actuarial.outstandingPrincipal + actuarial.accruedInterest),
+    );
+    // Reported for disclosure: what settling now saves against running to term.
+    unearnedInterestRebate = Math.max(0, round2(grossRemaining - netOutstanding));
+  } else {
+    // Legacy flat-rate contract: straight-line rebate, capped so we never
+    // rebate interest already paid in earlier instalments.
+    const timeRebate = round2((totalInterest * remainingDays) / termDays);
+    unearnedInterestRebate = Math.min(Math.max(0, timeRebate), grossFutureInterest);
+    netOutstanding = Math.max(0, round2(grossRemaining - unearnedInterestRebate));
+  }
+
   const prepaymentFee = EARLY_REPAYMENT_FEE;
   const totalPayoff = round2(netOutstanding + prepaymentFee);
 
@@ -203,7 +257,7 @@ export function computeEarlyPayoff(
     totalPayoffCents: toCents(totalPayoff),
     installmentsCleared: unpaid.map((i) => i.installmentNumber),
     breakdown: {
-      method: INTEREST_REBATE_METHOD,
+      method,
       totalInterest,
       totalInstalments,
       remainingInstalments,
@@ -214,6 +268,10 @@ export function computeEarlyPayoff(
       loanStartDate,
       finalDueDate,
       settlementDate,
+      outstandingPrincipal: actuarial?.outstandingPrincipal,
+      accruedInterest: actuarial?.accruedInterest,
+      accrualFromDate: actuarial?.accrualFromDate,
+      accrualDays: actuarial?.accrualDays,
     },
   };
 }

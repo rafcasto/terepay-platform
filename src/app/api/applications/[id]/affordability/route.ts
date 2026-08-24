@@ -12,6 +12,7 @@ import { randomUUID } from 'crypto';
 import { generateAffordabilityPdf } from '@/lib/pdf/affordability-report';
 import { getDriveClient, getOrCreateSubfolder, uploadBufferToDrive } from '@/lib/gdrive/client';
 import type { AffordabilityAssessment, LoanApplication } from '@/types/application';
+import { fortnightlyPayment } from '@/lib/loan/repayment';
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -125,7 +126,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const requestedAmount = appData.loanDetails?.requestedAmount ?? 0;
     const assessedAmount = parsed.assessedAmount ?? requestedAmount;
-    const loanFortnightlyPayment = (assessedAmount * 1.047) / 4;
+    // CCCFA affordability must test the instalment the borrower will actually
+    // be charged, so use the amortised figure rather than a flat approximation.
+    const loanFortnightlyPayment = fortnightlyPayment(assessedAmount);
     const finalAvailableSurplus = netDisposableIncome - loanFortnightlyPayment;
 
     // Days of transaction data

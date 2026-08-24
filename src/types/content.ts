@@ -257,7 +257,7 @@ export const DEFAULT_CONTENT: Record<string, ContentSectionValues> = {
     q4: 'What identification do I need to apply?',
     a4: "You will need a valid New Zealand driver's licence or passport, proof of your residential address, recent bank statements (last 3 months), and proof of income. Additional documents may be requested during assessment.",
     q5: 'Are there any hidden fees?',
-    a5: 'No hidden fees. Our costs are clearly disclosed upfront: a $20 admin fee (new customers pay a $50 establishment fee), a 4.7% interest rate for the 8-week term, and a $25 prepayment fee if you repay early. Late payment fees apply only after a 3-day grace period. See our Fees & Charges policy for the full breakdown.',
+    a5: 'No hidden fees. Our costs are clearly disclosed upfront: a $20 admin fee (new customers pay a $50 establishment fee), interest at 49% p.a. charged on the reducing balance over the 8-week term, and a $25 prepayment fee if you repay early. Late payment fees apply only after a 3-day grace period. See our Fees & Charges policy for the full breakdown.',
     q6: 'What if I have a question or need help?',
     a6: 'Our team is here to help. You can reach us by phone at +64 9 886 7158 or by email at info@terepay.com. We are happy to assist you through every step of the application process.',
   },
@@ -281,7 +281,7 @@ export const DEFAULT_CONTENT: Record<string, ContentSectionValues> = {
     feature1Body:
       'Submit your application and receive a lending decision in as little as 24 hours. We know time matters.',
     feature2Title: 'Transparent Terms',
-    feature2Body: 'Interest rate of 4.7% for the 8-week term, plus a $20 admin fee. No hidden charges — ever.',
+    feature2Body: 'Interest at 49% p.a., charged only on what you still owe, over the 8-week term, plus a $20 admin fee. No hidden charges — ever.',
     feature3Title: 'Responsible Lending',
     feature3Body:
       'We ensure every loan meets your needs and that you can repay comfortably without financial hardship.',

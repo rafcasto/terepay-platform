@@ -3,7 +3,7 @@
 import { useFormContext, useWatch } from 'react-hook-form';
 import type { TerepayApplicationInput } from '@/lib/validation/schemas';
 import { useAuth } from '@/hooks/useAuth';
-import { LOAN_INTEREST_RATE, computeApplicationFee } from '@/lib/constants/fees';
+import { computeRepayment } from '@/lib/loan/status-display';
 
 const errorCls = 'mt-1.5 text-xs text-danger-text font-medium';
 
@@ -65,11 +65,14 @@ export default function Step8Declarations() {
 
   const requestedAmount = useWatch({ control, name: 'loanRequest.requestedAmount' }) ?? 0;
   const principal = Number(requestedAmount) || 0;
-  const interest = principal * LOAN_INTEREST_RATE;
   const isExisting = user?.isExistingCustomer === true;
-  const applicationFee = computeApplicationFee(isExisting);
-  const totalRepayable = principal + interest + applicationFee;
-  const fortnightlyPayment = totalRepayable / 4;
+  // The application fee is deducted from the disbursement, NOT amortised into
+  // the repayments, so it must not be added to `totalRepayable` here.
+  const quote = computeRepayment(principal, isExisting);
+  const interest = quote.interest;
+  const applicationFee = quote.fee;
+  const totalRepayable = quote.totalRepayable;
+  const fortnightlyPayment = quote.instalmentAmount;
   const customerLabel = isExisting ? 'existing customer' : 'new customer';
 
   const renderDeclaration = (decl: { key: DeclarationKey; text: string }) => (
@@ -107,7 +110,7 @@ export default function Step8Declarations() {
             <dd className="font-semibold sm:mt-0.5">${principal.toFixed(2)}</dd>
           </div>
           <div className="flex justify-between sm:block">
-            <dt className="text-[var(--text-muted)]">Interest (4.7%)</dt>
+            <dt className="text-[var(--text-muted)]">Interest (49% p.a.)</dt>
             <dd className="font-semibold sm:mt-0.5">${interest.toFixed(2)}</dd>
           </div>
           <div className="flex justify-between sm:block">
@@ -124,6 +127,9 @@ export default function Step8Declarations() {
             <dt className="text-ink-strong font-medium">Fortnightly payment</dt>
             <dd className="font-bold sm:mt-0.5">
               4 × ${fortnightlyPayment.toFixed(2)}
+              <span className="block text-[11px] font-normal text-[var(--text-muted)]">
+                final payment adjusted to clear the balance
+              </span>
             </dd>
           </div>
         </dl>
