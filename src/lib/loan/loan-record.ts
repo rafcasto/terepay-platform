@@ -1,7 +1,7 @@
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
 import { auditLog } from '@/lib/utils/audit';
-import { LOAN_INTEREST_RATE } from '@/lib/constants/fees';
+import { ANNUAL_INTEREST_RATE } from '@/lib/constants/fees';
 import { deriveLoanSummary, type ActiveLoanSummary, type DerivedInstallmentStatus } from './active-loan';
 import type { LoanApplication, InstallmentStatus, PaymentConsent } from '@/types/application';
 
@@ -78,8 +78,9 @@ export async function createLoanRecord(params: {
       ...(summary.nextPaymentDate
         ? { nextPaymentDate: Timestamp.fromDate(new Date(summary.nextPaymentDate)) }
         : {}),
-      // Top-level fields read by the lender portfolio view.
-      interestRate: Math.round(LOAN_INTEREST_RATE * 1000) / 10, // e.g. 4.7
+      // Top-level fields read by the lender portfolio view. Percent, so 49%
+      // p.a. is stored as 49. Legacy flat-rate loans stored 4.7 here.
+      interestRate: Math.round((app.loanDetails?.interestRate ?? ANNUAL_INTEREST_RATE) * 1000) / 10,
       createdAt: now,
       timeline: { createdAt: now, updatedAt: now, disbursedAt: now },
     };

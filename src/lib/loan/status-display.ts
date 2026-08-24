@@ -1,4 +1,6 @@
 import type { AnyApplicationStatus } from '@/types/application';
+import { buildSchedule } from './repayment';
+import { computeApplicationFee } from '@/lib/constants/fees';
 
 // Display states defined in the design handoff.
 // All concrete LMS application statuses map to exactly one of these.
@@ -78,26 +80,40 @@ export const STATUS_LABELS: Record<string, string> = {
 };
 
 // ---------------------------------------------------------------------------
-// Repayment math (handoff product rules: 8-week, 4 fortnightly instalments, 49% APR)
+// Repayment math — delegates to the amortisation engine (src/lib/loan/repayment.ts).
+// The product is a reducing-balance annuity at 49% p.a. over 4 fortnightly
+// instalments. The application fee is deducted from the disbursement and is
+// NOT part of the repayment schedule.
 // ---------------------------------------------------------------------------
 
 export interface RepaymentBreakdown {
+  /** Application fee — deducted from the cash disbursed, not amortised. */
   fee: number;
   interest: number;
+  /** Principal + interest. Excludes `fee`. */
   totalRepayable: number;
+  /** Level instalment for payments 1-3; the final one is trued up. */
   instalmentAmount: number;
+  /** Cash the borrower actually receives (amount − fee). */
+  amountReceived: number;
 }
 
-export function computeRepayment(amount: number): RepaymentBreakdown {
-  const fee = amount < 500 ? 65 : amount < 1000 ? 95 : 125;
-  const interest = amount * 0.49 * (8 / 52);
-  const totalRepayable = amount + fee + interest;
-  const instalmentAmount = totalRepayable / 4;
+/**
+ * Headline quote for an amount, used by the marketing calculator and the
+ * application form. `isExistingCustomer` selects the $20 / $50 application fee.
+ */
+export function computeRepayment(
+  amount: number,
+  isExistingCustomer?: boolean | null,
+): RepaymentBreakdown {
+  const fee = computeApplicationFee(isExistingCustomer);
+  const schedule = buildSchedule({ principal: amount, startDate: new Date() });
   return {
-    fee: round2(fee),
-    interest: round2(interest),
-    totalRepayable: round2(totalRepayable),
-    instalmentAmount: round2(instalmentAmount),
+    fee,
+    interest: schedule.totalInterest,
+    totalRepayable: schedule.totalRepayable,
+    instalmentAmount: schedule.fortnightlyPayment,
+    amountReceived: Math.max(round2(amount - fee), 0),
   };
 }
 

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 
 const loanRows = [
-  { label: 'Interest Rate', value: '4.7%', sub: 'for the 8-week term' },
+  { label: 'Interest Rate', value: '49% p.a.', sub: 'charged on the reducing balance' },
   { label: 'Admin Fee', value: '$20', sub: 'one-time (new customers $50)' },
   { label: 'Total Repayable', value: '$1,067', sub: 'over 8 weeks' },
   { label: 'Fortnightly Payment', value: '$266.75', sub: '× 4 payments' },

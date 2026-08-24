@@ -1,7 +1,8 @@
 import { Hero, HeroBalance, Pill, StatGrid } from '@/components/ui';
 import { fmtNZD } from '@/lib/loan/format';
 import type { LoanApplication, AnyApplicationStatus, PaymentConsent } from '@/types/application';
-import { computeApplicationFee, LOAN_INTEREST_RATE } from '@/lib/constants/fees';
+import { computeApplicationFee } from '@/lib/constants/fees';
+import { buildSchedule, RATE_MODEL } from '@/lib/loan/repayment';
 import AcceptOfferButton from '@/app/applicant/applications/[id]/_components/AcceptOfferButton';
 import RejectOfferButton from '@/app/applicant/applications/[id]/_components/RejectOfferButton';
 import InitiatePaymentConsentCard from '@/app/applicant/applications/[id]/_components/InitiatePaymentConsentCard';
@@ -113,15 +114,23 @@ export default function ScreenApproved({ app, status, applicationId, isExistingC
         const round2 = (n: number) => Math.round(n * 100) / 100;
         // Total amount to pay = principal + interest (the fee is deducted at
         // disbursement, not repaid via instalments). Total amount = that + fee.
-        const totalToPay = ld?.totalRepayment ?? round2(approvedAmount * (1 + LOAN_INTEREST_RATE));
+        // Figures agreed at approval win. Only fall back to a fresh quote for
+        // applications approved before pricing was persisted.
+        const quote = buildSchedule({ principal: approvedAmount, startDate: new Date() });
+        const totalToPay = ld?.totalRepayment ?? quote.totalRepayable;
         const interest = round2(totalToPay - approvedAmount);
         const totalAmount = round2(totalToPay + fee);
-        const fortnightly = ld?.fortnightlyPayment ?? round2(totalToPay / 4);
-        const ratePct = Math.round(LOAN_INTEREST_RATE * 1000) / 10; // 4.7
+        const fortnightly = ld?.fortnightlyPayment ?? quote.fortnightlyPayment;
+        // Legacy loans were priced on a flat 4.7%; amortised ones quote the
+        // annual rate. Label whichever this loan was actually written on.
+        const rateLabel =
+          ld?.rateModel === RATE_MODEL || ld?.rateModel === undefined
+            ? `${round2((ld?.interestRate ?? quote.annualRate) * 100)}% p.a.`
+            : `${Math.round((interest / approvedAmount) * 1000) / 10}%`;
 
         const rows: Array<{ label: string; value: string; strong?: boolean }> = [
           { label: 'Approved loan amount', value: fmtNZD(approvedAmount) },
-          { label: `Total interest charges (${ratePct}%)`, value: fmtNZD(interest) },
+          { label: `Total interest charges (${rateLabel})`, value: fmtNZD(interest) },
           { label: 'Application fee', value: fmtNZD(fee) },
           { label: 'Total amount', value: fmtNZD(totalAmount), strong: true },
           { label: 'Loan disbursed', value: fmtNZD(payout) },

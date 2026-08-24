@@ -1,6 +1,5 @@
 export const APPLICATION_FEE_NEW = 50;
 export const APPLICATION_FEE_EXISTING = 20;
-export const LOAN_INTEREST_RATE = 0.047;
 
 /**
  * Fixed administrative fee charged when a borrower repays their loan early in
@@ -43,12 +42,12 @@ export const PAYMENT_DEFAULT_FEE = 25;
 export const PAYMENT_DEFAULT_GRACE_DAYS = 7;
 
 /**
- * Fixed annual interest rate (49%). The flat LOAN_INTEREST_RATE (4.7% of the
- * initial balance) is the effective rate baked into the fortnightly instalments
- * of an on-time loan and remains the schedule for on-time repayment. This 49%
- * p.a. figure is used only for **post-default daily accrual**: once an
- * instalment is missed, additional interest accrues each day on the outstanding
- * balance (daily-balance method) because the borrower still owes the money.
+ * Fixed annual interest rate (49%). Loans are priced as a reducing-balance
+ * annuity at this rate — see src/lib/loan/repayment.ts, which reads the rate
+ * from the effective-dated collections config. Over an on-time 8-week term the
+ * total interest works out at ~4.7% of the initial balance, which is the
+ * sanity check the collections engine asserts (AC-3). The same rate drives
+ * post-default daily accrual on the outstanding balance.
  */
 export const ANNUAL_INTEREST_RATE = 0.49;
 /** Daily interest rate = annual / 365 (CCCFA daily-balance method). */

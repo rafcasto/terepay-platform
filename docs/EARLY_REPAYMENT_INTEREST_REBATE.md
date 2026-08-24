@@ -1,6 +1,8 @@
 # Early Repayment — Unearned Interest Rebate
 
-**Status:** DRAFT — pending finance + legal review before production launch.
+**Status:** APPROVED — actuarial reducing-balance basis signed off for the
+amortised product. Loans written before that product keep the straight-line
+method they were sold under (§3b).
 **Owner of the maths:** [`src/lib/loan/early-payoff.ts`](../src/lib/loan/early-payoff.ts) → `computeEarlyPayoff()`.
 **Fee constant:** `EARLY_REPAYMENT_FEE = 25` in [`src/lib/constants/fees.ts`](../src/lib/constants/fees.ts).
 
@@ -13,13 +15,18 @@ requirements before we enable it in production. The whole calculation lives in
 
 ## 1. The TerePay product (recap)
 
-- Fixed micro-loan. Interest is **flat**: `LOAN_INTEREST_RATE = 4.7%` charged on
-  the approved (financed) amount.
+- Fixed micro-loan. Interest is **49% p.a. charged on the reducing balance**.
+  The loan is a level-payment annuity: `PMT(0.49/365×14, 4, principal)`. Over an
+  on-time 8-week term the total interest lands at ~4.7% of the amount financed,
+  which is where the legacy flat rate came from. See
+  [`src/lib/loan/repayment.ts`](../src/lib/loan/repayment.ts).
 - Repaid in **4 equal fortnightly instalments** over an **8-week (56-day)** term.
-- Original pricing (see `POST /api/applications/[id]/decision`):
-  - `totalRepayment = approvedAmount × (1 + 0.047)`
-  - `fortnightlyPayment = totalRepayment / 4`
-  - **Total contractual interest** `I = totalRepayment − approvedAmount = approvedAmount × 0.047`
+- Pricing (see `POST /api/applications/[id]/decision`):
+  - `fortnightlyPayment = PMT(dailyRate × 14, 4, approvedAmount)` — instalments
+    1–3; the **final instalment is trued up** to clear the balance exactly
+  - `totalRepayment = Σ instalments`
+  - **Total contractual interest** `I = totalRepayment − approvedAmount`
+  - Loans priced this way carry `loanDetails.rateModel = 'amortised_v1'`
 - The **application fee** ($50 new / $20 existing) is deducted from the
   disbursement — it is **not** part of `totalRepayment` and is **not** touched by
   the payoff calculation.
@@ -49,10 +56,39 @@ portion of the term is **refunded**.
 
 ---
 
-## 3. Unearned interest rebate — the formula under review
+## 3. Settlement basis — actuarial reducing balance
 
-Method implemented: **pro-rata time-apportionment (straight-line by elapsed
-term).** Identifier in code: `INTEREST_REBATE_METHOD = 'pro_rata_time_apportionment'`.
+Method implemented: **actuarial reducing balance**, matching how the loan was
+priced. Identifier in code: `INTEREST_REBATE_METHOD = 'actuarial_reducing_balance'`.
+
+```
+outstandingPrincipal = closing balance of the last SETTLED instalment
+                       (= approvedAmount when nothing has been paid)
+accrualFromDate      = due date of that instalment (= loanStartDate if none)
+accrualDays          = settlementDate − accrualFromDate        // whole days, ≥ 0
+accruedInterest      = outstandingPrincipal × dailyRate × accrualDays
+netOutstanding       = outstandingPrincipal + accruedInterest
+totalPayoff          = netOutstanding + $25
+```
+
+Interest simply **stops accruing** at settlement, so there is nothing to rebate
+as a separate step. `unearnedInterestRebate` is still reported — it is the
+difference between running the schedule to term and settling now — but it is a
+disclosure figure, not an input to the charge.
+
+**Worked example** ($1,000 loan, settling on the first due date, nothing paid):
+`1000 + (1000 × 0.49/365 × 14) + 25 = 1000 + 18.79 + 25 =` **$1,043.79**,
+saving the borrower $3.63 against the $1,047.42 contractual total. This matches
+the pricing spreadsheet's Scenario 1 exactly and is asserted in
+[`early-payoff.test.ts`](../src/lib/loan/early-payoff.test.ts).
+
+---
+
+## 3b. Legacy method — flat-rate loans only
+
+Loans with **no** `rateModel` stamp were sold on a flat 4.7% and keep the
+straight-line rebate disclosed in their contract. Identifier:
+`LEGACY_INTEREST_REBATE_METHOD = 'pro_rata_time_apportionment'`.
 
 ```
 I             = total contractual interest on the loan (NZD)
@@ -90,7 +126,7 @@ drop below the principal the borrower still owes.
 
 ---
 
-## 4. Worked examples
+## 4. Worked examples — LEGACY flat-rate loans only
 
 Assume `approvedAmount = $500`, so `I = $500 × 0.047 = $23.50`,
 `totalRepayment = $523.50`, `fortnightlyPayment = $130.875 ≈ $130.88`,

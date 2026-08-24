@@ -12,6 +12,7 @@ import {
   listProviders,
 } from '@/lib/qippay/setpay-client';
 import type { PaymentConsent, PaymentConsentAttempt } from '@/types/application';
+import { buildSchedule } from '@/lib/loan/repayment';
 
 export const dynamic = 'force-dynamic';
 
@@ -115,24 +116,23 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         );
       }
 
-      // TerePay product is 4 × fortnightly. Derive installment amounts when
-      // we don't have a stored schedule yet.
-      const installmentCount = 4;
-      const perInstallmentNzd =
-        typeof fortnightlyPayment === 'number'
-          ? fortnightlyPayment
-          : ((approvedAmount + approvedAmount * 0.047) / installmentCount);
-      const perInstallmentCents = Math.round(perInstallmentNzd * 100);
-
+      // TerePay product is 4 × fortnightly on a reducing balance, so the final
+      // instalment differs from the first three by a few cents. Build the real
+      // amortisation rather than splitting a total four ways.
       const today = new Date();
-      const installments = Array.from({ length: installmentCount }, (_, i) => {
-        const due = new Date(today);
-        due.setDate(today.getDate() + 14 * (i + 1));
-        return {
-          dueDate: due.toISOString().slice(0, 10),
-          amountCents: perInstallmentCents,
-        };
-      });
+      const schedule = buildSchedule({ principal: approvedAmount, startDate: today });
+      const installmentCount = schedule.rows.length;
+
+      const installments = schedule.rows.map((row) => ({
+        dueDate: row.dueDate,
+        amountCents: Math.round(row.amount * 100),
+      }));
+
+      // Prefer the figures agreed at approval; fall back to this schedule when
+      // an older application predates them.
+      const perInstallmentCents = Math.round(
+        (fortnightlyPayment ?? schedule.fortnightlyPayment) * 100,
+      );
       const totalAmountCents =
         typeof totalRepayment === 'number'
           ? Math.round(totalRepayment * 100)

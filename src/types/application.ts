@@ -504,7 +504,18 @@ export interface LoanApplication {
     approvedAmount?: number;
     applicationFee?: number;
     fortnightlyPayment?: number;
+    /** Principal + interest. Excludes `applicationFee`, which is deducted at disbursement. */
     totalRepayment?: number;
+    /** Total interest over the term (totalRepayment − approvedAmount). */
+    totalInterest?: number;
+    /** Annual interest rate the loan was priced at, e.g. 0.49. */
+    interestRate?: number;
+    /**
+     * Pricing model stamp. `'amortised_v1'` = reducing-balance annuity.
+     * Absent on loans written under the legacy flat 4.7% product, which keep
+     * their original figures and settlement basis.
+     */
+    rateModel?: 'amortised_v1';
     disbursementDate?: string;
     disbursedAmount?: number;
   };

@@ -7,10 +7,8 @@ import { LOAN_PURPOSES } from '@/lib/constants/loan-purposes';
 import {
   APPLICATION_FEE_NEW,
   APPLICATION_FEE_EXISTING,
-  LOAN_INTEREST_RATE,
-  computeApplicationFee,
 } from '@/lib/constants/fees';
-import { LOAN_MIN, LOAN_MAX } from '@/lib/loan/status-display';
+import { LOAN_MIN, LOAN_MAX, computeRepayment } from '@/lib/loan/status-display';
 import { RangeSlider, QuickAmounts } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
 import { useApplyContent } from './ApplyContentContext';
@@ -64,13 +62,13 @@ export default function Step5LoanRequest() {
   const setAmount = (n: number) =>
     setValue('loanRequest.requestedAmount', n, { shouldValidate: true, shouldDirty: true });
 
-  // Estimate repayments: 4 fortnightly payments of (principal + 4.7% interest).
-  // The application fee is deducted from the disbursement, NOT added to repayments.
-  const interest = principal * LOAN_INTEREST_RATE;
-  const estFee = computeApplicationFee(user?.isExistingCustomer);
-  const totalRepayable = principal + interest;
-  const fortnightlyPayment = totalRepayable / 4;
-  const amountReceived = Math.max(principal - estFee, 0);
+  // 4 fortnightly payments on a reducing balance at 49% p.a. The application
+  // fee is deducted from the disbursement, NOT added to the repayments.
+  const quote = computeRepayment(principal, user?.isExistingCustomer);
+  const estFee = quote.fee;
+  const totalRepayable = quote.totalRepayable;
+  const fortnightlyPayment = quote.instalmentAmount;
+  const amountReceived = quote.amountReceived;
 
   return (
     <div className="space-y-6">
@@ -132,7 +130,9 @@ export default function Step5LoanRequest() {
             <span className="font-bold font-tabular">${fortnightlyPayment.toFixed(2)}</span>
           </p>
           <p className="text-xs text-[var(--text-muted)]">
-            Total repayable ${totalRepayable.toFixed(2)} (principal + 4.7% interest over 8 weeks).
+            Total repayable ${totalRepayable.toFixed(2)} — principal plus $
+            {quote.interest.toFixed(2)} interest at 49% p.a. over 8 weeks, charged on the
+            reducing balance. The last payment is trued up to clear the balance exactly.
           </p>
           <p className="text-xs text-[var(--text-muted)]">
             You&apos;ll receive{' '}
@@ -150,7 +150,7 @@ export default function Step5LoanRequest() {
         <div className="grid grid-cols-2 gap-3 text-xs text-ink-strong mt-3">
           <div><span className="font-semibold">Period:</span> 8 weeks (56 days)</div>
           <div><span className="font-semibold">Payments:</span> 4 × fortnightly</div>
-          <div><span className="font-semibold">Interest:</span> 4.7% for 8 weeks</div>
+          <div><span className="font-semibold">Interest:</span> 49% p.a. on the reducing balance</div>
           <div><span className="font-semibold">APR:</span> 49%</div>
           <div><span className="font-semibold">New customer fee:</span> ${APPLICATION_FEE_NEW}</div>
           <div><span className="font-semibold">Existing customer fee:</span> ${APPLICATION_FEE_EXISTING}</div>
