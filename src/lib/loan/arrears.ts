@@ -21,9 +21,10 @@ import type { ArrearsState, FeeAssessment } from '@/types/application';
  *     due, one charge per instalment, capped at $40 (4 instalments) per loan.
  *   - Payment Default Fee: $25 charged once per loan when any instalment is
  *     > 7 calendar days past due, in addition to the late fee.
- *   - Post-default interest: the flat 4.7% stays for on-time loans; once an
- *     instalment is missed, 49% p.a. (daily-balance method) accrues on the
- *     outstanding balance from the miss date because the money is still owed.
+ *   - Post-default interest: an on-time loan costs only the interest built
+ *     into its amortised schedule (~4.74% of principal over the 8-week term);
+ *     once an instalment is missed, 49% p.a. (daily-balance method) accrues on
+ *     the outstanding balance from the miss date because the money is owed.
  *
  * Interest accrual uses the true daily-balance method incrementally: each run
  * adds `outstandingBalance × dailyRate × (days since last accrual)`. Driven by

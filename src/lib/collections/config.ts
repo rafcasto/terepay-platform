@@ -23,7 +23,11 @@ export interface CollectionsConfig {
   dailyRate: Decimal;
   /** Days between fortnightly interest charges (compounding cadence). */
   chargeIntervalDays: number;
-  /** On-time total interest as a fraction of principal — SANITY CHECK ONLY (AC-3). */
+  /**
+   * On-time total interest as a fraction of principal — SANITY CHECK ONLY
+   * (AC-3). Derived from `annualRate` over the standard 4-fortnight term, not
+   * an independent input: nothing prices off this field.
+   */
   onTimeInterestFraction: Decimal;
   fees: {
     latePayment: Decimal;
@@ -56,7 +60,7 @@ const CONFIG_VERSIONS: readonly CollectionsConfig[] = [
     annualRate: new Decimal('0.49'),
     dailyRate: new Decimal('0.49').div(365), // 0.00134246575...
     chargeIntervalDays: 14,
-    onTimeInterestFraction: new Decimal('0.047'),
+    onTimeInterestFraction: new Decimal('0.0474'),
     fees: {
       latePayment: new Decimal('10'),
       paymentDefault: new Decimal('25'),
