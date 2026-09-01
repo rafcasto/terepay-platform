@@ -98,9 +98,11 @@ describe('buildSchedule — invariants across the product range', () => {
     expect(s.totalRepayable).toBe(0);
   });
 
-  it('effective interest is ~4.7% of principal, the documented sanity check', () => {
+  it('effective interest is 4.74% of principal, the documented sanity check', () => {
     const s = buildSchedule({ principal: 1000, startDate: START });
-    expect(s.totalInterest / 1000).toBeCloseTo(0.047, 3);
+    // 49% p.a. on a reducing balance over four fortnights = $47.42 per $1,000.
+    expect(s.totalInterest).toBeCloseTo(47.42, 2);
+    expect(s.totalInterest / 1000).toBeCloseTo(0.0474, 4);
   });
 });
 

@@ -82,7 +82,7 @@ export interface ComponentBreakdown {
   principalOutstanding: Decimal;
   interestAccruedToDate: Decimal;
   /** Gross interest accrued over the whole life, incl. amounts absorbed by
-   *  payments — the 4.7% on-time sanity check (AC-3) is measured against this. */
+   *  payments — the 4.74% on-time sanity check (AC-3) is measured against this. */
   totalInterestAccrued: Decimal;
   lateFeeCount: number;
   lateFeesTotal: Decimal;

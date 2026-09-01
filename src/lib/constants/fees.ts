@@ -45,9 +45,9 @@ export const PAYMENT_DEFAULT_GRACE_DAYS = 7;
  * Fixed annual interest rate (49%). Loans are priced as a reducing-balance
  * annuity at this rate — see src/lib/loan/repayment.ts, which reads the rate
  * from the effective-dated collections config. Over an on-time 8-week term the
- * total interest works out at ~4.7% of the initial balance, which is the
- * sanity check the collections engine asserts (AC-3). The same rate drives
- * post-default daily accrual on the outstanding balance.
+ * total interest works out at ~4.74% of the initial balance ($47.42 per
+ * $1,000), which is the sanity check the collections engine asserts (AC-3).
+ * The same rate drives post-default daily accrual on the outstanding balance.
  */
 export const ANNUAL_INTEREST_RATE = 0.49;
 /** Daily interest rate = annual / 365 (CCCFA daily-balance method). */
