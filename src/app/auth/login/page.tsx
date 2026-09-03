@@ -5,9 +5,9 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 import { useAuth } from '@/hooks/useAuth';
 import { loginSchema, type LoginInput } from '@/lib/validation/schemas';
+import { useRecaptchaToken } from '../recaptcha-provider';
 import { AuthShell } from '../_components/auth-shell';
 import { AuthIcon } from '../_components/auth-icons';
 import { Field, InputShell, EyeToggle, SubmitButton, ErrorAlert, Divider } from '../_components/auth-ui';
@@ -24,7 +24,7 @@ function LoginFormInner() {
   // this latch the button briefly re-enables in that gap and the user can fire
   // duplicate login requests.
   const [isRedirecting, setIsRedirecting] = useState(false);
-  const { executeRecaptcha } = useGoogleReCaptcha();
+  const getRecaptchaToken = useRecaptchaToken();
 
   const {
     register,
@@ -36,7 +36,7 @@ function LoginFormInner() {
   const onSubmit = useCallback(
     async (data: LoginInput) => {
       try {
-        const recaptchaToken = executeRecaptcha ? await executeRecaptcha('login') : undefined;
+        const recaptchaToken = await getRecaptchaToken('login');
         const user = await login(data.email, data.password, recaptchaToken);
         // Keep the button disabled through navigation — never reset on success.
         setIsRedirecting(true);
@@ -53,7 +53,7 @@ function LoginFormInner() {
         setError('root', { message: msg });
       }
     },
-    [executeRecaptcha, login, redirectTo, router, setError],
+    [getRecaptchaToken, login, redirectTo, router, setError],
   );
 
   // Busy whenever the form is submitting OR a successful login is mid-redirect.

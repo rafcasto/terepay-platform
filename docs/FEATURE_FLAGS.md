@@ -140,6 +140,36 @@ export function PaymentClient({ useV2 }: { useV2: boolean }) {
 | `new_applicant_dashboard` | Redesigned applicant UI | `false` | 25% |
 | `payment_tracking_v2` | New payment history | `false` | 10% |
 | `auto_underwriting` | Automated credit scoring | `false` | Internal only |
+| `disable-sms-otp` | Skip SMS OTP step | `true` | All |
+| `env_reset_enabled` | Full environment data reset from admin console | `false` (`ENV_RESET_ENABLED=true`) | Dev/staging only |
+| `recaptcha_disabled` | Skip reCAPTCHA v3 (client script + server verify) | `false` (`DISABLE_RECAPTCHA=true`) | Local dev only |
+
+### 5.1 `recaptcha_disabled`
+
+Lets you develop against the emulators without real reCAPTCHA keys.
+
+When on:
+- `src/app/auth/layout.tsx` skips rendering `GoogleReCaptchaProvider`, so the Google script never loads and no token is minted.
+- `verifyRecaptcha()` short-circuits to `true` before hitting Google's siteverify endpoint.
+
+Default is **off** — opt in from `.env.local`:
+
+```bash
+DISABLE_RECAPTCHA=true
+```
+
+**It cannot be turned on in production.** `decide()` returns `false` whenever
+`NEXT_PUBLIC_ENVIRONMENT === 'production'` or `VERCEL_ENV === 'production'`, no matter
+what `DISABLE_RECAPTCHA` says — so there is no env var and no dashboard toggle that
+disables reCAPTCHA on prod. Flag evaluation in `verifyRecaptcha()` also fails closed:
+if the flag throws, verification stays on.
+
+Remove the line (or set it to anything other than `true`) to test the real verification
+path locally.
+
+Client code must use `useRecaptchaToken()` from `src/app/auth/recaptcha-provider.tsx`
+rather than `useGoogleReCaptcha()` directly — the raw hook throws when the provider
+is absent, which is exactly what happens with the flag on.
 
 ---
 
