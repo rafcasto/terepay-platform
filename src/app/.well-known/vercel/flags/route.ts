@@ -7,6 +7,7 @@ import {
   autoUnderwriting,
   disableSmsOtp,
   envResetEnabled,
+  recaptchaDisabled,
 } from '../../../../lib/flags/flags';
 
 export async function GET(request: NextRequest) {
@@ -20,6 +21,7 @@ export async function GET(request: NextRequest) {
     autoUnderwriting,
     disableSmsOtp,
     envResetEnabled,
+    recaptchaDisabled,
   });
   return NextResponse.json(data);
 }

@@ -45,8 +45,33 @@ export const envResetEnabled = flag<boolean>({
   decide: () => process.env.ENV_RESET_ENABLED === 'true',
 });
 
+/**
+ * Disable reCAPTCHA v3 — development only.
+ *
+ * When on, the client skips loading the reCAPTCHA script (no token is minted)
+ * and `verifyRecaptcha()` short-circuits to `true` on the server. Lets you work
+ * locally without real reCAPTCHA keys.
+ *
+ * DEFAULT OFF. Opt in with DISABLE_RECAPTCHA=true in .env.local.
+ *
+ * HARD GUARD: `decide` returns `false` whenever the app is running as
+ * production, regardless of DISABLE_RECAPTCHA. There is no env var and no
+ * dashboard toggle that can switch reCAPTCHA off in production.
+ */
+export const recaptchaDisabled = flag<boolean>({
+  key: 'recaptcha_disabled',
+  description: 'Skip reCAPTCHA v3 verification (local dev only — cannot be turned on in production)',
+  decide: () => {
+    const isProduction =
+      process.env.NEXT_PUBLIC_ENVIRONMENT === 'production' || process.env.VERCEL_ENV === 'production';
+    if (isProduction) return false;
+    return process.env.DISABLE_RECAPTCHA === 'true';
+  },
+});
+
 // Keep lazy-getter aliases for backward compatibility
 export const getNewApplicantDashboard = () => newApplicantDashboard;
 export const getPaymentTrackingV2 = () => paymentTrackingV2;
 export const getAutoUnderwriting = () => autoUnderwriting;
 export const getDisableSmsOtp = () => disableSmsOtp;
+export const getRecaptchaDisabled = () => recaptchaDisabled;

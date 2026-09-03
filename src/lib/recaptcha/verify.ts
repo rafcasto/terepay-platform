@@ -6,12 +6,31 @@
  *   if (!ok) return errorResponse(new AppError('RECAPTCHA_FAILED', 400, 'reCAPTCHA verification failed.'));
  */
 
+import { recaptchaDisabled } from '@/lib/flags/flags';
+
 const RECAPTCHA_VERIFY_URL = 'https://www.google.com/recaptcha/api/siteverify';
 
 // Minimum acceptable reCAPTCHA v3 score (0.0 = definitely bot, 1.0 = definitely human)
 const MIN_SCORE = 0.5;
 
+/**
+ * Reads the `recaptcha_disabled` flag. Fails CLOSED — any error evaluating the
+ * flag (e.g. called outside a request scope) leaves verification switched on.
+ */
+async function isRecaptchaDisabled(): Promise<boolean> {
+  try {
+    return await recaptchaDisabled();
+  } catch {
+    return false;
+  }
+}
+
 export async function verifyRecaptcha(token: string, action?: string): Promise<boolean> {
+  if (await isRecaptchaDisabled()) {
+    console.warn('[recaptcha] recaptcha_disabled flag is on — skipping verification (development only)');
+    return true;
+  }
+
   const secretKey = process.env.RECAPTCHA_SECRET_KEY;
   if (!secretKey) {
     console.warn('[recaptcha] RECAPTCHA_SECRET_KEY is not set — skipping verification');

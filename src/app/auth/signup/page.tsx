@@ -6,10 +6,10 @@ import Link from 'next/link';
 import { createUserWithEmailAndPassword, deleteUser } from 'firebase/auth';
 import { clientAuth } from '@/lib/firebase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 import { AuthShell } from '../_components/auth-shell';
 import { AuthIcon } from '../_components/auth-icons';
 import { Field, InputShell, EyeToggle, SubmitButton, Checkbox, ErrorAlert } from '../_components/auth-ui';
+import { useRecaptchaToken } from '../recaptcha-provider';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -75,7 +75,7 @@ function PasswordStrength({ password }: { password: string }) {
 export default function SignupPage() {
   const { login } = useAuth();
   const router = useRouter();
-  const { executeRecaptcha } = useGoogleReCaptcha();
+  const getRecaptchaToken = useRecaptchaToken();
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -115,7 +115,7 @@ export default function SignupPage() {
       const idToken = await firebaseUser.getIdToken(true);
 
       // 3. Create Firestore profile and set role: 'applicant' custom claim
-      const recaptchaToken = executeRecaptcha ? await executeRecaptcha('signup') : undefined;
+      const recaptchaToken = await getRecaptchaToken('signup');
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -144,7 +144,7 @@ export default function SignupPage() {
     } finally {
       setLoading(false);
     }
-  }, [firstName, lastName, email, password, confirmPassword, agreedToTerms, executeRecaptcha, login, router, validate]);
+  }, [firstName, lastName, email, password, confirmPassword, agreedToTerms, getRecaptchaToken, login, router, validate]);
 
   return (
     <AuthShell
