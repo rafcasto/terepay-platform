@@ -142,30 +142,37 @@ export function PaymentClient({ useV2 }: { useV2: boolean }) {
 | `auto_underwriting` | Automated credit scoring | `false` | Internal only |
 | `disable-sms-otp` | Skip SMS OTP step | `true` | All |
 | `env_reset_enabled` | Full environment data reset from admin console | `false` (`ENV_RESET_ENABLED=true`) | Dev/staging only |
-| `recaptcha_disabled` | Skip reCAPTCHA v3 (client script + server verify) | `false` (`DISABLE_RECAPTCHA=true`) | Local dev only |
+| `recaptcha_disabled` | Skip reCAPTCHA v3 (client script + server verify) | `false` (`DISABLE_RECAPTCHA=true`) | Any env except Vercel production |
 
 ### 5.1 `recaptcha_disabled`
 
-Lets you develop against the emulators without real reCAPTCHA keys.
+Lets you run the app without real reCAPTCHA keys.
 
 When on:
 - `src/app/auth/layout.tsx` skips rendering `GoogleReCaptchaProvider`, so the Google script never loads and no token is minted.
 - `verifyRecaptcha()` short-circuits to `true` before hitting Google's siteverify endpoint.
 
-Default is **off** — opt in from `.env.local`:
+Default is **off** — opt in with a single runtime env var:
 
 ```bash
 DISABLE_RECAPTCHA=true
 ```
 
-**It cannot be turned on in production.** `decide()` returns `false` whenever
-`NEXT_PUBLIC_ENVIRONMENT === 'production'` or `VERCEL_ENV === 'production'`, no matter
-what `DISABLE_RECAPTCHA` says — so there is no env var and no dashboard toggle that
-disables reCAPTCHA on prod. Flag evaluation in `verifyRecaptcha()` also fails closed:
-if the flag throws, verification stays on.
+Remove the line (or set it to anything other than `true`) to exercise the real
+verification path.
 
-Remove the line (or set it to anything other than `true`) to test the real verification
-path locally.
+**Works in any environment.** The flag is deliberately *not* keyed off
+`NEXT_PUBLIC_ENVIRONMENT` — that value is inlined at build time and is set to
+`production` in setups that are not production, so it is not a reliable signal here.
+`DISABLE_RECAPTCHA` is a plain server-side env var read at request time, so no rebuild
+is needed to flip it and it never reaches the client bundle.
+
+**One hard guard remains:** `decide()` returns `false` when `VERCEL_ENV === 'production'`,
+regardless of `DISABLE_RECAPTCHA`. reCAPTCHA is the bot and credential-stuffing control
+on signup and login, so it stays on where real customer data is. `VERCEL_ENV` is set by
+Vercel only on deployments, so this never affects local runs; preview and staging
+deployments honour the env var. Flag evaluation in `verifyRecaptcha()` also fails
+closed — if the flag throws, verification stays on.
 
 Client code must use `useRecaptchaToken()` from `src/app/auth/recaptcha-provider.tsx`
 rather than `useGoogleReCaptcha()` directly — the raw hook throws when the provider
