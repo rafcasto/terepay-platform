@@ -191,6 +191,7 @@ export function toPlainScheduledPayments(payments: ScheduledPayment[]): Schedule
     ...(p.qippayPaymentId ? { qippayPaymentId: p.qippayPaymentId } : {}),
     ...(p.failureReason ? { failureReason: p.failureReason } : {}),
     ...(p.scheduleAttempts !== undefined ? { scheduleAttempts: p.scheduleAttempts } : {}),
+    ...(p.mockFailure && p.mockFailure.length > 0 ? { mockFailure: [...p.mockFailure] } : {}),
   }));
 }
 

@@ -1,5 +1,6 @@
 import { AppError } from '@/lib/utils/api-error';
 import { qippayFetch } from './http';
+import type { SetPayMockFailure } from '@/types/application';
 
 // Qippay SetPay (Integrated v1.0, rev 1 May 2026) — open-banking enduring
 // payment consent (NZ direct-debit replacement). This client uses the
@@ -113,6 +114,61 @@ export function getReturnBaseUrl(): string {
 
 export function getMode(): SetPayMode {
   return readEnv().mode;
+}
+
+// --- UAT failure simulation ----------------------------------------------
+// Qippay UAT lets us simulate a scheduled payment failing by adding a
+// `mock_setpay_failure` array to the POST /v1/setpay `metadata`. Each entry is
+// executed on a subsequent day, in order — e.g. ['rejected','error','revoked']
+// yields three attempts over three days, then the payment is abandoned.
+//   - 'rejected' → most likely insufficient funds (consent stays active); retried next day
+//   - 'error'    → bank API communication error (maintenance/outage); retried next day
+//   - 'revoked'  → customer revoked consent in their bank app — TERMINAL, needs a new consent
+// Qippay currently fires a webhook for the revocation only; retry/failure
+// webhooks are on their roadmap.
+
+export const SETPAY_MOCK_FAILURES: readonly SetPayMockFailure[] = ['rejected', 'error', 'revoked'];
+
+export function isSetPayMockFailure(value: unknown): value is SetPayMockFailure {
+  return typeof value === 'string' && (SETPAY_MOCK_FAILURES as readonly string[]).includes(value);
+}
+
+/**
+ * True when failure simulation may be sent to Qippay from this deployment.
+ *
+ * Opt in with QIPPAY_MOCK_SETPAY_FAILURE_ENABLED=true (UAT / preview / local).
+ *
+ * HARD GUARD: always `false` on Vercel production (VERCEL_ENV === 'production')
+ * regardless of the env var — a stray mock flag on a real customer's
+ * instalment would deliberately fail a genuine collection. Mirrors the
+ * `recaptchaDisabled` flag's guard; NEXT_PUBLIC_ENVIRONMENT is not used
+ * because it is inlined at build time and unreliable as a prod signal.
+ */
+export function isSetPayMockFailureEnabled(): boolean {
+  if (process.env.VERCEL_ENV === 'production') return false;
+  return process.env.QIPPAY_MOCK_SETPAY_FAILURE_ENABLED === 'true';
+}
+
+/**
+ * Optional default sequence (QIPPAY_MOCK_SETPAY_FAILURE_DEFAULT, comma-separated)
+ * attached to EVERY lodgement while set — including the one fired at
+ * disbursement and by the daily cron. Returns `undefined` when simulation is
+ * disabled, unset, or the value contains an unknown entry (logged, ignored).
+ */
+export function getDefaultSetPayMockFailure(): SetPayMockFailure[] | undefined {
+  if (!isSetPayMockFailureEnabled()) return undefined;
+  const raw = process.env.QIPPAY_MOCK_SETPAY_FAILURE_DEFAULT ?? '';
+  const seq = raw
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  if (seq.length === 0) return undefined;
+  const invalid = seq.filter((s) => !isSetPayMockFailure(s));
+  if (invalid.length > 0) {
+    console.warn('[setpay] Ignoring QIPPAY_MOCK_SETPAY_FAILURE_DEFAULT — unknown entries', invalid);
+    return undefined;
+  }
+  return seq as SetPayMockFailure[];
 }
 
 function stubHostedUrl(successUrl: string): string {
@@ -368,6 +424,11 @@ export type SetPaySchedulePaymentInput = {
   statementCode: string;
   statementReference: string;
   maxRetry?: number; // optional Qippay-side retry on failure
+  /**
+   * UAT only — sent as `metadata.mock_setpay_failure`. Refused (throws) unless
+   * `isSetPayMockFailureEnabled()`; never reaches Qippay from production.
+   */
+  mockFailure?: SetPayMockFailure[];
 };
 
 export type SetPayScheduledPayment = {
@@ -427,6 +488,19 @@ export async function schedulePayment(
     scheduled_for: input.scheduledFor,
   };
   if (input.maxRetry !== undefined) body.max_retry = input.maxRetry;
+
+  if (input.mockFailure && input.mockFailure.length > 0) {
+    // Defence in depth: callers already gate on this, but the client is the
+    // last thing between us and the wire.
+    if (!isSetPayMockFailureEnabled()) {
+      throw new AppError(
+        'SETPAY_MOCK_FORBIDDEN',
+        500,
+        'SetPay failure simulation is not enabled in this environment',
+      );
+    }
+    body.metadata = { mock_setpay_failure: [...input.mockFailure] };
+  }
 
   const data = await qippayFetch<SchedulePaymentResponse>('/v1/setpay', {
     method: 'POST',

@@ -2,9 +2,14 @@ import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
 import { AppError } from '@/lib/utils/api-error';
 import { auditLog } from '@/lib/utils/audit';
-import { schedulePayment, getBeneficiaryId } from './setpay-client';
+import { schedulePayment, getBeneficiaryId, getDefaultSetPayMockFailure } from './setpay-client';
 import { syncLoanRecord } from '@/lib/loan/loan-record';
-import type { LoanApplication, PaymentConsent, ScheduledPayment } from '@/types/application';
+import type {
+  LoanApplication,
+  PaymentConsent,
+  ScheduledPayment,
+  SetPayMockFailure,
+} from '@/types/application';
 
 /** Today's calendar date in NZ (Pacific/Auckland) as YYYY-MM-DD. */
 export function nzToday(): string {
@@ -52,8 +57,16 @@ export async function scheduleInstallments(opts: {
   applicationId: string;
   actor: string;
   ip?: string;
+  /**
+   * UAT only — Qippay failure simulation attached to every instalment lodged
+   * in this run. Falls back to QIPPAY_MOCK_SETPAY_FAILURE_DEFAULT when omitted.
+   * Callers must gate on `isSetPayMockFailureEnabled()`; the client throws
+   * otherwise.
+   */
+  mockFailure?: SetPayMockFailure[];
 }): Promise<ScheduleInstallmentsResult> {
   const { applicationId, actor, ip } = opts;
+  const mockFailure = opts.mockFailure ?? getDefaultSetPayMockFailure();
   const appRef = adminDb.collection('loanApplications').doc(applicationId);
   const snap = await appRef.get();
   if (!snap.exists) throw new AppError('NOT_FOUND', 404, 'Application not found');
@@ -141,6 +154,7 @@ export async function scheduleInstallments(opts: {
         statementCode: `Inst${p.installmentNumber}`,
         statementReference: shortRef,
         maxRetry: SETPAY_MAX_RETRY_DAYS,
+        mockFailure,
       });
 
       // Success — drop any prior failureReason for a clean row.
@@ -153,6 +167,9 @@ export async function scheduleInstallments(opts: {
         scheduledAt: Timestamp.now(),
         lastAttemptAt: Timestamp.now(),
         scheduleAttempts: (p.scheduleAttempts ?? 0) + 1,
+        // Record what we asked Qippay to simulate so the lender panel can
+        // explain the eventual retry/failure and the audit trail is explicit.
+        ...(mockFailure && mockFailure.length > 0 ? { mockFailure: [...mockFailure] } : {}),
       };
     } catch (err) {
       const reason =
@@ -194,6 +211,7 @@ export async function scheduleInstallments(opts: {
         attempted,
         scheduledCount,
         pendingCount,
+        ...(mockFailure && mockFailure.length > 0 ? { mockSetpayFailure: mockFailure } : {}),
       },
     });
   }

@@ -5,6 +5,9 @@ import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { checkRateLimit, defaultLimiter } from '@/lib/rate-limit/limiter';
 import { auditLog, getClientIp } from '@/lib/utils/audit';
 import { scheduleInstallments } from '@/lib/qippay/schedule-installments';
+import { isSetPayMockFailureEnabled } from '@/lib/qippay/setpay-client';
+import { schedulePaymentsSchema } from '@/lib/validation/schemas';
+import { ZodError } from 'zod';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,6 +20,12 @@ type RouteParams = { params: Promise<{ id: string }> };
  * `pending` with Qippay (e.g. ones whose rolling period has since opened).
  * Idempotent — already-scheduled instalments are untouched. Returns the
  * refreshed instalment array so the UI can update in place.
+ *
+ * Optional body `{ mockSetpayFailure: ('rejected'|'error'|'revoked')[] }` —
+ * UAT only. Forwarded to Qippay as `metadata.mock_setpay_failure` so the
+ * vendor simulates a failed collection on the lodged instalments (one entry
+ * per subsequent day). Rejected with 400 unless
+ * QIPPAY_MOCK_SETPAY_FAILURE_ENABLED=true; always rejected on Vercel production.
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   const ip = getClientIp(request);
@@ -44,7 +53,34 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const result = await scheduleInstallments({ applicationId: id, actor: auth.uid, ip });
+    // Body is optional — the lender console POSTs with no body for a plain retry.
+    const rawBody = await request.json().catch(() => ({}));
+    const parsed = schedulePaymentsSchema.parse(rawBody);
+
+    const mockFailure = parsed.mockSetpayFailure;
+    if (mockFailure && !isSetPayMockFailureEnabled()) {
+      await auditLog({
+        userId: auth.uid,
+        action: 'setpay_mock_failure_rejected',
+        targetId: id,
+        targetType: 'application',
+        outcome: 'failure',
+        ipAddress: ip,
+        changes: { mockSetpayFailure: mockFailure },
+      });
+      throw new AppError(
+        'BAD_REQUEST',
+        400,
+        'Payment failure simulation is not available in this environment',
+      );
+    }
+
+    const result = await scheduleInstallments({
+      applicationId: id,
+      actor: auth.uid,
+      ip,
+      mockFailure,
+    });
 
     await auditLog({
       userId: auth.uid,
@@ -58,6 +94,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         scheduledCount: result.scheduledCount,
         pendingCount: result.pendingCount,
         ...(result.skippedReason ? { skippedReason: result.skippedReason } : {}),
+        ...(mockFailure ? { mockSetpayFailure: mockFailure } : {}),
       },
     });
 
@@ -71,6 +108,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       },
     });
   } catch (err) {
+    if (err instanceof ZodError) {
+      return errorResponse(
+        new AppError('VALIDATION_ERROR', 422, 'Invalid request', err.flatten().fieldErrors),
+      );
+    }
     if (err instanceof AppError) return errorResponse(err);
     console.error('[schedule-payments] unexpected error', err);
     return internalError();

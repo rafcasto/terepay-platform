@@ -6,6 +6,7 @@ import type { PillTone } from '@/components/lender/ConsolePill';
 import { loanPurposeLabel } from '@/lib/constants/loan-purposes';
 import { computeApplicationFee } from '@/lib/constants/fees';
 import { reconcileConsent } from '@/lib/qippay/reconcile-consent';
+import { isSetPayMockFailureEnabled } from '@/lib/qippay/setpay-client';
 import { toPlainScheduledPayments } from '@/lib/loan/active-loan';
 import LoanReview, { type ReviewData } from './_components/LoanReview';
 
@@ -408,6 +409,8 @@ export default async function LenderApplicationDetailPage({
     payments: {
       show: PAYMENT_STATUSES.has(status),
       scheduled: toPlainScheduledPayments((app.scheduledPayments ?? []) as ScheduledPayment[]),
+      // UAT only — decided server-side so the selector never renders on production.
+      mockFailureEnabled: isSetPayMockFailureEnabled(),
     },
     disburse,
     decisionInput: {
