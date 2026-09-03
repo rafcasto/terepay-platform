@@ -150,6 +150,50 @@ export function isSetPayMockFailureEnabled(): boolean {
 }
 
 /**
+ * Derive a failure sequence from a test customer's email address, so the
+ * scenario is a property of the UAT user rather than something a tester has
+ * to pick on every lodgement. Convention (case-insensitive):
+ *
+ *   setpayfail-rejected-error-revoked@example.test    (local-part prefix)
+ *   you+setpayfail-rejected@yourdomain.com            (plus-tag — still lands in
+ *                                                      your real inbox for OTP /
+ *                                                      verification mail)
+ *
+ * Entries are separated by `-`, `.` or `_`. Anything after `revoked` is
+ * dropped (terminal upstream). Returns `undefined` for a normal email, when
+ * simulation is disabled, or when the tag contains an unknown entry (logged).
+ */
+export const SETPAY_MOCK_EMAIL_TAG = 'setpayfail';
+
+export function parseSetPayMockFailureFromEmail(
+  email: string | undefined | null,
+): SetPayMockFailure[] | undefined {
+  if (!isSetPayMockFailureEnabled() || !email) return undefined;
+  const local = email.trim().toLowerCase().split('@')[0] ?? '';
+  const tag = `${SETPAY_MOCK_EMAIL_TAG}-`;
+  let rest: string | undefined;
+  if (local.startsWith(tag)) {
+    rest = local.slice(tag.length);
+  } else {
+    const plus = local.indexOf(`+${tag}`);
+    if (plus !== -1) rest = local.slice(plus + 1 + tag.length);
+  }
+  if (rest === undefined) return undefined;
+
+  const seq = rest.split(/[-._]+/).filter(Boolean);
+  if (seq.length === 0) return undefined;
+  const invalid = seq.filter((s) => !isSetPayMockFailure(s));
+  if (invalid.length > 0) {
+    // Don't log the address itself — it's PII. The tag alone is enough to debug.
+    console.warn('[setpay] Ignoring setpayfail email tag — unknown entries', invalid);
+    return undefined;
+  }
+  const typed = seq as SetPayMockFailure[];
+  const revokedAt = typed.indexOf('revoked');
+  return revokedAt === -1 ? typed : typed.slice(0, revokedAt + 1);
+}
+
+/**
  * Optional default sequence (QIPPAY_MOCK_SETPAY_FAILURE_DEFAULT, comma-separated)
  * attached to EVERY lodgement while set — including the one fired at
  * disbursement and by the daily cron. Returns `undefined` when simulation is
