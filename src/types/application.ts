@@ -99,7 +99,22 @@ export interface ScheduledPayment {
   /** How many times we have attempted to schedule this instalment with Qippay. */
   scheduleAttempts?: number;
   retryCount: number;               // incremented on each setpay.status.retry event
+  /**
+   * UAT only — Qippay failure-simulation sequence sent as
+   * `metadata.mock_setpay_failure` when this instalment was lodged. Each entry
+   * plays out on a subsequent day. Never set in production (hard-guarded in
+   * `src/lib/qippay/setpay-client.ts`).
+   */
+  mockFailure?: SetPayMockFailure[];
 }
+
+/**
+ * Qippay UAT failure simulation for a scheduled SetPay payment:
+ *   - 'rejected' — most likely insufficient funds (consent stays active); Qippay retries next day
+ *   - 'error'    — bank API communication error (maintenance/outage); Qippay retries next day
+ *   - 'revoked'  — customer revoked the consent in their bank app; TERMINAL — needs a new consent
+ */
+export type SetPayMockFailure = 'rejected' | 'error' | 'revoked';
 
 // ---------------------------------------------------------------------------
 // Early Repayment (Qippay PayBy — one-off open-banking payment to settle the

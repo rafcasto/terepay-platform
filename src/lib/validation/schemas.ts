@@ -460,6 +460,28 @@ export const disburseSchema = z.object({
   disbursedAmount: z.number().positive().optional(),
 });
 
+/**
+ * POST /api/applications/[id]/schedule-payments body.
+ *
+ * `mockSetpayFailure` is UAT-only: forwarded to Qippay as
+ * `metadata.mock_setpay_failure` so the vendor simulates a failed collection
+ * (one entry per subsequent day). `revoked` is terminal upstream, so anything
+ * after it would never run — reject such sequences early.
+ */
+export const setpayMockFailureSchema = z.enum(['rejected', 'error', 'revoked']);
+
+export const schedulePaymentsSchema = z.object({
+  mockSetpayFailure: z
+    .array(setpayMockFailureSchema)
+    .min(1)
+    .max(10)
+    .refine(
+      (seq) => !seq.includes('revoked') || seq.indexOf('revoked') === seq.length - 1,
+      { message: "'revoked' is terminal and must be the last entry" },
+    )
+    .optional(),
+});
+
 export const benchmarkEntrySchema = z.object({
   categoryName: z.string().min(1, 'Category name is required'),
   householdType: z.string().min(1, 'Household type is required'),
