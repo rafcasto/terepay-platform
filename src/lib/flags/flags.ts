@@ -46,25 +46,29 @@ export const envResetEnabled = flag<boolean>({
 });
 
 /**
- * Disable reCAPTCHA v3 — development only.
+ * Disable reCAPTCHA v3.
  *
  * When on, the client skips loading the reCAPTCHA script (no token is minted)
- * and `verifyRecaptcha()` short-circuits to `true` on the server. Lets you work
- * locally without real reCAPTCHA keys.
+ * and `verifyRecaptcha()` short-circuits to `true` on the server, so the app
+ * runs without real reCAPTCHA keys.
  *
- * DEFAULT OFF. Opt in with DISABLE_RECAPTCHA=true in .env.local.
+ * DEFAULT OFF. Opt in with DISABLE_RECAPTCHA=true.
  *
- * HARD GUARD: `decide` returns `false` whenever the app is running as
- * production, regardless of DISABLE_RECAPTCHA. There is no env var and no
- * dashboard toggle that can switch reCAPTCHA off in production.
+ * Deliberately NOT keyed off NEXT_PUBLIC_ENVIRONMENT: that value is inlined at
+ * build time and is set to `production` in setups that are not production, so
+ * it is not a reliable signal here. This is a plain runtime opt-in and works in
+ * any environment.
+ *
+ * HARD GUARD: `decide` returns `false` on Vercel production deployments
+ * (VERCEL_ENV === 'production'), regardless of DISABLE_RECAPTCHA. reCAPTCHA is
+ * the bot and credential-stuffing control on signup and login, so it stays on
+ * where real customer data is. Local, preview and staging honour the env var.
  */
 export const recaptchaDisabled = flag<boolean>({
   key: 'recaptcha_disabled',
-  description: 'Skip reCAPTCHA v3 verification (local dev only — cannot be turned on in production)',
+  description: 'Skip reCAPTCHA v3 verification (opt in via DISABLE_RECAPTCHA; always off on Vercel production)',
   decide: () => {
-    const isProduction =
-      process.env.NEXT_PUBLIC_ENVIRONMENT === 'production' || process.env.VERCEL_ENV === 'production';
-    if (isProduction) return false;
+    if (process.env.VERCEL_ENV === 'production') return false;
     return process.env.DISABLE_RECAPTCHA === 'true';
   },
 });
