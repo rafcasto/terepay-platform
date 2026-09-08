@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import { loginSchema, type LoginInput } from '@/lib/validation/schemas';
 import { useRecaptchaToken } from '../recaptcha-provider';
+import { useSiteContent } from '@/lib/content/SiteContentContext';
 import { AuthShell } from '../_components/auth-shell';
 import { AuthIcon } from '../_components/auth-icons';
 import { Field, InputShell, EyeToggle, SubmitButton, ErrorAlert, Divider } from '../_components/auth-ui';
@@ -25,6 +26,7 @@ function LoginFormInner() {
   // duplicate login requests.
   const [isRedirecting, setIsRedirecting] = useState(false);
   const getRecaptchaToken = useRecaptchaToken();
+  const c = useSiteContent('auth.login');
 
   const {
     register,
@@ -90,7 +92,7 @@ function LoginFormInner() {
 
       <div className="flex items-center justify-end">
         <Link href="/auth/forgot-password" className="text-[14px] font-semibold text-[var(--text-link)] hover:underline">
-          Forgot password?
+          {c.forgotPassword}
         </Link>
       </div>
 
@@ -98,18 +100,18 @@ function LoginFormInner() {
 
       <div className="mt-2">
         <SubmitButton type="submit" disabled={isBusy} aria-busy={isBusy}>
-          {isBusy ? 'Signing in…' : 'Sign in'}
+          {isBusy ? c.submittingCta : c.submitCta}
           {!isBusy && AuthIcon.arrow}
         </SubmitButton>
       </div>
 
-      <Divider>New to TerePay?</Divider>
+      <Divider>{c.divider}</Divider>
 
       <Link
         href="/auth/signup"
         className="inline-flex h-[52px] w-full items-center justify-center gap-2 rounded-[10px] border border-[var(--slate-300)] bg-white font-display text-[15px] font-semibold text-[var(--text-strong)] transition-colors hover:bg-[var(--slate-50)] active:bg-[var(--slate-100)]"
       >
-        Create an account
+        {c.createAccountCta}
       </Link>
     </form>
   );
@@ -117,12 +119,7 @@ function LoginFormInner() {
 
 export default function LoginPage() {
   return (
-    <AuthShell
-      mode="signin"
-      eyebrow="Welcome back"
-      title="Sign in to your account"
-      subtitle="Enter your details to access your TerePay account."
-    >
+    <AuthShell mode="signin">
       <Suspense>
         <LoginFormInner />
       </Suspense>

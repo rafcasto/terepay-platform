@@ -15,6 +15,7 @@ import {
   obPrimaryBtn,
   obAlert,
 } from '../_components/onboarding-styles';
+import { useSiteContent } from '@/lib/content/SiteContentContext';
 
 interface ProfileForm {
   dateOfBirth: string;
@@ -31,6 +32,7 @@ type FieldErrors = Partial<Record<string, string>>;
 
 export default function KycProfilePage() {
   const router = useRouter();
+  const c = useSiteContent('onboarding.profile');
   const [checking, setChecking] = useState(true);
   const [user, setUser] = useState<{ firstName?: string; lastName?: string; email?: string } | null>(null);
   const [form, setForm] = useState<ProfileForm>({
@@ -177,10 +179,8 @@ export default function KycProfilePage() {
       ) : (
       <div className="w-full max-w-lg screen-in">
         <div className="mb-7">
-          <h2 className="font-display text-2xl font-bold text-ink-strong">Complete your profile</h2>
-          <p className="text-[var(--text-muted)] mt-1 text-sm">
-            We need a few more details to verify your identity and process your application.
-          </p>
+          <h2 className="font-display text-2xl font-bold text-ink-strong">{c.title}</h2>
+          <p className="text-[var(--text-muted)] mt-1 text-sm">{c.subtitle}</p>
         </div>
 
         <form onSubmit={handleSubmit} noValidate className="space-y-5">
@@ -203,7 +203,7 @@ export default function KycProfilePage() {
           {/* ── Existing TerePay client? ────────────────────────────── */}
           <div className="rounded-xl border border-border-default bg-surface-sunken px-4 py-4">
             <p className="text-sm font-semibold text-ink-strong mb-3">
-              Are you an existing TerePay client? <span className="text-danger-text">*</span>
+              {c.existingClientQuestion} <span className="text-danger-text">*</span>
             </p>
             <SegmentedRadio
               name="isExistingClient"
@@ -232,9 +232,7 @@ export default function KycProfilePage() {
                   placeholder="e.g. TERE001"
                   className={`${obField} font-tabular uppercase`}
                 />
-                <p className="mt-1 text-xs text-[var(--text-muted)]">
-                  Your Customer ID was provided by TerePay. Enter it here to link your existing records.
-                </p>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">{c.customerIdHelp}</p>
                 {errors.customerId && <p className={obError}>{errors.customerId}</p>}
               </div>
             )}
@@ -350,7 +348,7 @@ export default function KycProfilePage() {
           {apiError && <div className={obAlert}>{apiError}</div>}
 
           <button type="submit" disabled={loading} className={`${obPrimaryBtn} mt-2`}>
-            {loading ? 'Saving…' : 'Continue'}
+            {loading ? 'Saving…' : c.submitCta}
           </button>
         </form>
       </div>

@@ -4,6 +4,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Spinner } from '../_components/Spinner';
 import { obPrimaryBtn, obError } from '../_components/onboarding-styles';
+import { useSiteContent } from '@/lib/content/SiteContentContext';
 
 type Stage = 'phone' | 'otp';
 
@@ -184,18 +185,17 @@ function PhoneStage({
   loading: boolean;
   error: string;
 }) {
+  const c = useSiteContent('onboarding.verifyMobile');
   return (
     <>
       <div className="mb-6">
-        <h2 className="font-display text-2xl font-bold text-ink-strong">Verify your mobile</h2>
-        <p className="text-[var(--text-muted)] mt-1 text-sm">
-          We&apos;ll send a 6-digit code to your New Zealand mobile number.
-        </p>
+        <h2 className="font-display text-2xl font-bold text-ink-strong">{c.phoneTitle}</h2>
+        <p className="text-[var(--text-muted)] mt-1 text-sm">{c.phoneSubtitle}</p>
       </div>
 
       <div className="mb-4">
         <label className="block text-sm font-semibold text-ink-strong mb-1.5">
-          Mobile number <span className="text-danger-text">*</span>
+          {c.phoneLabel} <span className="text-danger-text">*</span>
         </label>
         <div className="flex rounded-md border border-border-default bg-surface-card focus-within:ring-2 focus-within:ring-[var(--focus-ring)] focus-within:border-brand overflow-hidden transition-shadow">
           {/* NZ prefix (no emoji per DS product-UI rule) */}
@@ -218,7 +218,7 @@ function PhoneStage({
       {error && <p className={`${obError} mb-4`}>{error}</p>}
 
       <button onClick={onSubmit} disabled={loading} className={obPrimaryBtn}>
-        {loading ? 'Sending…' : 'Send code'}
+        {loading ? 'Sending…' : c.sendCta}
       </button>
     </>
   );
@@ -253,17 +253,18 @@ function OtpStage({
   cooldown: number;
   bypassMode: boolean;
 }) {
+  const c = useSiteContent('onboarding.verifyMobile');
   return (
     <>
       <div className="mb-6">
-        <h2 className="font-display text-2xl font-bold text-ink-strong">Enter the code</h2>
+        <h2 className="font-display text-2xl font-bold text-ink-strong">{c.otpTitle}</h2>
         {bypassMode ? (
           <p className="text-warning-text mt-1 text-sm font-medium">
             SMS verification is currently disabled. Enter <strong>000000</strong> to continue.
           </p>
         ) : (
           <p className="text-[var(--text-muted)] mt-1 text-sm">
-            We sent a 6-digit code to <span className="font-medium text-ink-strong font-tabular">+64 {phone}</span>
+            {c.otpSubtitleLead} <span className="font-medium text-ink-strong font-tabular">+64 {phone}</span>
           </p>
         )}
       </div>
@@ -291,11 +292,11 @@ function OtpStage({
       {error && <p className={`${obError} mb-4`}>{error}</p>}
 
       <button onClick={onVerify} disabled={loading} className={`${obPrimaryBtn} mb-4`}>
-        {loading ? 'Verifying…' : 'Verify code'}
+        {loading ? 'Verifying…' : c.verifyCta}
       </button>
 
       <p className="text-center text-sm text-[var(--text-muted)]">
-        Didn&apos;t receive a code?{' '}
+        {c.noCodeText}{' '}
         {cooldown > 0 ? (
           <span className="text-[var(--text-disabled)]">Resend in {cooldown}s</span>
         ) : (
@@ -304,7 +305,7 @@ function OtpStage({
             disabled={loading}
             className="text-brand-text font-semibold underline-offset-2 hover:underline disabled:opacity-50"
           >
-            Resend
+            {c.resendCta}
           </button>
         )}
       </p>

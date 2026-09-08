@@ -3,32 +3,35 @@
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { Icons } from '@/components/ui';
+import { useSiteContent } from '@/lib/content/SiteContentContext';
 
-const STEPS = [
-  'Personal information',
-  'Employment & income',
-  'Living expenses',
-  'Existing debts',
-  'Loan request',
-  'Bank account',
-  'References',
-  'Declarations',
-];
+const STEP_KEYS = [
+  'step1Label',
+  'step2Label',
+  'step3Label',
+  'step4Label',
+  'step5Label',
+  'step6Label',
+  'step7Label',
+  'step8Label',
+] as const;
 
 function LoanStepTrackerInner() {
   const searchParams = useSearchParams();
-  const activeIndex = Math.min(Math.max(Number(searchParams.get('step') ?? 0), 0), STEPS.length - 1);
+  const c = useSiteContent('apply.layout');
+  const steps = STEP_KEYS.map((k) => c[k]);
+  const activeIndex = Math.min(Math.max(Number(searchParams.get('step') ?? 0), 0), steps.length - 1);
 
   return (
     <>
       {/* ── Desktop: vertical connector rail ──────────────────────────── */}
       <ol className="hidden sm:flex flex-col">
-        {STEPS.map((label, index) => {
+        {steps.map((label, index) => {
           const isDone = index < activeIndex;
           const isActive = index === activeIndex;
-          const isLast = index === STEPS.length - 1;
+          const isLast = index === steps.length - 1;
           return (
-            <li key={label} className="flex gap-4">
+            <li key={STEP_KEYS[index]} className="flex gap-4">
               <div className="flex flex-col items-center">
                 <span
                   className={[
@@ -67,9 +70,9 @@ function LoanStepTrackerInner() {
       {/* ── Mobile: segmented progress bar ────────────────────────────── */}
       <div className="sm:hidden w-full px-4 pt-3 pb-2.5 bg-surface-card border-b border-border-default">
         <div className="flex gap-1.5">
-          {STEPS.map((label, index) => (
+          {steps.map((label, index) => (
             <div
-              key={label}
+              key={STEP_KEYS[index]}
               className={[
                 'h-1.5 flex-1 rounded-pill transition-colors',
                 index <= activeIndex ? 'bg-brand' : 'bg-[var(--border-default)]',
@@ -79,8 +82,8 @@ function LoanStepTrackerInner() {
           ))}
         </div>
         <p className="text-[11.5px] text-[var(--text-muted)] mt-1.5 font-medium">
-          Step {activeIndex + 1} of {STEPS.length} ·{' '}
-          <span className="text-ink-strong">{STEPS[activeIndex]}</span>
+          Step {activeIndex + 1} of {steps.length} ·{' '}
+          <span className="text-ink-strong">{steps[activeIndex]}</span>
         </p>
       </div>
     </>

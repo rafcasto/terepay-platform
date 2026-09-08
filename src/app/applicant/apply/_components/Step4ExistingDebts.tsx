@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useFormContext, useWatch, type UseFormRegister } from 'react-hook-form';
 import type { TerepayApplicationInput } from '@/lib/validation/schemas';
 import { Toggle } from '@/components/ui';
+import { useSiteContent } from '@/lib/content/SiteContentContext';
 
 const inputCls =
   'w-full pl-7 pr-3 h-11 border border-border-default rounded-xl text-sm focus:ring-2 focus:ring-[var(--focus-ring)] focus:border-brand focus:outline-none transition-colors bg-surface-card text-ink-strong';
@@ -69,6 +70,7 @@ function DebtBlock({
 
 export default function Step4ExistingDebts() {
   const { register, control, setValue } = useFormContext<TerepayApplicationInput>();
+  const c = useSiteContent('apply.step4');
 
   const debts = useWatch({ control, name: 'existingDebts' });
   const safeNum = (v: unknown) => (typeof v === 'number' && !isNaN(v) ? v : 0);
@@ -111,18 +113,16 @@ export default function Step4ExistingDebts() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-xl font-bold text-ink-strong">Existing Debts &amp; Commitments</h2>
-        <p className="text-sm text-[var(--text-muted)] mt-1">
-          Tell us about loans or repayments you already have, so we can check this loan is affordable.
-        </p>
+        <h2 className="text-xl font-bold text-ink-strong">{c.title}</h2>
+        <p className="text-sm text-[var(--text-muted)] mt-1">{c.intro}</p>
       </div>
 
       <div className="rounded-xl border border-border-default p-4">
         <Toggle
           checked={hasDebts}
           onChange={toggleDebts}
-          label="Do you have any existing debts or repayments?"
-          description="Mortgage, personal or car loans, credit cards, overdrafts, BNPL, etc."
+          label={c.toggleLabel}
+          description={c.toggleDesc}
         />
       </div>
 
@@ -172,12 +172,8 @@ export default function Step4ExistingDebts() {
 
           {/* Debt purpose description */}
           <div>
-            <label className="block text-sm font-semibold text-ink-strong mb-1">
-              Help us understand your situation
-            </label>
-            <p className="text-xs text-[var(--text-muted)] mb-2">
-              What are these loans for, and when will they finish?
-            </p>
+            <label className="block text-sm font-semibold text-ink-strong mb-1">{c.situationLabel}</label>
+            <p className="text-xs text-[var(--text-muted)] mb-2">{c.situationHint}</p>
             <textarea
               rows={4}
               {...register('existingDebts.debtPurposeDescription')}

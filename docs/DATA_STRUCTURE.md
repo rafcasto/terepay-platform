@@ -468,6 +468,24 @@ interface Notification {
 
 ---
 
+### 7. Site Content Collection (editable copy)
+
+```typescript
+// Collection: siteContent
+// Document ID: content section key, e.g. "landing.hero", "onboarding.verifyEmail", "borrower.status.active"
+{
+  values: Record<string, string>;   // field key -> plain-text value (no HTML; `**bold**` only)
+  updatedAt: Timestamp;
+  updatedBy: string;                // uid of the content editor / admin who saved
+}
+```
+
+- **Written only** via `PATCH /api/content/[section]` (roles: `content_editor`, `admin`). The route validates against the section definition — unknown fields are dropped, values are trimmed to the field's `maxLength`.
+- **Read fail-open** with `getContentSection()` / `getContentSections()` in [src/lib/content/site-content.ts](../src/lib/content/site-content.ts): a missing doc or read error falls back to the defaults in [src/types/content.ts](../src/types/content.ts), so an un-edited site renders identically to the hardcoded copy.
+- Section definitions + defaults live in `src/types/content.ts`; the editor's page/menu structure (which sections appear on which `/content-editor/*` page) lives in [src/lib/content/pages.ts](../src/lib/content/pages.ts).
+- Client trees read content through `SiteContentProvider` / `useSiteContent()` ([src/lib/content/SiteContentContext.tsx](../src/lib/content/SiteContentContext.tsx)), fed by the nearest server layout.
+- No PII. Every save is audit-logged as `content_section_updated`.
+
 ## Data Relationships & Constraints
 
 ### Foreign Key Relationships

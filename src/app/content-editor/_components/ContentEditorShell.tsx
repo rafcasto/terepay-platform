@@ -3,56 +3,127 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import RoleSwitcher from '@/components/shared/RoleSwitcher';
+import { CONTENT_NAV, type ContentNavItem } from '@/lib/content/pages';
 
-const NAV_ITEMS = [
-  {
-    href: '/content-editor/dashboard',
-    label: 'Overview',
-    icon: (
-      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
-      </svg>
-    ),
-  },
-  {
-    href: '/content-editor/landing',
-    label: 'Public site',
-    icon: (
-      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9 9 0 100-18 9 9 0 000 18zm0 0c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m-9 9h18" />
-      </svg>
-    ),
-  },
-  {
-    href: '/content-editor/borrower',
-    label: 'Borrower pages',
-    icon: (
-      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
-      </svg>
-    ),
-  },
-  {
-    href: '/content-editor/emails',
-    label: 'Email sequences',
-    icon: (
-      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
-      </svg>
-    ),
-  },
-];
+const BASE = '/content-editor';
+
+const hrefFor = (slug: string) => `${BASE}/${slug}`;
+
+function isActivePath(pathname: string | null, slug: string) {
+  return pathname === hrefFor(slug);
+}
+
+function NavLeaf({
+  slug,
+  label,
+  pathname,
+  nested = false,
+}: {
+  slug: string;
+  label: string;
+  pathname: string | null;
+  nested?: boolean;
+}) {
+  const active = isActivePath(pathname, slug);
+  return (
+    <Link
+      href={hrefFor(slug)}
+      className={[
+        'flex items-center rounded-lg text-sm font-medium transition-colors',
+        nested ? 'py-1.5 pl-9 pr-3 text-[13px]' : 'px-3 py-2',
+        active ? 'bg-[#F59A1E]/15 text-[#F59A1E]' : 'text-slate-300 hover:bg-white/8 hover:text-white',
+      ].join(' ')}
+    >
+      {label}
+    </Link>
+  );
+}
+
+function NavParent({ item, pathname }: { item: ContentNavItem; pathname: string | null }) {
+  const children = item.children ?? [];
+  const hasActiveChild = children.some((c) => isActivePath(pathname, c.slug));
+  const [open, setOpen] = useState(hasActiveChild);
+  const expanded = open || hasActiveChild;
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={expanded}
+        className={[
+          'flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+          hasActiveChild ? 'text-white' : 'text-slate-300 hover:bg-white/8 hover:text-white',
+        ].join(' ')}
+      >
+        <span>{item.label}</span>
+        <svg
+          className={`h-4 w-4 text-slate-500 transition-transform ${expanded ? 'rotate-180' : ''}`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+        </svg>
+      </button>
+      {expanded && (
+        <div className="mt-0.5 space-y-0.5 border-l border-white/10 ml-4">
+          {children.map((c) => (
+            <NavLeaf key={c.slug} slug={c.slug} label={c.label} pathname={pathname} nested />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SidebarNav({ pathname }: { pathname: string | null }) {
+  return (
+    <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
+      <NavLeaf slug="dashboard" label="Overview" pathname={pathname} />
+      {CONTENT_NAV.map((group) => (
+        <div key={group.label}>
+          <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+            {group.label}
+          </p>
+          <div className="space-y-0.5">
+            {group.items.map((item) =>
+              item.children ? (
+                <NavParent key={item.label} item={item} pathname={pathname} />
+              ) : (
+                <NavLeaf key={item.slug} slug={item.slug!} label={item.label} pathname={pathname} />
+              ),
+            )}
+          </div>
+        </div>
+      ))}
+    </nav>
+  );
+}
 
 export default function ContentEditorShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-[#F6F8FB] flex flex-col">
       {/* Mobile top header */}
       <header className="sm:hidden sticky top-0 z-20 bg-[#0F1D2E] px-4 h-12 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setMobileOpen((v) => !v)}
+            aria-label="Toggle navigation"
+            aria-expanded={mobileOpen}
+            className="text-slate-300 hover:text-white"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+            </svg>
+          </button>
           <span className="text-sm font-bold text-[#F59A1E]">TerePay</span>
           <span className="text-xs font-medium text-slate-400">Content</span>
         </div>
@@ -65,6 +136,12 @@ export default function ContentEditorShell({ children }: { children: ReactNode }
           </form>
         </div>
       </header>
+
+      {mobileOpen && (
+        <div className="sm:hidden bg-[#0F1D2E] border-b border-white/10" onClick={() => setMobileOpen(false)}>
+          <SidebarNav pathname={pathname} />
+        </div>
+      )}
 
       <div className="flex flex-1">
         {/* Desktop sidebar */}
@@ -82,25 +159,7 @@ export default function ContentEditorShell({ children }: { children: ReactNode }
             </span>
           </div>
 
-          <nav className="flex-1 px-3 py-4 space-y-0.5">
-            {NAV_ITEMS.map((item) => {
-              const isActive = pathname?.startsWith(item.href);
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                    isActive
-                      ? 'bg-[#F59A1E]/15 text-[#F59A1E]'
-                      : 'text-slate-300 hover:bg-white/8 hover:text-white'
-                  }`}
-                >
-                  <span className={isActive ? 'text-[#F59A1E]' : 'text-slate-400'}>{item.icon}</span>
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
+          <SidebarNav pathname={pathname} />
 
           <div className="px-3 pb-4 space-y-0.5 border-t border-white/10 pt-3">
             <form action="/api/auth/logout" method="POST">

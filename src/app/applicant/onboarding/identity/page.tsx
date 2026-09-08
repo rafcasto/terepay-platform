@@ -6,8 +6,11 @@ import { Icons } from '@/components/ui';
 import { Spinner } from '../_components/Spinner';
 import { SegmentedRadio } from '../_components/SegmentedRadio';
 import { obPrimaryBtn, obLabel, obAlert } from '../_components/onboarding-styles';
+import { useSiteContent } from '@/lib/content/SiteContentContext';
+import type { ContentSectionValues } from '@/types/content';
 
 type ImmigrationStatus = 'student' | 'work_visa' | 'resident' | 'permanent_resident' | 'citizen';
+type PrimaryDocType = 'nz_drivers_licence' | 'nz_passport';
 
 interface UploadedDoc {
   docType: string;
@@ -18,9 +21,7 @@ interface UploadedDoc {
 
 interface FileSlot {
   docType: string;
-  label: string;
   required: boolean;
-  description: string;
   file: File | null;
   uploaded: UploadedDoc | null;
   uploading: boolean;
@@ -28,52 +29,50 @@ interface FileSlot {
   error: string;
 }
 
-const PERMANENT_SLOTS: Omit<FileSlot, 'file' | 'uploaded' | 'uploading' | 'removing' | 'error'>[] = [
-  {
-    docType: 'nz_id_primary',
-    label: "NZ Driver's Licence or Passport",
-    required: true,
-    description: "Upload your NZ Driver's Licence or NZ Passport (front page).",
-  },
-  {
-    docType: 'proof_of_address',
-    label: 'Proof of Address',
-    required: true,
-    description: 'Bank statement or utility bill showing your name and address — dated within the last 3 months.',
-  },
-];
+// Slot structure is fixed (it drives docType + validation); the label and
+// description shown for each slot are editable copy resolved at render time.
+const PERMANENT_SLOT_TYPES = ['nz_id_primary', 'proof_of_address'] as const;
+const NON_PERMANENT_SLOT_TYPES = ['foreign_passport', 'nz_visa', 'proof_of_address'] as const;
 
-const NON_PERMANENT_SLOTS: Omit<FileSlot, 'file' | 'uploaded' | 'uploading' | 'removing' | 'error'>[] = [
-  {
-    docType: 'foreign_passport',
-    label: 'Passport (country of origin)',
+function makeSlots(docTypes: readonly string[]): FileSlot[] {
+  return docTypes.map((docType) => ({
+    docType,
     required: true,
-    description: 'Upload the photo page of your passport.',
-  },
-  {
-    docType: 'nz_visa',
-    label: 'NZ Visa',
-    required: true,
-    description: 'Upload your current NZ visa (e.g. student visa, work visa permit).',
-  },
-  {
-    docType: 'proof_of_address',
-    label: 'Proof of Address',
-    required: true,
-    description: 'Bank statement or utility bill showing your name and address — dated within the last 3 months.',
-  },
-];
+    file: null,
+    uploaded: null,
+    uploading: false,
+    removing: false,
+    error: '',
+  }));
+}
 
-function makeSlots(templates: typeof PERMANENT_SLOTS): FileSlot[] {
-  return templates.map((t) => ({ ...t, file: null, uploaded: null, uploading: false, removing: false, error: '' }));
+function describeSlot(
+  docType: string,
+  primaryDocType: PrimaryDocType,
+  c: ContentSectionValues,
+): { label: string; description: string } {
+  switch (docType) {
+    case 'nz_id_primary':
+      return primaryDocType === 'nz_drivers_licence'
+        ? { label: "NZ Driver's Licence", description: c.nzLicenceDesc }
+        : { label: 'NZ Passport', description: c.nzPassportDesc };
+    case 'foreign_passport':
+      return { label: c.foreignPassportLabel, description: c.foreignPassportDesc };
+    case 'nz_visa':
+      return { label: c.nzVisaLabel, description: c.nzVisaDesc };
+    case 'proof_of_address':
+    default:
+      return { label: c.proofOfAddressLabel, description: c.proofOfAddressDesc };
+  }
 }
 
 export default function KycIdentityPage() {
   const router = useRouter();
+  const c = useSiteContent('onboarding.identity');
   const [checking, setChecking] = useState(true);
   const [immigrationStatus, setImmigrationStatus] = useState<ImmigrationStatus | null>(null);
   const [slots, setSlots] = useState<FileSlot[]>([]);
-  const [primaryDocType, setPrimaryDocType] = useState<'nz_drivers_licence' | 'nz_passport'>('nz_drivers_licence');
+  const [primaryDocType, setPrimaryDocType] = useState<PrimaryDocType>('nz_drivers_licence');
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
 
@@ -93,8 +92,7 @@ export default function KycIdentityPage() {
         setImmigrationStatus(status);
 
         const isPermanent = status === 'permanent_resident' || status === 'citizen';
-        const templates = isPermanent ? PERMANENT_SLOTS : NON_PERMANENT_SLOTS;
-        const builtSlots = makeSlots(templates);
+        const builtSlots = makeSlots(isPermanent ? PERMANENT_SLOT_TYPES : NON_PERMANENT_SLOT_TYPES);
 
         const uploads: Record<string, { driveFileId: string; fileName: string; mimeType: string }> =
           draftData?.data ?? {};
@@ -126,29 +124,10 @@ export default function KycIdentityPage() {
       })
       .catch(() => {
         setImmigrationStatus('resident');
-        setSlots(makeSlots(NON_PERMANENT_SLOTS));
+        setSlots(makeSlots(NON_PERMANENT_SLOT_TYPES));
         setChecking(false);
       });
   }, [router]);
-
-  // Update primary doc label when radio changes (permanent residents only)
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- updates document labels when the selected primary doc type changes
-    setSlots((prev) =>
-      prev.map((s) =>
-        s.docType === 'nz_id_primary'
-          ? {
-              ...s,
-              label: primaryDocType === 'nz_drivers_licence' ? "NZ Driver's Licence" : 'NZ Passport',
-              description:
-                primaryDocType === 'nz_drivers_licence'
-                  ? "Upload the front and back of your NZ Driver's Licence."
-                  : 'Upload the photo page of your NZ Passport.',
-            }
-          : s,
-      ),
-    );
-  }, [primaryDocType]);
 
   const handleFileChange = async (index: number, file: File | null) => {
     if (!file) return;
@@ -267,18 +246,15 @@ export default function KycIdentityPage() {
       ) : (
       <div className="w-full max-w-lg screen-in">
         <div className="mb-7">
-          <h2 className="font-display text-2xl font-bold text-ink-strong">Verify your identity</h2>
-          <p className="text-[var(--text-muted)] mt-1 text-sm">
-            Upload clear photos or scans of the required documents. Files must be JPEG, PNG, WebP,
-            or PDF — max 10 MB each.
-          </p>
+          <h2 className="font-display text-2xl font-bold text-ink-strong">{c.title}</h2>
+          <p className="text-[var(--text-muted)] mt-1 text-sm">{c.subtitle}</p>
         </div>
 
         {/* Primary doc selector (permanent resident / citizen only) */}
         {isPermanent && (
           <div className="mb-5">
             <p className={obLabel}>
-              Primary ID document <span className="text-danger-text">*</span>
+              {c.primaryDocLabel} <span className="text-danger-text">*</span>
             </p>
             <SegmentedRadio
               name="primaryDoc"
@@ -287,7 +263,7 @@ export default function KycIdentityPage() {
                 { value: 'nz_drivers_licence', label: "NZ Driver's Licence" },
                 { value: 'nz_passport', label: 'NZ Passport' },
               ]}
-              onChange={(v) => setPrimaryDocType(v as 'nz_drivers_licence' | 'nz_passport')}
+              onChange={(v) => setPrimaryDocType(v as PrimaryDocType)}
             />
           </div>
         )}
@@ -304,6 +280,8 @@ export default function KycIdentityPage() {
                 key={slot.docType}
                 slot={slot}
                 index={index}
+                {...describeSlot(slot.docType, primaryDocType, c)}
+                uploadCta={c.uploadCta}
                 onFileChange={handleFileChange}
                 onRemove={handleRemove}
               />
@@ -314,12 +292,10 @@ export default function KycIdentityPage() {
         {submitError && <div className={`${obAlert} mb-4`}>{submitError}</div>}
 
         <button onClick={handleSubmit} disabled={submitting || slots.length === 0} className={obPrimaryBtn}>
-          {submitting ? 'Submitting…' : 'Submit & continue'}
+          {submitting ? 'Submitting…' : c.submitCta}
         </button>
 
-        <p className="text-xs text-[var(--text-muted)] mt-3 text-center">
-          Your documents are reviewed by our compliance team. You&apos;ll receive an update within 1–2 business days.
-        </p>
+        <p className="text-xs text-[var(--text-muted)] mt-3 text-center">{c.footnote}</p>
       </div>
       )}
     </div>
@@ -329,11 +305,17 @@ export default function KycIdentityPage() {
 function FileUploadSlot({
   slot,
   index,
+  label,
+  description,
+  uploadCta,
   onFileChange,
   onRemove,
 }: {
   slot: FileSlot;
   index: number;
+  label: string;
+  description: string;
+  uploadCta: string;
   onFileChange: (i: number, f: File | null) => void;
   onRemove: (i: number) => void;
 }) {
@@ -350,10 +332,10 @@ function FileUploadSlot({
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-ink-strong">
-            {slot.label}
+            {label}
             {slot.required && <span className="text-danger-text ml-0.5">*</span>}
           </p>
-          <p className="text-xs text-[var(--text-muted)] mt-0.5 leading-relaxed">{slot.description}</p>
+          <p className="text-xs text-[var(--text-muted)] mt-0.5 leading-relaxed">{description}</p>
         </div>
         {isDone && (
           <span className="shrink-0 inline-flex items-center justify-center h-6 w-6 rounded-full bg-success-soft-ds text-success-text">
@@ -391,7 +373,7 @@ function FileUploadSlot({
               className="flex items-center justify-center gap-2 w-full rounded-md border-2 border-dashed border-border-strong hover:border-brand px-4 py-3 text-sm text-[var(--text-muted)] hover:text-brand-text transition-colors"
             >
               <Icons.Upload size={16} className="shrink-0" />
-              <span>Choose file or tap to browse</span>
+              <span>{uploadCta}</span>
             </button>
             <input
               ref={inputRef}

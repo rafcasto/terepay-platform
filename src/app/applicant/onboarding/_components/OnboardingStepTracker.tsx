@@ -2,28 +2,31 @@
 
 import { usePathname } from 'next/navigation';
 import { Icons } from '@/components/ui';
+import { useSiteContent } from '@/lib/content/SiteContentContext';
 
-const STEPS = [
-  { label: 'Quick intro',          path: '/applicant/onboarding' },
-  { label: 'Verify email',         path: '/applicant/onboarding/verify-email' },
-  { label: 'Verify mobile',        path: '/applicant/onboarding/verify-mobile' },
-  { label: 'Complete profile',     path: '/applicant/onboarding/profile' },
-  { label: 'Verify government ID', path: '/applicant/onboarding/identity' },
-];
+const STEP_PATHS = [
+  { key: 'step1Label', path: '/applicant/onboarding' },
+  { key: 'step2Label', path: '/applicant/onboarding/verify-email' },
+  { key: 'step3Label', path: '/applicant/onboarding/verify-mobile' },
+  { key: 'step4Label', path: '/applicant/onboarding/profile' },
+  { key: 'step5Label', path: '/applicant/onboarding/identity' },
+] as const;
 
 export default function OnboardingStepTracker() {
   const pathname = usePathname();
-  const activeIndex = STEPS.findIndex((s) => s.path === pathname);
+  const c = useSiteContent('onboarding.layout');
+  const steps = STEP_PATHS.map((s) => ({ label: c[s.key], path: s.path }));
+  const activeIndex = steps.findIndex((s) => s.path === pathname);
   const safeActive = activeIndex < 0 ? 0 : activeIndex;
 
   return (
     <>
       {/* ── Desktop: vertical connector rail ──────────────────────────── */}
       <ol className="hidden sm:flex flex-col">
-        {STEPS.map((step, index) => {
+        {steps.map((step, index) => {
           const isDone = index < safeActive;
           const isActive = index === safeActive;
-          const isLast = index === STEPS.length - 1;
+          const isLast = index === steps.length - 1;
           return (
             <li key={step.path} className="flex gap-4">
               <div className="flex flex-col items-center">
@@ -64,7 +67,7 @@ export default function OnboardingStepTracker() {
       {/* ── Mobile: segmented progress bar ────────────────────────────── */}
       <div className="sm:hidden w-full px-4 pt-3 pb-2.5 bg-surface-card border-b border-border-default">
         <div className="flex gap-1.5">
-          {STEPS.map((step, index) => (
+          {steps.map((step, index) => (
             <div
               key={step.path}
               className={[
@@ -76,8 +79,8 @@ export default function OnboardingStepTracker() {
           ))}
         </div>
         <p className="text-[11.5px] text-[var(--text-muted)] mt-1.5 font-medium">
-          Step {safeActive + 1} of {STEPS.length} ·{' '}
-          <span className="text-ink-strong">{STEPS[safeActive]?.label}</span>
+          Step {safeActive + 1} of {steps.length} ·{' '}
+          <span className="text-ink-strong">{steps[safeActive]?.label}</span>
         </p>
       </div>
     </>

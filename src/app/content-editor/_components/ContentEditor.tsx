@@ -1,21 +1,28 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { ContentGroup, ContentSectionDef, ContentSectionValues } from '@/types/content';
+import type { ContentSectionDef, ContentSectionValues } from '@/types/content';
 
 type ApiResponse = {
   sections: ContentSectionDef[];
   values: Record<string, ContentSectionValues>;
 };
 
-export default function ContentEditor({ group }: { group: ContentGroup }) {
+/**
+ * Renders one save-able form per section key, in the order given. Loads the
+ * full content payload once (it's small) and picks the requested sections.
+ */
+export default function ContentEditor({ sectionKeys }: { sectionKeys: string[] }) {
   const [sections, setSections] = useState<ContentSectionDef[]>([]);
   const [values, setValues] = useState<Record<string, ContentSectionValues>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const keysSig = sectionKeys.join('|');
+
   useEffect(() => {
     let active = true;
+    const wanted = keysSig.split('|');
     fetch('/api/content')
       .then(async (r) => {
         const json = await r.json();
@@ -24,7 +31,8 @@ export default function ContentEditor({ group }: { group: ContentGroup }) {
       })
       .then((data) => {
         if (!active) return;
-        setSections(data.sections.filter((s) => s.group === group));
+        const byKey = new Map(data.sections.map((s) => [s.key, s]));
+        setSections(wanted.map((k) => byKey.get(k)).filter((s): s is ContentSectionDef => Boolean(s)));
         setValues(data.values);
       })
       .catch((err) => active && setError(err instanceof Error ? err.message : 'Failed to load content'))
@@ -32,7 +40,7 @@ export default function ContentEditor({ group }: { group: ContentGroup }) {
     return () => {
       active = false;
     };
-  }, [group]);
+  }, [keysSig]);
 
   if (loading) {
     return (
@@ -49,6 +57,10 @@ export default function ContentEditor({ group }: { group: ContentGroup }) {
     return (
       <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
     );
+  }
+
+  if (sections.length === 0) {
+    return <p className="text-sm text-slate-500">No editable sections are registered for this page yet.</p>;
   }
 
   return (

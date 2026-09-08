@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useFormContext } from 'react-hook-form';
 import type { TerepayApplicationInput } from '@/lib/validation/schemas';
 import AddressAutocomplete from './AddressAutocomplete';
+import { useSiteContent } from '@/lib/content/SiteContentContext';
 
 // Computed at module load time — acceptable for DOB age gate (changes at most once daily)
 const MAX_DOB_DATE = new Date(Date.now() - 18 * 365.25 * 86400000).toISOString().split('T')[0];
@@ -33,6 +34,7 @@ export default function Step1PersonalInfo() {
     watch,
     formState: { errors, touchedFields },
   } = useFormContext<TerepayApplicationInput>();
+  const c = useSiteContent('apply.step1');
 
   const e = errors.personalInfo;
   const visaStatus = watch('personalInfo.visaStatus');
@@ -120,8 +122,8 @@ export default function Step1PersonalInfo() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-ink-strong">Personal Information</h2>
-        <p className="text-sm text-[var(--text-muted)] mt-1">Please provide your legal personal details.</p>
+        <h2 className="text-xl font-bold text-ink-strong">{c.title}</h2>
+        <p className="text-sm text-[var(--text-muted)] mt-1">{c.intro}</p>
       </div>
 
       {/* Name row */}

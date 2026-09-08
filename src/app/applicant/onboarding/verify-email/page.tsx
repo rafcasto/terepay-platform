@@ -7,12 +7,14 @@ import { clientAuth } from '@/lib/firebase/client';
 import { Icons } from '@/components/ui';
 import { Spinner } from '../_components/Spinner';
 import { obField, obPrimaryBtn, obSecondaryBtn, obAlert } from '../_components/onboarding-styles';
+import { useSiteContent } from '@/lib/content/SiteContentContext';
 
 const CHANNEL = 'terepay-email-verify';
 const NEXT_STEP = '/applicant/onboarding/verify-mobile';
 
 export default function VerifyEmailPage() {
   const router = useRouter();
+  const c = useSiteContent('onboarding.verifyEmail');
   const [user, setUser]             = useState<User | null>(null);
   const [sent, setSent]             = useState(false);
   const [error, setError]           = useState('');
@@ -214,8 +216,8 @@ export default function VerifyEmailPage() {
             <div className="w-16 h-16 rounded-full bg-success-soft-ds flex items-center justify-center mx-auto mb-4">
               <Icons.CheckCircle size={32} className="text-success-text" />
             </div>
-            <h2 className="font-display text-xl font-bold text-ink-strong mb-1">Email verified</h2>
-            <p className="text-sm text-[var(--text-muted)]">Redirecting you to the next step…</p>
+            <h2 className="font-display text-xl font-bold text-ink-strong mb-1">{c.verifiedTitle}</h2>
+            <p className="text-sm text-[var(--text-muted)]">{c.verifiedBody}</p>
           </div>
         ) : (
           /* ── Waiting state ── */
@@ -227,23 +229,22 @@ export default function VerifyEmailPage() {
               </svg>
             </div>
 
-            <h2 className="font-display text-2xl font-bold text-ink-strong mb-2">Check your inbox</h2>
+            <h2 className="font-display text-2xl font-bold text-ink-strong mb-2">{c.title}</h2>
             <p className="text-[var(--text-muted)] text-sm mb-1">
-              {sent ? 'We sent a verification link to' : 'Sending a verification link to'}
+              {sent ? c.sentText : c.sendingText}
             </p>
             {user?.email && (
               <p className="font-semibold text-ink-strong text-sm mb-6">{user.email}</p>
             )}
 
-            <p className="text-[var(--text-muted)] text-xs mb-8 leading-relaxed">
-              Click the link in the email to verify your address.
-              <br />This page will automatically move forward once you do.
+            <p className="text-[var(--text-muted)] text-xs mb-8 leading-relaxed whitespace-pre-line">
+              {c.instructions}
             </p>
 
             {/* Spinner — waiting indicator */}
             <div className="flex items-center justify-center gap-2 text-xs text-[var(--text-muted)] mb-8">
               <Spinner size={16} className="text-brand-text" />
-              Waiting for verification…
+              {c.waitingText}
             </div>
 
             {error && <p className={`${obAlert} mb-4`}>{error}</p>}
@@ -253,12 +254,10 @@ export default function VerifyEmailPage() {
               disabled={cooldown > 0}
               className="text-sm font-semibold text-brand-text hover:underline disabled:text-[var(--text-disabled)] disabled:no-underline disabled:cursor-not-allowed transition-colors"
             >
-              {cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend verification email'}
+              {cooldown > 0 ? `Resend in ${cooldown}s` : c.resendCta}
             </button>
 
-            <p className="text-xs text-[var(--text-muted)] mt-4">
-              Can&apos;t find it? Check your spam or junk folder.
-            </p>
+            <p className="text-xs text-[var(--text-muted)] mt-4">{c.spamHint}</p>
 
             {/* ── Wrong email? update form ─────────────────────────── */}
             <div className="mt-6 border-t border-border-subtle pt-5">
@@ -267,14 +266,12 @@ export default function VerifyEmailPage() {
                   onClick={() => { setShowEmailForm(true); setEmailUpdateError(''); }}
                   className="text-xs text-[var(--text-muted)] hover:text-ink-strong transition-colors underline underline-offset-2"
                 >
-                  Wrong email address?
+                  {c.wrongEmailCta}
                 </button>
               ) : (
                 <form onSubmit={handleEmailUpdate} className="text-left space-y-3">
-                  <p className="text-sm font-semibold text-ink-strong">Update your email address</p>
-                  <p className="text-xs text-[var(--text-muted)]">
-                    Enter the correct email address. We&apos;ll send a new verification link there, and it will also become your login email.
-                  </p>
+                  <p className="text-sm font-semibold text-ink-strong">{c.updateTitle}</p>
+                  <p className="text-xs text-[var(--text-muted)]">{c.updateBody}</p>
                   <input
                     type="email"
                     value={newEmailInput}
@@ -291,14 +288,14 @@ export default function VerifyEmailPage() {
                       disabled={emailUpdateLoading || !newEmailInput.trim()}
                       className={`${obPrimaryBtn} h-11 flex-1`}
                     >
-                      {emailUpdateLoading ? 'Updating…' : 'Update email'}
+                      {emailUpdateLoading ? 'Updating…' : c.updateCta}
                     </button>
                     <button
                       type="button"
                       onClick={() => { setShowEmailForm(false); setNewEmailInput(''); setEmailUpdateError(''); }}
                       className={`${obSecondaryBtn} flex-1`}
                     >
-                      Cancel
+                      {c.cancelCta}
                     </button>
                   </div>
                 </form>
