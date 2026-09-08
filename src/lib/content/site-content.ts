@@ -24,23 +24,31 @@ export async function getContentSection(key: string): Promise<ContentSectionValu
   }
 }
 
-/** Read every known content section (defaults-merged). Used by the editor. */
-export async function getAllContent(): Promise<Record<string, ContentSectionValues>> {
-  const keys = Object.keys(DEFAULT_CONTENT);
+/**
+ * Read several sections in one round-trip (defaults-merged, fail-open). Use
+ * this in server layouts that feed a `SiteContentProvider`.
+ */
+export async function getContentSections(
+  keys: readonly string[],
+): Promise<Record<string, ContentSectionValues>> {
+  const out: Record<string, ContentSectionValues> = {};
+  if (keys.length === 0) return out;
   try {
     const snaps = await adminDb.getAll(...keys.map((k) => adminDb.collection(COLLECTION).doc(k)));
-    const out: Record<string, ContentSectionValues> = {};
     snaps.forEach((snap, i) => {
       const key = keys[i];
       const data = snap.exists ? (snap.data() as { values?: ContentSectionValues }) : undefined;
       out[key] = withDefaults(key, data?.values);
     });
-    return out;
   } catch {
-    const out: Record<string, ContentSectionValues> = {};
     for (const key of keys) out[key] = withDefaults(key, undefined);
-    return out;
   }
+  return out;
+}
+
+/** Read every known content section (defaults-merged). Used by the editor. */
+export async function getAllContent(): Promise<Record<string, ContentSectionValues>> {
+  return getContentSections(Object.keys(DEFAULT_CONTENT));
 }
 
 /**

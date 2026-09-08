@@ -4,6 +4,8 @@ import { useState, type ReactNode } from 'react';
 import { useFormContext, useWatch, type UseFormRegister } from 'react-hook-form';
 import type { TerepayApplicationInput } from '@/lib/validation/schemas';
 import { Icons, Toggle } from '@/components/ui';
+import { useSiteContent } from '@/lib/content/SiteContentContext';
+import { renderEmphasis } from '@/lib/content/emphasis';
 
 const selectCls =
   'w-full px-3 h-11 border border-border-default rounded-xl text-sm focus:ring-2 focus:ring-[var(--focus-ring)] focus:border-brand focus:outline-none transition-colors bg-surface-card text-ink-strong appearance-none';
@@ -93,6 +95,7 @@ function Section({
 
 export default function Step3LivingExpenses() {
   const { register, control, setValue } = useFormContext<TerepayApplicationInput>();
+  const c = useSiteContent('apply.step3');
 
   const nd = useWatch({ control, name: 'livingExpenses.nonDiscretionary' });
   const d = useWatch({ control, name: 'livingExpenses.discretionary' });
@@ -126,18 +129,15 @@ export default function Step3LivingExpenses() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-xl font-bold text-ink-strong">Living Expenses</h2>
-        <p className="text-sm text-[var(--text-muted)] mt-1">
-          Enter your regular <strong>fortnightly</strong> costs. Tap a section to open it, and skip anything that
-          doesn&apos;t apply.
-        </p>
+        <h2 className="text-xl font-bold text-ink-strong">{c.title}</h2>
+        <p className="text-sm text-[var(--text-muted)] mt-1">{renderEmphasis(c.intro)}</p>
       </div>
 
       {/* Essential costs */}
       <Section
         id="essentials"
-        title="Essential costs"
-        hint="Rent, food, power, transport, insurance…"
+        title={c.essentialsTitle}
+        hint={c.essentialsHint}
         subtotal={sumNd}
         open={open}
         onToggle={setOpen}
@@ -160,8 +160,8 @@ export default function Step3LivingExpenses() {
       {/* Lifestyle & extras */}
       <Section
         id="lifestyle"
-        title="Lifestyle & extras"
-        hint="Eating out, entertainment, travel…"
+        title={c.lifestyleTitle}
+        hint={c.lifestyleHint}
         subtotal={sumD}
         open={open}
         onToggle={setOpen}
@@ -179,8 +179,8 @@ export default function Step3LivingExpenses() {
         <Toggle
           checked={hasSubs}
           onChange={toggleSubs}
-          label="Do you pay for subscriptions?"
-          description="Gym, streaming, sports and similar memberships."
+          label={c.subsLabel}
+          description={c.subsDesc}
         />
         {hasSubs && (
           <div className="mt-4 space-y-3">
@@ -230,8 +230,8 @@ export default function Step3LivingExpenses() {
         <Toggle
           checked={hasBnpl}
           onChange={toggleBnpl}
-          label="Do you use Buy Now, Pay Later?"
-          description="Afterpay, Klarna, Zip and similar."
+          label={c.bnplLabel}
+          description={c.bnplDesc}
         />
         {hasBnpl && (
           <div className="mt-3">
@@ -244,7 +244,7 @@ export default function Step3LivingExpenses() {
 
       {/* Grand total */}
       <div className="flex items-center justify-between bg-[var(--orange-700)] text-white rounded-xl px-5 py-4">
-        <span className="font-semibold text-sm">Total fortnightly expenses</span>
+        <span className="font-semibold text-sm">{c.totalLabel}</span>
         <span className="font-tabular text-xl font-bold">{money(grandTotal)}</span>
       </div>
     </div>

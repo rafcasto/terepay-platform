@@ -4,7 +4,7 @@ import { verifySessionOrIdToken, getAdminDb } from '@/lib/firebase/admin';
 import Link from 'next/link';
 import { Pill, Icons } from '@/components/ui';
 import { obPrimaryBtn } from './_components/onboarding-styles';
-import { getContentSection } from '@/lib/content/site-content';
+import { getContentSections } from '@/lib/content/site-content';
 
 export default async function OnboardingIntroPage() {
   const cookieStore = await cookies();
@@ -15,14 +15,16 @@ export default async function OnboardingIntroPage() {
   if (!decoded) redirect('/auth/login');
 
   const db = getAdminDb();
-  const [userSnap, profileSnap] = await Promise.all([
+  const [userSnap, profileSnap, content] = await Promise.all([
     db.collection('users').doc(decoded.uid).get(),
     db.collection('users').doc(decoded.uid).collection('applicantProfile').doc('profile').get(),
+    getContentSections(['onboarding.intro', 'onboarding.disclaimers']),
   ]);
   const userData = userSnap.data();
   if (userData?.profileComplete) redirect('/applicant/dashboard');
 
-  const disclaimers = await getContentSection('onboarding.disclaimers');
+  const c = content['onboarding.intro'];
+  const disclaimers = content['onboarding.disclaimers'];
 
   let nextStep = '/applicant/onboarding/verify-email';
   if (userData?.emailVerified && !userData?.phoneVerified) {
@@ -37,37 +39,35 @@ export default async function OnboardingIntroPage() {
     <div className="flex items-center justify-center min-h-full py-10 px-4">
       <div className="w-full max-w-lg screen-in">
         <p className="text-[11px] font-display font-semibold uppercase tracking-[0.08em] text-brand-text mb-3">
-          Welcome to TerePay
+          {c.eyebrow}
         </p>
         <h1 className="font-display text-3xl sm:text-[2rem] font-bold tracking-tight text-ink-strong leading-tight mb-2">
-          Let&apos;s set up your account
+          {c.title}
         </h1>
-        <p className="text-[var(--text-muted)] mb-8 text-sm sm:text-base leading-relaxed">
-          It takes a couple of minutes. Have your government-issued ID handy before you start.
-        </p>
+        <p className="text-[var(--text-muted)] mb-8 text-sm sm:text-base leading-relaxed">{c.subtitle}</p>
 
         <div className="space-y-3 mb-7">
           <StepCard
             tone="info"
             icon={<Icons.Bell size={20} />}
-            title="Email verification"
-            description="We'll send a link to your email address to confirm it belongs to you."
+            title={c.step1Title}
+            description={c.step1Body}
             done={Boolean(userData?.emailVerified)}
             badge={userData?.emailVerified ? 'Verified' : undefined}
           />
           <StepCard
             tone="brand"
             icon={<Icons.MessageCircle size={20} />}
-            title="Mobile verification"
-            description="This helps us confirm your identity and prevent unauthorised access."
+            title={c.step2Title}
+            description={c.step2Body}
             done={Boolean(userData?.phoneVerified)}
             badge={userData?.phoneVerified ? 'Verified' : undefined}
           />
           <StepCard
             tone="info"
             icon={<Icons.User size={20} />}
-            title="Complete profile"
-            description="We take security seriously, so we need to get to know you a little better before you can start."
+            title={c.step3Title}
+            description={c.step3Body}
             done={profileSnap.exists}
             badge={profileSnap.exists ? 'Saved' : undefined}
             editHref={profileSnap.exists && !userData?.profileComplete ? '/applicant/onboarding/profile' : undefined}
@@ -75,15 +75,15 @@ export default async function OnboardingIntroPage() {
           <StepCard
             tone="success"
             icon={<Icons.ShieldCheck size={20} />}
-            title="Identity verification"
-            description="As a final security measure, you'll upload a government-issued ID to complete this step."
+            title={c.step4Title}
+            description={c.step4Body}
             done={Boolean(userData?.profileComplete)}
             badge={userData?.profileComplete ? 'Submitted' : undefined}
           />
         </div>
 
         <Link href={nextStep} className={obPrimaryBtn}>
-          Continue
+          {c.cta}
           <Icons.ArrowRight size={18} />
         </Link>
 

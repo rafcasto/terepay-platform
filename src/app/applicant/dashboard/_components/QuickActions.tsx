@@ -1,12 +1,18 @@
 import { ActionRow, Icons } from '@/components/ui';
 import type { LoanDisplayState } from '@/lib/loan/status-display';
+import { withDefaults, type ContentSectionValues } from '@/types/content';
 
 interface QuickActionsProps {
   state: LoanDisplayState;
   pendingAppId?: string | null;
+  /** Editable `borrower.status.<state>` section (defaults applied if absent). */
+  content?: ContentSectionValues;
+  /** Editable section heading (from `borrower.dashboard`). */
+  heading?: string;
 }
 
-export default function QuickActions({ state, pendingAppId }: QuickActionsProps) {
+export default function QuickActions({ state, pendingAppId, content, heading }: QuickActionsProps) {
+  const c = withDefaults(`borrower.status.${state}`, content);
   const items: Array<{
     href: string;
     title: string;
@@ -18,8 +24,8 @@ export default function QuickActions({ state, pendingAppId }: QuickActionsProps)
   if (state === 'active') {
     items.push({
       href: pendingAppId ? `/applicant/applications/${pendingAppId}` : '/applicant/dashboard',
-      title: 'View repayment schedule',
-      subtitle: 'Each instalment is auto-debited on its due date',
+      title: c.actionTitle,
+      subtitle: c.actionSubtitle,
       icon: <Icons.Calendar size={20} />,
       tone: 'amber',
     });
@@ -27,11 +33,8 @@ export default function QuickActions({ state, pendingAppId }: QuickActionsProps)
     if (pendingAppId) {
       items.push({
         href: `/applicant/applications/${pendingAppId}`,
-        title: state === 'approved' ? 'Review your offer' : 'Track application',
-        subtitle:
-          state === 'approved'
-            ? 'Accept or decline your loan offer'
-            : 'See the current step and estimated timing',
+        title: c.actionTitle,
+        subtitle: c.actionSubtitle,
         icon: <Icons.Receipt size={20} />,
         tone: state === 'approved' ? 'success' : 'amber',
       });
@@ -39,33 +42,34 @@ export default function QuickActions({ state, pendingAppId }: QuickActionsProps)
   } else if (state === 'rejected') {
     items.push({
       href: '/applicant/apply',
-      title: 'Apply again',
-      subtitle: 'Start a fresh application',
+      title: c.actionTitle,
+      subtitle: c.actionSubtitle,
       icon: <Icons.Refresh size={20} />,
       tone: 'amber',
     });
   } else if (state === 'paid') {
     items.push({
       href: '/applicant/apply',
-      title: 'Start a new loan',
-      subtitle: 'Your repayment history is on your side',
+      title: c.actionTitle,
+      subtitle: c.actionSubtitle,
       icon: <Icons.Sparkles size={20} />,
       tone: 'amber',
     });
   } else {
-    // new
+    // new (and draft, which shares the "new" actions)
+    const n = withDefaults('borrower.status.new', state === 'new' ? content : undefined);
     items.push(
       {
         href: '/applicant/apply',
-        title: 'Apply for a loan',
-        subtitle: 'Quick application · decision in 1–2 business days',
+        title: n.action1Title,
+        subtitle: n.action1Subtitle,
         icon: <Icons.Card size={20} />,
         tone: 'amber',
       },
       {
         href: '/applicant/profile',
-        title: 'Update your profile',
-        subtitle: 'Keep your details current for faster approvals',
+        title: n.action2Title,
+        subtitle: n.action2Subtitle,
         icon: <Icons.User size={20} />,
         tone: 'info',
       },
@@ -77,7 +81,7 @@ export default function QuickActions({ state, pendingAppId }: QuickActionsProps)
   return (
     <section className="space-y-2.5">
       <p className="text-[11.5px] font-semibold tracking-[0.08em] text-muted uppercase">
-        Quick actions
+        {heading ?? withDefaults('borrower.dashboard', undefined).quickActionsHeading}
       </p>
       {items.map((it) => (
         <ActionRow

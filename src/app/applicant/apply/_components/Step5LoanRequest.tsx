@@ -11,7 +11,8 @@ import {
 import { LOAN_MIN, LOAN_MAX, computeRepayment } from '@/lib/loan/status-display';
 import { RangeSlider, QuickAmounts } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
-import { useApplyContent } from './ApplyContentContext';
+import { useSiteContent } from '@/lib/content/SiteContentContext';
+import { renderEmphasis } from '@/lib/content/emphasis';
 
 const inputCls =
   'w-full px-3 h-11 border border-border-default rounded-xl text-sm focus:ring-2 focus:ring-[var(--focus-ring)] focus:border-brand focus:outline-none transition-colors bg-surface-card text-ink-strong placeholder:text-[var(--text-disabled)]';
@@ -41,7 +42,8 @@ export default function Step5LoanRequest() {
     formState: { errors },
   } = useFormContext<TerepayApplicationInput>();
   const { user } = useAuth();
-  const applyContent = useApplyContent();
+  const c = useSiteContent('apply.step5');
+  const applyContent = useSiteContent('apply.disclaimers');
 
   const e = errors.loanRequest;
   const isPEP = useWatch({ control, name: 'loanRequest.isPEP' });
@@ -73,15 +75,15 @@ export default function Step5LoanRequest() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-ink-strong">Loan Request</h2>
-        <p className="text-sm text-[var(--text-muted)] mt-1">Tell us about the loan you need.</p>
+        <h2 className="text-xl font-bold text-ink-strong">{c.title}</h2>
+        <p className="text-sm text-[var(--text-muted)] mt-1">{c.intro}</p>
       </div>
 
       {/* Requested amount — slider + quick picks + precise entry */}
       <div>
         <div className="flex items-baseline justify-between mb-2">
           <label className={labelCls + ' mb-0'}>
-            How much do you need? <span className="text-danger-text">*</span>
+            {c.amountLabel} <span className="text-danger-text">*</span>
           </label>
           <span className="font-tabular text-lg font-bold text-ink-strong">{fmtNZD0(sliderValue)}</span>
         </div>
@@ -123,7 +125,7 @@ export default function Step5LoanRequest() {
       {principal >= LOAN_MIN && (
         <div className="bg-success-soft border border-[color-mix(in_srgb,var(--success-500)_25%,transparent)] rounded-xl p-4 space-y-1.5">
           <p className="text-xs font-semibold text-[var(--success-700)] uppercase tracking-wide">
-            Estimated repayments
+            {c.estimateHeading}
           </p>
           <p className="text-sm text-ink-strong">
             4 fortnightly payments of{' '}
@@ -145,7 +147,7 @@ export default function Step5LoanRequest() {
       {/* Loan terms — key facts */}
       <details className="bg-brand-soft border border-brand/30 rounded-xl p-4">
         <summary className="text-xs font-bold text-brand-text uppercase tracking-wide cursor-pointer">
-          Loan terms
+          {c.termsHeading}
         </summary>
         <div className="grid grid-cols-2 gap-3 text-xs text-ink-strong mt-3">
           <div><span className="font-semibold">Period:</span> 8 weeks (56 days)</div>
@@ -208,11 +210,7 @@ export default function Step5LoanRequest() {
             {...register('loanRequest.isPEP')}
             className="mt-0.5 h-4 w-4 rounded border-border-default text-brand-text focus:ring-[var(--focus-ring)]"
           />
-          <span className="text-sm text-amber-900">
-            I, or an immediate family member, am a{' '}
-            <strong>Politically Exposed Person (PEP)</strong> — someone who holds a senior public role — or a close
-            associate of one.
-          </span>
+          <span className="text-sm text-amber-900">{renderEmphasis(c.pepText)}</span>
         </label>
         {isPEP && (
           <div>
@@ -230,10 +228,8 @@ export default function Step5LoanRequest() {
       {/* Remittance */}
       <div className="space-y-4">
         <div>
-          <h3 className="text-sm font-semibold text-ink-strong mb-1">Money you send overseas</h3>
-          <p className="text-xs text-[var(--text-muted)]">
-            Regular transfers abroad (remittances) help us understand your financial commitments.
-          </p>
+          <h3 className="text-sm font-semibold text-ink-strong mb-1">{c.remittanceTitle}</h3>
+          <p className="text-xs text-[var(--text-muted)]">{c.remittanceBody}</p>
         </div>
 
         <div>

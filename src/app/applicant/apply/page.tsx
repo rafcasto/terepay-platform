@@ -16,6 +16,7 @@ import Step5LoanRequest from './_components/Step5LoanRequest';
 import Step6BankDetails from './_components/Step6BankDetails';
 import Step7References from './_components/Step7References';
 import Step8Declarations from './_components/Step8Declarations';
+import { useSiteContent } from '@/lib/content/SiteContentContext';
 
 export default function ApplyPage() {
   return (
@@ -112,6 +113,7 @@ function ApplyPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, loading } = useAuth();
+  const c = useSiteContent('apply.layout');
   const [currentStep, setCurrentStep] = useState(
     () => Math.min(Math.max(Number(searchParams.get('step') ?? 0), 0), STEPS.length - 1)
   );
@@ -339,7 +341,7 @@ function ApplyPageInner() {
       <div className="min-h-screen bg-[var(--surface-page)] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="h-8 w-8 rounded-full border-2 border-[var(--orange-700)] border-t-transparent animate-spin" />
-          <p className="text-sm text-[var(--text-muted)]">Loading your application...</p>
+          <p className="text-sm text-[var(--text-muted)]">{c.loadingText}</p>
         </div>
       </div>
     );
@@ -352,12 +354,10 @@ function ApplyPageInner() {
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-brand-soft">
             <Icons.AlertTriangle size={28} className="text-brand-text" />
           </div>
-          <h2 className="text-lg font-bold mb-2">Email verification required</h2>
-          <p className="text-sm text-[var(--text-muted)] mb-6">
-            You must verify your email address before you can submit a loan application.
-          </p>
+          <h2 className="text-lg font-bold mb-2">{c.emailRequiredTitle}</h2>
+          <p className="text-sm text-[var(--text-muted)] mb-6">{c.emailRequiredBody}</p>
           <ButtonLink href="/applicant/verify-email" fullWidth>
-            Verify my email
+            {c.emailRequiredCta}
           </ButtonLink>
         </Card>
       </div>
@@ -384,11 +384,11 @@ function ApplyPageInner() {
             <div className="flex flex-col gap-2">
               {isLastStep ? (
                 <Button type="button" onClick={handleSubmit(onSubmit)} disabled={isSubmitting} size="lg" fullWidth>
-                  {isSubmitting ? 'Submitting…' : 'Submit application'}
+                  {isSubmitting ? c.submittingCta : c.submitCta}
                 </Button>
               ) : (
                 <Button type="button" onClick={handleNext} size="lg" fullWidth>
-                  Continue
+                  {c.continueCta}
                 </Button>
               )}
 
@@ -399,7 +399,7 @@ function ApplyPageInner() {
                   className="py-2 text-sm font-semibold text-[var(--text-muted)] hover:text-ink-strong transition-colors flex items-center gap-1.5"
                 >
                   <Icons.ArrowLeft size={16} />
-                  {currentStep === 0 ? 'Back to dashboard' : 'Back'}
+                  {currentStep === 0 ? c.backToDashboard : c.backCta}
                 </button>
 
                 <span
@@ -407,13 +407,11 @@ function ApplyPageInner() {
                   className={`flex items-center gap-1.5 text-xs font-medium text-[var(--text-muted)] transition-opacity duration-200 ${justSaved ? 'opacity-100' : 'opacity-0'}`}
                 >
                   <Icons.Check size={14} className="text-[var(--success-700)]" />
-                  Draft saved
+                  {c.draftSaved}
                 </span>
               </div>
 
-              <p className="text-center sm:text-left text-[11.5px] text-[var(--text-muted)]">
-                Your progress is saved automatically — you can leave and come back anytime.
-              </p>
+              <p className="text-center sm:text-left text-[11.5px] text-[var(--text-muted)]">{c.autosaveNote}</p>
             </div>
           </div>
         </div>

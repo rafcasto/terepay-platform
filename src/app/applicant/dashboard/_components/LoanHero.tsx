@@ -1,7 +1,7 @@
 import { Hero, HeroBalance, Pill, ProgressBar, StatGrid, ButtonLink, Confetti } from '@/components/ui';
 import { fmtDate, fmtNZD, daysUntil } from '@/lib/loan/format';
 import type { LoanDisplayState } from '@/lib/loan/status-display';
-import { DEFAULT_CONTENT, type ContentSectionValues } from '@/types/content';
+import { withDefaults, type ContentSectionValues } from '@/types/content';
 
 export type DashboardHeroData = {
   state: LoanDisplayState;
@@ -24,6 +24,11 @@ export type DashboardHeroData = {
   };
 };
 
+/**
+ * Status hero for the borrower dashboard. `content` is the editable
+ * `borrower.status.<state>` section matching `data.state` (defaults applied
+ * if absent), so every heading, subtitle, pill and button here is editable.
+ */
 export default function LoanHero({
   data,
   firstName,
@@ -33,7 +38,8 @@ export default function LoanHero({
   firstName?: string | null;
   content?: ContentSectionValues;
 }) {
-  const c = { ...DEFAULT_CONTENT['borrower.dashboard'], ...(content ?? {}) };
+  const c = withDefaults(`borrower.status.${data.state}`, content);
+
   if (data.state === 'active' && data.loan) {
     const { remainingBalance, totalPaid, nextPaymentDate, isDelinquent, applicationId } = data.loan;
     const total = totalPaid + remainingBalance;
@@ -41,20 +47,16 @@ export default function LoanHero({
     const dleft = daysUntil(nextPaymentDate);
     return (
       <Hero
-        eyebrow={isDelinquent ? 'Payment missed' : 'Active loan balance'}
-        subtitle={
-          isDelinquent
-            ? "Your last instalment didn't go through. We'll keep retrying — make sure funds are available in your account."
-            : undefined
-        }
+        eyebrow={isDelinquent ? c.delinquentEyebrow : c.eyebrow}
+        subtitle={isDelinquent ? c.delinquentSubtitle : undefined}
         pill={
           isDelinquent ? (
             <Pill tone="danger" pulse onInk>
-              Late
+              {c.pillLate}
             </Pill>
           ) : (
             <Pill tone="success" pulse onInk>
-              On track
+              {c.pillOnTrack}
             </Pill>
           )
         }
@@ -64,7 +66,7 @@ export default function LoanHero({
           <ProgressBar
             value={repaidPct}
             onInk
-            label="Repayment progress"
+            label={c.progressLabel}
             trailing={`${repaidPct}% repaid`}
           />
         </div>
@@ -84,7 +86,7 @@ export default function LoanHero({
         {applicationId && (
           <div className="mt-5">
             <ButtonLink href={`/applicant/applications/${applicationId}`} variant="ghost-light" fullWidth>
-              View repayment schedule
+              {c.cta}
             </ButtonLink>
           </div>
         )}
@@ -96,12 +98,12 @@ export default function LoanHero({
     return (
       <Hero
         state="paid"
-        eyebrow="Loan complete"
-        title={`Loan repaid${firstName ? `, ${firstName}` : ''}`}
-        subtitle="Thanks for repaying on time. You're all set."
+        eyebrow={c.eyebrow}
+        title={`${c.title}${firstName ? `, ${firstName}` : ''}`}
+        subtitle={c.subtitle}
         pill={
           <Pill tone="success" onInk>
-            Repaid
+            {c.pill}
           </Pill>
         }
       >
@@ -122,12 +124,12 @@ export default function LoanHero({
     const requested = data.application?.requestedAmount;
     return (
       <Hero
-        eyebrow="Application in progress"
-        title="Finish your application"
-        subtitle="You've started a loan application but haven't submitted it yet. Pick up right where you left off — it only takes a few minutes."
+        eyebrow={c.eyebrow}
+        title={c.title}
+        subtitle={c.subtitle}
         pill={
           <Pill tone="amber" pulse onInk>
-            Not submitted
+            {c.pill}
           </Pill>
         }
       >
@@ -139,12 +141,10 @@ export default function LoanHero({
         ) : null}
         <div className="mt-5">
           <ButtonLink href="/applicant/apply" fullWidth>
-            Continue your application
+            {c.cta}
           </ButtonLink>
         </div>
-        <p className="mt-3 text-[12px] text-white/60">
-          {c.draftDisclaimer}
-        </p>
+        <p className="mt-3 text-[12px] text-white/60">{c.disclaimer}</p>
       </Hero>
     );
   }
@@ -153,12 +153,12 @@ export default function LoanHero({
     return (
       <Hero
         state="approved"
-        eyebrow="Loan approved"
-        title="Your loan is approved"
-        subtitle="Review your offer and one-tap accept on the loan tracker."
+        eyebrow={c.eyebrow}
+        title={c.title}
+        subtitle={c.subtitle}
         pill={
           <Pill tone="success" pulse onInk>
-            Approved
+            {c.pill}
           </Pill>
         }
       >
@@ -175,7 +175,7 @@ export default function LoanHero({
         />
         <div className="mt-5">
           <ButtonLink href={`/applicant/applications/${data.application.id}`} fullWidth>
-            Review offer
+            {c.cta}
           </ButtonLink>
         </div>
       </Hero>
@@ -185,12 +185,12 @@ export default function LoanHero({
   if (data.state === 'review' && data.application) {
     return (
       <Hero
-        eyebrow="Application in review"
-        title="We're processing your loan"
-        subtitle="A lender is reviewing your application. We'll notify you when there's an update."
+        eyebrow={c.eyebrow}
+        title={c.title}
+        subtitle={c.subtitle}
         pill={
           <Pill tone="amber" pulse onInk>
-            In review
+            {c.pill}
           </Pill>
         }
       >
@@ -202,7 +202,7 @@ export default function LoanHero({
         />
         <div className="mt-5">
           <ButtonLink href={`/applicant/applications/${data.application.id}`} variant="ghost-light" fullWidth>
-            Track progress
+            {c.cta}
           </ButtonLink>
         </div>
       </Hero>
@@ -213,34 +213,31 @@ export default function LoanHero({
     return (
       <Hero
         state="rejected"
-        eyebrow="Application outcome"
-        title="We couldn't approve this time"
-        subtitle="Don't worry — you can review the details and try again when you're ready."
+        eyebrow={c.eyebrow}
+        title={c.title}
+        subtitle={c.subtitle}
         pill={
           <Pill tone="danger" onInk>
-            Declined
+            {c.pill}
           </Pill>
         }
       >
         <div className="flex flex-wrap gap-2">
           <ButtonLink href={`/applicant/applications/${data.application.id}`} variant="ghost-light">
-            See details
+            {c.detailsCta}
           </ButtonLink>
-          <ButtonLink href="/applicant/apply">Apply again</ButtonLink>
+          <ButtonLink href="/applicant/apply">{c.applyAgainCta}</ButtonLink>
         </div>
       </Hero>
     );
   }
 
-  // state === 'new'
+  // state === 'new' (also the fallback when a status has no matching data)
+  const n = withDefaults('borrower.status.new', data.state === 'new' ? content : undefined);
   return (
-    <Hero
-      eyebrow={c.newEyebrow}
-      title={c.newTitle}
-      subtitle={c.newSubtitle}
-    >
+    <Hero eyebrow={n.eyebrow} title={n.title} subtitle={n.subtitle}>
       <ButtonLink href="/applicant/apply" fullWidth>
-        {c.newCta}
+        {n.cta}
       </ButtonLink>
     </Hero>
   );

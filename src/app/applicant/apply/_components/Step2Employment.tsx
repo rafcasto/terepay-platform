@@ -3,6 +3,7 @@
 import React from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
 import type { TerepayApplicationInput } from '@/lib/validation/schemas';
+import { useSiteContent } from '@/lib/content/SiteContentContext';
 
 const inputCls =
   'w-full px-3 h-11 border border-border-default rounded-xl text-sm focus:ring-2 focus:ring-[var(--focus-ring)] focus:border-brand focus:outline-none transition-colors bg-surface-card text-ink-strong placeholder:text-[var(--text-disabled)]';
@@ -49,6 +50,7 @@ export default function Step2Employment() {
     control,
     formState: { errors },
   } = useFormContext<TerepayApplicationInput>();
+  const c = useSiteContent('apply.step2');
 
   const e = errors.employment;
 
@@ -64,8 +66,8 @@ export default function Step2Employment() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-ink-strong">Employment &amp; Income</h2>
-        <p className="text-sm text-[var(--text-muted)] mt-1">Tell us about your current employment and fortnightly earnings.</p>
+        <h2 className="text-xl font-bold text-ink-strong">{c.title}</h2>
+        <p className="text-sm text-[var(--text-muted)] mt-1">{c.intro}</p>
       </div>
 
       {/* Employer details */}
@@ -159,10 +161,8 @@ export default function Step2Employment() {
       {isNewJob && (
         <div className="rounded-xl border border-border-default bg-surface-sunken p-4 space-y-4">
           <div>
-            <h3 className="text-sm font-semibold text-ink-strong">Previous employer</h3>
-            <p className="text-xs text-[var(--text-muted)] mt-0.5">
-              You&apos;ve been at your current job under 6 months — tell us where you worked before.
-            </p>
+            <h3 className="text-sm font-semibold text-ink-strong">{c.previousEmployerTitle}</h3>
+            <p className="text-xs text-[var(--text-muted)] mt-0.5">{c.previousEmployerBody}</p>
           </div>
           <div>
             <label className={labelCls}>
@@ -194,9 +194,7 @@ export default function Step2Employment() {
 
       {/* Income table */}
       <div className="bg-surface-sunken rounded-xl border border-border-default p-4 space-y-3">
-        <h3 className="text-sm font-semibold text-ink-strong">
-          Fortnightly Income (NZD)
-        </h3>
+        <h3 className="text-sm font-semibold text-ink-strong">{c.incomeHeading}</h3>
 
         <div className="space-y-3">
           {[
@@ -245,9 +243,7 @@ export default function Step2Employment() {
 
         {/* Total */}
         <div className="flex items-center gap-3 pt-2 border-t border-border-default">
-          <span className="text-sm font-semibold text-ink-strong flex-1">
-            Total Fortnightly Income
-          </span>
+          <span className="text-sm font-semibold text-ink-strong flex-1">{c.totalLabel}</span>
           <span className="w-36 px-3 py-2 bg-brand-soft text-brand-text font-bold text-sm rounded-lg text-right">
             ${total.toFixed(2)}
           </span>

@@ -10,6 +10,7 @@ import { AuthShell } from '../_components/auth-shell';
 import { AuthIcon } from '../_components/auth-icons';
 import { Field, InputShell, EyeToggle, SubmitButton, Checkbox, ErrorAlert } from '../_components/auth-ui';
 import { useRecaptchaToken } from '../recaptcha-provider';
+import { useSiteContent } from '@/lib/content/SiteContentContext';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -76,6 +77,7 @@ export default function SignupPage() {
   const { login } = useAuth();
   const router = useRouter();
   const getRecaptchaToken = useRecaptchaToken();
+  const c = useSiteContent('auth.signup');
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -147,12 +149,7 @@ export default function SignupPage() {
   }, [firstName, lastName, email, password, confirmPassword, agreedToTerms, getRecaptchaToken, login, router, validate]);
 
   return (
-    <AuthShell
-      mode="register"
-      eyebrow="Get started"
-      title="Create your account"
-      subtitle="A few details to get going. You’ll complete your full loan application after signing in."
-    >
+    <AuthShell mode="register">
       <form
         className="flex flex-col gap-[18px]"
         noValidate
@@ -211,7 +208,7 @@ export default function SignupPage() {
           htmlFor="password"
           label="Password"
           required
-          hint="At least 8 characters. Use a mix of letters, numbers and symbols."
+          hint={c.passwordHint}
           error={errors.password}
         >
           <InputShell
@@ -243,8 +240,8 @@ export default function SignupPage() {
 
         <div className="pt-1">
           <Checkbox id="terms" checked={agreedToTerms} onChange={(e) => setAgreedToTerms(e.target.checked)}>
-            I agree to the <a href="/terms">loan agreement terms</a> and <a href="/privacy">privacy policy</a>. All loans are
-            charged interest and an admin fee, shown in full before you sign.
+            I agree to the <a href="/terms">loan agreement terms</a> and <a href="/privacy">privacy policy</a>.{' '}
+            {c.termsDisclosure}
           </Checkbox>
           {errors.terms && <p className="mt-1.5 text-[12.5px] font-medium text-[var(--text-danger)]">{errors.terms}</p>}
         </div>
@@ -253,15 +250,15 @@ export default function SignupPage() {
 
         <div className="mt-2">
           <SubmitButton type="submit" disabled={loading}>
-            {loading ? 'Creating account…' : 'Create account'}
+            {loading ? c.submittingCta : c.submitCta}
             {!loading && AuthIcon.arrow}
           </SubmitButton>
         </div>
 
         <p className="text-center text-[14.5px] text-[var(--text-muted)]">
-          Already have an account?{' '}
+          {c.haveAccountText}{' '}
           <Link href="/auth/login" className="font-semibold text-[var(--text-link)] hover:underline">
-            Sign in
+            {c.signInLink}
           </Link>
         </p>
       </form>

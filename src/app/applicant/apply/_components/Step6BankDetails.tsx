@@ -2,6 +2,7 @@
 
 import { useFormContext } from 'react-hook-form';
 import type { TerepayApplicationInput } from '@/lib/validation/schemas';
+import { useSiteContent } from '@/lib/content/SiteContentContext';
 
 const inputCls =
   'w-full px-3 h-11 border border-border-default rounded-xl text-sm focus:ring-2 focus:ring-[var(--focus-ring)] focus:border-brand focus:outline-none transition-colors bg-surface-card text-ink-strong placeholder:text-[var(--text-disabled)]';
@@ -13,16 +14,15 @@ export default function Step6BankDetails() {
     register,
     formState: { errors },
   } = useFormContext<TerepayApplicationInput>();
+  const c = useSiteContent('apply.step6');
 
   const e = errors.bankDetails;
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-ink-strong">Bank Account</h2>
-        <p className="text-sm text-[var(--text-muted)] mt-1">
-          Provide the account where you&apos;d like your loan funds deposited.
-        </p>
+        <h2 className="text-xl font-bold text-ink-strong">{c.title}</h2>
+        <p className="text-sm text-[var(--text-muted)] mt-1">{c.intro}</p>
       </div>
 
       {/* Security note */}
@@ -30,10 +30,7 @@ export default function Step6BankDetails() {
         <svg className="w-5 h-5 text-[var(--info-700)] mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
         </svg>
-        <p className="text-xs text-[var(--info-700)]">
-          Your bank details are stored securely and used solely to deposit your loan funds. We never share
-          this information with third parties.
-        </p>
+        <p className="text-xs text-[var(--info-700)]">{c.securityNote}</p>
       </div>
 
       <div>
@@ -70,9 +67,7 @@ export default function Step6BankDetails() {
           className={inputCls}
           placeholder="XX-XXXX-XXXXXXX-XX"
         />
-        <p className="mt-1 text-xs text-[var(--text-disabled)]">
-          NZ format: 02-0100-0000000-00
-        </p>
+        <p className="mt-1 text-xs text-[var(--text-disabled)]">{c.accountFormatHint}</p>
         {e?.accountNumber && <p className={errorCls}>{e.accountNumber.message}</p>}
       </div>
     </div>

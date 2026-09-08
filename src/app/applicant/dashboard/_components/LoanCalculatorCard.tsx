@@ -16,7 +16,7 @@ export default function LoanCalculatorCard({ content }: { content?: ContentSecti
   return (
     <Card>
       <CardHeader
-        eyebrow="Quick estimate"
+        eyebrow={c.calculatorEyebrow}
         title={`Borrow ${fmtNZDCompact(amount)}`}
       />
       <div className="mt-5">
@@ -55,7 +55,7 @@ export default function LoanCalculatorCard({ content }: { content?: ContentSecti
 
       <div className="mt-5">
         <ButtonLink href="/applicant/apply" fullWidth>
-          Continue to application
+          {c.calculatorCta}
         </ButtonLink>
       </div>
     </Card>
