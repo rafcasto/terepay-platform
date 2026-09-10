@@ -21,6 +21,9 @@ export function getQippayClientSecret(): string {
   return secret;
 }
 
+/** Max chars of a Qippay error response body kept in logs/error details. */
+const QIPPAY_LOG_BODY_MAX = 500;
+
 export type QippayEnvelope<T> = {
   success: boolean;
   data?: T;
@@ -55,9 +58,12 @@ export async function qippayFetch<T>(
     );
   }
 
+  // Read the body once as text so a non-JSON error page (e.g. a bare
+  // "Internal Server Error" from a gateway) is still available for logging.
+  const rawBody = await res.text().catch(() => '');
   let envelope: QippayEnvelope<T> | undefined;
   try {
-    envelope = (await res.json()) as QippayEnvelope<T>;
+    envelope = JSON.parse(rawBody) as QippayEnvelope<T>;
   } catch {
     // Non-JSON response — fall through to status-based mapping below.
   }
@@ -67,10 +73,23 @@ export async function qippayFetch<T>(
       typeof envelope?.error === 'string'
         ? envelope.error
         : envelope?.error?.message ?? res.statusText ?? 'Qippay request failed';
-    if (res.status >= 500 || res.status === 0) {
-      throw new AppError('QIPPAY_UPSTREAM', 502, errMsg, { qippayStatus: res.status });
-    }
-    throw new AppError('QIPPAY_BAD_REQUEST', 502, errMsg, { qippayStatus: res.status });
+    const errCode = typeof envelope?.error === 'object' ? envelope.error?.code : undefined;
+    const code = res.status >= 500 || res.status === 0 ? 'QIPPAY_UPSTREAM' : 'QIPPAY_BAD_REQUEST';
+    const details = {
+      qippayStatus: res.status,
+      ...(errCode ? { qippayCode: errCode } : {}),
+    };
+    // Surface upstream failures in server logs — callers often persist just
+    // the message (e.g. an instalment's failureReason) and swallow the error.
+    // The raw body stays here (not in `details`, which errorResponse() sends
+    // to the client). Response body only — the request can carry PII.
+    console.error(`[qippay] ${init.method} ${path} failed`, {
+      code,
+      message: errMsg,
+      ...details,
+      body: rawBody.slice(0, QIPPAY_LOG_BODY_MAX),
+    });
+    throw new AppError(code, 502, errMsg, details);
   }
 
   return envelope.data;

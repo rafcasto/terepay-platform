@@ -149,6 +149,7 @@ export async function scheduleInstallments(opts: {
   const today = nzToday();
   const shortRef = applicationId.slice(0, 12);
   let attempted = 0;
+  const failures: { installmentNumber: number; code: string; reason: string }[] = [];
 
   // Schedule sequentially (lowest instalment first) so the consent's per-period
   // availability is consumed near-term-first and we don't race Qippay's checks.
@@ -214,6 +215,20 @@ export async function scheduleInstallments(opts: {
           : err instanceof Error
             ? err.message
             : String(err);
+      const code = err instanceof AppError ? err.code : 'UNKNOWN';
+      failures.push({ installmentNumber: p.installmentNumber, code, reason });
+      // The failure is persisted as `failureReason` and the run continues, so
+      // this is the only place the underlying cause reaches the server logs.
+      console.error('[setpay] schedulePayment failed', {
+        applicationId,
+        installmentNumber: p.installmentNumber,
+        dueDate: p.dueDate,
+        amountCents: p.amountCents,
+        code,
+        reason,
+        details: err instanceof AppError ? err.details : undefined,
+        ...(mock ? { mockSetpayFailure: mock.sequence, mockSetpayFailureSource: mock.source } : {}),
+      });
       payments[i] = {
         ...p,
         status: 'pending',
@@ -239,14 +254,19 @@ export async function scheduleInstallments(opts: {
       action: 'setpay_payments_scheduled',
       targetId: applicationId,
       targetType: 'application',
-      outcome: 'success',
+      outcome: failures.length > 0 ? 'failure' : 'success',
       ipAddress: ip,
+      ...(failures.length > 0
+        ? { errorDetail: failures.map((f) => `#${f.installmentNumber} ${f.code}: ${f.reason}`).join('; ') }
+        : {}),
       changes: {
         mandateId: consent.mandateId,
         totalInstallments: payments.length,
         attempted,
         scheduledCount,
         pendingCount,
+        failedCount: failures.length,
+        ...(failures.length > 0 ? { failures } : {}),
         ...(mock ? { mockSetpayFailure: mock.sequence, mockSetpayFailureSource: mock.source } : {}),
       },
     });
