@@ -30,6 +30,26 @@ export type QippayEnvelope<T> = {
   error?: { code?: string; message?: string } | string;
 };
 
+/**
+ * Qippay's *other* error shape — an RFC 7807-style problem document, seen on
+ * unhandled server errors (e.g. `{"type":"unknown-error","title":"Unknown
+ * error","detail":"…contact customer support.","trace_id":"…"}`). The
+ * `trace_id` is what Qippay support asks for, so we surface it.
+ */
+type QippayProblem = {
+  type?: string;
+  title?: string;
+  detail?: string;
+  trace_id?: string;
+  errors?: unknown[];
+};
+
+function isProblem(value: unknown): value is QippayProblem {
+  if (value === null || typeof value !== 'object') return false;
+  const v = value as Record<string, unknown>;
+  return typeof v.title === 'string' || typeof v.detail === 'string' || typeof v.trace_id === 'string';
+}
+
 export async function qippayFetch<T>(
   path: string,
   init: { method: 'GET' | 'POST'; body?: unknown },
@@ -69,15 +89,27 @@ export async function qippayFetch<T>(
   }
 
   if (!res.ok || !envelope?.success || !envelope.data) {
-    const errMsg =
-      typeof envelope?.error === 'string'
-        ? envelope.error
-        : envelope?.error?.message ?? res.statusText ?? 'Qippay request failed';
-    const errCode = typeof envelope?.error === 'object' ? envelope.error?.code : undefined;
+    const problem = isProblem(envelope) ? envelope : undefined;
+    let errMsg: string;
+    let errCode: string | undefined;
+    if (problem) {
+      // e.g. "Unknown error — An error occurred. Please contact customer support. (Qippay trace 9924…)"
+      const text = [problem.title, problem.detail].filter(Boolean).join(' — ');
+      errMsg = text || res.statusText || 'Qippay request failed';
+      if (problem.trace_id) errMsg += ` (Qippay trace ${problem.trace_id})`;
+      errCode = problem.type;
+    } else {
+      errMsg =
+        typeof envelope?.error === 'string'
+          ? envelope.error
+          : envelope?.error?.message ?? res.statusText ?? 'Qippay request failed';
+      errCode = typeof envelope?.error === 'object' ? envelope.error?.code : undefined;
+    }
     const code = res.status >= 500 || res.status === 0 ? 'QIPPAY_UPSTREAM' : 'QIPPAY_BAD_REQUEST';
     const details = {
       qippayStatus: res.status,
       ...(errCode ? { qippayCode: errCode } : {}),
+      ...(problem?.trace_id ? { qippayTraceId: problem.trace_id } : {}),
     };
     // Surface upstream failures in server logs — callers often persist just
     // the message (e.g. an instalment's failureReason) and swallow the error.
