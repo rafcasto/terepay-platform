@@ -2,20 +2,9 @@ import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
 import { AppError } from '@/lib/utils/api-error';
 import { auditLog } from '@/lib/utils/audit';
-import {
-  schedulePayment,
-  getBeneficiaryId,
-  getDefaultSetPayMockFailure,
-  isSetPayMockFailureEnabled,
-  parseSetPayMockFailureFromEmail,
-} from './setpay-client';
+import { schedulePayment, getBeneficiaryId } from './setpay-client';
 import { syncLoanRecord } from '@/lib/loan/loan-record';
-import type {
-  LoanApplication,
-  PaymentConsent,
-  ScheduledPayment,
-  SetPayMockFailure,
-} from '@/types/application';
+import type { LoanApplication, PaymentConsent, ScheduledPayment } from '@/types/application';
 
 /** Today's calendar date in NZ (Pacific/Auckland) as YYYY-MM-DD. */
 export function nzToday(): string {
@@ -59,54 +48,16 @@ export type ScheduleInstallmentsResult = {
  */
 const SETPAY_MAX_RETRY_DAYS = 4;
 
-type MockFailureSource = 'request' | 'email' | 'env';
-
-/**
- * UAT only — decide which Qippay failure simulation (if any) applies to this
- * run. Precedence: explicit request body → applicant email tag
- * (`setpayfail-…`) → QIPPAY_MOCK_SETPAY_FAILURE_DEFAULT. Skips the extra
- * Firestore read entirely when simulation is disabled (always on production).
- */
-async function resolveMockFailure(
-  explicit: SetPayMockFailure[] | undefined,
-  applicantId: string,
-): Promise<{ sequence: SetPayMockFailure[]; source: MockFailureSource } | undefined> {
-  if (!isSetPayMockFailureEnabled()) return undefined;
-  if (explicit && explicit.length > 0) return { sequence: explicit, source: 'request' };
-
-  try {
-    const userSnap = await adminDb.collection('users').doc(applicantId).get();
-    const user = userSnap.data() as { email?: string } | undefined;
-    const fromEmail = parseSetPayMockFailureFromEmail(user?.email);
-    if (fromEmail) return { sequence: fromEmail, source: 'email' };
-  } catch (err) {
-    console.warn('[setpay] Could not read applicant email for mock-failure tag', err);
-  }
-
-  const fromEnv = getDefaultSetPayMockFailure();
-  return fromEnv ? { sequence: fromEnv, source: 'env' } : undefined;
-}
-
 export async function scheduleInstallments(opts: {
   applicationId: string;
   actor: string;
   ip?: string;
-  /**
-   * UAT only — Qippay failure simulation attached to every instalment lodged
-   * in this run. When omitted, falls back to the applicant's `setpayfail-…`
-   * email tag, then QIPPAY_MOCK_SETPAY_FAILURE_DEFAULT. Ignored (never sent)
-   * unless `isSetPayMockFailureEnabled()`.
-   */
-  mockFailure?: SetPayMockFailure[];
 }): Promise<ScheduleInstallmentsResult> {
   const { applicationId, actor, ip } = opts;
   const appRef = adminDb.collection('loanApplications').doc(applicationId);
   const snap = await appRef.get();
   if (!snap.exists) throw new AppError('NOT_FOUND', 404, 'Application not found');
   const app = snap.data() as LoanApplication;
-
-  const mock = await resolveMockFailure(opts.mockFailure, app.applicantId);
-  const mockFailure = mock?.sequence;
 
   const consent = app.paymentConsent as PaymentConsent | undefined;
 
@@ -191,7 +142,6 @@ export async function scheduleInstallments(opts: {
         statementCode: `Inst${p.installmentNumber}`,
         statementReference: shortRef,
         maxRetry: SETPAY_MAX_RETRY_DAYS,
-        mockFailure,
       });
 
       // Success — drop any prior failureReason for a clean row.
@@ -204,9 +154,6 @@ export async function scheduleInstallments(opts: {
         scheduledAt: Timestamp.now(),
         lastAttemptAt: Timestamp.now(),
         scheduleAttempts: (p.scheduleAttempts ?? 0) + 1,
-        // Record what we asked Qippay to simulate so the lender panel can
-        // explain the eventual retry/failure and the audit trail is explicit.
-        ...(mockFailure && mockFailure.length > 0 ? { mockFailure: [...mockFailure] } : {}),
       };
     } catch (err) {
       const reason =
@@ -227,7 +174,6 @@ export async function scheduleInstallments(opts: {
         code,
         reason,
         details: err instanceof AppError ? err.details : undefined,
-        ...(mock ? { mockSetpayFailure: mock.sequence, mockSetpayFailureSource: mock.source } : {}),
       });
       payments[i] = {
         ...p,
@@ -267,7 +213,6 @@ export async function scheduleInstallments(opts: {
         pendingCount,
         failedCount: failures.length,
         ...(failures.length > 0 ? { failures } : {}),
-        ...(mock ? { mockSetpayFailure: mock.sequence, mockSetpayFailureSource: mock.source } : {}),
       },
     });
   }
