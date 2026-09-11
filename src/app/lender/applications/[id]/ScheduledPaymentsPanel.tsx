@@ -1,41 +1,14 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import type { ScheduledPayment, SetPayMockFailure } from '@/types/application';
+import type { ScheduledPayment } from '@/types/application';
 import ConsoleIcon from '@/components/lender/ConsoleIcon';
 import ConsolePill, { type PillTone } from '@/components/lender/ConsolePill';
 
 type Props = {
   applicationId: string;
   scheduledPayments: ScheduledPayment[];
-  /**
-   * UAT only — shows the "Simulate failure" selector beside "Schedule pending".
-   * Decided server-side (QIPPAY_MOCK_SETPAY_FAILURE_ENABLED; never on prod).
-   */
-  mockFailureEnabled?: boolean;
 };
-
-/**
- * Qippay UAT failure scenarios. Each entry in a sequence plays out on a
- * subsequent day; `revoked` is terminal (a new consent is required).
- */
-const MOCK_SCENARIOS: { value: string; label: string; sequence: SetPayMockFailure[] }[] = [
-  { value: 'rejected', label: 'Rejected (insufficient funds), then retry', sequence: ['rejected'] },
-  { value: 'error', label: 'Bank API error (outage), then retry', sequence: ['error'] },
-  {
-    value: 'rejected,error',
-    label: 'Rejected, then bank error, then retry',
-    sequence: ['rejected', 'error'],
-  },
-  { value: 'revoked', label: 'Consent revoked by customer (terminal)', sequence: ['revoked'] },
-  {
-    value: 'rejected,error,revoked',
-    label: 'Rejected, error, then revoked (3 days, abandoned)',
-    sequence: ['rejected', 'error', 'revoked'],
-  },
-];
-
-const describeMock = (seq: SetPayMockFailure[]) => seq.join(' \u2192 ');
 
 const fmtNzd = (cents: number) =>
   new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(
@@ -104,7 +77,6 @@ function describe(p: ScheduledPayment, today: string): RowView {
 export default function ScheduledPaymentsPanel({
   applicationId,
   scheduledPayments: initial,
-  mockFailureEnabled = false,
 }: Props) {
   const [payments, setPayments] = useState<ScheduledPayment[]>(initial);
   const [isChecking, startChecking] = useTransition();
@@ -112,7 +84,6 @@ export default function ScheduledPaymentsPanel({
   const [lastChecked, setLastChecked] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [mockScenario, setMockScenario] = useState<string>('');
 
   const today = nzToday();
   const rows = payments.map((p) => ({ p, view: describe(p, today) }));
@@ -150,19 +121,10 @@ export default function ScheduledPaymentsPanel({
   const handleSchedulePending = () => {
     setError(null);
     setNotice(null);
-    const scenario = mockFailureEnabled
-      ? MOCK_SCENARIOS.find((m) => m.value === mockScenario)
-      : undefined;
     startScheduling(async () => {
       try {
         const res = await fetch(`/api/applications/${applicationId}/schedule-payments`, {
           method: 'POST',
-          ...(scenario
-            ? {
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ mockSetpayFailure: scenario.sequence }),
-              }
-            : {}),
         });
         const body = await res.json();
         if (!res.ok) {
@@ -173,8 +135,7 @@ export default function ScheduledPaymentsPanel({
         const lodged = body.data?.scheduledCount ?? 0;
         const stillPending = body.data?.pendingCount ?? 0;
         setNotice(
-          `${lodged} lodged with the bank · ${stillPending} still awaiting their window.` +
-            (scenario ? ` Simulating: ${describeMock(scenario.sequence)}.` : ''),
+          `${lodged} lodged with the bank · ${stillPending} still awaiting their window.`,
         );
         setLastChecked(new Date().toLocaleTimeString('en-NZ'));
       } catch {
@@ -209,25 +170,6 @@ export default function ScheduledPaymentsPanel({
         <div className="flex items-center gap-2">
           {lastChecked && (
             <span className="text-xs text-[var(--text-muted)]">Checked {lastChecked}</span>
-          )}
-          {mockFailureEnabled && pendingCount > 0 && (
-            <label className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
-              <span className="whitespace-nowrap">Simulate failure (UAT)</span>
-              <select
-                value={mockScenario}
-                onChange={(e) => setMockScenario(e.target.value)}
-                disabled={isScheduling}
-                aria-label="Simulate a failed collection on the next lodgement (UAT only)"
-                className="rounded-[10px] border border-[var(--border-default)] bg-white px-2 py-1.5 text-xs text-[var(--text-body)] disabled:opacity-50"
-              >
-                <option value="">None</option>
-                {MOCK_SCENARIOS.map((m) => (
-                  <option key={m.value} value={m.value}>
-                    {m.label}
-                  </option>
-                ))}
-              </select>
-            </label>
           )}
           {pendingCount > 0 && (
             <button
@@ -306,11 +248,6 @@ export default function ScheduledPaymentsPanel({
                         }`}
                       >
                         {view.note}
-                      </p>
-                    )}
-                    {p.mockFailure && p.mockFailure.length > 0 && (
-                      <p className="mt-1 max-w-[34ch] text-[11px] leading-snug text-[var(--warning-700)]">
-                        Simulated failure: {describeMock(p.mockFailure)}
                       </p>
                     )}
                   </td>

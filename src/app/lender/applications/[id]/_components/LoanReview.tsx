@@ -69,7 +69,7 @@ export type ReviewData = {
     declineReasons?: string[];
   };
   applicantRejection?: { rejectedAt: string; reason: string };
-  payments: { show: boolean; scheduled: ScheduledPayment[]; mockFailureEnabled?: boolean };
+  payments: { show: boolean; scheduled: ScheduledPayment[] };
   disburse?: {
     approvedAmount: number;
     applicationFee: number;
@@ -519,11 +519,7 @@ function OverviewTab({ data }: { data: ReviewData }) {
       )}
 
       {data.payments.show && (
-        <ScheduledPaymentsPanel
-          applicationId={data.applicationId}
-          scheduledPayments={data.payments.scheduled}
-          mockFailureEnabled={data.payments.mockFailureEnabled}
-        />
+        <ScheduledPaymentsPanel applicationId={data.applicationId} scheduledPayments={data.payments.scheduled} />
       )}
 
       {/* KYC summary (mocked) */}
