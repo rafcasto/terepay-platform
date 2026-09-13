@@ -42,6 +42,8 @@ export interface User {
   customerId?: string;
   /** Whether this customer has had at least one loan approved. Controls application fee tier. */
   isExistingCustomer?: boolean;
+  /** Lender may use the Model Training console. Granted by an admin on the Users page. */
+  trainingAccess?: boolean;
 }
 
 export type OfflineCustomerStatus = 'unlinked' | 'linked';

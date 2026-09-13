@@ -22,6 +22,8 @@ type AppUser = {
   profileComplete: boolean;
   emailVerified: boolean;
   isExistingCustomer?: boolean;
+  /** Can open the Model Training console (admins always; lenders by admin grant). */
+  trainingAccess?: boolean;
 };
 
 type AuthState = {

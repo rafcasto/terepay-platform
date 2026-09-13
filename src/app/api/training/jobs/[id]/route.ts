@@ -3,6 +3,7 @@ import { withAuth } from '@/lib/auth/middleware';
 import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { auditLog, getClientIp } from '@/lib/utils/audit';
 import { defaultLimiter, checkRateLimit } from '@/lib/rate-limit/limiter';
+import { assertTrainingAccess } from '@/lib/training/access';
 import { cancelTrainingJob, getTrainingJob } from '@/lib/training/queue';
 
 export const dynamic = 'force-dynamic';
@@ -11,10 +12,11 @@ type RouteParams = { params: Promise<{ id: string }> };
 
 const JOB_ID = /^[A-Za-z0-9-]{8,64}$/;
 
-// GET /api/admin/training/jobs/[id] — full job record including log tail and result.
+// GET /api/training/jobs/[id] — full job record including log tail and result.
 export async function GET(request: NextRequest, { params }: RouteParams): Promise<Response> {
   try {
-    const auth = await withAuth(request, ['admin']);
+    const auth = await withAuth(request, ['admin', 'lender']);
+    await assertTrainingAccess(auth);
     const allowed = await checkRateLimit(defaultLimiter, auth.uid);
     if (!allowed) throw new AppError('RATE_LIMITED', 429, 'Too many requests.');
 
@@ -27,20 +29,21 @@ export async function GET(request: NextRequest, { params }: RouteParams): Promis
     return NextResponse.json({ data: job });
   } catch (err) {
     if (err instanceof AppError) return errorResponse(err);
-    console.error('[admin/training/jobs/[id] GET]', err);
+    console.error('[training/jobs/[id] GET]', err);
     return internalError();
   }
 }
 
-// DELETE /api/admin/training/jobs/[id] — cancel a queued or running job.
+// DELETE /api/training/jobs/[id] — cancel a queued or running job.
 export async function DELETE(request: NextRequest, { params }: RouteParams): Promise<Response> {
   const ip = getClientIp(request);
   let uid = 'unknown';
   let jobId = 'unknown';
 
   try {
-    const auth = await withAuth(request, ['admin']);
+    const auth = await withAuth(request, ['admin', 'lender']);
     uid = auth.uid;
+    await assertTrainingAccess(auth);
     const allowed = await checkRateLimit(defaultLimiter, auth.uid);
     if (!allowed) throw new AppError('RATE_LIMITED', 429, 'Too many requests.');
 
@@ -53,7 +56,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams): Pro
 
     await auditLog({
       userId: auth.uid,
-      action: 'admin_training_job_cancelled',
+      action: 'training_job_cancelled',
       targetId: id,
       targetType: 'training_job',
       outcome: 'success',
@@ -66,10 +69,10 @@ export async function DELETE(request: NextRequest, { params }: RouteParams): Pro
   } catch (err) {
     if (err instanceof AppError) return errorResponse(err);
 
-    console.error('[admin/training/jobs/[id] DELETE]', err);
+    console.error('[training/jobs/[id] DELETE]', err);
     await auditLog({
       userId: uid,
-      action: 'admin_training_job_cancelled',
+      action: 'training_job_cancelled',
       targetId: jobId,
       targetType: 'training_job',
       outcome: 'failure',

@@ -498,6 +498,8 @@ export const adminUpdateLenderSchema = z.object({
   lastName: z.string().min(1).max(50).optional(),
   status: z.enum(['active', 'suspended', 'inactive']).optional(),
   roles: z.array(z.enum(['lender', 'content_editor'])).min(1).max(2).optional(),
+  /** Per-user grant for the Model Training console (lenders only; admins always have it). */
+  trainingAccess: z.boolean().optional(),
 });
 
 export const adminUpdateUserRolesSchema = z.object({
@@ -599,3 +601,92 @@ export const adminTrainingJobSchema = z.discriminatedUnion('type', [
 ]);
 
 export type AdminTrainingJobInput = z.infer<typeof adminTrainingJobSchema>;
+
+// ---------------------------------------------------------------------------
+// Training console — cases uploaded from the site + worker request/reply
+// ---------------------------------------------------------------------------
+
+const trainingIdSchema = z.string().regex(/^[a-z0-9][a-z0-9-]{1,39}$/, 'Lowercase letters, digits and dashes');
+const trainingCaseIdSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$/, 'Invalid case id');
+const money = z.number().min(0).max(10_000_000).nullable().optional();
+const triBool = z.boolean().nullable().optional();
+
+export const trainingCaseApplicationSchema = z.object({
+  applicationId: trainingIdSchema,
+  application: z.object({
+    applicant_name: z.string().max(80).optional(),
+    application_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal('')).optional(),
+    loan_amount: money,
+    interest_rate: z.number().min(0).max(100).nullable().optional(),
+    income: money,
+    expenses: money,
+    existing_debt: money,
+    loan_purpose: z.string().max(200).optional(),
+    decision_made: z.enum(['', 'approved', 'conditional', 'declined']).optional(),
+    decision_by: z.string().max(40).optional(),
+    outcome: z.enum(['unknown', 'repaid', 'repaid_late', 'arrears', 'default', 'written_off', 'current', 'declined']).optional(),
+    max_days_late: z.number().int().min(0).max(5000).nullable().optional(),
+    outcome_notes: z.string().max(1000).optional(),
+    behaviour_paid_previous_loan_early: triBool,
+    behaviour_paid_on_time_consistently: triBool,
+    behaviour_communicates_proactively: triBool,
+    behaviour_missed_payments_before: triBool,
+    behaviour_existing_defaults: triBool,
+    behaviour_write_off_history: triBool,
+    behaviour_requests_bigger_loan_too_fast: triBool,
+    behaviour_provides_multiple_excuses: triBool,
+    behaviour_avoids_communication: triBool,
+  }),
+});
+export type TrainingCaseApplicationInput = z.infer<typeof trainingCaseApplicationSchema>;
+
+const trainingLabelSchema = z.object({
+  judgements: z.record(z.string().regex(/^[a-z_]{3,60}$/), z.boolean()).default({}),
+  behaviour: z.array(z.string().max(60)).max(20).default([]),
+  analyst_note: z.string().max(2000).default(''),
+  confidence: z.number().min(0).max(100).default(70),
+  data_gaps: z.array(z.string().max(200)).max(20).default([]),
+  officer: z.string().max(80).default(''),
+});
+
+export const trainingRpcSchema = z.discriminatedUnion('op', [
+  z.object({ op: z.literal('ping') }),
+  z.object({ op: z.literal('cases.list') }),
+  z.object({ op: z.literal('cases.get'), id: trainingCaseIdSchema }),
+  z.object({ op: z.literal('cases.label'), id: trainingCaseIdSchema, label: trainingLabelSchema }),
+  z.object({ op: z.literal('cases.reanalyse'), id: trainingCaseIdSchema, application: trainingCaseApplicationSchema.shape.application }),
+  z.object({ op: z.literal('cases.delete'), id: trainingCaseIdSchema }),
+  z.object({ op: z.literal('backtest.get') }),
+  z.object({ op: z.literal('gold.list'), profile: z.string().max(60).optional(), status: z.enum(['unreviewed', 'approved', 'edited', 'rejected']).optional() }),
+  z.object({ op: z.literal('gold.get'), id: trainingCaseIdSchema }),
+  z.object({
+    op: z.literal('gold.review'),
+    id: trainingCaseIdSchema,
+    review: z.object({
+      status: z.enum(['approved', 'edited', 'rejected']),
+      judgements: z.record(z.string().regex(/^[a-z_]{3,60}$/), z.boolean()).optional(),
+      behaviour: z.array(z.string().max(60)).max(20).optional(),
+      analyst_note: z.string().max(2000).optional(),
+      officer: z.string().max(80).optional(),
+    }),
+  }),
+  z.object({ op: z.literal('dataset.get') }),
+  z.object({ op: z.literal('exams.list') }),
+  z.object({ op: z.literal('exams.get'), file: z.string().regex(/^exam-[A-Za-z0-9._-]+\.json$/) }),
+  z.object({ op: z.literal('settings.get') }),
+  z.object({
+    op: z.literal('settings.set'),
+    settings: z.object({
+      gpu_mode: z.enum(['ssh', 'local']).optional(),
+      ssh_host: z.string().max(200).optional(),
+      ssh_user: z.string().max(64).optional(),
+      ssh_key: z.string().max(300).optional(),
+      remote_dir: z.string().max(200).optional(),
+      base_model: z.string().max(200).optional(),
+      ollama_name: z.string().regex(/^[a-z0-9][a-z0-9-]{1,39}$/).optional(),
+      epochs: z.number().int().min(1).max(10).optional(),
+    }),
+  }),
+  z.object({ op: z.literal('prompts.list') }),
+]);
+export type TrainingRpcInput = z.infer<typeof trainingRpcSchema>;

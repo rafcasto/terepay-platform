@@ -59,6 +59,7 @@ export async function GET(request: NextRequest) {
         phoneVerified: data.phoneVerified ?? false,
         emailVerified: liveEmailVerified,
         isExistingCustomer: data.isExistingCustomer === true,
+        trainingAccess: roles.includes('admin') || data.trainingAccess === true,
       },
     });
   } catch {

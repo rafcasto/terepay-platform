@@ -1,10 +1,17 @@
-# Model Training (admin console → Upstash Redis → assessment worker)
+# Model Training (site console → Upstash Redis → assessment worker)
 
-The **Model Training** page (`/admin/training`, admin role only) replaces the LAN-only trainer console that
-used to run on the Raspberry Pi. Nothing heavy runs on Vercel: the site queues *messages* and the Pi does the work.
+The **Model Training** console replaces the LAN-only trainer console that used to run on the Raspberry Pi. It is
+available at `/admin/training` (admins) and `/lender/training` (lenders an admin has granted **Model training
+access** to on the Users page — a Firestore flag `users/{uid}.trainingAccess`, applied immediately, no re-login).
+Nothing heavy runs on Vercel: the site queues *messages* and the Pi does the work.
+
+Tabs mirror the old console: **Cases** (upload one case, batch import from Drive, case list → findings, figures,
+officer label), **Backtest**, **Gold review**, **Dataset & fine-tune**, **Exams**, **Jobs**, **Settings** (admin).
 
 ```
-admin browser ──> /api/admin/training/jobs (POST) ──> Upstash Redis  training:queue   (LPUSH)
+browser ──> /api/training/jobs (POST) ──────────────> Upstash Redis  training:queue   (LPUSH)   long jobs
+browser ──> /api/training/rpc  (POST) ──────────────> Upstash Redis  training:rpc     (LPUSH)   quick reads/writes
+                                                       worker replies  training:rpc:<id> (SET, EX 60)
                                                             │
    Raspberry Pi: credit-assessment-agent/console/worker.js  ┘ RPOP every 5 s, no inbound port needed
         │  pulls data from the Google Drive training folder (service account, read-only)
@@ -39,6 +46,8 @@ admin browser ──> /api/admin/training/jobs (POST) ──> Upstash Redis  tra
 | `training:job:<id>` | hash | `id type status payload createdAt createdBy startedAt endedAt worker log result error cancel` |
 | `training:worker` | string | heartbeat JSON, `EX 120`; the page shows Offline when older than 90 s |
 | `training:state` | string | worker snapshot: dataset stats, Ollama models, latest exams, backtest summary |
+| `training:rpc` | list | request/reply requests `{id, op, args}`; worker pumps it every second (`console/rpc.js`) |
+| `training:rpc:<id>` | string | reply `{ok, data}` or `{ok:false, error}`, `EX 60` |
 
 Types live in [src/types/training.ts](../src/types/training.ts); queue helpers in
 [src/lib/training/queue.ts](../src/lib/training/queue.ts).
@@ -58,10 +67,26 @@ Types live in [src/types/training.ts](../src/types/training.ts); queue helpers i
 Cancel: queued jobs are removed from the list immediately; running jobs get `cancel=1` and the worker kills the
 child process at its next check (≤ 4 s).
 
+## Uploading cases from the site
+
+`Cases → Upload one case` writes `training/cases/<applicationId>/` in the Drive folder: `application.json`
+(declared figures, TerePay decision, outcome, behaviour flags) plus one document per request, named
+`<kind>-<n>-<file>` where kind is `statement`, `payslip`, `centrix` (credit history), `history` or `other`.
+Each document is capped at 4 MB (Vercel body limit); statements are uploaded one at a time. "Save and import"
+then queues `import_batch` for that folder — the worker recognises a folder holding only files as a single case.
+
+## RPC ops (`/api/training/rpc`)
+
+`cases.list/get/label/reanalyse/delete`, `backtest.get`, `gold.list/get/review`, `dataset.get`, `exams.list/get`,
+`settings.get/set`, `prompts.list`, `ping`. `settings.set` and `cases.delete` are admin only; officer attribution
+on labels and reviews comes from the session email, never the form.
+
 ## Security
 
-- Every route is `withAuth(request, ['admin'])` + rate limited; mutations are audit-logged
-  (`admin_training_job_queued`, `admin_training_job_cancelled`).
+- Every route is `withAuth(request, ['admin', 'lender'])` + `assertTrainingAccess()` + rate limited; mutations
+  are audit-logged (`training_job_queued`, `training_job_cancelled`, `training_case_document_uploaded`,
+  `training_case_application_saved`, `training_cases_label`, `training_gold_review`, …).
+- Fine-tune, synthetic regeneration, worker settings and case deletion are admin only.
 - The site validates the Drive id is a direct child of the training folder before queuing, so the worker can
   never be pointed at other Drive content. Payloads are rebuilt server-side; the client's values are not trusted.
 - Training data contains bank statements. Keep the Drive folder restricted to admins and the service account;
