@@ -99,6 +99,17 @@ QIPPAY_RETURN_BASE_URL=https://terepay.com
 
 ---
 
+### 2.3 Model training (admin console)
+
+```bash
+# Upstash Redis — same database the rate limiter uses; the Pi worker needs the same two values
+UPSTASH_REDIS_REST_URL=
+UPSTASH_REDIS_REST_TOKEN=
+# Google Drive folder the admin drops training batches into (shared with the Drive service account)
+GOOGLE_DRIVE_TRAINING_FOLDER_ID=
+```
+See [MODEL_TRAINING.md](MODEL_TRAINING.md).
+
 ## 3. Local Development Setup
 
 ### 3.1 Prerequisites
