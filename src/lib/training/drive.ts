@@ -157,11 +157,16 @@ export async function writeCaseApplication(applicationId: string, application: R
   return { fileId: created.data.id!, folderId };
 }
 
-/** Remove one uploaded document from a case folder (must be a direct child). */
+/**
+ * Remove one uploaded document from a case folder (must be a direct child).
+ * The service account is not the folder owner, so it can trash but not
+ * permanently delete; trashed files are invisible to every listing here and
+ * to the worker (`trashed = false` queries).
+ */
 export async function deleteCaseFile(applicationId: string, fileId: string): Promise<void> {
   const drive = getDriveClient();
   const folderId = await getCaseFolderId(drive, applicationId);
   const res = await drive.files.get({ fileId, fields: 'id,parents', supportsAllDrives: true }).catch(() => null);
   if (!res?.data.parents?.includes(folderId)) throw new AppError('NOT_FOUND', 404, 'File not found in this case');
-  await drive.files.delete({ fileId, supportsAllDrives: true });
+  await drive.files.update({ fileId, requestBody: { trashed: true }, supportsAllDrives: true });
 }
