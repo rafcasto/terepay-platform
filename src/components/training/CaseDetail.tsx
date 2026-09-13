@@ -76,26 +76,39 @@ export default function CaseDetail({ id, isAdmin, onClose, notify, fail }: Props
         <div className="mt-4 grid gap-5 md:grid-cols-3">
           <div>
             <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Rule hits</h3>
-            {Object.entries(f.rule_hits ?? {}).flatMap(([tier, hits]) => hits.map((h) => `${tier}: ${h.rule}`)).length === 0 ? <p className="text-sm text-slate-500">None.</p> : (
-              <ul className="space-y-1 text-sm text-[#1C2A3A]">{Object.entries(f.rule_hits ?? {}).flatMap(([tier, hits]) => hits.map((h, i) => <li key={`${tier}-${i}`}><Tone value={tier.charAt(0).toUpperCase() + tier.slice(1)} /> <span className="ml-1">{h.rule}</span></li>))}</ul>
+            {Object.entries(f.rule_hits ?? {}).flatMap(([tier, hits]) => (Array.isArray(hits) ? hits : []).map((h) => `${tier}: ${h.rule}`)).length === 0 ? <p className="text-sm text-slate-500">None.</p> : (
+              <ul className="space-y-1 text-sm text-[#1C2A3A]">{Object.entries(f.rule_hits ?? {}).flatMap(([tier, hits]) => (Array.isArray(hits) ? hits : []).map((h, i) => <li key={`${tier}-${i}`}><Tone value={tier.charAt(0).toUpperCase() + tier.slice(1)} /> <span className="ml-1">{h.rule}</span></li>))}</ul>
             )}
           </div>
           <div>
             <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Engine factors</h3>
-            {f.factors.length === 0 ? <p className="text-sm text-slate-500">None.</p> : <ul className="list-disc pl-4 space-y-1 text-sm text-[#1C2A3A]">{f.factors.map((x, i) => <li key={i}>{x}</li>)}</ul>}
+            {(f.factors ?? []).length === 0 ? <p className="text-sm text-slate-500">None.</p> : (
+              <ul className="space-y-1.5 text-sm text-[#1C2A3A]">
+                {(f.factors ?? []).map((x, i) => typeof x === 'string' ? <li key={i}>{x}</li> : (
+                  <li key={i}>
+                    <span className={`mr-1.5 inline-block rounded-full px-1.5 text-[11px] font-medium ${/positive/i.test(x.impact) ? 'bg-green-50 text-green-700' : /negative|critical|high/i.test(x.impact) ? 'bg-red-50 text-red-700' : 'bg-slate-100 text-slate-600'}`}>{x.impact}</span>
+                    <span className="font-medium">{x.name}</span>{x.assessment ? <span className="text-slate-600"> — {x.assessment}</span> : null}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
           <div>
             <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Evidence lines</h3>
-            {detail.analysis.evidence.length === 0 ? <p className="text-sm text-slate-500">None.</p> : <ul className="space-y-1 text-xs font-mono text-[#1C2A3A]">{detail.analysis.evidence.slice(0, 20).map((x, i) => <li key={i} className="truncate">{x}</li>)}</ul>}
+            {(detail.analysis.evidence ?? []).length === 0 ? <p className="text-sm text-slate-500">None.</p> : (
+              <ul className="space-y-1 text-xs font-mono text-[#1C2A3A]">
+                {(detail.analysis.evidence ?? []).slice(0, 20).map((x, i) => <li key={i} className="truncate">{typeof x === 'string' ? x : Object.values(x).filter((v) => typeof v === 'string' || typeof v === 'number').join(' · ')}</li>)}
+              </ul>
+            )}
           </div>
         </div>
         <div className="mt-4">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Documents</h3>
           <table className="min-w-full"><thead><tr className="border-b border-slate-200"><th className={th}>File</th><th className={th}>Kind</th><th className={th}>Chars</th><th className={th}>Tx</th><th className={th}>Notes</th></tr></thead>
-            <tbody>{detail.analysis.documents.map((d) => (
+            <tbody>{(detail.analysis.documents ?? []).map((d) => (
               <tr key={d.file} className="border-b border-slate-100 last:border-0"><td className={td}>{d.original}</td><td className={`${td} text-slate-500`}>{d.kind}</td><td className={`${td} font-tabular`}>{d.chars}</td><td className={`${td} font-tabular`}>{d.transactions}</td><td className={`${td} text-slate-500`}>{d.unreadable ? 'unreadable (scanned? run OCR)' : ''}</td></tr>
             ))}</tbody></table>
-          {detail.analysis.parser.notes.length > 0 && <p className="mt-2 text-xs text-amber-800">{detail.analysis.parser.notes.slice(0, 5).join(' · ')}</p>}
+          {(detail.analysis.parser?.notes ?? []).length > 0 && <p className="mt-2 text-xs text-amber-800">{(detail.analysis.parser?.notes ?? []).slice(0, 5).join(' · ')}</p>}
         </div>
       </Section>
 
@@ -155,9 +168,9 @@ export default function CaseDetail({ id, isAdmin, onClose, notify, fail }: Props
       <Section title="What the model sees">
         <details><summary className="cursor-pointer text-sm font-medium text-[#1C2A3A]">Brief ({detail.analysis.brief ? `${detail.analysis.brief.length} chars` : 'not built — parser fallback'})</summary>
           <pre className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap rounded-[10px] bg-slate-50 border border-slate-200 p-4 text-xs font-mono text-[#1C2A3A]">{detail.analysis.brief ?? '—'}</pre></details>
-        <details className="mt-2"><summary className="cursor-pointer text-sm font-medium text-[#1C2A3A]">Parsed transactions (first {detail.analysis.transactions.length})</summary>
+        <details className="mt-2"><summary className="cursor-pointer text-sm font-medium text-[#1C2A3A]">Parsed transactions (first {(detail.analysis.transactions ?? []).length})</summary>
           <div className="mt-2 max-h-96 overflow-auto"><table className="min-w-full"><thead><tr className="border-b border-slate-200"><th className={th}>Date</th><th className={th}>Description</th><th className={th}>Amount</th><th className={th}>Category</th></tr></thead>
-            <tbody>{detail.analysis.transactions.map((t, i) => <tr key={i} className="border-b border-slate-100"><td className={`${td} font-mono text-xs`}>{t.date}</td><td className={`${td} text-xs`}>{t.desc}</td><td className={`${td} font-tabular text-xs text-right`}>{t.amount}</td><td className={`${td} text-xs text-slate-500`}>{t.category ?? ''}</td></tr>)}</tbody></table></div></details>
+            <tbody>{(detail.analysis.transactions ?? []).map((t, i) => <tr key={i} className="border-b border-slate-100"><td className={`${td} font-mono text-xs`}>{t.date}</td><td className={`${td} text-xs`}>{t.desc}</td><td className={`${td} font-tabular text-xs text-right`}>{t.amount}</td><td className={`${td} text-xs text-slate-500`}>{t.category ?? ''}</td></tr>)}</tbody></table></div></details>
         <details className="mt-2"><summary className="cursor-pointer text-sm font-medium text-[#1C2A3A]">Statement text</summary>
           <pre className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap rounded-[10px] bg-slate-50 border border-slate-200 p-4 text-xs font-mono text-[#1C2A3A]">{detail.text || '—'}</pre></details>
       </Section>
