@@ -570,3 +570,32 @@ export const adminPaymentRefreshSchema = z.object({
 });
 
 export type AdminPaymentRefreshInput = z.infer<typeof adminPaymentRefreshSchema>;
+
+// ---------------------------------------------------------------------------
+// Admin — model training jobs (queued to the Pi worker via Upstash Redis)
+// ---------------------------------------------------------------------------
+
+const driveIdSchema = z.string().regex(/^[A-Za-z0-9_-]{10,}$/, 'Invalid Google Drive ID');
+
+export const adminTrainingJobSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('import_batch'), driveId: driveIdSchema, replace: z.boolean().default(true) }),
+  z.object({ type: z.literal('import_outcomes'), driveId: driveIdSchema }),
+  z.object({ type: z.literal('backtest') }),
+  z.object({ type: z.literal('build_dataset') }),
+  z.object({
+    type: z.literal('finetune'),
+    outName: z.string().regex(/^[a-z0-9][a-z0-9-]{1,39}$/, 'Lowercase letters, digits and dashes').optional(),
+  }),
+  z.object({
+    type: z.literal('exam'),
+    model: z.string().min(1).max(80),
+    n: z.number().int().min(1).max(200).default(12),
+  }),
+  z.object({
+    type: z.literal('regenerate_synthetic'),
+    n: z.number().int().min(10).max(2000).default(200),
+    seed: z.number().int().min(0).max(1_000_000).default(11),
+  }),
+]);
+
+export type AdminTrainingJobInput = z.infer<typeof adminTrainingJobSchema>;

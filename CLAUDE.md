@@ -109,6 +109,7 @@ Don't duplicate these — point at them.
 - [docs/KYC_ONBOARDING_IMPLEMENTATION.md](docs/KYC_ONBOARDING_IMPLEMENTATION.md), [docs/ONBOARDING_UX_REQUIREMENTS.md](docs/ONBOARDING_UX_REQUIREMENTS.md) — onboarding flow + UX
 - [docs/PLATFORM_PLAN.md](docs/PLATFORM_PLAN.md), [docs/TerePay_LMS_Requirements.md](docs/TerePay_LMS_Requirements.md) — product/architecture intent
 - [docs/CODING_PATTERNS.md](docs/CODING_PATTERNS.md) — **canonical code patterns with annotated examples**
+- [docs/MODEL_TRAINING.md](docs/MODEL_TRAINING.md) — admin Model Training page → Upstash Redis queue → Pi worker (key contract, job types)
 - [docs/SECURITY_AUDIT.md](docs/SECURITY_AUDIT.md) — **security checklist — NZ Privacy Act, CCCFA, AML/CFT**
 
 `.env.local` is gitignored. See QUICK_START / DEPLOYMENT for the variable list (`NEXT_PUBLIC_FIREBASE_*`, `FIREBASE_ADMIN_*`, `ENCRYPTION_KEY`, `NEXT_PUBLIC_ENVIRONMENT`, Twilio/Resend/Upstash/reCAPTCHA secrets).
@@ -123,6 +124,7 @@ Don't duplicate these — point at them.
 - **reCAPTCHA v3 fails open** — server-side verify at `MIN_SCORE = 0.5`; if the secret is unset, requests pass with a warning log.
 - **PDF generation** lives at [src/lib/pdf/affordability-report.tsx](src/lib/pdf/affordability-report.tsx) and uses `@react-pdf/renderer`.
 - **KYC documents** upload to Google Drive via `googleapis` — not Firebase Storage.
+- **Model training runs off-site.** `/admin/training` only queues jobs into Upstash Redis (`training:queue`) and reads status back; the Pi worker in the `credit-assessment-agent` repo does the work and pulls data from `GOOGLE_DRIVE_TRAINING_FOLDER_ID`. Never run parsing/training in a Vercel function. See [docs/MODEL_TRAINING.md](docs/MODEL_TRAINING.md).
 - **Qippay SetPay consent gate** sits between `loan_accepted` and `disbursed`. The accept route now advances applications to `awaiting_payment_consent`; the applicant must complete a SetPay mandate (status → `active`) before the lender's disburse route will release funds. The SetPay client at [src/lib/qippay/setpay-client.ts](src/lib/qippay/setpay-client.ts) talks to `POST /v1/enduring_initiation` and `GET /v1/enduring_initiation/{epcId}` (Hosted-style: one redirect, no embedded bank picker). `QIPPAY_MODE=live` hits the real API; `QIPPAY_MODE=stub` keeps the integration deterministic for offline dev. Status reconciliation: [src/lib/qippay/reconcile-consent.ts](src/lib/qippay/reconcile-consent.ts).
 
 ## Don't
