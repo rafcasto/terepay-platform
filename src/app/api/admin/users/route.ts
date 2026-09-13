@@ -40,6 +40,7 @@ export async function GET(request: NextRequest): Promise<Response> {
           roles: normalizeRoles(d.role, d.roles),
           status: d.status,
           profileComplete: d.profileComplete,
+          trainingAccess: d.trainingAccess === true,
           createdAt: d.createdAt?.toMillis?.() ?? null,
           lastLoginAt: d.lastLoginAt?.toMillis?.() ?? null,
         };

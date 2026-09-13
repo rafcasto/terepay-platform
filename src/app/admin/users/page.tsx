@@ -70,7 +70,8 @@ export default function AdminUsersPage() {
     lastName: string;
     status: AdminLenderView['status'];
     roles: StaffRole[];
-  }>({ firstName: '', lastName: '', status: 'active', roles: ['lender'] });
+    trainingAccess: boolean;
+  }>({ firstName: '', lastName: '', status: 'active', roles: ['lender'], trainingAccess: false });
   const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
@@ -134,6 +135,7 @@ export default function AdminUsersPage() {
       lastName: user.lastName,
       status: user.status,
       roles: staffRoles.length ? staffRoles : ['lender'],
+      trainingAccess: user.trainingAccess === true,
     });
     setEditError(null);
   };
@@ -262,7 +264,12 @@ export default function AdminUsersPage() {
                     {u.firstName} {u.lastName}
                   </td>
                   <td className="px-4 py-3 text-slate-500">{u.email}</td>
-                  <td className="px-4 py-3"><RoleBadges roles={u.roles} /></td>
+                  <td className="px-4 py-3">
+                    <RoleBadges roles={u.roles} />
+                    {u.trainingAccess && (
+                      <span className="mt-1 inline-block rounded-full bg-orange-50 px-2 py-0.5 text-[11px] font-medium text-[#B45600] border border-orange-200">Model training</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3">{statusBadge(u.status)}</td>
                   <td className="px-4 py-3 text-slate-400 text-xs font-tabular">
                     {u.createdAt
@@ -413,6 +420,22 @@ export default function AdminUsersPage() {
                   Role changes sign the user out; new access applies at their next sign-in.
                 </p>
               </div>
+              {editForm.roles.includes('lender') && (
+                <label className="flex items-start gap-3 rounded-lg border border-gray-200 px-3 py-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editForm.trainingAccess}
+                    onChange={(e) => setEditForm((p) => ({ ...p, trainingAccess: e.target.checked }))}
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300"
+                  />
+                  <span>
+                    <span className="block text-sm font-medium text-slate-800">Model training access</span>
+                    <span className="block text-xs text-slate-500">
+                      Adds the Model Training console to this lender&apos;s portal: upload cases, backtest, label, run exams. Applies immediately.
+                    </span>
+                  </span>
+                </label>
+              )}
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1">Status</label>
                 <select

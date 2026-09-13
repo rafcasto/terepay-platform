@@ -53,6 +53,7 @@ export async function PATCH(
     if (updates.firstName !== undefined) firestorePatch.firstName = updates.firstName;
     if (updates.lastName !== undefined) firestorePatch.lastName = updates.lastName;
     if (updates.status !== undefined) firestorePatch.status = updates.status;
+    if (updates.trainingAccess !== undefined) firestorePatch.trainingAccess = updates.trainingAccess;
 
     // --- Role assignment ---------------------------------------------------
     let claimsUpdated = false;

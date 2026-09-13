@@ -157,6 +157,8 @@ export interface AdminLenderView {
   roles: UserRole[];
   status: 'active' | 'suspended' | 'inactive';
   profileComplete: boolean;
+  /** Model Training console access (lenders only). */
+  trainingAccess?: boolean;
   createdAt?: Timestamp;
   lastLoginAt?: Timestamp;
 }

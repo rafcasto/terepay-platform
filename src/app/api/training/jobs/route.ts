@@ -5,6 +5,7 @@ import { adminTrainingJobSchema } from '@/lib/validation/schemas';
 import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { auditLog, getClientIp } from '@/lib/utils/audit';
 import { defaultLimiter, checkRateLimit } from '@/lib/rate-limit/limiter';
+import { assertTrainingAccess } from '@/lib/training/access';
 import {
   enqueueTrainingJob,
   getQueueLength,
@@ -19,16 +20,20 @@ import type { TrainingJobType } from '@/types/training';
 
 export const dynamic = 'force-dynamic';
 
-// GET /api/admin/training/jobs — job list + worker heartbeat + worker-published state.
+/** Jobs that reshape the training set or need the GPU host — admin only. */
+const ADMIN_ONLY_JOBS: TrainingJobType[] = ['finetune', 'regenerate_synthetic'];
+
+// GET /api/training/jobs — job list + worker heartbeat + worker-published state.
 export async function GET(request: NextRequest): Promise<Response> {
   try {
-    const auth = await withAuth(request, ['admin']);
+    const auth = await withAuth(request, ['admin', 'lender']);
+    const access = await assertTrainingAccess(auth);
     const allowed = await checkRateLimit(defaultLimiter, auth.uid);
     if (!allowed) throw new AppError('RATE_LIMITED', 429, 'Too many requests.');
 
     if (!isTrainingQueueConfigured()) {
       return NextResponse.json({
-        data: { configured: false, jobs: [], queueLength: 0, worker: null, workerOnline: false, state: null },
+        data: { configured: false, isAdmin: access.isAdmin, jobs: [], queueLength: 0, worker: null, workerOnline: false, state: null },
       });
     }
 
@@ -43,6 +48,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     return NextResponse.json({
       data: {
         configured: true,
+        isAdmin: access.isAdmin,
         driveFolderId: process.env.GOOGLE_DRIVE_TRAINING_FOLDER_ID ?? null,
         jobs,
         queueLength,
@@ -53,26 +59,30 @@ export async function GET(request: NextRequest): Promise<Response> {
     });
   } catch (err) {
     if (err instanceof AppError) return errorResponse(err);
-    console.error('[admin/training/jobs GET]', err);
+    console.error('[training/jobs GET]', err);
     return internalError();
   }
 }
 
-// POST /api/admin/training/jobs — queue a job for the Pi worker.
+// POST /api/training/jobs — queue a job for the Pi worker.
 export async function POST(request: NextRequest): Promise<Response> {
   const ip = getClientIp(request);
   let uid = 'unknown';
   let type: TrainingJobType | 'unknown' = 'unknown';
 
   try {
-    const auth = await withAuth(request, ['admin']);
+    const auth = await withAuth(request, ['admin', 'lender']);
     uid = auth.uid;
+    const access = await assertTrainingAccess(auth);
     const allowed = await checkRateLimit(defaultLimiter, auth.uid);
     if (!allowed) throw new AppError('RATE_LIMITED', 429, 'Too many requests.');
 
     const body = await request.json();
     const input = adminTrainingJobSchema.parse(body);
     type = input.type;
+    if (ADMIN_ONLY_JOBS.includes(input.type) && !access.isAdmin) {
+      throw new AppError('FORBIDDEN', 403, 'Only an admin can run this job');
+    }
 
     // Everything the worker needs, and nothing it should not trust the client for.
     let payload: Record<string, unknown>;
@@ -111,7 +121,7 @@ export async function POST(request: NextRequest): Promise<Response> {
 
     await auditLog({
       userId: auth.uid,
-      action: 'admin_training_job_queued',
+      action: 'training_job_queued',
       targetId: job.id,
       targetType: 'training_job',
       outcome: 'success',
@@ -127,10 +137,10 @@ export async function POST(request: NextRequest): Promise<Response> {
     }
     if (err instanceof AppError) return errorResponse(err);
 
-    console.error('[admin/training/jobs POST]', err);
+    console.error('[training/jobs POST]', err);
     await auditLog({
       userId: uid,
-      action: 'admin_training_job_queued',
+      action: 'training_job_queued',
       targetType: 'training_job',
       outcome: 'failure',
       changes: { type },
