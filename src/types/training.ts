@@ -206,11 +206,12 @@ export interface TrainingCaseDetail {
       behaviour_tier: string;
       rule_hits: Record<string, { rule: string; [k: string]: unknown }[]>;
       affordability: Record<string, unknown>;
-      factors: string[];
+      /** Engine factors; older analyses stored plain strings. */
+      factors: (string | { name: string; assessment: string; impact: string })[];
       confidence: number;
       header: string;
     };
-    evidence: string[];
+    evidence: (string | Record<string, unknown>)[];
     brief: string | null;
     transactions: { date: string; desc: string; amount: number; balance?: number; category?: string }[];
     analysed_at: string;
