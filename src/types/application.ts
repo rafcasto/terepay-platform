@@ -1,6 +1,7 @@
 import type { Timestamp } from 'firebase-admin/firestore';
 import type { LoanPurposeValue } from '@/lib/constants/loan-purposes';
 import type { DocumentRequestItem } from '@/lib/loan/document-requests';
+import type { CreditAssessmentSummary } from '@/types/credit-assessment';
 
 // ---------------------------------------------------------------------------
 // LMS Application Statuses (CCCFA-aligned workflow)
@@ -463,6 +464,10 @@ export interface AffordabilityAssessment {
   redFlagsAcknowledged: Record<string, string>; // flag → lender acknowledgement
   surplusRating: 'affordable' | 'marginal' | 'high_risk' | 'not_affordable';
   recommendation: 'proceed' | 'decline';
+
+  /** AI credit assessment (`creditAssessments/{id}`) the lender ran on this wizard, if any. Advisory only. */
+  creditAssessmentId?: string;
+  creditAssessment?: CreditAssessmentSummary;
 }
 
 // ---------------------------------------------------------------------------
@@ -614,6 +619,8 @@ export interface LoanApplication {
   affordabilityStatus: 'not_started' | 'in_progress' | 'complete';
   /** Persisted step-by-step draft while the lender is filling the assessment */
   affordabilityDraft?: AffordabilityDraftData;
+  /** Latest AI credit assessment queued for this application (full record in `creditAssessments`). */
+  creditAssessment?: CreditAssessmentSummary;
   /** True when the applicant is flagged as an existing customer ($20 fee vs $50 for new) */
   isExistingCustomer?: boolean;
   creditCheck?: {

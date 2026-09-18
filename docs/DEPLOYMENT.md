@@ -110,6 +110,10 @@ GOOGLE_DRIVE_TRAINING_FOLDER_ID=
 ```
 See [MODEL_TRAINING.md](MODEL_TRAINING.md).
 
+### 2.4 AI credit assessment (lender affordability wizard)
+
+No new Vercel variables: it reuses the Upstash pair above and `GOOGLE_DRIVE_KYC_FOLDER_ID` (the applications root). On the Pi, set `GOOGLE_DRIVE_KYC_FOLDER_ID` to the same id so the worker refuses documents outside it. See [AI_CREDIT_ASSESSMENT.md](AI_CREDIT_ASSESSMENT.md).
+
 ## 3. Local Development Setup
 
 ### 3.1 Prerequisites

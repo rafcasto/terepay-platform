@@ -472,6 +472,25 @@ export const affordabilityAssessmentSchema = z.object({
   redFlagsAcknowledged: z.record(z.string(), z.string()).optional().default({}),
   recommendation: z.enum(['proceed', 'decline']),
   assessedAmount: z.number().min(200).max(2000).optional(),
+  /** Completed AI credit assessment job to attach to this assessment (see creditAssessmentRequestSchema). */
+  creditAssessmentId: z.string().regex(/^[0-9]{14}-[0-9a-f]{8}$/, 'Invalid assessment id').optional(),
+});
+
+/**
+ * Inputs the wizard sends when the lender runs the AI credit assessment from
+ * the Results & Decision step. Deliberately loose — the server assembles the
+ * full agent payload and reports every missing input in one MISSING_INPUTS
+ * error rather than a field-by-field Zod failure.
+ */
+export const creditAssessmentRequestSchema = z.object({
+  assessedAmount: z.number().optional(),
+  incomeRows: z.array(incomeRowSchema),
+  expenseRows: z.array(expenseRowSchema),
+  householdMultiplier: z.number().min(1),
+  checklist: z.object({
+    firstTransactionDate: z.string().optional(),
+    daysOfTransactionData: z.number().int().min(0).optional(),
+  }),
 });
 
 export const lenderDecisionSchema = z.object({
@@ -504,6 +523,7 @@ export type ReviewDocumentInput = z.infer<typeof reviewDocumentSchema>;
 export type ReviewKycDocumentInput = z.infer<typeof reviewKycDocumentSchema>;
 export type LogCommunicationInput = z.infer<typeof logCommunicationSchema>;
 export type AffordabilityAssessmentInput = z.infer<typeof affordabilityAssessmentSchema>;
+export type CreditAssessmentRequestInput = z.infer<typeof creditAssessmentRequestSchema>;
 export type LenderDecisionInput = z.infer<typeof lenderDecisionSchema>;
 export type BenchmarkEntryInput = z.infer<typeof benchmarkEntrySchema>;
 
