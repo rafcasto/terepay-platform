@@ -28,6 +28,18 @@ function daysUntil(due: string, today: string): number {
 
 type RowView = { label: string; tone: PillTone; note?: string; suffix?: string };
 
+/** Test-cadence instalments carry an exact time — show it in NZ local time. */
+function fmtDueAt(iso: string): string {
+  return new Date(iso).toLocaleString('en-NZ', {
+    timeZone: 'Pacific/Auckland',
+    day: 'numeric',
+    month: 'short',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+}
+
 /**
  * Turn the raw instalment state into something an operator can read at a glance.
  * The key distinction is *why* an instalment has no Qippay ID yet:
@@ -54,14 +66,16 @@ function describe(p: ScheduledPayment, today: string): RowView {
       return { label: 'Cancelled', tone: 'neutral' };
     case 'pending':
     default: {
-      if (p.dueDate < today) {
+      const missed = p.dueAt ? Date.parse(p.dueAt) < Date.now() : p.dueDate < today;
+      if (missed) {
         return {
           label: 'Missed window',
           tone: 'danger',
           note: p.failureReason ?? 'Due date passed before it could be scheduled',
         };
       }
-      const soon = daysUntil(p.dueDate, today) <= 16;
+      // A test-cadence instalment's window is always open (Daily consent).
+      const soon = p.dueAt ? true : daysUntil(p.dueDate, today) <= 16;
       if (p.failureReason && soon) {
         return { label: 'Needs attention', tone: 'danger', note: p.failureReason };
       }
@@ -230,7 +244,16 @@ export default function ScheduledPaymentsPanel({
                   className="border-b border-[var(--border-subtle)] align-top last:border-b-0"
                 >
                   <td className="py-2.5 text-[var(--text-muted)]">{p.installmentNumber}</td>
-                  <td className="py-2.5 text-[var(--text-body)]">{p.dueDate}</td>
+                  <td className="py-2.5 text-[var(--text-body)]">
+                    {p.dueAt ? (
+                      <>
+                        {fmtDueAt(p.dueAt)}
+                        <span className="block text-[11px] text-[var(--text-muted)]">Test cadence</span>
+                      </>
+                    ) : (
+                      p.dueDate
+                    )}
+                  </td>
                   <td className="py-2.5 text-right font-mono font-semibold tabular-nums text-[var(--text-strong)]">
                     {fmtNzd(p.amountCents)}
                   </td>

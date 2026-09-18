@@ -67,7 +67,16 @@ export async function reconcilePaymentStatus(params: {
     };
   }
 
-  const detailed = await getDetailedConsentStatus(consent.mandateId);
+  // Lodged instalments, passed through so stub mode can simulate collection
+  // once each scheduled time passes (no effect in live mode).
+  const stubLodged = storedPayments
+    .filter((p) => p.status === 'scheduled' || p.status === 'retrying' || p.status === 'success')
+    .map((p) => ({
+      scheduledFor: p.dueAt ?? `${p.dueDate}T00:00:00.000Z`,
+      amountCents: p.amountCents,
+    }));
+
+  const detailed = await getDetailedConsentStatus(consent.mandateId, { stubLodged });
   const countComplete = detailed.consentOverallStatus?.countComplete ?? 0;
 
   const providerRevoked =

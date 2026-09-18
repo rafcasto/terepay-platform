@@ -55,7 +55,23 @@ export interface PaymentConsent {
   scheduleSummary: {
     currency: 'NZD';
     totalAmountCents: number;
-    installments: Array<{ dueDate: string; amountCents: number }>;
+    installments: Array<{
+      dueDate: string;
+      amountCents: number;
+      /** ISO datetime — only set for test-cadence schedules (minutes apart). */
+      dueAt?: string;
+    }>;
+  };
+  /**
+   * Present when this consent was created with the admin SetPay test cadence
+   * on (non-production only). Instalments are re-anchored `intervalMinutes`
+   * apart from the moment they are first lodged, instead of fortnightly.
+   */
+  testCadence?: {
+    intervalMinutes: number;
+    enabledBy: string;
+    /** Set when instalments are first lodged (the minute clock starts here). */
+    anchoredAt?: string;
   };
   verifiedBankAccount?: PaymentConsentVerifiedBank;
   initiatedAt: Timestamp;
@@ -86,7 +102,9 @@ export type ScheduledPaymentStatus =
 
 export interface ScheduledPayment {
   installmentNumber: number;        // 1-based index
-  dueDate: string;                  // YYYY-MM-DD (the scheduled_for date sent to Qippay)
+  dueDate: string;                  // YYYY-MM-DD (NZ calendar date the instalment falls on)
+  /** ISO datetime sent as scheduled_for — only set for test-cadence schedules. */
+  dueAt?: string;
   amountCents: number;
   qippayPaymentId?: string;         // pmU_... returned by POST /v1/setpay
   status: ScheduledPaymentStatus;

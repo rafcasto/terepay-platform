@@ -185,6 +185,7 @@ export function toPlainScheduledPayments(payments: ScheduledPayment[]): Schedule
   return payments.map((p) => ({
     installmentNumber: p.installmentNumber,
     dueDate: p.dueDate,
+    ...(p.dueAt ? { dueAt: p.dueAt } : {}),
     amountCents: p.amountCents,
     status: p.status,
     retryCount: p.retryCount,

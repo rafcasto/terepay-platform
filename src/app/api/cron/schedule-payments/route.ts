@@ -17,7 +17,11 @@ function needsScheduling(app: LoanApplication, today: string): boolean {
   if (payments.length === 0) {
     return (app.paymentConsent?.scheduleSummary?.installments?.length ?? 0) > 0;
   }
-  return payments.some((p) => p.status === 'pending' && p.dueDate > today);
+  return payments.some(
+    (p) =>
+      p.status === 'pending' &&
+      (p.dueAt ? Date.parse(p.dueAt) > Date.now() : p.dueDate > today),
+  );
 }
 
 /**

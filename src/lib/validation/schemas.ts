@@ -690,3 +690,10 @@ export const trainingRpcSchema = z.discriminatedUnion('op', [
   z.object({ op: z.literal('prompts.list') }),
 ]);
 export type TrainingRpcInput = z.infer<typeof trainingRpcSchema>;
+
+export const adminSetPayTestSchema = z.object({
+  enabled: z.boolean().optional(),
+  intervalMinutes: z.number().int().min(1).max(1440).optional(),
+});
+
+export type AdminSetPayTestInput = z.infer<typeof adminSetPayTestSchema>;
