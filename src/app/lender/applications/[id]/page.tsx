@@ -454,6 +454,7 @@ export default async function LenderApplicationDetailPage({
       id: c.entryId,
       channel: c.channel,
       direction: c.direction,
+      source: c.source ?? 'manual',
       summary: c.summary,
       outcome: c.outcome || undefined,
       occurredAt: fmtTs(c.occurredAt as TS),

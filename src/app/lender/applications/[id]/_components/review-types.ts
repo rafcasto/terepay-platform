@@ -1,6 +1,7 @@
 import type {
   CommunicationChannel,
   CommunicationDirection,
+  CommunicationSource,
   DocumentStatus,
   ScheduledPayment,
 } from '@/types/application';
@@ -59,6 +60,7 @@ export type CommunicationItem = {
   id: string;
   channel: CommunicationChannel;
   direction: CommunicationDirection;
+  source: CommunicationSource;
   summary: string;
   outcome?: string;
   occurredAt: string;

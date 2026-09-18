@@ -102,6 +102,30 @@ If you didn't create a TerePay account, you can safely ignore this email.
 TerePay - 27 Henry Partington Place, Greenhithe, Auckland.
 All loans are charged interest and an admin fee, shown in full before you sign. Applications can be declined.`;
 
+const DOCUMENTS_REQUESTED_HTML = shell(
+  `<h1 style="margin:0 0 8px;font-family:'Poppins',Arial,Helvetica,sans-serif;font-size:22px;font-weight:600;color:${BRAND_INK};">We need a few more documents</h1>
+   <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Hi {{firstName}},</p>
+   <p style="margin:0 0 8px;font-size:15px;line-height:1.6;">We&rsquo;re reviewing your loan application <strong>{{referenceNumber}}</strong>. To keep it moving, please upload the following:</p>
+   <ul style="margin:0 0 16px;padding-left:20px;font-size:15px;line-height:1.7;">{{documentList}}</ul>
+   {{lenderMessageBlock}}
+   ${button('{{trackerUrl}}', 'Upload documents')}
+   <p style="margin:0 0 8px;font-size:13px;line-height:1.6;color:${TEXT_MUTED};">If the button doesn&rsquo;t work, copy and paste this link into your browser:</p>
+   <p style="margin:0 0 16px;font-size:13px;line-height:1.6;word-break:break-all;"><a href="{{trackerUrl}}" style="color:${BRAND_ORANGE_TEXT};">{{trackerUrl}}</a></p>
+   <p style="margin:0;font-size:13px;line-height:1.6;color:${TEXT_MUTED};">Your application stays on hold until we receive these. Applications can be declined, and all loans are charged interest and an admin fee &mdash; shown in full before you sign.</p>`,
+);
+
+const DOCUMENTS_REQUESTED_TEXT = `Hi {{firstName}},
+
+We're reviewing your loan application {{referenceNumber}}. To keep it moving, please upload the following:
+
+{{documentListText}}
+{{lenderMessageText}}
+Upload them here: {{trackerUrl}}
+
+Your application stays on hold until we receive these. Applications can be declined, and all loans are charged interest and an admin fee, shown in full before you sign.
+
+TerePay - 27 Henry Partington Place, Greenhithe, Auckland.`;
+
 /**
  * Default templates keyed by template type. Only types with a built-in default
  * appear here; others are admin-authored only.
@@ -112,5 +136,19 @@ export const EMAIL_DEFAULT_TEMPLATES: Partial<Record<EmailTemplateType, EmailDef
     htmlBody: EMAIL_VERIFICATION_HTML,
     textBody: EMAIL_VERIFICATION_TEXT,
     availableVariables: ['firstName', 'verificationUrl'],
+  },
+  documents_requested: {
+    subject: 'Action needed: documents for your TerePay application {{referenceNumber}}',
+    htmlBody: DOCUMENTS_REQUESTED_HTML,
+    textBody: DOCUMENTS_REQUESTED_TEXT,
+    availableVariables: [
+      'firstName',
+      'referenceNumber',
+      'documentList',
+      'documentListText',
+      'lenderMessageBlock',
+      'lenderMessageText',
+      'trackerUrl',
+    ],
   },
 };
