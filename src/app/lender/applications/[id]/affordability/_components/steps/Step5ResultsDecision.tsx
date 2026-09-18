@@ -22,6 +22,8 @@ interface Props {
   loading: boolean;
   error: string | null;
   onBack: () => void;
+  /** AI credit assessment panel (rendered between the calculation and the recommendation). */
+  aiPanel?: React.ReactNode;
 }
 
 export default function Step5ResultsDecision({
@@ -43,6 +45,7 @@ export default function Step5ResultsDecision({
   loading,
   error,
   onBack,
+  aiPanel,
 }: Props) {
   const isAdjusted = assessedAmount !== requestedAmount;
   const outOfRange = assessedAmount < 200 || assessedAmount > 2000;
@@ -160,6 +163,9 @@ export default function Step5ResultsDecision({
           </div>
         </div>
       </div>
+
+      {/* AI credit assessment (advisory) */}
+      {aiPanel}
 
       {/* Recommendation */}
       <div className="rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-white p-6 shadow-[var(--shadow-xs)]">

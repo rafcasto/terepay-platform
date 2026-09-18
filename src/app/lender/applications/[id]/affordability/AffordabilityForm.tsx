@@ -9,6 +9,7 @@ import Step2DataChecklist from './_components/steps/Step2DataChecklist';
 import Step3IncomeVerification from './_components/steps/Step3IncomeVerification';
 import Step4ExpenseVerification from './_components/steps/Step4ExpenseVerification';
 import Step5ResultsDecision from './_components/steps/Step5ResultsDecision';
+import AiAssessmentPanel from './_components/steps/AiAssessmentPanel';
 import {
   type IncomeRow,
   type ExpenseRow,
@@ -20,6 +21,7 @@ import {
   calcExpenseRow,
 } from './_components/types';
 import type { AffordabilityDraftData } from '@/types/application';
+import type { CreditAssessmentJob } from '@/types/credit-assessment';
 import { affordabilityLoanPayment } from '@/lib/loan/affordability-calc';
 import { buildSchedule, DEFAULT_INSTALMENTS } from '@/lib/loan/repayment';
 
@@ -180,6 +182,8 @@ export default function AffordabilityForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stepErrors, setStepErrors] = useState<string[]>([]);
+  // Latest AI credit assessment the Results & Decision panel knows about.
+  const [creditAssessment, setCreditAssessment] = useState<CreditAssessmentJob | null>(null);
 
   useEffect(() => {
     fetch('/api/benchmarks')
@@ -265,6 +269,11 @@ export default function AffordabilityForm({
           redFlagsAcknowledged: {},
           recommendation: hardDeclines.length > 0 ? 'decline' : recommendation,
           assessedAmount,
+          // Attach the AI assessment only when it finished (and for this amount).
+          creditAssessmentId:
+            creditAssessment?.status === 'done' && creditAssessment.payload?.application.loan_amount === assessedAmount
+              ? creditAssessment.id
+              : undefined,
         }),
       });
       if (!res.ok) {
@@ -433,6 +442,18 @@ export default function AffordabilityForm({
                 loading={loading}
                 error={error}
                 onBack={back}
+                aiPanel={
+                  <AiAssessmentPanel
+                    applicationId={applicationId}
+                    assessedAmount={assessedAmount}
+                    incomeRows={incomeRows}
+                    expenseRows={expenseRows}
+                    checklist={checklist}
+                    householdMultiplier={hMult}
+                    daysOfData={daysOfData}
+                    onChange={setCreditAssessment}
+                  />
+                }
               />
             )}
           </div>

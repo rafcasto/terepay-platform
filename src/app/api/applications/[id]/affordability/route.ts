@@ -12,6 +12,8 @@ import { randomUUID } from 'crypto';
 import { generateAffordabilityPdf } from '@/lib/pdf/affordability-report';
 import { getDriveClient, getOrCreateSubfolder, uploadBufferToDrive } from '@/lib/gdrive/client';
 import type { AffordabilityAssessment, LoanApplication } from '@/types/application';
+import type { CreditAssessmentSummary } from '@/types/credit-assessment';
+import { getAssessmentRecord, summariseRecord } from '@/lib/assessment/persist';
 import {
   affordabilityLoanPayment,
   calcExpenseFinal,
@@ -106,6 +108,17 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const body = await request.json();
     const parsed = affordabilityAssessmentSchema.parse(body);
+
+    // Link the AI credit assessment the lender ran on this wizard, if any.
+    // It must be this application's and complete — a stale or foreign id is refused.
+    let creditAssessment: CreditAssessmentSummary | undefined;
+    if (parsed.creditAssessmentId) {
+      const record = await getAssessmentRecord(parsed.creditAssessmentId);
+      if (!record || record.applicationId !== id || record.status !== 'done') {
+        throw new AppError('VALIDATION_ERROR', 422, 'The AI assessment is not complete for this application — wait for it to finish or run it again');
+      }
+      creditAssessment = summariseRecord(record);
+    }
 
     // Recompute finals server-side with the same shared maths the wizard uses,
     // so the persisted surplus is exactly what the lender saw on screen.
@@ -202,6 +215,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       redFlagsAcknowledged: parsed.redFlagsAcknowledged,
       surplusRating,
       recommendation,
+      ...(creditAssessment ? { creditAssessmentId: creditAssessment.assessmentId, creditAssessment } : {}),
     });
 
     const now = FieldValue.serverTimestamp();
@@ -279,7 +293,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       targetType: 'application',
       outcome: 'success',
       ipAddress: ip,
-      changes: { assessmentId, version: nextVersion, recommendation, surplus: finalAvailableSurplus },
+      changes: { assessmentId, version: nextVersion, recommendation, surplus: finalAvailableSurplus, creditAssessmentId: creditAssessment?.assessmentId },
     });
 
     return NextResponse.json({
