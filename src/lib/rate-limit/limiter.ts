@@ -36,6 +36,17 @@ export async function checkRateLimit(
   identifier: string,
 ): Promise<boolean> {
   if (!limiter) return true; // fail open when Redis is not configured
-  const { success } = await limiter.limit(identifier);
-  return success;
+  try {
+    const { success } = await limiter.limit(identifier);
+    return success;
+  } catch (err) {
+    // Fail open on runtime errors too (Upstash unreachable, quota exceeded,
+    // bad token). Several routes call this before their try/catch, so a
+    // throw here would surface as a bodiless 500 to the client. Rate limiting
+    // is defense-in-depth, not the only line — but make the outage loud.
+    console.error('[rate-limit] Upstash limiter failed; allowing request', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return true;
+  }
 }

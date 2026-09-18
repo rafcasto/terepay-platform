@@ -125,10 +125,12 @@ export default function SignupPage() {
       });
 
       if (!res.ok) {
-        const body = await res.json();
+        // A crashed function returns a bodiless 500 — don't let res.json()
+        // throw and mask the real failure with a JSON-parse error.
+        const body = await res.json().catch(() => null);
         // Clean up orphaned Firebase account
         await deleteUser(firebaseUser).catch(() => {});
-        setApiError(body.error?.message ?? 'Registration failed. Please try again.');
+        setApiError(body?.error?.message ?? 'Registration failed. Please try again.');
         return;
       }
 
