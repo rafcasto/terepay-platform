@@ -1,7 +1,11 @@
 // ─── Shared types & helpers for the Affordability Assessment wizard ──────────
 
+import { calcIncomeFinal, calcExpenseFinal } from '@/lib/loan/affordability-calc';
+
 export interface IncomeRow {
   category: string;
+  /** Fortnightly figure the applicant declared on their application (read-only reference). */
+  declaredAmount?: number;
   centrixAmount: number;
   verifiedAmount: number;
   adjustment: number;
@@ -11,6 +15,8 @@ export interface IncomeRow {
 
 export interface ExpenseRow {
   category: string;
+  /** Fortnightly figure the applicant declared on their application. */
+  declaredAmount?: number;
   centrixAmount: number;
   benchmarkAmount: number;
   adjustment: number;
@@ -93,29 +99,18 @@ export const HOUSEHOLD_MULTIPLIERS: Record<string, number> = {
   couple_children: 1.8,
 };
 
-// ─── Calculation helpers (must match Excel logic) ────────────────────────────
+// ─── Calculation helpers ─────────────────────────────────────────────────────
+// The maths lives in src/lib/loan/affordability-calc.ts and is shared with the
+// submit route, so the on-screen surplus and the persisted surplus can't drift.
 
-/**
- * Income final = MIN(centrix, verified) + adjustment
- * If only one source has data, use that source + adjustment.
- */
+/** Income final = MIN(centrix, verified) + adjustment. */
 export function calcIncomeRow(row: IncomeRow): IncomeRow {
-  const c = row.centrixAmount;
-  const v = row.verifiedAmount;
-  let base = 0;
-  if (c > 0 && v > 0) base = Math.min(c, v);
-  else if (c > 0) base = c;
-  else if (v > 0) base = v;
-  return { ...row, finalAmount: Math.max(0, base + row.adjustment) };
+  return { ...row, finalAmount: calcIncomeFinal(row) };
 }
 
-/**
- * Expense final = MAX(centrix, benchmark) + adjustment
- * Excel formula: the adjustment is ADDED on top, not included in the MAX.
- */
+/** Expense final = MAX(centrix || declared, benchmark) + adjustment. */
 export function calcExpenseRow(row: ExpenseRow): ExpenseRow {
-  const base = Math.max(row.centrixAmount, row.benchmarkAmount);
-  return { ...row, finalAmount: Math.max(0, base + row.adjustment) };
+  return { ...row, finalAmount: calcExpenseFinal(row) };
 }
 
 // ─── Formatting ──────────────────────────────────────────────────────────────

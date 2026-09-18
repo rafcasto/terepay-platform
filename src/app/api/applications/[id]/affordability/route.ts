@@ -12,7 +12,11 @@ import { randomUUID } from 'crypto';
 import { generateAffordabilityPdf } from '@/lib/pdf/affordability-report';
 import { getDriveClient, getOrCreateSubfolder, uploadBufferToDrive } from '@/lib/gdrive/client';
 import type { AffordabilityAssessment, LoanApplication } from '@/types/application';
-import { fortnightlyPayment } from '@/lib/loan/repayment';
+import {
+  affordabilityLoanPayment,
+  calcExpenseFinal,
+  calcIncomeFinal,
+} from '@/lib/loan/affordability-calc';
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -103,21 +107,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const body = await request.json();
     const parsed = affordabilityAssessmentSchema.parse(body);
 
-    // Calculate income totals
+    // Recompute finals server-side with the same shared maths the wizard uses,
+    // so the persisted surplus is exactly what the lender saw on screen.
     const incomeRows = parsed.incomeRows.map((row) => ({
       ...row,
-      finalAmount: Math.min(
-        row.centrixAmount > 0 ? row.centrixAmount : Infinity,
-        row.verifiedAmount > 0 ? row.verifiedAmount : Infinity,
-      ) === Infinity ? 0 : Math.min(
-        row.centrixAmount > 0 ? row.centrixAmount : row.verifiedAmount,
-        row.verifiedAmount > 0 ? row.verifiedAmount : row.centrixAmount,
-      ),
+      finalAmount: calcIncomeFinal(row),
     }));
 
     const expenseRows = parsed.expenseRows.map((row) => ({
       ...row,
-      finalAmount: Math.max(0, Math.max(row.centrixAmount, row.benchmarkAmount) + row.adjustment),
+      finalAmount: calcExpenseFinal(row),
     }));
 
     const totalVerifiedIncome = incomeRows.reduce((sum, r) => sum + r.finalAmount, 0);
@@ -127,8 +126,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const requestedAmount = appData.loanDetails?.requestedAmount ?? 0;
     const assessedAmount = parsed.assessedAmount ?? requestedAmount;
     // CCCFA affordability must test the instalment the borrower will actually
-    // be charged, so use the amortised figure rather than a flat approximation.
-    const loanFortnightlyPayment = fortnightlyPayment(assessedAmount);
+    // be charged — identical pricing to the applicant's quote and the approval
+    // schedule (reducing-balance annuity, rate from collections config).
+    const loanFortnightlyPayment = affordabilityLoanPayment(assessedAmount);
     const finalAvailableSurplus = netDisposableIncome - loanFortnightlyPayment;
 
     // Days of transaction data
