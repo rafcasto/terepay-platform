@@ -1,6 +1,7 @@
 import { Hero, Pill, Stepper, type Step } from '@/components/ui';
 import { fmtDate, fmtNZD } from '@/lib/loan/format';
 import type { LoanApplication, AnyApplicationStatus, ApplicationDocument } from '@/types/application';
+import { toPlainApplicationDocuments } from '@/lib/utils/plain-document';
 import { PROGRESS_STEPS, SectionCard, STATUS_COMPLETED_COUNT, Field } from './shared';
 import DocumentUploadCard from './DocumentUploadCard';
 
@@ -23,7 +24,11 @@ export default function ScreenInReview({ app, status, applicationId }: Props) {
   const refNum = (app.referenceNumber as string | undefined) ?? `#${applicationId.slice(0, 8)}`;
   const docRequest = app.documentRequest as { requiredDocuments?: string[]; message?: string } | undefined;
   const showUpload = status === 'waiting_for_docs';
-  const existingDocuments: ApplicationDocument[] = (app.documents as ApplicationDocument[] | undefined) ?? [];
+  // DocumentUploadCard is a Client Component — strip Firestore Timestamps
+  // (uploadedAt / reviewedAt) or Next.js throws at the RSC boundary.
+  const existingDocuments = toPlainApplicationDocuments(
+    app.documents as ApplicationDocument[] | undefined,
+  );
 
   return (
     <div className="space-y-5">

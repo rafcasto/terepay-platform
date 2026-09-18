@@ -3,13 +3,14 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardHeader, DropZone, Pill, SelectField, Icons } from '@/components/ui';
-import type { ApplicationDocument, DocumentType } from '@/types/application';
+import type { DocumentType } from '@/types/application';
+import type { PlainApplicationDocument } from '@/lib/utils/plain-document';
 
 interface Props {
   applicationId: string;
   requiredDocuments?: string[];
   message?: string;
-  existingDocuments: ApplicationDocument[];
+  existingDocuments: PlainApplicationDocument[];
 }
 
 interface UploadingFile {
