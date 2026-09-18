@@ -22,6 +22,8 @@ export type ReviewableDocument = {
   rejectionReason?: string;
   reviewedAt?: string;
   kind: 'identity' | 'income' | 'other';
+  /** Label of the request item this upload was made against, if any. */
+  requestedAs?: string;
 };
 
 /** A piece of evidence from a previous application / the customer profile that may not need re-collecting. */
@@ -105,6 +107,16 @@ export type ReviewData = {
   documentRequest?: {
     requestedAt: string;
     requiredDocuments: string[];
+    /** Per-item fulfilment (empty for requests made before structured items existed). */
+    items: {
+      key: string;
+      label: string;
+      fulfilled: boolean;
+      needsReupload: boolean;
+      files: { id: string; fileName: string; status: DocumentStatus }[];
+    }[];
+    /** Catalogue keys still unfulfilled — used to pre-tick a re-request. */
+    missingKeys: string[];
     message?: string;
     outstanding: boolean;
   };

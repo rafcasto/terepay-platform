@@ -16,6 +16,7 @@ import {
   logSystemCommunication,
   resolveApplicantContact,
 } from '@/lib/loan/communication-log';
+import { buildRequestItems } from '@/lib/loan/document-requests';
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -49,13 +50,22 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const parsed = requestDocumentsSchema.parse(body);
     const message = parsed.message?.trim() ?? '';
 
+    // Expand catalogue keys into structured items (label + satisfying types).
+    // The applicant uploads into a slot per item; the type is derived server-side.
+    const items = buildRequestItems(parsed.items);
+    if (!items || items.length === 0) {
+      throw new AppError('VALIDATION_ERROR', 422, 'One or more requested documents are not recognised');
+    }
+    const requiredDocuments = items.map((i) => i.label);
+
     const now = FieldValue.serverTimestamp();
     await adminDb.collection('loanApplications').doc(id).update({
       status: 'waiting_for_docs',
       documentRequest: {
         requestedAt: now,
         requestedBy: auth.uid,
-        requiredDocuments: parsed.requiredDocuments,
+        requiredDocuments,
+        items,
         message,
       },
       'timeline.updatedAt': now,
@@ -68,7 +78,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       targetType: 'application',
       outcome: 'success',
       ipAddress: ip,
-      changes: { requiredDocuments: parsed.requiredDocuments },
+      changes: { items: items.map((i) => i.key) },
     });
 
     // ── Notify the applicant + auto-log the contact ─────────────────────────
@@ -86,8 +96,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         const rendered = await renderEmail('documents_requested', {
           firstName: escapeHtml(firstName || 'there'),
           referenceNumber: escapeHtml(reference),
-          documentList: parsed.requiredDocuments.map((d) => `<li>${escapeHtml(d)}</li>`).join(''),
-          documentListText: parsed.requiredDocuments.map((d) => `- ${d}`).join('\n'),
+          documentList: requiredDocuments.map((d) => `<li>${escapeHtml(d)}</li>`).join(''),
+          documentListText: requiredDocuments.map((d) => `- ${d}`).join('\n'),
           lenderMessageBlock: message
             ? `<p style="margin:0 0 16px;padding:12px 16px;background:#F6F8FB;border-radius:10px;font-size:15px;line-height:1.6;">${escapeHtml(message)}</p>`
             : '',
@@ -113,7 +123,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       applicationId: id,
       channel: emailSent ? 'email' : 'system',
       event: 'documents_requested',
-      summary: `Requested documents: ${parsed.requiredDocuments.join('; ')}.${message ? ` Message to applicant: "${message}"` : ''}`,
+      summary: `Requested documents: ${requiredDocuments.join('; ')}.${message ? ` Message to applicant: "${message}"` : ''}`,
       outcome: `${emailOutcome} Application moved to "Waiting for docs".`,
     });
 

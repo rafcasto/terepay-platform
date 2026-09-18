@@ -102,6 +102,7 @@ function DocumentRow({ doc, canReview }: { doc: ReviewableDocument; canReview: b
             <p className="truncate text-sm font-semibold text-[var(--text-body)]">{doc.title}</p>
             <p className="truncate text-xs text-[var(--text-muted)]">
               {doc.subtitle} · Uploaded {doc.uploadedAt}
+              {doc.requestedAs && ` · for "${doc.requestedAs}"`}
               {doc.reviewedAt && doc.status !== 'pending' && ` · Reviewed ${doc.reviewedAt}`}
             </p>
           </div>

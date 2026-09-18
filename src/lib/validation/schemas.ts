@@ -396,7 +396,16 @@ export const addNoteSchema = z.object({
 });
 
 export const requestDocumentsSchema = z.object({
-  requiredDocuments: z.array(z.string().min(1)).min(1, 'Specify at least one document'),
+  /** Catalogue keys, or `{ key: 'other', label }` for a custom ask. */
+  items: z
+    .array(
+      z.object({
+        key: z.string().min(1).max(60),
+        label: z.string().min(1).max(120).optional(),
+      }),
+    )
+    .min(1, 'Select at least one document')
+    .max(12),
   message: z.string().max(500).optional(),
 });
 

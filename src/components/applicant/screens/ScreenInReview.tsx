@@ -4,6 +4,7 @@ import type { LoanApplication, AnyApplicationStatus, ApplicationDocument } from 
 import { toPlainApplicationDocuments } from '@/lib/utils/plain-document';
 import { PROGRESS_STEPS, SectionCard, STATUS_COMPLETED_COUNT, Field } from './shared';
 import DocumentUploadCard from './DocumentUploadCard';
+import type { DocumentRequestItem } from '@/lib/loan/document-requests';
 
 interface Props {
   app: LoanApplication & Record<string, unknown>;
@@ -22,8 +23,19 @@ export default function ScreenInReview({ app, status, applicationId }: Props) {
   const ld = app.loanDetails;
   const submitted = (app.timeline as { submittedAt?: unknown } | undefined)?.submittedAt ?? null;
   const refNum = (app.referenceNumber as string | undefined) ?? `#${applicationId.slice(0, 8)}`;
-  const docRequest = app.documentRequest as { requiredDocuments?: string[]; message?: string } | undefined;
+  const docRequest = app.documentRequest as
+    | { requiredDocuments?: string[]; items?: DocumentRequestItem[]; message?: string; requestedAt?: unknown }
+    | undefined;
   const showUpload = status === 'waiting_for_docs';
+  // Timestamp → ISO so the Client Component can compare upload times to the request.
+  const requestedAtRaw = docRequest?.requestedAt as { toDate?: () => Date; _seconds?: number } | undefined;
+  const requestedAt = requestedAtRaw
+    ? typeof requestedAtRaw.toDate === 'function'
+      ? requestedAtRaw.toDate().toISOString()
+      : typeof requestedAtRaw._seconds === 'number'
+        ? new Date(requestedAtRaw._seconds * 1000).toISOString()
+        : undefined
+    : undefined;
   // DocumentUploadCard is a Client Component — strip Firestore Timestamps
   // (uploadedAt / reviewedAt) or Next.js throws at the RSC boundary.
   const existingDocuments = toPlainApplicationDocuments(
@@ -54,8 +66,10 @@ export default function ScreenInReview({ app, status, applicationId }: Props) {
       {showUpload && (
         <DocumentUploadCard
           applicationId={applicationId}
+          items={docRequest?.items}
           requiredDocuments={docRequest?.requiredDocuments}
           message={docRequest?.message}
+          requestedAt={requestedAt}
           existingDocuments={existingDocuments}
         />
       )}

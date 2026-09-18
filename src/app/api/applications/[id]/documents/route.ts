@@ -7,6 +7,13 @@ import { auditLog, getClientIp } from '@/lib/utils/audit';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { getDriveClient, getOrCreateSubfolder } from '@/lib/gdrive/client';
 import type { ApplicationDocument, DocumentType } from '@/types/application';
+import {
+  allFulfilled,
+  fulfilRequest,
+  type DocumentRequestItem,
+  type FulfilmentDoc,
+} from '@/lib/loan/document-requests';
+import { logSystemCommunication } from '@/lib/loan/communication-log';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,6 +34,8 @@ const ALLOWED_DOC_TYPES: ReadonlySet<DocumentType> = new Set([
   'visa',
   'payslip',
   'bank_statement',
+  'proof_of_address',
+  'other_income',
   'other',
 ]);
 
@@ -51,7 +60,14 @@ const UPLOAD_ALLOWED_STATUSES = new Set([
  *
  * Body (multipart/form-data):
  *   - file: File
- *   - type: DocumentType  (passport | drivers_licence | visa | payslip | bank_statement | other)
+ *   - requestKey?: string  — the lender's request item this file satisfies.
+ *       When present the type is derived from the request (the applicant
+ *       never classifies the upload), and `type` may only pick between the
+ *       item's allowed types (e.g. passport vs driver licence for photo ID).
+ *   - type?: DocumentType  — required when no requestKey is given.
+ *
+ * Once every item of an outstanding request has a file, the application
+ * moves back from `waiting_for_docs` to `under_assessment` automatically.
  */
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const ip = getClientIp(request);
@@ -90,7 +106,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const form = await request.formData();
     const file = form.get('file') as File | null;
-    const rawType = (form.get('type') as string | null) ?? 'other';
+    const requestKey = ((form.get('requestKey') as string | null) ?? '').trim() || null;
+    const rawTypeInput = ((form.get('type') as string | null) ?? '').trim() || null;
+
+    const requestItems = (app.documentRequest?.items as DocumentRequestItem[] | undefined) ?? [];
+    let requestItem: DocumentRequestItem | undefined;
+    if (requestKey) {
+      requestItem = requestItems.find((i) => i.key === requestKey);
+      if (!requestItem) {
+        throw new AppError('VALIDATION_ERROR', 422, 'That document is not part of the current request');
+      }
+    }
+    // Slot upload: type comes from the request item (first type by default).
+    const rawType = requestItem ? (rawTypeInput ?? requestItem.types[0]) : (rawTypeInput ?? 'other');
 
     if (!file) {
       throw new AppError('VALIDATION_ERROR', 422, 'No file provided');
@@ -109,6 +137,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       throw new AppError('VALIDATION_ERROR', 422, `Unknown document type: ${rawType}`);
     }
     const docType = rawType as DocumentType;
+    if (requestItem && !requestItem.types.includes(docType)) {
+      throw new AppError('VALIDATION_ERROR', 422, `"${requestItem.label}" cannot be satisfied by a ${docType.replace(/_/g, ' ')}`);
+    }
 
     const parentFolderId = process.env.GOOGLE_DRIVE_APPLICATIONS_FOLDER_ID
       ?? process.env.GOOGLE_DRIVE_KYC_FOLDER_ID;
@@ -146,6 +177,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       uploadedAt: Timestamp.now(),
       uploadedBy: auth.uid,
       status: 'pending',
+      ...(requestItem ? { requestKey: requestItem.key } : {}),
     };
 
     await appRef.update({
@@ -159,13 +191,67 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       targetId: id,
       targetType: 'application',
       outcome: 'success',
-      changes: { documentId, type: docType, fileName: file.name, fileSize: file.size },
+      changes: { documentId, type: docType, fileName: file.name, fileSize: file.size, requestKey: requestItem?.key },
       ipAddress: ip,
     });
 
+    // ── Auto-return to the lender once the request is complete ─────────────
+    let requestComplete = false;
+    if (app.status === 'waiting_for_docs' && requestItems.length > 0) {
+      const toMs = (v: unknown) => {
+        const t = v as { toMillis?: () => number; _seconds?: number } | undefined;
+        if (!t) return undefined;
+        if (typeof t.toMillis === 'function') return t.toMillis();
+        if (typeof t._seconds === 'number') return t._seconds * 1000;
+        return undefined;
+      };
+      const existing = ((app.documents as ApplicationDocument[] | undefined) ?? []).map<FulfilmentDoc>((d) => ({
+        documentId: d.documentId,
+        type: d.type,
+        status: d.status,
+        fileName: d.fileName,
+        requestKey: d.requestKey,
+        uploadedAtMs: toMs(d.uploadedAt),
+      }));
+      const justUploaded: FulfilmentDoc = {
+        documentId,
+        type: docType,
+        status: 'pending',
+        fileName: file.name,
+        requestKey: requestItem?.key,
+        uploadedAtMs: Date.now(),
+      };
+      const requestedAtMs = toMs(app.documentRequest?.requestedAt);
+      const fulfilment = fulfilRequest(requestItems, [...existing, justUploaded], requestedAtMs);
+      if (allFulfilled(fulfilment)) {
+        requestComplete = true;
+        await appRef.update({
+          status: 'under_assessment',
+          'timeline.updatedAt': FieldValue.serverTimestamp(),
+        });
+        await auditLog({
+          userId: auth.uid,
+          action: 'documents_received',
+          targetId: id,
+          targetType: 'application',
+          outcome: 'success',
+          changes: { items: requestItems.map((i) => i.key) },
+          ipAddress: ip,
+        });
+        await logSystemCommunication({
+          applicationId: id,
+          channel: 'system',
+          direction: 'inbound',
+          event: 'documents_received',
+          summary: `Applicant supplied all requested documents (${requestItems.map((i) => i.label).join('; ')}).`,
+          outcome: 'Application returned to "Under assessment" — review the new files.',
+        });
+      }
+    }
+
     return NextResponse.json({
       success: true,
-      data: { documentId, fileName: file.name, type: docType, status: 'pending' },
+      data: { documentId, fileName: file.name, type: docType, status: 'pending', requestKey: requestItem?.key, requestComplete },
     });
   } catch (err) {
     if (err instanceof AppError) return errorResponse(err);

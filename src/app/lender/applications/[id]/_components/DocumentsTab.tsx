@@ -33,12 +33,50 @@ export default function DocumentsTab({ data }: { data: ReviewData }) {
             </ConsolePill>
           }
         >
-          <p className={`${SECTION_LABEL} mb-2`}>Requested {data.documentRequest.requestedAt}</p>
-          <ul className="list-inside list-disc space-y-1 text-sm text-[var(--text-body)]">
-            {data.documentRequest.requiredDocuments.map((d) => (
-              <li key={d}>{d}</li>
-            ))}
-          </ul>
+          <p className={`${SECTION_LABEL} mb-2`}>
+            Requested {data.documentRequest.requestedAt}
+            {data.documentRequest.items.length > 0 &&
+              ` · ${data.documentRequest.items.filter((i) => i.fulfilled).length}/${data.documentRequest.items.length} provided`}
+          </p>
+          {data.documentRequest.items.length === 0 ? (
+            <ul className="list-inside list-disc space-y-1 text-sm text-[var(--text-body)]">
+              {data.documentRequest.requiredDocuments.map((d) => (
+                <li key={d}>{d}</li>
+              ))}
+            </ul>
+          ) : (
+            <ul className="space-y-1.5">
+              {data.documentRequest.items.map((item) => (
+                <li key={item.key} className="flex items-start justify-between gap-3 text-sm">
+                  <div className="flex min-w-0 items-start gap-2">
+                    <span
+                      className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${
+                        item.fulfilled
+                          ? 'bg-[var(--success-700)] text-white'
+                          : item.needsReupload
+                            ? 'bg-[var(--danger-700)] text-white'
+                            : 'border border-[var(--border-default)] bg-white'
+                      }`}
+                    >
+                      {item.fulfilled && <ConsoleIcon name="check" size={10} />}
+                      {item.needsReupload && <ConsoleIcon name="x" size={10} />}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-[var(--text-body)]">{item.label}</p>
+                      {item.files.length > 0 && (
+                        <p className="truncate text-xs text-[var(--text-muted)]">
+                          {item.files.map((f) => f.fileName).join(', ')}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <ConsolePill tone={item.fulfilled ? 'success' : item.needsReupload ? 'danger' : 'warning'}>
+                    {item.fulfilled ? 'Provided' : item.needsReupload ? 'Rejected · awaiting re-upload' : 'Not yet provided'}
+                  </ConsolePill>
+                </li>
+              ))}
+            </ul>
+          )}
           {data.documentRequest.message && (
             <p className="mt-3 rounded-[var(--radius-md)] bg-[var(--slate-50)] p-3 text-sm text-[var(--text-muted)]">
               &ldquo;{data.documentRequest.message}&rdquo;
@@ -88,6 +126,7 @@ export default function DocumentsTab({ data }: { data: ReviewData }) {
           applicationId={data.applicationId}
           requestedAmount={data.decisionInput.requestedAmount}
           assessedAmount={data.decisionInput.assessedAmount}
+          preselectKeys={data.documentRequest?.outstanding ? data.documentRequest.missingKeys : []}
           onClose={() => setRequesting(false)}
         />
       )}
