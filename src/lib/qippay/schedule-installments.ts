@@ -4,7 +4,13 @@ import { AppError } from '@/lib/utils/api-error';
 import { auditLog } from '@/lib/utils/audit';
 import { schedulePayment, getBeneficiaryId, getReturnBaseUrl } from './setpay-client';
 import { syncLoanRecord } from '@/lib/loan/loan-record';
+import { buildTestCadenceTimes } from '@/lib/admin/setpay-test-settings';
 import type { LoanApplication, PaymentConsent, ScheduledPayment } from '@/types/application';
+
+/** ISO datetime Qippay should collect this instalment at. */
+function scheduledForOf(p: Pick<ScheduledPayment, 'dueDate' | 'dueAt'>): string {
+  return p.dueAt ?? `${p.dueDate}T00:00:00.000Z`;
+}
 
 /** Today's calendar date in NZ (Pacific/Auckland) as YYYY-MM-DD. */
 export function nzToday(): string {
@@ -78,15 +84,32 @@ export async function scheduleInstallments(opts: {
   let payments: ScheduledPayment[] = Array.isArray(app.scheduledPayments)
     ? [...(app.scheduledPayments as ScheduledPayment[])]
     : [];
+  // Extra document fields written alongside the instalment array.
+  const extraUpdates: Record<string, unknown> = {};
   if (payments.length === 0) {
     const summary = consent.scheduleSummary?.installments ?? [];
+    // Test cadence (non-production): start the minute clock *now*, at first
+    // lodgement, rather than at consent — otherwise a lender disbursing an
+    // hour after the applicant consented would find every window missed.
+    const testTimes = consent.testCadence
+      ? buildTestCadenceTimes(summary.length, consent.testCadence.intervalMinutes)
+      : undefined;
     payments = summary.map((inst, i) => ({
       installmentNumber: i + 1,
-      dueDate: inst.dueDate,
+      dueDate: testTimes ? testTimes[i].dueDate : inst.dueDate,
+      ...(testTimes ? { dueAt: testTimes[i].dueAt } : {}),
       amountCents: inst.amountCents,
       status: 'pending',
       retryCount: 0,
     }));
+    if (testTimes) {
+      extraUpdates['paymentConsent.testCadence.anchoredAt'] = new Date().toISOString();
+      extraUpdates['paymentConsent.scheduleSummary.installments'] = summary.map((inst, i) => ({
+        ...inst,
+        dueDate: testTimes[i].dueDate,
+        dueAt: testTimes[i].dueAt,
+      }));
+    }
   }
   if (payments.length === 0) return emptyResult('no_schedule');
 
@@ -125,10 +148,14 @@ export async function scheduleInstallments(opts: {
     if (p.status !== 'pending') continue; // already lodged / terminal — leave it
 
     // Qippay requires a future NZ calendar date (cannot be today or past).
-    if (p.dueDate <= today) {
+    // Test-cadence instalments carry an exact `dueAt` and are compared by time.
+    const isPast = p.dueAt ? Date.parse(p.dueAt) <= Date.now() : p.dueDate <= today;
+    if (isPast) {
       payments[i] = {
         ...p,
-        failureReason: 'Due date has passed — instalment can no longer be scheduled',
+        failureReason: p.dueAt
+          ? 'Due time has passed — instalment can no longer be scheduled'
+          : 'Due date has passed — instalment can no longer be scheduled',
         lastAttemptAt: Timestamp.now(),
         scheduleAttempts: (p.scheduleAttempts ?? 0) + 1,
       };
@@ -161,7 +188,7 @@ export async function scheduleInstallments(opts: {
         epcId: consent.mandateId,
         beneficiaryId,
         amountCents: p.amountCents,
-        scheduledFor: `${p.dueDate}T00:00:00.000Z`,
+        scheduledFor: scheduledForOf(p),
         statementParticulars: 'TerePay',
         statementCode: `Inst${p.installmentNumber}`,
         statementReference: shortRef,
@@ -212,6 +239,7 @@ export async function scheduleInstallments(opts: {
   }
 
   await appRef.update({
+    ...extraUpdates,
     scheduledPayments: payments,
     'timeline.updatedAt': FieldValue.serverTimestamp(),
   });
@@ -234,6 +262,7 @@ export async function scheduleInstallments(opts: {
       changes: {
         mandateId: consent.mandateId,
         totalInstallments: payments.length,
+        testCadence: consent.testCadence?.intervalMinutes ?? false,
         attempted,
         scheduledCount,
         pendingCount,

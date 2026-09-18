@@ -544,12 +544,28 @@ function mapOverallStatus(
   };
 }
 
+export type GetDetailedConsentStatusOptions = {
+  /**
+   * Stub mode only (ignored when live): the instalments we have lodged, so the
+   * stub can simulate the bank collecting each one once its time has passed.
+   * Lets the scheduling → verification loop be exercised without internet,
+   * including the admin test cadence (instalments minutes apart).
+   */
+  stubLodged?: Array<{ scheduledFor: string; amountCents?: number }>;
+};
+
 export async function getDetailedConsentStatus(
   epcId: string,
+  options: GetDetailedConsentStatusOptions = {},
 ): Promise<SetPayDetailedStatus> {
   const env = readEnv();
 
   if (env.mode === 'stub') {
+    const now = Date.now();
+    const lodged = options.stubLodged ?? [];
+    const complete = lodged.filter((l) => Date.parse(l.scheduledFor) <= now);
+    const pending = lodged.filter((l) => Date.parse(l.scheduledFor) > now);
+    const sum = (xs: typeof lodged) => xs.reduce((acc, l) => acc + (l.amountCents ?? 0), 0);
     return {
       epcId,
       status: 'success',
@@ -558,11 +574,11 @@ export async function getDetailedConsentStatus(
         periodIndex: 0,
         periodStart: null,
         periodEnd: null,
-        amountComplete: 0,
-        amountScheduled: 0,
+        amountComplete: sum(complete),
+        amountScheduled: sum(pending),
         amountAvailable: null,
-        countComplete: 0,
-        countScheduled: 0,
+        countComplete: complete.length,
+        countScheduled: pending.length,
         countAvailable: null,
       },
       periodStatus: [],

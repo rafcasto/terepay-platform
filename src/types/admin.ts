@@ -191,3 +191,37 @@ export const DEFAULT_PAYMENT_REFRESH_SETTINGS: PaymentRefreshSettings = {
   enabled: true,
   refreshHourNzt: 0, // midnight NZT
 };
+
+// ---------------------------------------------------------------------------
+// SetPay Test Cadence (non-production only)
+// ---------------------------------------------------------------------------
+
+/**
+ * Compresses the SetPay instalment cadence from fortnightly to a few minutes
+ * apart so a full repayment cycle can be exercised end-to-end in a test
+ * environment. Hard-locked off when NEXT_PUBLIC_ENVIRONMENT=production.
+ *
+ * Applies only to payment consents *created* while enabled; the minute clock
+ * is anchored at disbursement (when instalments are first lodged), not at
+ * consent, so a lender disbursing later doesn't find every window missed.
+ */
+export interface SetPayTestSettings {
+  enabled: boolean;
+  /** Minutes between consecutive instalments (1–1440). */
+  intervalMinutes: number;
+  /** True when the server refuses to honour `enabled` (production build). */
+  lockedInProduction: boolean;
+  lastVerifyAt?: Timestamp;
+  lastVerifyCount?: number;
+  updatedAt?: Timestamp;
+  updatedBy?: string;
+}
+
+export const DEFAULT_SETPAY_TEST_SETTINGS: SetPayTestSettings = {
+  enabled: false,
+  intervalMinutes: 4,
+  lockedInProduction: false,
+};
+
+export const SETPAY_TEST_INTERVAL_MIN = 1;
+export const SETPAY_TEST_INTERVAL_MAX = 1440;

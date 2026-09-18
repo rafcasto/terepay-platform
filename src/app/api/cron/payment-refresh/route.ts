@@ -1,21 +1,19 @@
 import { type NextRequest, NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebase/admin';
 import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { auditLog, getClientIp } from '@/lib/utils/audit';
-import { reconcilePaymentStatus } from '@/lib/qippay/reconcile-payments';
-import { assessArrearsForApplication } from '@/lib/loan/assess-arrears';
+import { runPaymentRefreshSweep } from '@/lib/qippay/refresh-sweep';
 import {
   getPaymentRefreshSettings,
   markPaymentRefreshRun,
   nzNow,
 } from '@/lib/admin/payment-refresh-settings';
+import { getSetPayTestSettings } from '@/lib/admin/setpay-test-settings';
 
 export const dynamic = 'force-dynamic';
 // Daily sweep can touch many applications; give it headroom.
 export const maxDuration = 300;
 
 const CRON_ACTOR = 'system:payment_refresh_cron';
-const MAX_APPLICATIONS = 500;
 
 /**
  * GET /api/cron/payment-refresh
@@ -26,9 +24,11 @@ const MAX_APPLICATIONS = 500;
  * run for the current NZT date. This makes the schedule admin-editable at
  * runtime without redeploying, and is DST-safe.
  *
+ * While the admin SetPay test cadence is on (never in production) the hour and
+ * once-a-day gates are bypassed so every hourly tick verifies test instalments.
+ *
  * Each active loan is (1) reconciled against Qippay, then (2) run through the
- * arrears engine — charging any now-due late/default fees, accruing
- * post-default interest, and sending the due dunning reminders via Resend.
+ * arrears engine — see runPaymentRefreshSweep().
  *
  * Auth: Vercel Cron sends `Authorization: Bearer ${CRON_SECRET}`. We require
  * CRON_SECRET to be set and to match (fail-closed).
@@ -46,88 +46,63 @@ export async function GET(request: NextRequest): Promise<Response> {
       throw new AppError('UNAUTHORIZED', 401, 'Invalid cron credentials');
     }
 
-    const settings = await getPaymentRefreshSettings();
+    const [settings, testSettings] = await Promise.all([
+      getPaymentRefreshSettings(),
+      getSetPayTestSettings(),
+    ]);
     const { hour, dateNzt } = nzNow();
     // Dev-only escape hatch to trigger the sweep regardless of the hour/dedupe gates.
     const force =
       process.env.NEXT_PUBLIC_ENVIRONMENT === 'development' &&
       request.nextUrl.searchParams.get('force') === '1';
+    // Test cadence is locked off in production, so this never bypasses gates there.
+    const bypassGates = force || testSettings.enabled;
 
     // --- Gating: enabled, right hour, not already run today ---
-    if (!settings.enabled && !force) {
+    if (!settings.enabled && !bypassGates) {
       return NextResponse.json({ data: { ran: false, reason: 'disabled', hour, dateNzt } });
     }
-    if (hour !== settings.refreshHourNzt && !force) {
+    if (hour !== settings.refreshHourNzt && !bypassGates) {
       return NextResponse.json({
         data: { ran: false, reason: 'not_scheduled_hour', hour, scheduledHour: settings.refreshHourNzt, dateNzt },
       });
     }
-    if (settings.lastRunDateNzt === dateNzt && !force) {
+    if (settings.lastRunDateNzt === dateNzt && !bypassGates) {
       return NextResponse.json({ data: { ran: false, reason: 'already_ran_today', dateNzt } });
     }
 
-    // --- Sweep every active-consent application ---
-    const snap = await adminDb
-      .collection('loanApplications')
-      .where('paymentConsent.status', '==', 'active')
-      .limit(MAX_APPLICATIONS)
-      .get();
+    const sweep = await runPaymentRefreshSweep({
+      actor: CRON_ACTOR,
+      ip,
+      auditAction: 'setpay_payment_status_cron_refresh',
+    });
 
-    let processed = 0;
-    let changed = 0;
-    let errored = 0;
-    let feesAssessed = 0;
-    let remindersSent = 0;
-    let inArrears = 0;
+    await markPaymentRefreshRun(dateNzt, sweep.processed);
 
-    for (const doc of snap.docs) {
-      try {
-        const result = await reconcilePaymentStatus({
-          applicationId: doc.id,
-          callerUid: CRON_ACTOR,
-          ipAddress: ip,
-          auditAction: 'setpay_payment_status_cron_refresh',
-        });
-        processed += 1;
-        if (result.changed) changed += 1;
-      } catch (err) {
-        errored += 1;
-        console.error('[cron/payment-refresh] failed to reconcile', doc.id, err);
-      }
-
-      // Arrears assessment runs after reconciliation so fees/interest reflect
-      // the freshest payment state. Independent try/catch — an arrears failure
-      // never aborts the sweep. No-op for loans without a fee-policy stamp.
-      try {
-        const arrears = await assessArrearsForApplication({
-          applicationId: doc.id,
-          actor: CRON_ACTOR,
-          ip,
-        });
-        feesAssessed += arrears.newFeeCount;
-        remindersSent += arrears.remindersSent;
-        if (arrears.isInArrears) inArrears += 1;
-      } catch (err) {
-        errored += 1;
-        console.error('[cron/payment-refresh] failed to assess arrears', doc.id, err);
-      }
-    }
-
-    await markPaymentRefreshRun(dateNzt, processed);
+    const summary = {
+      dateNzt,
+      hour,
+      testCadence: testSettings.enabled,
+      total: sweep.total,
+      processed: sweep.processed,
+      changed: sweep.changed,
+      errored: sweep.errored,
+      feesAssessed: sweep.feesAssessed,
+      remindersSent: sweep.remindersSent,
+      inArrears: sweep.inArrears,
+    };
 
     await auditLog({
       userId: CRON_ACTOR,
       action: 'payment_refresh_cron_completed',
       targetId: 'paymentRefresh',
       targetType: 'systemConfig',
-      outcome: errored > 0 ? 'failure' : 'success',
+      outcome: sweep.errored > 0 ? 'failure' : 'success',
       ipAddress: ip,
-      changes: { dateNzt, hour, total: snap.size, processed, changed, errored, feesAssessed, remindersSent, inArrears },
+      changes: summary,
     });
 
-    return NextResponse.json({
-      data: { ran: true, dateNzt, hour, total: snap.size, processed, changed, errored, feesAssessed, remindersSent, inArrears },
-    });
+    return NextResponse.json({ data: { ran: true, ...summary } });
   } catch (err) {
     if (err instanceof AppError) return errorResponse(err);
     console.error('[cron/payment-refresh] unexpected error', err);
