@@ -358,6 +358,12 @@ export async function approveEnduring(
 // SetPay requires each individual instalment to be scheduled via POST
 // /v1/setpay (docs rev 1, p.19). The enduring consent only authorises
 // limits — Qippay does not auto-fire payments on its own.
+//
+// Undocumented (confirmed by Qippay support, Sep 2026): `success_url` is now
+// MANDATORY on /v1/setpay. Qippay added a fallback that lets the end-user
+// resolve a failed instalment by paying via a different account/bank on the
+// default Hosted Payment Page, and that page needs somewhere to bounce back
+// to. Omitting it makes the whole call fail with a 500.
 
 export type SetPaySchedulePaymentInput = {
   epcId: string;
@@ -368,6 +374,10 @@ export type SetPaySchedulePaymentInput = {
   statementCode: string;
   statementReference: string;
   maxRetry?: number; // optional Qippay-side retry on failure
+  /** Where Qippay's Hosted fallback page returns the payer after success. Required. */
+  successUrl: string;
+  /** Where the Hosted fallback page returns the payer after failure/cancel. */
+  failureUrl?: string;
 };
 
 export type SetPayScheduledPayment = {
@@ -425,7 +435,9 @@ export async function schedulePayment(
     statement_code: code,
     statement_reference: reference,
     scheduled_for: input.scheduledFor,
+    success_url: input.successUrl,
   };
+  if (input.failureUrl) body.failure_url = input.failureUrl;
   if (input.maxRetry !== undefined) body.max_retry = input.maxRetry;
 
   const data = await qippayFetch<SchedulePaymentResponse>('/v1/setpay', {

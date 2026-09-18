@@ -2,7 +2,7 @@ import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
 import { AppError } from '@/lib/utils/api-error';
 import { auditLog } from '@/lib/utils/audit';
-import { schedulePayment, getBeneficiaryId } from './setpay-client';
+import { schedulePayment, getBeneficiaryId, getReturnBaseUrl } from './setpay-client';
 import { syncLoanRecord } from '@/lib/loan/loan-record';
 import type { LoanApplication, PaymentConsent, ScheduledPayment } from '@/types/application';
 
@@ -97,6 +97,20 @@ export async function scheduleInstallments(opts: {
     // Not configured — every pending instalment will be recorded as such.
   }
 
+  // Qippay requires a `success_url` on every POST /v1/setpay (used by its
+  // Hosted fallback page when a payer resolves a failed instalment via a
+  // different bank/account). Reuse the consent-return page — it is the URL
+  // already registered with Qippay for this application.
+  let successUrl = '';
+  let failureUrl = '';
+  try {
+    const returnBaseUrl = getReturnBaseUrl();
+    successUrl = `${returnBaseUrl}/applicant/applications/${applicationId}/consent/return?outcome=success`;
+    failureUrl = `${returnBaseUrl}/applicant/applications/${applicationId}/consent/return?outcome=failure`;
+  } catch {
+    // Not configured — handled per-instalment below, like beneficiaryId.
+  }
+
   const today = nzToday();
   const shortRef = applicationId.slice(0, 12);
   let attempted = 0;
@@ -131,6 +145,16 @@ export async function scheduleInstallments(opts: {
       continue;
     }
 
+    if (!successUrl) {
+      payments[i] = {
+        ...p,
+        failureReason: 'Payment return URL is not configured',
+        lastAttemptAt: Timestamp.now(),
+        scheduleAttempts: (p.scheduleAttempts ?? 0) + 1,
+      };
+      continue;
+    }
+
     attempted++;
     try {
       const scheduled = await schedulePayment({
@@ -142,6 +166,8 @@ export async function scheduleInstallments(opts: {
         statementCode: `Inst${p.installmentNumber}`,
         statementReference: shortRef,
         maxRetry: SETPAY_MAX_RETRY_DAYS,
+        successUrl,
+        failureUrl,
       });
 
       // Success — drop any prior failureReason for a clean row.
