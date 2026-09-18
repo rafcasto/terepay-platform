@@ -1,13 +1,37 @@
 import { cookies } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
 import { getAdminDb, verifySessionOrIdToken } from '@/lib/firebase/admin';
-import type { DocumentStatus, DocumentType, LoanApplication, ScheduledPayment } from '@/types/application';
+import type {
+  ApplicationDocument,
+  CommunicationLogEntry,
+  DocumentStatus,
+  DocumentType,
+  LoanApplication,
+  ScheduledPayment,
+} from '@/types/application';
 import type { PillTone } from '@/components/lender/ConsolePill';
 import { loanPurposeLabel } from '@/lib/constants/loan-purposes';
 import { computeApplicationFee } from '@/lib/constants/fees';
 import { reconcileConsent } from '@/lib/qippay/reconcile-consent';
 import { toPlainScheduledPayments } from '@/lib/loan/active-loan';
-import LoanReview, { type ReviewData } from './_components/LoanReview';
+import {
+  BANK_STATEMENT_REUSE_MONTHS,
+  CREDIT_REPORT_REUSE_MONTHS,
+  PAYSLIP_REUSE_MONTHS,
+  evidenceAge,
+  isWithinReuseWindow,
+  reuseExpiry,
+} from '@/lib/loan/evidence-reuse';
+import LoanReview from './_components/LoanReview';
+import type {
+  ApplicantHistory,
+  CommunicationItem,
+  PreviousApplication,
+  ReportItem,
+  ReuseItem,
+  ReviewData,
+  ReviewableDocument,
+} from './_components/review-types';
 
 export const dynamic = 'force-dynamic';
 
@@ -56,6 +80,11 @@ const DOC_LABEL: Record<DocumentType, string> = {
   other: 'Document',
 };
 
+const IDENTITY_TYPES = new Set<DocumentType>(['passport', 'drivers_licence', 'visa']);
+const INCOME_TYPES = new Set<DocumentType>(['payslip', 'bank_statement']);
+const docKind = (t: DocumentType): ReviewableDocument['kind'] =>
+  IDENTITY_TYPES.has(t) ? 'identity' : INCOME_TYPES.has(t) ? 'income' : 'other';
+
 const KYC_DOC_LABEL: Record<string, string> = {
   nz_passport: 'NZ Passport',
   passport: 'Passport',
@@ -71,6 +100,13 @@ const kycDocLabel = (t?: string) =>
   (t && KYC_DOC_LABEL[t]) ||
   (t ? t.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : 'Document');
 
+/** Onboarding docs use `pending_review`; normalise onto the application DocumentStatus. */
+const normaliseDocStatus = (s?: string): DocumentStatus =>
+  s === 'accepted' || s === 'approved' || s === 'verified'
+    ? 'accepted'
+    : s === 'rejected'
+      ? 'rejected'
+      : 'pending';
 
 const VISA_LABEL: Record<string, string> = {
   work_visa: 'Work visa',
@@ -81,30 +117,39 @@ const VISA_LABEL: Record<string, string> = {
 };
 
 const ASSESSMENT_STATUSES = ['under_assessment', 'waiting_for_docs', 'credit_check'];
+const REQUEST_DOCS_STATUSES = ['under_assessment', 'waiting_for_docs'];
+const PAYMENT_STATUSES = new Set(['disbursed', 'active', 'closed_repaid']);
+/** Statuses that count as a real previous loan (money went out). */
+const LOAN_STATUSES = new Set(['disbursed', 'active', 'closed_repaid']);
 
 const fmt = (n?: number | null) =>
   typeof n === 'number'
     ? new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(n)
     : '—';
 
-type TS = { _seconds?: number; toDate?: () => Date } | null | undefined;
+type TS = { _seconds?: number; toDate?: () => Date } | string | Date | null | undefined;
+
+/** Firestore Timestamp / serialised timestamp / ISO string / Date → Date (or null). */
+function toDate(ts: TS): Date | null {
+  if (!ts) return null;
+  if (ts instanceof Date) return Number.isNaN(ts.getTime()) ? null : ts;
+  if (typeof ts === 'string') {
+    const d = new Date(ts);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  if (typeof ts.toDate === 'function') return ts.toDate();
+  if (ts._seconds) return new Date(ts._seconds * 1000);
+  return null;
+}
 
 const fmtTs = (ts: TS) => {
-  if (!ts) return '—';
-  let d: Date;
-  if (typeof ts.toDate === 'function') d = ts.toDate();
-  else if (ts._seconds) d = new Date(ts._seconds * 1000);
-  else return '—';
-  return new Intl.DateTimeFormat('en-NZ', { dateStyle: 'medium', timeStyle: 'short' }).format(d);
+  const d = toDate(ts);
+  return d ? new Intl.DateTimeFormat('en-NZ', { dateStyle: 'medium', timeStyle: 'short' }).format(d) : '—';
 };
 
 const fmtDate = (ts: TS) => {
-  if (!ts) return '—';
-  let d: Date;
-  if (typeof ts.toDate === 'function') d = ts.toDate();
-  else if (ts._seconds) d = new Date(ts._seconds * 1000);
-  else return '—';
-  return new Intl.DateTimeFormat('en-NZ', { dateStyle: 'medium' }).format(d);
+  const d = toDate(ts);
+  return d ? new Intl.DateTimeFormat('en-NZ', { dateStyle: 'medium' }).format(d) : '—';
 };
 
 function initialsOf(name: string) {
@@ -114,7 +159,33 @@ function initialsOf(name: string) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-const PAYMENT_STATUSES = new Set(['disbursed', 'active', 'closed_repaid']);
+function buildReuseItem(args: {
+  key: string;
+  label: string;
+  fileName: string;
+  fromLabel: string;
+  date: Date;
+  windowMonths: number | null;
+  viewUrl: string;
+}): ReuseItem {
+  const age = evidenceAge(args.date);
+  const base = {
+    key: args.key,
+    label: args.label,
+    fileName: args.fileName,
+    fromLabel: args.fromLabel,
+    date: fmtDate(args.date),
+    ageLabel: age.label,
+    viewUrl: args.viewUrl,
+  };
+  if (args.windowMonths === null) return { ...base, reusable: null };
+  return {
+    ...base,
+    reusable: isWithinReuseWindow(args.date, args.windowMonths),
+    windowMonths: args.windowMonths,
+    expiresLabel: fmtDate(reuseExpiry(args.date, args.windowMonths)),
+  };
+}
 
 export default async function LenderApplicationDetailPage({
   params,
@@ -162,35 +233,28 @@ export default async function LenderApplicationDetailPage({
   const expenses = app.livingExpenses;
   const debts = app.existingDebts;
   const isAssigned = app.assignedLenderId === decoded.uid;
+  const decided = Boolean(app.decision);
 
-  // ---- Lender-uploaded reports (stored on the customer profile) ----------
-  // DataZoo (KYC) and Centrix (credit) reports are uploaded by the lender and
-  // kept on the borrower's profile so they carry across future applications.
-  type ReportItem = { id: string; fileName: string; uploadedAt: string; uploadedBy: string };
-  type BorrowerKycDoc = {
-    label: string;
-    fileName: string;
-    uploadedAt: string;
-    status: string;
-    downloadUrl: string;
-  };
-  const datazooReports: ReportItem[] = [];
-  const centrixReports: ReportItem[] = [];
-  const affordabilityReports: ReportItem[] = [];
-  const borrowerKycDocuments: BorrowerKycDoc[] = [];
+  // ---- Documents uploaded with this application -------------------------
+  const documents: ReviewableDocument[] = (app.documents ?? []).map((d) => ({
+    id: d.documentId,
+    title: DOC_LABEL[d.type] ?? 'Document',
+    subtitle: d.fileName,
+    uploadedAt: fmtDate(d.uploadedAt as TS),
+    status: d.status,
+    viewUrl: `/api/applications/${id}/documents/${d.documentId}`,
+    reviewUrl: `/api/applications/${id}/documents/${d.documentId}`,
+    rejectionReason: d.rejectionReason || undefined,
+    reviewedAt: d.reviewedAt ? fmtDate(d.reviewedAt as TS) : undefined,
+    kind: docKind(d.type),
+  }));
+  const docsVerified = documents.filter((d) => d.status === 'accepted').length;
+  const docsPending = documents.filter((d) => d.status === 'pending').length;
 
-  // Identity documents the applicant uploaded with their application.
-  const IDENTITY_TYPES = new Set<DocumentType>(['passport', 'drivers_licence', 'visa']);
-  for (const d of app.documents ?? []) {
-    if (!IDENTITY_TYPES.has(d.type)) continue;
-    borrowerKycDocuments.push({
-      label: DOC_LABEL[d.type] ?? 'Identity document',
-      fileName: d.fileName,
-      uploadedAt: fmtDate(d.uploadedAt as TS),
-      status: d.status,
-      downloadUrl: `/api/applications/${id}/documents/${d.documentId}`,
-    });
-  }
+  // ---- Customer-profile data: lender reports + onboarding KYC docs ------
+  type RawReport = ReportItem & { provider: string; date: Date | null; fromApplicationId?: string };
+  const rawReports: RawReport[] = [];
+  const borrowerKycDocuments: ReviewableDocument[] = [];
 
   if (app.applicantId) {
     try {
@@ -201,27 +265,32 @@ export default async function LenderApplicationDetailPage({
       ]);
       repSnap.forEach((doc) => {
         const r = doc.data();
-        const item: ReportItem = {
+        rawReports.push({
           id: doc.id,
+          provider: (r.provider as string) ?? '',
           fileName: (r.fileName as string) ?? 'Report',
           uploadedAt: fmtDate(r.uploadedAt as TS),
           uploadedBy: (r.uploadedByName as string) ?? 'Lender',
-        };
-        if (r.provider === 'datazoo') datazooReports.push(item);
-        else if (r.provider === 'centrix') centrixReports.push(item);
-        else if (r.provider === 'affordability') affordabilityReports.push(item);
+          date: toDate(r.uploadedAt as TS),
+          fromApplicationId: r.uploadedFromApplicationId as string | undefined,
+        });
       });
-      // Identity evidence captured during onboarding (if any).
       const onboardingDocs = kycDocsSnap.data()?.documents;
       if (Array.isArray(onboardingDocs)) {
         for (const d of onboardingDocs as Array<Record<string, unknown>>) {
-          if (!d.driveFileId) continue;
+          const fileId = d.driveFileId as string | undefined;
+          if (!fileId) continue;
           borrowerKycDocuments.push({
-            label: kycDocLabel(d.docType as string | undefined),
-            fileName: (d.fileName as string) ?? 'Document',
+            id: fileId,
+            title: kycDocLabel(d.docType as string | undefined),
+            subtitle: (d.fileName as string) ?? 'Document',
             uploadedAt: fmtDate(d.uploadedAt as TS),
-            status: (d.status as string) ?? 'pending_review',
-            downloadUrl: `/api/applications/${id}/kyc-documents/${d.driveFileId as string}`,
+            status: normaliseDocStatus(d.status as string | undefined),
+            viewUrl: `/api/applications/${id}/kyc-documents/${fileId}`,
+            reviewUrl: `/api/applications/${id}/kyc-documents/${fileId}`,
+            rejectionReason: (d.rejectionReason as string | null | undefined) || undefined,
+            reviewedAt: d.reviewedAt ? fmtDate(d.reviewedAt as TS) : undefined,
+            kind: 'identity',
           });
         }
       }
@@ -230,31 +299,179 @@ export default async function LenderApplicationDetailPage({
     }
   }
 
+  // Most recent first within each provider.
+  rawReports.sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0));
+  const byProvider = (p: string): ReportItem[] =>
+    rawReports.filter((r) => r.provider === p).map(({ id, fileName, uploadedAt, uploadedBy }) => ({ id, fileName, uploadedAt, uploadedBy }));
+  const datazooReports = byProvider('datazoo');
+  const centrixReports = byProvider('centrix');
+  const affordabilityReports = byProvider('affordability');
+
   const borrowerKycCount = borrowerKycDocuments.length;
   const borrowerAllAccepted =
     borrowerKycCount > 0 && borrowerKycDocuments.every((d) => d.status === 'accepted');
+  const borrowerAnyRejected = borrowerKycDocuments.some((d) => d.status === 'rejected');
   const borrowerStatusLabel =
-    borrowerKycCount === 0 ? 'Not provided' : borrowerAllAccepted ? 'Verified' : 'Provided';
+    borrowerKycCount === 0
+      ? 'Not provided'
+      : borrowerAllAccepted
+        ? 'Verified'
+        : borrowerAnyRejected
+          ? 'Action needed'
+          : 'Needs review';
   const borrowerStatusTone: PillTone =
-    borrowerKycCount === 0 ? 'neutral' : borrowerAllAccepted ? 'success' : 'info';
+    borrowerKycCount === 0 ? 'neutral' : borrowerAllAccepted ? 'success' : borrowerAnyRejected ? 'danger' : 'warning';
 
+  // ---- Previous applications by the same customer ------------------------
+  // Lets the lender reuse evidence (bank statements, payslips, credit report)
+  // instead of asking a returning applicant for everything again.
+  const previousApps: LoanApplication[] = [];
+  try {
+    const seen = new Set<string>([id]);
+    const queries = [];
+    if (app.applicantId) {
+      queries.push(db.collection('loanApplications').where('applicantId', '==', app.applicantId).get());
+    }
+    if (app.offlineCustomerId) {
+      queries.push(db.collection('loanApplications').where('offlineCustomerId', '==', app.offlineCustomerId).get());
+    }
+    const results = await Promise.all(queries);
+    for (const qs of results) {
+      qs.forEach((doc) => {
+        if (seen.has(doc.id)) return;
+        seen.add(doc.id);
+        const data = { applicationId: doc.id, ...doc.data() } as LoanApplication;
+        if (data.status === 'draft') return;
+        previousApps.push(data);
+      });
+    }
+    const sortKey = (a: LoanApplication) =>
+      toDate((a.timeline?.submittedAt ?? a.timeline?.createdAt) as TS)?.getTime() ?? 0;
+    previousApps.sort((a, b) => sortKey(b) - sortKey(a));
+  } catch {
+    // Best-effort — history panel shows nothing on failure.
+  }
+
+  const previous: PreviousApplication[] = previousApps.slice(0, 8).map((p) => ({
+    id: p.applicationId,
+    reference: p.referenceNumber ?? p.applicationId,
+    statusLabel: STATUS_LABELS[p.status] ?? p.status,
+    statusTone: STATUS_TONE[p.status] ?? 'neutral',
+    amount: fmt(p.loanDetails?.approvedAmount ?? p.loanDetails?.requestedAmount),
+    date: fmtDate((p.timeline?.submittedAt ?? p.timeline?.createdAt) as TS),
+    href: `/lender/applications/${p.applicationId}`,
+  }));
+
+  const lastLoan = previousApps.find((p) => LOAN_STATUSES.has(p.status));
+  const lastLoanLabel = lastLoan
+    ? `${STATUS_LABELS[lastLoan.status] ?? lastLoan.status} · ${lastLoan.referenceNumber ?? lastLoan.applicationId} · ${fmt(
+        lastLoan.loanDetails?.approvedAmount ?? lastLoan.loanDetails?.requestedAmount,
+      )} · ${fmtDate((lastLoan.timeline?.disbursedAt ?? lastLoan.timeline?.submittedAt) as TS)}`
+    : undefined;
+
+  // Latest *accepted* document of a given type across previous applications.
+  const latestAccepted = (type: DocumentType) => {
+    let best: { doc: ApplicationDocument; app: LoanApplication; date: Date } | null = null;
+    for (const p of previousApps) {
+      for (const d of p.documents ?? []) {
+        if (d.type !== type || d.status !== 'accepted') continue;
+        const date = toDate(d.uploadedAt as TS);
+        if (!date) continue;
+        if (!best || date > best.date) best = { doc: d, app: p, date };
+      }
+    }
+    return best;
+  };
+
+  const reuse: ReuseItem[] = [];
+  const bank = latestAccepted('bank_statement');
+  if (bank) {
+    reuse.push(
+      buildReuseItem({
+        key: 'bank_statement',
+        label: 'Bank statements',
+        fileName: bank.doc.fileName,
+        fromLabel: bank.app.referenceNumber ?? 'previous application',
+        date: bank.date,
+        windowMonths: BANK_STATEMENT_REUSE_MONTHS,
+        viewUrl: `/api/applications/${bank.app.applicationId}/documents/${bank.doc.documentId}`,
+      }),
+    );
+  }
+  const pay = latestAccepted('payslip');
+  if (pay) {
+    reuse.push(
+      buildReuseItem({
+        key: 'payslip',
+        label: 'Payslips',
+        fileName: pay.doc.fileName,
+        fromLabel: pay.app.referenceNumber ?? 'previous application',
+        date: pay.date,
+        windowMonths: PAYSLIP_REUSE_MONTHS,
+        viewUrl: `/api/applications/${pay.app.applicationId}/documents/${pay.doc.documentId}`,
+      }),
+    );
+  }
+  const latestCentrix = rawReports.find((r) => r.provider === 'centrix' && r.date);
+  if (latestCentrix?.date) {
+    reuse.push(
+      buildReuseItem({
+        key: 'credit',
+        label: 'Comprehensive credit report',
+        fileName: latestCentrix.fileName,
+        fromLabel: latestCentrix.fromApplicationId === id ? 'this application' : 'customer profile',
+        date: latestCentrix.date,
+        windowMonths: CREDIT_REPORT_REUSE_MONTHS,
+        viewUrl: `/api/applications/${id}/reports/${latestCentrix.id}`,
+      }),
+    );
+  }
+  const latestDatazoo = rawReports.find((r) => r.provider === 'datazoo' && r.date);
+  if (latestDatazoo?.date) {
+    reuse.push(
+      buildReuseItem({
+        key: 'identity',
+        label: 'DataZoo identity verification',
+        fileName: latestDatazoo.fileName,
+        fromLabel: latestDatazoo.fromApplicationId === id ? 'this application' : 'customer profile',
+        date: latestDatazoo.date,
+        windowMonths: null,
+        viewUrl: `/api/applications/${id}/reports/${latestDatazoo.id}`,
+      }),
+    );
+  }
+
+  const history: ApplicantHistory = {
+    previousCount: previousApps.length,
+    previous,
+    lastLoanLabel,
+    reuse,
+  };
+
+  // ---- Communication log --------------------------------------------------
+  const communications: CommunicationItem[] = ((app.communicationLog ?? []) as CommunicationLogEntry[])
+    .map((c) => ({
+      id: c.entryId,
+      channel: c.channel,
+      direction: c.direction,
+      summary: c.summary,
+      outcome: c.outcome || undefined,
+      occurredAt: fmtTs(c.occurredAt as TS),
+      loggedBy: c.loggedByName,
+      _t: toDate(c.occurredAt as TS)?.getTime() ?? 0,
+    }))
+    .sort((a, b) => b._t - a._t)
+    .map(({ _t, ...rest }) => {
+      void _t;
+      return rest;
+    });
+
+  // ---- Everything else ----------------------------------------------------
   const name = pi ? `${pi.firstName ?? ''} ${pi.lastName ?? ''}`.trim() : '';
   const monthlyIncome = typeof fin?.monthlyIncome === 'number' ? fin.monthlyIncome : null;
   const monthlyExpenses = typeof fin?.monthlyExpenses === 'number' ? fin.monthlyExpenses : null;
   const monthlySurplus =
     monthlyIncome !== null && monthlyExpenses !== null ? monthlyIncome - monthlyExpenses : null;
-
-  // Every applicant-uploaded document (identity, payslips, bank statements,
-  // other) is streamed to the lender via the documents/[docId] route.
-  const documents = (app.documents ?? []).map((d) => ({
-    documentId: d.documentId,
-    title: DOC_LABEL[d.type] ?? 'Document',
-    subtitle: d.fileName,
-    uploadedAt: fmtDate(d.uploadedAt as TS),
-    status: d.status as DocumentStatus,
-    viewUrl: `/api/applications/${id}/documents/${d.documentId}`,
-  }));
-  const docsVerified = (app.documents ?? []).filter((d) => d.status === 'accepted').length;
 
   const employment = emp
     ? [
@@ -336,18 +553,22 @@ export default async function LenderApplicationDetailPage({
         }
       : undefined;
 
-  // ---- Mocked panels (no backing endpoint/data yet) ---------------------
-  // KYC verification and Centrix credit assessment are not yet integrated.
-  // These are rendered greyed-out and clearly labelled as sample data.
-  // KYC: the borrower uploads identity evidence at onboarding (downloadable by
-  // the lender), and the lender runs the DataZoo identity check and uploads
-  // that report — both kept on the customer profile and reused across apps.
+  const documentRequest = app.documentRequest
+    ? {
+        requestedAt: fmtTs(app.documentRequest.requestedAt as TS),
+        requiredDocuments: app.documentRequest.requiredDocuments ?? [],
+        message: app.documentRequest.message || undefined,
+        outstanding: status === 'waiting_for_docs',
+      }
+    : undefined;
+
   const kyc = {
     borrowerStatusLabel,
     borrowerStatusTone,
     borrowerDocuments: borrowerKycDocuments,
     reports: datazooReports,
   };
+  // Credit summary metrics are still sample values until a report parser exists.
   const credit = {
     reports: centrixReports,
     affordabilityReports,
@@ -368,6 +589,8 @@ export default async function LenderApplicationDetailPage({
     statusTone: STATUS_TONE[status] ?? 'neutral',
     isAssigned,
     isExistingCustomer: Boolean(app.isExistingCustomer),
+    canReviewDocs: isAssigned && !decided,
+    canRequestDocs: isAssigned && REQUEST_DOCS_STATUSES.includes(status),
     header: {
       reference: app.referenceNumber ?? id,
       name: name || 'Applicant',
@@ -392,7 +615,9 @@ export default async function LenderApplicationDetailPage({
     },
     documents,
     docsVerified,
+    docsPending,
     docsTotal: documents.length,
+    documentRequest,
     affordability: {
       statusLabel: app.affordabilityStatus?.replace(/_/g, ' ') ?? 'not started',
       complete: app.affordabilityStatus === 'complete',
@@ -421,6 +646,8 @@ export default async function LenderApplicationDetailPage({
     },
     kyc,
     credit,
+    history,
+    communications,
   };
 
   return <LoanReview data={data} />;

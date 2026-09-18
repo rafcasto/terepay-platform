@@ -3,211 +3,22 @@
 import Link from 'next/link';
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { DocumentStatus, ScheduledPayment } from '@/types/application';
 import ConsoleIcon, { type ConsoleIconName } from '@/components/lender/ConsoleIcon';
 import ConsolePill, { type PillTone } from '@/components/lender/ConsolePill';
-import AddNoteForm from '../AddNoteForm';
 import DisburseForm from '../DisburseForm';
 import ExistingCustomerToggle from '../ExistingCustomerToggle';
 import ScheduledPaymentsPanel from '../ScheduledPaymentsPanel';
+import { Card, Field, SECTION_LABEL } from './Card';
+import CommunicationTab from './CommunicationTab';
+import DecisionModal, { type DecisionMode } from './DecisionModal';
+import DocumentReviewList from './DocumentReviewList';
+import DocumentsTab from './DocumentsTab';
+import ReviewProgress from './ReviewProgress';
+import type { ReportItem, ReviewData, TabKey } from './review-types';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-export type ReportItem = { id: string; fileName: string; uploadedAt: string; uploadedBy: string };
-
-export type ReviewData = {
-  applicationId: string;
-  status: string;
-  statusLabel: string;
-  statusTone: PillTone;
-  isAssigned: boolean;
-  isExistingCustomer: boolean;
-  header: {
-    reference: string;
-    name: string;
-    initials: string;
-    email: string;
-    phone: string;
-    requested: string;
-    purpose: string;
-    submittedLabel: string;
-  };
-  snapshot: {
-    dob: string;
-    address: string;
-    visa: string;
-    employer: string;
-    monthlyIncome: string;
-    monthlyExpenses: string;
-    monthlySurplus: string;
-    surplusTone: 'pos' | 'neg' | 'none';
-  };
-  documents: {
-    documentId: string;
-    title: string;
-    subtitle: string;
-    uploadedAt: string;
-    status: DocumentStatus;
-    viewUrl: string;
-  }[];
-  docsVerified: number;
-  docsTotal: number;
-  affordability: {
-    statusLabel: string;
-    complete: boolean;
-    assessmentCount: number;
-    canAssess: boolean;
-    pdfUrl: string;
-    assessUrl: string;
-  };
-  estimatedFee: string;
-  feeIsEstimated: boolean;
-  employment: { label: string; value: string }[];
-  expenses: { label: string; value: string }[];
-  debts: { label: string; owed: string; fortnightly: string }[];
-  notes: { id: string; author: string; date: string; text: string }[];
-  timeline: { label: string; date: string }[];
-  decision?: {
-    approved: boolean;
-    approvedAmount?: string;
-    decidedAt: string;
-    rationale: string;
-    declineReasons?: string[];
-  };
-  applicantRejection?: { rejectedAt: string; reason: string };
-  payments: { show: boolean; scheduled: ScheduledPayment[] };
-  disburse?: {
-    approvedAmount: number;
-    applicationFee: number;
-    bankDetails?: {
-      bankName: string;
-      accountHolderName: string;
-      accountNumber: string;
-      paymentMethod?: 'direct_debit' | 'bank_transfer';
-    };
-    consentStatus?: string;
-    consentActivatedAt?: string;
-  };
-  decisionInput: { requestedAmount: number; assessedAmount?: number };
-  kyc: {
-    borrowerStatusLabel: string;
-    borrowerStatusTone: PillTone;
-    borrowerDocuments: { label: string; fileName: string; uploadedAt: string; status: string; downloadUrl: string }[];
-    reports: ReportItem[];
-  };
-  credit: {
-    reports: ReportItem[];
-    affordabilityReports: ReportItem[];
-    score: number;
-    band: string;
-    min: number;
-    max: number;
-    defaults: number;
-    enquiries: number;
-    utilisation: string;
-    dti: string;
-  };
-};
-
-type TabKey = 'overview' | 'affordability' | 'kyc' | 'credit' | 'calls' | 'messages';
+export type { ReportItem, ReviewData } from './review-types';
 
 const ASSESSMENT_STATUSES = ['under_assessment', 'waiting_for_docs', 'credit_check'];
-
-const STANDARD_DECLINE_REASONS = [
-  'Insufficient income',
-  'High existing debt load',
-  'Visa expires before loan completion',
-  'Less than 90 days transaction data',
-  'Income could not be verified',
-  'Negative affordability surplus',
-  'Failed credit check',
-  'Recent payment defaults',
-  'Loan purpose not permitted',
-  'Incomplete application/documents',
-  'AML/CFT concerns',
-  'Other',
-];
-
-const REQUESTABLE_DOCS = [
-  'Photo ID (passport or driver licence)',
-  'Bank statements (last 3 months)',
-  'Payslips (last 3 months)',
-  'Proof of address',
-  'Visa / residency document',
-  'Evidence of other income (WINZ etc.)',
-];
-
-const MIN_APPROVED = 200;
-
-const fmtNzd = (n: number) =>
-  new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD', maximumFractionDigits: 0 }).format(n);
-
-const docTone = (s: DocumentStatus): PillTone =>
-  s === 'accepted' ? 'success' : s === 'rejected' ? 'danger' : 'neutral';
-
-const docLabel = (s: DocumentStatus) => (s === 'accepted' ? 'Verified' : s === 'rejected' ? 'Rejected' : 'Pending');
-
-// ---------------------------------------------------------------------------
-// Small building blocks
-// ---------------------------------------------------------------------------
-function Card({
-  title,
-  icon,
-  action,
-  muted,
-  children,
-}: {
-  title?: string;
-  icon?: ConsoleIconName;
-  action?: React.ReactNode;
-  muted?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <section
-      className={`rounded-[var(--radius-lg)] border bg-white p-5 shadow-[var(--shadow-xs)] ${
-        muted ? 'border-dashed border-[var(--border-default)] bg-[var(--slate-50)]' : 'border-[var(--border-default)]'
-      }`}
-    >
-      {title && (
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <h2
-            className={`flex items-center gap-2 font-display text-[15px] font-bold ${
-              muted ? 'text-[var(--text-muted)]' : 'text-[var(--text-strong)]'
-            }`}
-          >
-            {icon && (
-              <span
-                className={`flex h-7 w-7 items-center justify-center rounded-[8px] ${
-                  muted ? 'bg-[var(--slate-100)] text-[var(--slate-400)]' : 'bg-[var(--orange-50)] text-[var(--orange-700)]'
-                }`}
-              >
-                <ConsoleIcon name={icon} size={16} />
-              </span>
-            )}
-            {title}
-          </h2>
-          {action}
-        </div>
-      )}
-      {children}
-    </section>
-  );
-}
-
-function Field({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">{label}</dt>
-      <dd className="mt-1 break-words text-sm text-[var(--text-body)]">{value}</dd>
-    </div>
-  );
-}
-
-function MockBadge() {
-  return <ConsolePill tone="neutral">Not connected</ConsolePill>;
-}
 
 // ---------------------------------------------------------------------------
 // Main component
@@ -215,13 +26,16 @@ function MockBadge() {
 export default function LoanReview({ data }: { data: ReviewData }) {
   const [tab, setTab] = useState<TabKey>('overview');
 
-  const tabs: { key: TabKey; label: string; icon: ConsoleIconName; count?: number }[] = [
+  const kycPending = data.kyc.borrowerDocuments.filter((d) => d.status === 'pending').length;
+
+  // Ordered to match the lender's review flow: documents → affordability → KYC → credit → communication.
+  const tabs: { key: TabKey; label: string; icon: ConsoleIconName; count?: number; tone?: PillTone }[] = [
     { key: 'overview', label: 'Overview', icon: 'gauge' },
+    { key: 'documents', label: 'Documents', icon: 'fileText', count: data.docsPending || undefined, tone: 'warning' },
     { key: 'affordability', label: 'Affordability', icon: 'wallet' },
-    { key: 'kyc', label: 'KYC', icon: 'shield' },
-    { key: 'credit', label: 'Credit', icon: 'trending' },
-    { key: 'calls', label: 'Calls', icon: 'phoneCall', count: 1 },
-    { key: 'messages', label: 'Messages', icon: 'message', count: 2 },
+    { key: 'kyc', label: 'KYC', icon: 'shield', count: kycPending || undefined, tone: 'warning' },
+    { key: 'credit', label: 'Credit reports', icon: 'trending' },
+    { key: 'communication', label: 'Communication', icon: 'phoneCall', count: data.communications.length || undefined },
   ];
 
   const showActionBar =
@@ -239,7 +53,7 @@ export default function LoanReview({ data }: { data: ReviewData }) {
           Loan review
         </Link>
         <span className="text-[var(--text-muted)]">·</span>
-        <span className="text-[var(--text-muted)]">{data.header.name} · Tabbed workspace</span>
+        <span className="text-[var(--text-muted)]">{data.header.name}</span>
       </div>
 
       {/* Header card */}
@@ -260,6 +74,11 @@ export default function LoanReview({ data }: { data: ReviewData }) {
                 ) : (
                   <ConsolePill tone="warning">New customer</ConsolePill>
                 )}
+                {data.history.previousCount > 0 && (
+                  <ConsolePill tone="info">
+                    {data.history.previousCount} previous {data.history.previousCount === 1 ? 'application' : 'applications'}
+                  </ConsolePill>
+                )}
               </div>
               <p className="mt-0.5 text-sm text-[var(--text-muted)]">
                 <span className="font-mono">{data.header.reference}</span> · Submitted {data.header.submittedLabel}
@@ -269,11 +88,11 @@ export default function LoanReview({ data }: { data: ReviewData }) {
 
           <div className="flex items-center gap-6">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">Requested</p>
+              <p className={SECTION_LABEL}>Requested</p>
               <p className="font-mono text-lg font-bold tabular-nums text-[var(--text-strong)]">{data.header.requested}</p>
             </div>
             <div className="hidden max-w-[220px] sm:block">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">Purpose</p>
+              <p className={SECTION_LABEL}>Purpose</p>
               <p className="text-sm font-semibold text-[var(--text-strong)]">{data.header.purpose}</p>
             </div>
             <div className="flex items-center gap-2">
@@ -303,7 +122,7 @@ export default function LoanReview({ data }: { data: ReviewData }) {
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[300px_1fr]">
         {/* Sidebar */}
         <aside className="space-y-5">
-          <Sidebar data={data} />
+          <Sidebar data={data} onOpenDocuments={() => setTab('documents')} />
         </aside>
 
         {/* Main */}
@@ -324,7 +143,13 @@ export default function LoanReview({ data }: { data: ReviewData }) {
                 <ConsoleIcon name={t.icon} size={16} />
                 {t.label}
                 {t.count != null && (
-                  <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[var(--surface-sunken)] px-1 text-[11px] font-bold text-[var(--text-muted)]">
+                  <span
+                    className={`flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[11px] font-bold ${
+                      t.tone === 'warning'
+                        ? 'bg-[var(--warning-50)] text-[var(--warning-700)]'
+                        : 'bg-[var(--surface-sunken)] text-[var(--text-muted)]'
+                    }`}
+                  >
                     {t.count}
                   </span>
                 )}
@@ -333,12 +158,12 @@ export default function LoanReview({ data }: { data: ReviewData }) {
           </div>
 
           <div className="space-y-5">
-            {tab === 'overview' && <OverviewTab data={data} />}
+            {tab === 'overview' && <OverviewTab data={data} onSelect={setTab} />}
+            {tab === 'documents' && <DocumentsTab data={data} />}
             {tab === 'affordability' && <AffordabilityTab data={data} />}
             {tab === 'kyc' && <KycTab data={data} />}
-            {tab === 'credit' && <CreditTab data={data} />}
-            {tab === 'calls' && <CallsTab />}
-            {tab === 'messages' && <MessagesTab data={data} />}
+            {tab === 'credit' && <CreditCard data={data} full />}
+            {tab === 'communication' && <CommunicationTab data={data} />}
           </div>
         </main>
       </div>
@@ -347,6 +172,7 @@ export default function LoanReview({ data }: { data: ReviewData }) {
         <ActionBar
           applicationId={data.applicationId}
           affordabilityComplete={data.affordability.complete}
+          docsPending={data.docsPending}
           requestedAmount={data.decisionInput.requestedAmount}
           assessedAmount={data.decisionInput.assessedAmount}
         />
@@ -358,7 +184,7 @@ export default function LoanReview({ data }: { data: ReviewData }) {
 // ---------------------------------------------------------------------------
 // Sidebar
 // ---------------------------------------------------------------------------
-function Sidebar({ data }: { data: ReviewData }) {
+function Sidebar({ data, onOpenDocuments }: { data: ReviewData; onOpenDocuments: () => void }) {
   const s = data.snapshot;
   const surplusColor =
     s.surplusTone === 'pos'
@@ -420,7 +246,7 @@ function Sidebar({ data }: { data: ReviewData }) {
         <div className="mb-4 flex items-center justify-between gap-2">
           <h2 className="font-display text-[15px] font-bold text-[var(--text-strong)]">Documents</h2>
           <span className="text-xs font-semibold text-[var(--text-muted)]">
-            {data.docsVerified}/{data.docsTotal} verified
+            {data.docsVerified}/{data.docsTotal} accepted
           </span>
         </div>
         {data.documents.length === 0 ? (
@@ -428,31 +254,46 @@ function Sidebar({ data }: { data: ReviewData }) {
         ) : (
           <ul className="space-y-2.5">
             {data.documents.map((d) => (
-              <li key={d.documentId} className="flex items-center justify-between gap-2">
+              <li key={d.id} className="flex items-center justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-2.5">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-[var(--slate-100)] text-[var(--text-muted)]">
-                    <ConsoleIcon name="fileText" size={16} />
+                  <span
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] ${
+                      d.status === 'accepted'
+                        ? 'bg-[var(--success-50)] text-[var(--success-700)]'
+                        : d.status === 'rejected'
+                          ? 'bg-[var(--danger-50)] text-[var(--danger-700)]'
+                          : 'bg-[var(--slate-100)] text-[var(--text-muted)]'
+                    }`}
+                  >
+                    <ConsoleIcon name={d.status === 'accepted' ? 'check' : d.status === 'rejected' ? 'x' : 'fileText'} size={16} />
                   </span>
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-[var(--text-body)]">{d.title}</p>
                     <p className="truncate text-xs text-[var(--text-muted)]">{d.subtitle}</p>
                   </div>
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <ConsolePill tone={docTone(d.status)}>{docLabel(d.status)}</ConsolePill>
-                  <a
-                    href={d.viewUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 rounded-[8px] border border-[var(--border-default)] bg-white px-2 py-1 text-xs font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--surface-sunken)]"
-                  >
-                    <ConsoleIcon name="download" size={14} />
-                    View
-                  </a>
-                </div>
+                <a
+                  href={d.viewUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex shrink-0 items-center gap-1 rounded-[8px] border border-[var(--border-default)] bg-white px-2 py-1 text-xs font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--surface-sunken)]"
+                >
+                  <ConsoleIcon name="search" size={14} />
+                  View
+                </a>
               </li>
             ))}
           </ul>
+        )}
+        {data.docsPending > 0 && (
+          <button
+            type="button"
+            onClick={onOpenDocuments}
+            className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-[10px] bg-[var(--orange-500)] px-3 py-2 text-sm font-semibold text-[var(--ink-900)] transition-[filter] hover:brightness-105"
+          >
+            Review {data.docsPending} pending {data.docsPending === 1 ? 'document' : 'documents'}
+            <ConsoleIcon name="chevRight" size={16} />
+          </button>
         )}
       </section>
     </>
@@ -466,7 +307,7 @@ function SnapItem({ icon, label, value }: { icon: ConsoleIconName; label: string
         <ConsoleIcon name={icon} size={15} />
       </span>
       <div className="min-w-0">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">{label}</p>
+        <p className={SECTION_LABEL}>{label}</p>
         <p className="mt-0.5 break-words text-[13px] font-medium text-[var(--text-body)]">{value}</p>
       </div>
     </div>
@@ -476,7 +317,7 @@ function SnapItem({ icon, label, value }: { icon: ConsoleIconName; label: string
 // ---------------------------------------------------------------------------
 // Tabs
 // ---------------------------------------------------------------------------
-function OverviewTab({ data }: { data: ReviewData }) {
+function OverviewTab({ data, onSelect }: { data: ReviewData; onSelect: (tab: TabKey) => void }) {
   const router = useRouter();
   return (
     <>
@@ -522,6 +363,11 @@ function OverviewTab({ data }: { data: ReviewData }) {
       {/* Claim */}
       {data.status === 'pending_review' && <ClaimCard applicationId={data.applicationId} onDone={() => router.refresh()} />}
 
+      {/* Where the review is up to */}
+      {!data.decision && ASSESSMENT_STATUSES.concat('pending_review').includes(data.status) && (
+        <ReviewProgress data={data} onSelect={onSelect} />
+      )}
+
       {/* Disburse */}
       {data.disburse && (
         <Card title="Disbursement" icon="wallet">
@@ -540,10 +386,7 @@ function OverviewTab({ data }: { data: ReviewData }) {
         <ScheduledPaymentsPanel applicationId={data.applicationId} scheduledPayments={data.payments.scheduled} />
       )}
 
-      {/* KYC summary (mocked) */}
       <KycCard data={data} />
-
-      {/* Credit summary (mocked) */}
       <CreditCard data={data} />
 
       {/* Timeline */}
@@ -598,10 +441,15 @@ function AffordabilityTab({ data }: { data: ReviewData }) {
             <p className="mt-0.5 font-semibold capitalize">{a.statusLabel}</p>
           </div>
           <div className="rounded-[var(--radius-md)] bg-[var(--slate-50)] p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">Assessments</p>
+            <p className={SECTION_LABEL}>Assessments</p>
             <p className="mt-0.5 font-semibold text-[var(--text-strong)]">{a.assessmentCount}</p>
           </div>
         </div>
+        {data.docsPending > 0 && (
+          <p className="mt-3 text-xs text-[var(--warning-700)]">
+            {data.docsPending} document{data.docsPending === 1 ? '' : 's'} still need review — check them before relying on declared figures.
+          </p>
+        )}
       </Card>
 
       {/* Declared financials */}
@@ -613,7 +461,7 @@ function AffordabilityTab({ data }: { data: ReviewData }) {
             { label: 'Surplus', value: data.snapshot.monthlySurplus },
           ].map((c) => (
             <div key={c.label} className="bg-[var(--slate-50)] p-4 text-center">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">{c.label}</p>
+              <p className={SECTION_LABEL}>{c.label}</p>
               <p className="mt-1 font-mono font-bold tabular-nums text-[var(--text-strong)]">{c.value}</p>
             </div>
           ))}
@@ -651,7 +499,7 @@ function AffordabilityTab({ data }: { data: ReviewData }) {
           <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
             {data.debts.map((d) => (
               <div key={d.label}>
-                <dt className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">{d.label}</dt>
+                <dt className={SECTION_LABEL}>{d.label}</dt>
                 <dd className="mt-1 text-sm text-[var(--text-body)]">Owed: {d.owed}</dd>
                 <dd className="text-xs text-[var(--text-muted)]">Fortnightly: {d.fortnightly}</dd>
               </div>
@@ -675,126 +523,23 @@ function AffordabilityTab({ data }: { data: ReviewData }) {
 }
 
 function KycTab({ data }: { data: ReviewData }) {
+  const identityDocs = data.documents.filter((d) => d.kind === 'identity');
   return (
     <>
-      <KycCard data={data} full />
-      {/* Documents detail (real) */}
-      <Card title="Documents" icon="fileText">
-        {data.documents.length === 0 ? (
-          <p className="text-sm text-[var(--text-muted)]">No documents uploaded yet.</p>
-        ) : (
-          <ul className="space-y-2">
-            {data.documents.map((d) => (
-              <li
-                key={d.documentId}
-                className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] bg-[var(--slate-50)] p-3"
-              >
-                <div className="flex min-w-0 items-center gap-2.5">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-[var(--slate-100)] text-[var(--text-muted)]">
-                    <ConsoleIcon name="fileText" size={16} />
-                  </span>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-[var(--text-body)]">{d.title}</p>
-                    <p className="truncate text-xs text-[var(--text-muted)]">
-                      {d.subtitle} · Uploaded {d.uploadedAt}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <ConsolePill tone={docTone(d.status)}>{docLabel(d.status)}</ConsolePill>
-                  <a
-                    href={d.viewUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 rounded-[8px] border border-[var(--border-default)] bg-white px-2 py-1 text-xs font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--surface-sunken)]"
-                  >
-                    <ConsoleIcon name="download" size={14} />
-                    View
-                  </a>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
-    </>
-  );
-}
-
-function CreditTab({ data }: { data: ReviewData }) {
-  return <CreditCard data={data} full />;
-}
-
-function CallsTab() {
-  return (
-    <Card title="Call log" icon="phoneCall" muted action={<MockBadge />}>
-      <div className="space-y-3 opacity-60" aria-hidden="true">
-        {[
-          { dir: 'Outbound', note: 'Discussed loan purpose and repayment dates', when: 'Sample · 09:42' },
-        ].map((c, i) => (
-          <div key={i} className="flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-white/60 p-3">
-            <div className="flex items-center gap-3">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--slate-100)] text-[var(--slate-400)]">
-                <ConsoleIcon name="phoneCall" size={16} />
-              </span>
-              <div>
-                <p className="text-sm font-semibold text-[var(--text-muted)]">{c.dir} call</p>
-                <p className="text-xs text-[var(--text-muted)]">{c.note}</p>
-              </div>
-            </div>
-            <span className="text-xs text-[var(--slate-400)]">{c.when}</span>
-          </div>
-        ))}
-      </div>
-      <p className="mt-4 text-xs text-[var(--text-muted)]">
-        Call logging is not yet connected. This panel shows sample data only.
-      </p>
-    </Card>
-  );
-}
-
-function MessagesTab({ data }: { data: ReviewData }) {
-  return (
-    <>
-      <Card title="Applicant messages" icon="message" muted action={<MockBadge />}>
-        <div className="space-y-3 opacity-60" aria-hidden="true">
-          <div className="max-w-[80%] rounded-[var(--radius-md)] bg-white/70 p-3">
-            <p className="text-sm text-[var(--text-muted)]">Hi, when will I hear back on my application?</p>
-            <p className="mt-1 text-[11px] text-[var(--slate-400)]">Applicant · sample</p>
-          </div>
-          <div className="ml-auto max-w-[80%] rounded-[var(--radius-md)] bg-[var(--slate-100)] p-3">
-            <p className="text-sm text-[var(--text-muted)]">We&apos;re reviewing your documents and will update you shortly.</p>
-            <p className="mt-1 text-right text-[11px] text-[var(--slate-400)]">You · sample</p>
-          </div>
-        </div>
-        <p className="mt-4 text-xs text-[var(--text-muted)]">
-          In-app messaging is not yet connected. This panel shows sample data only.
-        </p>
-      </Card>
-
-      {/* Internal notes (real) */}
-      <Card title={`Internal notes (${data.notes.length})`} icon="fileText">
-        {data.notes.length > 0 && (
-          <ul className="mb-4 space-y-3">
-            {data.notes.map((n) => (
-              <li key={n.id} className="rounded-[var(--radius-md)] bg-[var(--slate-50)] p-3">
-                <div className="mb-1 flex items-center justify-between gap-2">
-                  <span className="text-xs font-semibold text-[var(--text-body)]">{n.author}</span>
-                  <span className="text-xs text-[var(--text-muted)]">{n.date}</span>
-                </div>
-                <p className="whitespace-pre-wrap text-sm text-[var(--text-body)]">{n.text}</p>
-              </li>
-            ))}
-          </ul>
-        )}
-        {data.isAssigned && <AddNoteForm applicationId={data.applicationId} />}
+      <KycCard data={data} />
+      <Card title="Identity documents (this application)" icon="fileText">
+        <DocumentReviewList
+          items={identityDocs}
+          canReview={data.canReviewDocs}
+          emptyText="No identity documents were uploaded with this application."
+        />
       </Card>
     </>
   );
 }
 
 // ---------------------------------------------------------------------------
-// KYC + Credit cards (mocked, greyed)
+// KYC + Credit cards
 // ---------------------------------------------------------------------------
 function ReportList({ reports, applicationId }: { reports: ReportItem[]; applicationId: string }) {
   if (reports.length === 0) {
@@ -915,74 +660,10 @@ function ReportUploader({
   );
 }
 
-const ONBOARDING_DOC_TONE: Record<string, PillTone> = {
-  pending_review: 'warning',
-  pending: 'warning',
-  accepted: 'success',
-  approved: 'success',
-  verified: 'success',
-  rejected: 'danger',
-};
-
-const onboardingDocStatusLabel = (st: string) =>
-  st === 'pending_review' || st === 'pending'
-    ? 'Pending review'
-    : st === 'accepted' || st === 'approved' || st === 'verified'
-      ? 'Verified'
-      : st === 'rejected'
-        ? 'Rejected'
-        : st;
-
-function BorrowerKycList({ docs }: { docs: ReviewData['kyc']['borrowerDocuments'] }) {
-  if (docs.length === 0) {
-    return (
-      <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--border-default)] bg-white/70 p-4 text-sm text-[var(--text-muted)]">
-        No identity documents were uploaded by the borrower at onboarding.
-      </div>
-    );
-  }
-  return (
-    <ul className="space-y-2">
-      {docs.map((d, i) => (
-        <li
-          key={`${d.fileName}-${i}`}
-          className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-white p-3"
-        >
-          <div className="flex min-w-0 items-center gap-2.5">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-[var(--slate-100)] text-[var(--text-muted)]">
-              <ConsoleIcon name="fileText" size={16} />
-            </span>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-[var(--text-body)]">{d.label}</p>
-              <p className="truncate text-xs text-[var(--text-muted)]">
-                {d.fileName} · Uploaded {d.uploadedAt}
-              </p>
-            </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <ConsolePill tone={ONBOARDING_DOC_TONE[d.status] ?? 'neutral'}>
-              {onboardingDocStatusLabel(d.status)}
-            </ConsolePill>
-            <a
-              href={d.downloadUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 rounded-[8px] border border-[var(--border-default)] bg-white px-2 py-1 text-xs font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--surface-sunken)]"
-            >
-              <ConsoleIcon name="download" size={14} />
-              Download
-            </a>
-          </div>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function KycCard({ data, full = false }: { data: ReviewData; full?: boolean }) {
-  void full;
+function KycCard({ data }: { data: ReviewData }) {
   const k = data.kyc;
   const dzVerified = k.reports.length > 0;
+  const identityReuse = data.history.reuse.find((r) => r.key === 'identity');
   return (
     <Card
       title="KYC verification"
@@ -993,25 +674,29 @@ function KycCard({ data, full = false }: { data: ReviewData; full?: boolean }) {
         </ConsolePill>
       }
     >
-      {/* Borrower-provided onboarding evidence (downloadable by the lender) */}
+      {/* Borrower-provided onboarding evidence (reviewable by the lender) */}
       <div className="mb-5">
         <div className="mb-2 flex items-center justify-between gap-2">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">
-            Borrower identity documents (uploaded at onboarding)
-          </p>
+          <p className={SECTION_LABEL}>Borrower identity documents (uploaded at onboarding)</p>
           <ConsolePill tone={k.borrowerStatusTone}>{k.borrowerStatusLabel}</ConsolePill>
         </div>
-        <BorrowerKycList docs={k.borrowerDocuments} />
+        <DocumentReviewList
+          items={k.borrowerDocuments}
+          canReview={data.canReviewDocs}
+          emptyText="No identity documents were uploaded by the borrower at onboarding."
+        />
+        <p className="mt-2 text-xs text-[var(--text-muted)]">
+          Verdicts are saved on the customer profile, so they carry across every application this borrower makes.
+        </p>
       </div>
 
       {/* Lender-run DataZoo identity check */}
       <div className="border-t border-[var(--border-subtle)] pt-5">
-        <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">
-          DataZoo identity check (lender)
-        </p>
+        <p className={`${SECTION_LABEL} mb-1`}>DataZoo identity check (lender)</p>
         <p className="mb-3 text-sm text-[var(--text-muted)]">
-          Run the identity check in DataZoo and upload the report. It is stored on the borrower&apos;s
-          profile and reused across their future loan applications.
+          {identityReuse
+            ? `Identity was verified ${identityReuse.ageLabel} (${identityReuse.fromLabel}). A new check is only needed if the borrower's details have changed.`
+            : "Run the identity check in DataZoo and upload the report. It is stored on the borrower's profile and reused across their future loan applications."}
         </p>
         <ReportList reports={k.reports} applicationId={data.applicationId} />
         <ReportUploader
@@ -1031,6 +716,7 @@ function CreditCard({ data, full = false }: { data: ReviewData; full?: boolean }
   const affordabilityReports = c.affordabilityReports;
   const bothOnFile = creditReports.length > 0 && affordabilityReports.length > 0;
   const anyReport = creditReports.length > 0 || affordabilityReports.length > 0;
+  const creditReuse = data.history.reuse.find((r) => r.key === 'credit');
   const pct = Math.max(0, Math.min(1, (c.score - c.min) / (c.max - c.min)));
   return (
     <Card
@@ -1048,11 +734,23 @@ function CreditCard({ data, full = false }: { data: ReviewData; full?: boolean }
         borrower&apos;s profile and reused across their future loan applications.
       </p>
 
+      {creditReuse && (
+        <div
+          className={`mb-4 rounded-[var(--radius-md)] border p-3 text-sm ${
+            creditReuse.reusable
+              ? 'border-[var(--success-700)]/25 bg-[var(--success-50)] text-[var(--success-700)]'
+              : 'border-[var(--warning-700)]/30 bg-[var(--warning-50)] text-[var(--warning-700)]'
+          }`}
+        >
+          {creditReuse.reusable
+            ? `A credit report from ${creditReuse.ageLabel} is still within the ${creditReuse.windowMonths}-month window (valid until ${creditReuse.expiresLabel}) — no need to pull a new one unless something has changed.`
+            : `The last credit report is ${creditReuse.ageLabel} — outside the ${creditReuse.windowMonths}-month window. Pull a fresh report before deciding.`}
+        </div>
+      )}
+
       <div className="space-y-5">
         <div>
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">
-            Comprehensive credit report
-          </p>
+          <p className={`${SECTION_LABEL} mb-2`}>Comprehensive credit report</p>
           <ReportList reports={creditReports} applicationId={data.applicationId} />
           <ReportUploader
             applicationId={data.applicationId}
@@ -1063,9 +761,7 @@ function CreditCard({ data, full = false }: { data: ReviewData; full?: boolean }
         </div>
 
         <div className="border-t border-[var(--border-subtle)] pt-5">
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">
-            Affordability report
-          </p>
+          <p className={`${SECTION_LABEL} mb-2`}>Affordability report</p>
           <ReportList reports={affordabilityReports} applicationId={data.applicationId} />
           <ReportUploader
             applicationId={data.applicationId}
@@ -1078,9 +774,7 @@ function CreditCard({ data, full = false }: { data: ReviewData; full?: boolean }
 
       {full && (
         <div className="mt-5 border-t border-[var(--border-subtle)] pt-5">
-          <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">
-            Summary — sample, populated from the uploaded report
-          </p>
+          <p className={`${SECTION_LABEL} mb-3`}>Summary — sample, populated from the uploaded report</p>
           <div className="opacity-70" aria-hidden="true">
             <div className="flex items-end gap-3">
               <span className="font-mono text-4xl font-bold tabular-nums text-[var(--text-muted)]">{c.score}</span>
@@ -1101,7 +795,7 @@ function CreditCard({ data, full = false }: { data: ReviewData; full?: boolean }
                 { label: 'Debt-to-income', value: c.dti },
               ].map((m) => (
                 <div key={m.label} className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-white/60 p-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">{m.label}</p>
+                  <p className={SECTION_LABEL}>{m.label}</p>
                   <p className="mt-0.5 font-semibold text-[var(--text-muted)]">{m.value}</p>
                 </div>
               ))}
@@ -1140,7 +834,7 @@ function ClaimCard({ applicationId, onDone }: { applicationId: string; onDone: (
   return (
     <Card title="Start review" icon="inbox">
       <p className="mb-3 text-sm text-[var(--text-muted)]">
-        Claim this application to assign it to yourself and begin the affordability assessment.
+        Claim this application to assign it to yourself and begin the review.
       </p>
       {error && (
         <div className="mb-3 rounded-[var(--radius-md)] border border-[var(--danger-700)]/25 bg-[var(--danger-50)] px-3 py-2 text-sm text-[var(--danger-700)]">
@@ -1159,29 +853,36 @@ function ClaimCard({ applicationId, onDone }: { applicationId: string; onDone: (
 }
 
 // ---------------------------------------------------------------------------
-// Sticky action bar + decision modals
+// Sticky action bar
 // ---------------------------------------------------------------------------
-type ActionMode = 'approve' | 'decline' | 'request' | null;
-
 function ActionBar({
   applicationId,
   affordabilityComplete,
+  docsPending,
   requestedAmount,
   assessedAmount,
 }: {
   applicationId: string;
   affordabilityComplete: boolean;
+  docsPending: number;
   requestedAmount: number;
   assessedAmount?: number;
 }) {
-  const [mode, setMode] = useState<ActionMode>(null);
+  const [mode, setMode] = useState<DecisionMode | null>(null);
 
   return (
     <>
       <div className="sticky bottom-0 z-30 -mx-4 mt-5 border-t border-[var(--border-default)] bg-white/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
-            {affordabilityComplete ? (
+            {docsPending > 0 ? (
+              <>
+                <span className="text-[var(--warning-700)]">
+                  <ConsoleIcon name="alert" size={16} />
+                </span>
+                {docsPending} document{docsPending === 1 ? '' : 's'} still to review
+              </>
+            ) : affordabilityComplete ? (
               <>
                 <span className="text-[var(--success-700)]">
                   <ConsoleIcon name="check" size={16} />
@@ -1212,7 +913,7 @@ function ActionBar({
               className="inline-flex items-center gap-1.5 rounded-[10px] border border-[var(--border-default)] bg-white px-3.5 py-2 text-sm font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--surface-sunken)]"
             >
               <ConsoleIcon name="mail" size={16} />
-              Request info
+              Request documents
             </button>
             <button
               type="button"
@@ -1238,229 +939,5 @@ function ActionBar({
         />
       )}
     </>
-  );
-}
-
-function DecisionModal({
-  mode,
-  applicationId,
-  requestedAmount,
-  assessedAmount,
-  onClose,
-}: {
-  mode: Exclude<ActionMode, null>;
-  applicationId: string;
-  requestedAmount: number;
-  assessedAmount?: number;
-  onClose: () => void;
-}) {
-  const router = useRouter();
-  const [rationale, setRationale] = useState('');
-  const [reasons, setReasons] = useState<string[]>([]);
-  const [requestedDocs, setRequestedDocs] = useState<string[]>([]);
-  const [message, setMessage] = useState('');
-  const [amount, setAmount] = useState<number>(Math.min(assessedAmount ?? requestedAmount, requestedAmount));
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const title = mode === 'approve' ? 'Approve application' : mode === 'decline' ? 'Decline application' : 'Request more information';
-
-  const amountInvalid =
-    mode === 'approve' && (!Number.isFinite(amount) || amount < MIN_APPROVED || amount > requestedAmount);
-
-  const toggle = (list: string[], set: (v: string[]) => void, v: string) =>
-    set(list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
-
-  const canSubmit =
-    mode === 'approve'
-      ? rationale.trim().length >= 10 && !amountInvalid
-      : mode === 'decline'
-        ? rationale.trim().length >= 10 && reasons.length > 0
-        : requestedDocs.length > 0;
-
-  const submit = async () => {
-    if (!canSubmit) return;
-    setLoading(true);
-    setError(null);
-    try {
-      let res: Response;
-      if (mode === 'request') {
-        res = await fetch(`/api/applications/${applicationId}/request-documents`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ requiredDocuments: requestedDocs, message: message || undefined }),
-        });
-      } else {
-        res = await fetch(`/api/applications/${applicationId}/decision`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: mode === 'approve' ? 'approve' : 'decline',
-            rationale,
-            declineReasons: mode === 'decline' ? reasons : undefined,
-            approvedAmount: mode === 'approve' ? amount : undefined,
-          }),
-        });
-      }
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        throw new Error(d.error?.message ?? 'Request failed');
-      }
-      onClose();
-      router.refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const inputClass =
-    'w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-white px-3 py-2 text-sm text-[var(--text-body)] focus:border-[var(--orange-400)] focus:outline-none focus:ring-2 focus:ring-[var(--orange-400)]';
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-[rgba(15,29,46,0.45)] p-0 sm:items-center sm:p-4"
-      onClick={onClose}
-    >
-      <div
-        className="max-h-[88vh] w-full max-w-lg overflow-y-auto rounded-t-[var(--radius-xl)] border border-[var(--border-default)] bg-white p-5 shadow-[var(--shadow-lg)] sm:rounded-[var(--radius-xl)]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="font-display text-base font-bold text-[var(--text-strong)]">{title}</h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-[var(--text-muted)] transition-colors hover:text-[var(--text-body)]"
-            aria-label="Close"
-          >
-            <ConsoleIcon name="x" size={18} />
-          </button>
-        </div>
-
-        {error && (
-          <div className="mb-3 rounded-[var(--radius-md)] border border-[var(--danger-700)]/25 bg-[var(--danger-50)] px-3 py-2 text-sm text-[var(--danger-700)]">
-            {error}
-          </div>
-        )}
-
-        <div className="space-y-4">
-          {mode === 'approve' && (
-            <div>
-              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">
-                Approved amount (NZD)
-              </label>
-              <input
-                type="number"
-                value={Number.isFinite(amount) ? amount : ''}
-                onChange={(e) => setAmount(e.target.valueAsNumber)}
-                min={MIN_APPROVED}
-                max={requestedAmount}
-                step={50}
-                className={inputClass}
-              />
-              <p className="mt-1 text-xs text-[var(--text-muted)]">
-                Requested: {fmtNzd(requestedAmount)} · Allowed: {fmtNzd(MIN_APPROVED)} – {fmtNzd(requestedAmount)}
-              </p>
-              {amountInvalid && (
-                <p className="mt-1 text-xs text-[var(--danger-700)]">
-                  Amount must be between {fmtNzd(MIN_APPROVED)} and {fmtNzd(requestedAmount)}.
-                </p>
-              )}
-            </div>
-          )}
-
-          {mode === 'decline' && (
-            <div>
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">
-                Decline reasons (select all that apply)
-              </p>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {STANDARD_DECLINE_REASONS.map((r) => (
-                  <label key={r} className="flex cursor-pointer items-center gap-2 text-sm text-[var(--text-body)]">
-                    <input
-                      type="checkbox"
-                      checked={reasons.includes(r)}
-                      onChange={() => toggle(reasons, setReasons, r)}
-                      className="rounded border-[var(--border-default)] text-[var(--orange-500)] focus:ring-[var(--orange-400)]"
-                    />
-                    {r}
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {mode === 'request' && (
-            <div>
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">
-                Documents to request
-              </p>
-              <div className="grid grid-cols-1 gap-2">
-                {REQUESTABLE_DOCS.map((r) => (
-                  <label key={r} className="flex cursor-pointer items-center gap-2 text-sm text-[var(--text-body)]">
-                    <input
-                      type="checkbox"
-                      checked={requestedDocs.includes(r)}
-                      onChange={() => toggle(requestedDocs, setRequestedDocs, r)}
-                      className="rounded border-[var(--border-default)] text-[var(--orange-500)] focus:ring-[var(--orange-400)]"
-                    />
-                    {r}
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div>
-            <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">
-              {mode === 'request' ? 'Message to applicant (optional)' : 'Rationale'}
-            </label>
-            <textarea
-              value={mode === 'request' ? message : rationale}
-              onChange={(e) => (mode === 'request' ? setMessage(e.target.value) : setRationale(e.target.value))}
-              rows={4}
-              placeholder={
-                mode === 'request'
-                  ? 'Let the applicant know what you need and why…'
-                  : `Document the reason for ${mode === 'approve' ? 'approving' : 'declining'}…`
-              }
-              className={`${inputClass} resize-none`}
-            />
-            {mode !== 'request' && rationale.trim().length > 0 && rationale.trim().length < 10 && (
-              <p className="mt-1 text-xs text-[var(--danger-700)]">Rationale must be at least 10 characters.</p>
-            )}
-          </div>
-        </div>
-
-        <div className="mt-5 flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={loading}
-            className="rounded-[10px] px-4 py-2 text-sm font-semibold text-[var(--text-muted)] hover:text-[var(--text-body)] disabled:opacity-50"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={submit}
-            disabled={loading || !canSubmit}
-            className={`rounded-[10px] px-4 py-2 text-sm font-semibold text-white transition-[filter] hover:brightness-110 disabled:opacity-50 ${
-              mode === 'decline' ? 'bg-[var(--danger-700)]' : mode === 'approve' ? 'bg-[var(--success-700)]' : 'bg-[var(--orange-500)] text-[var(--ink-900)]'
-            }`}
-          >
-            {loading
-              ? 'Working…'
-              : mode === 'approve'
-                ? 'Confirm approval'
-                : mode === 'decline'
-                  ? 'Confirm decline'
-                  : 'Send request'}
-          </button>
-        </div>
-      </div>
-    </div>
   );
 }
