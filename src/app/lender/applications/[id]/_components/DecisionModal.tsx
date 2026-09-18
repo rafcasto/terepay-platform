@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import ConsoleIcon from '@/components/lender/ConsoleIcon';
 import { INPUT_CLASS } from './Card';
+import { CUSTOM_REQUEST_KEY, DOCUMENT_REQUEST_CATALOGUE } from '@/lib/loan/document-requests';
 
 export type DecisionMode = 'approve' | 'decline' | 'request';
 
@@ -22,15 +23,6 @@ const STANDARD_DECLINE_REASONS = [
   'Other',
 ];
 
-const REQUESTABLE_DOCS = [
-  'Photo ID (passport or driver licence)',
-  'Bank statements (last 3 months)',
-  'Payslips (last 3 months)',
-  'Proof of address',
-  'Visa / residency document',
-  'Evidence of other income (WINZ etc.)',
-];
-
 const MIN_APPROVED = 200;
 
 const fmtNzd = (n: number) =>
@@ -41,18 +33,22 @@ export default function DecisionModal({
   applicationId,
   requestedAmount,
   assessedAmount,
+  preselectKeys = [],
   onClose,
 }: {
   mode: DecisionMode;
   applicationId: string;
   requestedAmount: number;
   assessedAmount?: number;
+  /** Request mode: catalogue keys to tick by default (e.g. what's still missing). */
+  preselectKeys?: string[];
   onClose: () => void;
 }) {
   const router = useRouter();
   const [rationale, setRationale] = useState('');
   const [reasons, setReasons] = useState<string[]>([]);
-  const [requestedDocs, setRequestedDocs] = useState<string[]>([]);
+  const [requestedKeys, setRequestedKeys] = useState<string[]>(preselectKeys);
+  const [customLabel, setCustomLabel] = useState('');
   const [message, setMessage] = useState('');
   const [amount, setAmount] = useState<number>(Math.min(assessedAmount ?? requestedAmount, requestedAmount));
   const [loading, setLoading] = useState(false);
@@ -66,12 +62,14 @@ export default function DecisionModal({
   const toggle = (list: string[], set: (v: string[]) => void, v: string) =>
     set(list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
 
+  const customTrimmed = customLabel.trim();
+  const requestCount = requestedKeys.length + (customTrimmed ? 1 : 0);
   const canSubmit =
     mode === 'approve'
       ? rationale.trim().length >= 10 && !amountInvalid
       : mode === 'decline'
         ? rationale.trim().length >= 10 && reasons.length > 0
-        : requestedDocs.length > 0;
+        : requestCount > 0;
 
   const submit = async () => {
     if (!canSubmit) return;
@@ -83,7 +81,13 @@ export default function DecisionModal({
         res = await fetch(`/api/applications/${applicationId}/request-documents`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ requiredDocuments: requestedDocs, message: message || undefined }),
+          body: JSON.stringify({
+            items: [
+              ...requestedKeys.map((key) => ({ key })),
+              ...(customTrimmed ? [{ key: CUSTOM_REQUEST_KEY, label: customTrimmed }] : []),
+            ],
+            message: message || undefined,
+          }),
         });
       } else {
         res = await fetch(`/api/applications/${applicationId}/decision`, {
@@ -190,20 +194,37 @@ export default function DecisionModal({
                 Documents to request
               </p>
               <div className="grid grid-cols-1 gap-2">
-                {REQUESTABLE_DOCS.map((r) => (
-                  <label key={r} className="flex cursor-pointer items-center gap-2 text-sm text-[var(--text-body)]">
+                {DOCUMENT_REQUEST_CATALOGUE.map((item) => (
+                  <label key={item.key} className="flex cursor-pointer items-start gap-2 text-sm text-[var(--text-body)]">
                     <input
                       type="checkbox"
-                      checked={requestedDocs.includes(r)}
-                      onChange={() => toggle(requestedDocs, setRequestedDocs, r)}
-                      className="rounded border-[var(--border-default)] text-[var(--orange-500)] focus:ring-[var(--orange-400)]"
+                      checked={requestedKeys.includes(item.key)}
+                      onChange={() => toggle(requestedKeys, setRequestedKeys, item.key)}
+                      className="mt-0.5 rounded border-[var(--border-default)] text-[var(--orange-500)] focus:ring-[var(--orange-400)]"
                     />
-                    {r}
+                    <span>
+                      {item.label}
+                      {item.hint && <span className="block text-xs text-[var(--text-muted)]">{item.hint}</span>}
+                    </span>
                   </label>
                 ))}
               </div>
+              <div className="mt-3">
+                <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">
+                  Something else (optional)
+                </label>
+                <input
+                  type="text"
+                  value={customLabel}
+                  onChange={(e) => setCustomLabel(e.target.value)}
+                  maxLength={120}
+                  placeholder="e.g. Letter from employer confirming start date"
+                  className={INPUT_CLASS}
+                />
+              </div>
               <p className="mt-2 text-xs text-[var(--text-muted)]">
-                The application moves to &ldquo;Waiting for docs&rdquo; and the applicant sees this list on their tracker.
+                The applicant gets an upload slot per item — no guessing which type to pick. Once every slot has
+                a file the application comes back to you automatically. They&apos;re also emailed this list.
               </p>
             </div>
           )}

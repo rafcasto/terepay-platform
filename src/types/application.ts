@@ -1,5 +1,6 @@
 import type { Timestamp } from 'firebase-admin/firestore';
 import type { LoanPurposeValue } from '@/lib/constants/loan-purposes';
+import type { DocumentRequestItem } from '@/lib/loan/document-requests';
 
 // ---------------------------------------------------------------------------
 // LMS Application Statuses (CCCFA-aligned workflow)
@@ -262,6 +263,8 @@ export type DocumentType =
   | 'visa'
   | 'payslip'
   | 'bank_statement'
+  | 'proof_of_address'
+  | 'other_income'
   | 'other';
 
 export type DocumentStatus = 'pending' | 'accepted' | 'rejected';
@@ -278,6 +281,8 @@ export interface ApplicationDocument {
   rejectionReason?: string;
   reviewedAt?: Timestamp;
   reviewedBy?: string; // lender uid
+  /** Which item of the lender's document request this upload satisfies (see documentRequest.items). */
+  requestKey?: string;
 }
 
 export interface InternalNote {
@@ -587,7 +592,10 @@ export interface LoanApplication {
   documentRequest?: {
     requestedAt: Timestamp;
     requestedBy: string;
+    /** Human labels — kept for the email and older clients. Derived from `items` when present. */
     requiredDocuments: string[];
+    /** Structured items; each knows the DocumentType(s) that satisfy it. Absent on requests made before this existed. */
+    items?: DocumentRequestItem[];
     message?: string;
   };
 

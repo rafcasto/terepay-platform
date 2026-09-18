@@ -14,6 +14,7 @@ import { loanPurposeLabel } from '@/lib/constants/loan-purposes';
 import { computeApplicationFee } from '@/lib/constants/fees';
 import { reconcileConsent } from '@/lib/qippay/reconcile-consent';
 import { toPlainScheduledPayments } from '@/lib/loan/active-loan';
+import { DOCUMENT_TYPE_LABELS, fulfilRequest, catalogueItem } from '@/lib/loan/document-requests';
 import {
   BANK_STATEMENT_REUSE_MONTHS,
   CREDIT_REPORT_REUSE_MONTHS,
@@ -71,14 +72,7 @@ const STATUS_TONE: Record<string, PillTone> = {
   expired: 'neutral',
 };
 
-const DOC_LABEL: Record<DocumentType, string> = {
-  passport: 'Passport',
-  drivers_licence: 'NZ Driver Licence',
-  visa: 'Visa document',
-  payslip: 'Payslips',
-  bank_statement: 'Bank statements',
-  other: 'Document',
-};
+const DOC_LABEL = DOCUMENT_TYPE_LABELS;
 
 const IDENTITY_TYPES = new Set<DocumentType>(['passport', 'drivers_licence', 'visa']);
 const INCOME_TYPES = new Set<DocumentType>(['payslip', 'bank_statement']);
@@ -236,6 +230,8 @@ export default async function LenderApplicationDetailPage({
   const decided = Boolean(app.decision);
 
   // ---- Documents uploaded with this application -------------------------
+  const requestItems = app.documentRequest?.items ?? [];
+  const requestLabel = (key?: string) => (key ? requestItems.find((i) => i.key === key)?.label : undefined);
   const documents: ReviewableDocument[] = (app.documents ?? []).map((d) => ({
     id: d.documentId,
     title: DOC_LABEL[d.type] ?? 'Document',
@@ -247,6 +243,7 @@ export default async function LenderApplicationDetailPage({
     rejectionReason: d.rejectionReason || undefined,
     reviewedAt: d.reviewedAt ? fmtDate(d.reviewedAt as TS) : undefined,
     kind: docKind(d.type),
+    requestedAs: requestLabel(d.requestKey),
   }));
   const docsVerified = documents.filter((d) => d.status === 'accepted').length;
   const docsPending = documents.filter((d) => d.status === 'pending').length;
@@ -554,14 +551,37 @@ export default async function LenderApplicationDetailPage({
         }
       : undefined;
 
-  const documentRequest = app.documentRequest
-    ? {
-        requestedAt: fmtTs(app.documentRequest.requestedAt as TS),
-        requiredDocuments: app.documentRequest.requiredDocuments ?? [],
-        message: app.documentRequest.message || undefined,
-        outstanding: status === 'waiting_for_docs',
-      }
-    : undefined;
+  let documentRequest: ReviewData['documentRequest'];
+  if (app.documentRequest) {
+    const requestedAtMs = toDate(app.documentRequest.requestedAt as TS)?.getTime();
+    const fulfilment = fulfilRequest(
+      requestItems,
+      (app.documents ?? []).map((d) => ({
+        documentId: d.documentId,
+        type: d.type,
+        status: d.status,
+        fileName: d.fileName,
+        requestKey: d.requestKey,
+        uploadedAtMs: toDate(d.uploadedAt as TS)?.getTime(),
+      })),
+      requestedAtMs,
+    );
+    documentRequest = {
+      requestedAt: fmtTs(app.documentRequest.requestedAt as TS),
+      requiredDocuments: app.documentRequest.requiredDocuments ?? requestItems.map((i) => i.label),
+      items: fulfilment.map((f) => ({
+        key: f.item.key,
+        label: f.item.label,
+        fulfilled: f.fulfilled,
+        needsReupload: f.needsReupload,
+        files: f.files.map((x) => ({ id: x.documentId, fileName: x.fileName, status: x.status })),
+      })),
+      // Only catalogue keys can be pre-ticked; custom asks are re-typed.
+      missingKeys: fulfilment.filter((f) => !f.fulfilled && catalogueItem(f.item.key)).map((f) => f.item.key),
+      message: app.documentRequest.message || undefined,
+      outstanding: status === 'waiting_for_docs',
+    };
+  }
 
   const kyc = {
     borrowerStatusLabel,
