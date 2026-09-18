@@ -43,7 +43,14 @@ export type ReviewData = {
     monthlySurplus: string;
     surplusTone: 'pos' | 'neg' | 'none';
   };
-  documents: { title: string; subtitle: string; status: DocumentStatus }[];
+  documents: {
+    documentId: string;
+    title: string;
+    subtitle: string;
+    uploadedAt: string;
+    status: DocumentStatus;
+    viewUrl: string;
+  }[];
   docsVerified: number;
   docsTotal: number;
   affordability: {
@@ -420,8 +427,8 @@ function Sidebar({ data }: { data: ReviewData }) {
           <p className="text-sm text-[var(--text-muted)]">No documents uploaded yet.</p>
         ) : (
           <ul className="space-y-2.5">
-            {data.documents.map((d, i) => (
-              <li key={`${d.subtitle}-${i}`} className="flex items-center justify-between gap-2">
+            {data.documents.map((d) => (
+              <li key={d.documentId} className="flex items-center justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-2.5">
                   <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-[var(--slate-100)] text-[var(--text-muted)]">
                     <ConsoleIcon name="fileText" size={16} />
@@ -431,7 +438,18 @@ function Sidebar({ data }: { data: ReviewData }) {
                     <p className="truncate text-xs text-[var(--text-muted)]">{d.subtitle}</p>
                   </div>
                 </div>
-                <ConsolePill tone={docTone(d.status)}>{docLabel(d.status)}</ConsolePill>
+                <div className="flex shrink-0 items-center gap-2">
+                  <ConsolePill tone={docTone(d.status)}>{docLabel(d.status)}</ConsolePill>
+                  <a
+                    href={d.viewUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 rounded-[8px] border border-[var(--border-default)] bg-white px-2 py-1 text-xs font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--surface-sunken)]"
+                  >
+                    <ConsoleIcon name="download" size={14} />
+                    View
+                  </a>
+                </div>
               </li>
             ))}
           </ul>
@@ -666,16 +684,34 @@ function KycTab({ data }: { data: ReviewData }) {
           <p className="text-sm text-[var(--text-muted)]">No documents uploaded yet.</p>
         ) : (
           <ul className="space-y-2">
-            {data.documents.map((d, i) => (
+            {data.documents.map((d) => (
               <li
-                key={`${d.subtitle}-${i}`}
+                key={d.documentId}
                 className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] bg-[var(--slate-50)] p-3"
               >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-[var(--text-body)]">{d.title}</p>
-                  <p className="truncate text-xs text-[var(--text-muted)]">{d.subtitle}</p>
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-[var(--slate-100)] text-[var(--text-muted)]">
+                    <ConsoleIcon name="fileText" size={16} />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-[var(--text-body)]">{d.title}</p>
+                    <p className="truncate text-xs text-[var(--text-muted)]">
+                      {d.subtitle} · Uploaded {d.uploadedAt}
+                    </p>
+                  </div>
                 </div>
-                <ConsolePill tone={docTone(d.status)}>{docLabel(d.status)}</ConsolePill>
+                <div className="flex shrink-0 items-center gap-2">
+                  <ConsolePill tone={docTone(d.status)}>{docLabel(d.status)}</ConsolePill>
+                  <a
+                    href={d.viewUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 rounded-[8px] border border-[var(--border-default)] bg-white px-2 py-1 text-xs font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--surface-sunken)]"
+                  >
+                    <ConsoleIcon name="download" size={14} />
+                    View
+                  </a>
+                </div>
               </li>
             ))}
           </ul>

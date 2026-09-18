@@ -244,10 +244,15 @@ export default async function LenderApplicationDetailPage({
   const monthlySurplus =
     monthlyIncome !== null && monthlyExpenses !== null ? monthlyIncome - monthlyExpenses : null;
 
+  // Every applicant-uploaded document (identity, payslips, bank statements,
+  // other) is streamed to the lender via the documents/[docId] route.
   const documents = (app.documents ?? []).map((d) => ({
+    documentId: d.documentId,
     title: DOC_LABEL[d.type] ?? 'Document',
     subtitle: d.fileName,
+    uploadedAt: fmtDate(d.uploadedAt as TS),
     status: d.status as DocumentStatus,
+    viewUrl: `/api/applications/${id}/documents/${d.documentId}`,
   }));
   const docsVerified = (app.documents ?? []).filter((d) => d.status === 'accepted').length;
 
