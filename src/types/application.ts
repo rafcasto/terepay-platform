@@ -288,6 +288,27 @@ export interface InternalNote {
   createdAt: Timestamp;
 }
 
+// ---------------------------------------------------------------------------
+// Lender communication log (calls / messages / emails with the applicant)
+// ---------------------------------------------------------------------------
+export type CommunicationChannel = 'call' | 'message' | 'email';
+export type CommunicationDirection = 'inbound' | 'outbound';
+
+export interface CommunicationLogEntry {
+  entryId: string;
+  channel: CommunicationChannel;
+  direction: CommunicationDirection;
+  /** Short summary of what was discussed / sent. Never store PII beyond what's needed. */
+  summary: string;
+  /** Optional outcome / next step (e.g. "Applicant to send payslips by Friday"). */
+  outcome?: string;
+  /** When the contact actually happened (may differ from when it was logged). */
+  occurredAt: Timestamp | string;
+  loggedBy: string; // lender uid
+  loggedByName: string;
+  createdAt: Timestamp | string;
+}
+
 export interface LenderDecision {
   decidedBy: string; // lender uid
   decidedAt: Timestamp;
@@ -510,6 +531,8 @@ export interface LoanApplication {
   referenceNumber: string;           // e.g. TP-2026-00001
   applicantId: string;
   assignedLenderId?: string;
+  /** Friendly customer ID (e.g. TERE001) when the application was raised for an offline customer. */
+  offlineCustomerId?: string;
   status: ApplicationStatus;
   submittedAt?: Timestamp;
 
@@ -563,6 +586,8 @@ export interface LoanApplication {
   };
 
   internalNotes: InternalNote[];
+  /** Lender-logged calls / messages / emails with the applicant (most recent last). */
+  communicationLog?: CommunicationLogEntry[];
   decision?: LenderDecision;
   applicantRejection?: {
     rejectedAt: Timestamp;

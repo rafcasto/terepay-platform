@@ -405,6 +405,20 @@ export const reviewDocumentSchema = z.object({
   rejectionReason: z.string().max(500).optional(),
 });
 
+export const reviewKycDocumentSchema = z.object({
+  action: z.enum(['accept', 'reject']),
+  rejectionReason: z.string().max(500).optional(),
+});
+
+export const logCommunicationSchema = z.object({
+  channel: z.enum(['call', 'message', 'email']),
+  direction: z.enum(['inbound', 'outbound']),
+  summary: z.string().min(3, 'Add a short summary').max(1000),
+  outcome: z.string().max(500).optional(),
+  /** ISO datetime of when the contact happened. Defaults to now on the server. */
+  occurredAt: z.string().datetime({ offset: true }).optional(),
+});
+
 export const affordabilityChecklistSchema = z.object({
   centrixReportObtained: z.boolean(),
   centrixReportNumber: z.string().optional(),
@@ -478,6 +492,8 @@ export type ClaimApplicationInput = z.infer<typeof claimApplicationSchema>;
 export type AddNoteInput = z.infer<typeof addNoteSchema>;
 export type RequestDocumentsInput = z.infer<typeof requestDocumentsSchema>;
 export type ReviewDocumentInput = z.infer<typeof reviewDocumentSchema>;
+export type ReviewKycDocumentInput = z.infer<typeof reviewKycDocumentSchema>;
+export type LogCommunicationInput = z.infer<typeof logCommunicationSchema>;
 export type AffordabilityAssessmentInput = z.infer<typeof affordabilityAssessmentSchema>;
 export type LenderDecisionInput = z.infer<typeof lenderDecisionSchema>;
 export type BenchmarkEntryInput = z.infer<typeof benchmarkEntrySchema>;

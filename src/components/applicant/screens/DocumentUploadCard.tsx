@@ -144,24 +144,35 @@ export default function DocumentUploadCard({
             {existingDocuments.map((doc) => (
               <li
                 key={doc.documentId}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-border bg-surface"
+                className="px-3 py-2.5 rounded-xl border border-border bg-surface"
               >
-                <Icons.File size={18} className="text-muted shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-text truncate">{doc.fileName}</p>
-                  <p className="text-xs text-muted">{doc.type.replace(/_/g, ' ')}</p>
-                </div>
-                <Pill
-                  tone={
-                    doc.status === 'accepted'
-                      ? 'success'
+                <div className="flex items-center gap-3">
+                  <Icons.File size={18} className="text-muted shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-text truncate">{doc.fileName}</p>
+                    <p className="text-xs text-muted">{doc.type.replace(/_/g, ' ')}</p>
+                  </div>
+                  <Pill
+                    tone={
+                      doc.status === 'accepted'
+                        ? 'success'
+                        : doc.status === 'rejected'
+                          ? 'danger'
+                          : 'muted'
+                    }
+                  >
+                    {doc.status === 'accepted'
+                      ? 'Accepted'
                       : doc.status === 'rejected'
-                        ? 'danger'
-                        : 'muted'
-                  }
-                >
-                  {doc.status}
-                </Pill>
+                        ? 'Please re-upload'
+                        : 'Being reviewed'}
+                  </Pill>
+                </div>
+                {doc.status === 'rejected' && doc.rejectionReason && (
+                  <p className="mt-2 text-xs text-text">
+                    <span className="font-semibold">Why:</span> {doc.rejectionReason}
+                  </p>
+                )}
               </li>
             ))}
           </ul>
