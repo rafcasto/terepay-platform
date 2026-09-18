@@ -291,13 +291,19 @@ export interface InternalNote {
 // ---------------------------------------------------------------------------
 // Lender communication log (calls / messages / emails with the applicant)
 // ---------------------------------------------------------------------------
-export type CommunicationChannel = 'call' | 'message' | 'email';
+/** `system` = an automatic in-app notification (status change on the applicant's tracker). */
+export type CommunicationChannel = 'call' | 'message' | 'email' | 'system';
 export type CommunicationDirection = 'inbound' | 'outbound';
+/** `manual` = typed in by a lender; `system` = recorded automatically by a workflow action. */
+export type CommunicationSource = 'manual' | 'system';
 
 export interface CommunicationLogEntry {
   entryId: string;
   channel: CommunicationChannel;
   direction: CommunicationDirection;
+  source?: CommunicationSource;
+  /** Workflow event that produced an automatic entry, e.g. `documents_requested`. */
+  event?: string;
   /** Short summary of what was discussed / sent. Never store PII beyond what's needed. */
   summary: string;
   /** Optional outcome / next step (e.g. "Applicant to send payslips by Friday"). */

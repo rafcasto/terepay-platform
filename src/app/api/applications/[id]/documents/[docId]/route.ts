@@ -10,6 +10,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { ZodError } from 'zod';
 import { getDriveClient, downloadDriveFile, inlineContentDisposition } from '@/lib/gdrive/client';
 import { checkRateLimit, defaultLimiter } from '@/lib/rate-limit/limiter';
+import { logSystemCommunication } from '@/lib/loan/communication-log';
 
 type RouteParams = { params: Promise<{ id: string; docId: string }> };
 
@@ -60,6 +61,20 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       ipAddress: ip,
       changes: { docId, action: parsed.action, rejectionReason: parsed.rejectionReason },
     });
+
+    // A rejection is a message to the applicant (reason shown on their
+    // tracker) — record it automatically. Acceptances are silent.
+    if (parsed.action === 'reject') {
+      const d = documents[docIndex] as { type?: string; fileName?: string };
+      const label = (d.type ?? 'document').replace(/_/g, ' ');
+      await logSystemCommunication({
+        applicationId: id,
+        channel: 'system',
+        event: 'document_rejected',
+        summary: `Rejected ${label}${d.fileName ? ` (${d.fileName})` : ''}: ${parsed.rejectionReason}`,
+        outcome: 'Applicant asked to re-upload via their tracker.',
+      });
+    }
 
     return NextResponse.json({ status: 'ok' });
   } catch (err) {

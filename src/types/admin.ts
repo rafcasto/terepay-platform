@@ -80,6 +80,7 @@ export type EmailTemplateType =
   | 'welcome_sequence'
   | 'loan_submitted'
   | 'loan_under_review'
+  | 'documents_requested'
   | 'loan_approved'
   | 'loan_declined'
   | 'loan_disbursed'
@@ -94,6 +95,7 @@ export const EMAIL_TEMPLATE_TYPE_LABELS: Record<EmailTemplateType, string> = {
   welcome_sequence: 'Welcome Sequence',
   loan_submitted: 'Loan Submitted',
   loan_under_review: 'Loan Under Review',
+  documents_requested: 'Documents Requested',
   loan_approved: 'Loan Approved',
   loan_declined: 'Loan Declined',
   loan_disbursed: 'Loan Disbursed',
@@ -115,6 +117,7 @@ export const EMAIL_TEMPLATE_TYPE_CATEGORY: Record<EmailTemplateType, EmailTempla
   welcome_sequence: 'welcome',
   loan_submitted: 'loan_events',
   loan_under_review: 'loan_events',
+  documents_requested: 'loan_events',
   loan_approved: 'loan_events',
   loan_declined: 'loan_events',
   loan_disbursed: 'loan_events',

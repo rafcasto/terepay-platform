@@ -15,7 +15,11 @@ const CHANNEL_META: Record<CommunicationChannel, { label: string; plural: string
   call: { label: 'Call', plural: 'Calls', icon: 'phoneCall' },
   message: { label: 'Message', plural: 'Messages', icon: 'message' },
   email: { label: 'Email', plural: 'Emails', icon: 'mail' },
+  system: { label: 'Tracker update', plural: 'Tracker updates', icon: 'cpu' },
 };
+
+/** Channels a lender can log by hand — `system` entries are only ever recorded automatically. */
+const MANUAL_CHANNELS: CommunicationChannel[] = ['call', 'message', 'email'];
 
 /**
  * Step 5 of the review flow — one place for every call, text/WhatsApp message
@@ -55,7 +59,7 @@ export default function CommunicationTab({ data }: { data: ReviewData }) {
         }
       >
         <div className="mb-4 flex flex-wrap gap-1.5">
-          {(['all', 'call', 'message', 'email'] as Filter[]).map((f) => {
+          {(['all', 'call', 'message', 'email', 'system'] as Filter[]).map((f) => {
             const n = f === 'all' ? data.communications.length : count(f);
             const label = f === 'all' ? 'All' : CHANNEL_META[f].plural;
             return (
@@ -79,7 +83,7 @@ export default function CommunicationTab({ data }: { data: ReviewData }) {
         {items.length === 0 ? (
           <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--border-default)] bg-white/70 p-4 text-sm text-[var(--text-muted)]">
             {data.communications.length === 0
-              ? 'No contact logged yet. Log every call, message and email so the file shows what the applicant was told.'
+              ? 'No contact logged yet. Document requests, decisions and rejections are recorded here automatically; log calls, messages and emails yourself.'
               : `No ${CHANNEL_META[filter as CommunicationChannel].plural.toLowerCase()} logged.`}
           </div>
         ) : (
@@ -121,18 +125,31 @@ export default function CommunicationTab({ data }: { data: ReviewData }) {
 function LogRow({ item }: { item: CommunicationItem }) {
   const meta = CHANNEL_META[item.channel];
   const outbound = item.direction === 'outbound';
+  const auto = item.source === 'system';
   return (
-    <li className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-white p-3">
+    <li
+      className={`rounded-[var(--radius-md)] border p-3 ${
+        auto ? 'border-[var(--border-subtle)] bg-[var(--slate-50)]' : 'border-[var(--border-subtle)] bg-white'
+      }`}
+    >
       <div className="flex items-start gap-3">
-        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--orange-50)] text-[var(--orange-700)]">
+        <span
+          className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+            auto ? 'bg-[var(--slate-100)] text-[var(--slate-600)]' : 'bg-[var(--orange-50)] text-[var(--orange-700)]'
+          }`}
+        >
           <ConsoleIcon name={meta.icon} size={16} />
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-sm font-semibold text-[var(--text-body)]">
-              {outbound ? 'Outbound' : 'Inbound'} {meta.label.toLowerCase()}
+              {item.channel === 'system' ? meta.label : `${outbound ? 'Outbound' : 'Inbound'} ${meta.label.toLowerCase()}`}
             </p>
-            <ConsolePill tone={outbound ? 'info' : 'neutral'}>{outbound ? 'We contacted them' : 'They contacted us'}</ConsolePill>
+            {auto ? (
+              <ConsolePill tone="neutral">Recorded automatically</ConsolePill>
+            ) : (
+              <ConsolePill tone={outbound ? 'info' : 'neutral'}>{outbound ? 'We contacted them' : 'They contacted us'}</ConsolePill>
+            )}
           </div>
           <p className="mt-1 whitespace-pre-wrap text-sm text-[var(--text-body)]">{item.summary}</p>
           {item.outcome && (
@@ -141,7 +158,7 @@ function LogRow({ item }: { item: CommunicationItem }) {
             </p>
           )}
           <p className="mt-1.5 text-[11px] text-[var(--text-muted)]">
-            {item.occurredAt} · logged by {item.loggedBy}
+            {item.occurredAt} · {auto ? item.loggedBy : `logged by ${item.loggedBy}`}
           </p>
         </div>
       </div>
@@ -231,7 +248,7 @@ function LogCommunicationForm({ applicationId }: { applicationId: string }) {
         <div>
           <p className={`${SECTION_LABEL} mb-1.5`}>Channel</p>
           <div className="flex gap-1">
-            {(['call', 'message', 'email'] as CommunicationChannel[]).map((ch) => (
+            {MANUAL_CHANNELS.map((ch) => (
               <button
                 key={ch}
                 type="button"

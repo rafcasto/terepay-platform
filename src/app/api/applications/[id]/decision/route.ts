@@ -10,6 +10,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { ZodError } from 'zod';
 import { computeApplicationFee } from '@/lib/constants/fees';
 import { buildSchedule } from '@/lib/loan/repayment';
+import { logSystemCommunication } from '@/lib/loan/communication-log';
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -179,6 +180,21 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         approvedAmount: parsed.action === 'approve' ? approvedAmount : undefined,
         declineReasons: parsed.declineReasons,
       },
+    });
+
+    // Auto-log the decision as an outbound system notification — the
+    // applicant sees the new status on their tracker immediately.
+    const fmtNzd = (n: number) =>
+      new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(n);
+    await logSystemCommunication({
+      applicationId: id,
+      channel: 'system',
+      event: parsed.action === 'approve' ? 'application_approved' : 'application_declined',
+      summary:
+        parsed.action === 'approve'
+          ? `Application approved${typeof approvedAmount === 'number' ? ` for ${fmtNzd(approvedAmount)}` : ''}. Applicant can now accept the offer on their tracker.`
+          : `Application declined${parsed.declineReasons?.length ? ` — ${parsed.declineReasons.join('; ')}` : ''}.`,
+      outcome: 'Status updated on the applicant\'s tracker.',
     });
 
     return NextResponse.json({ status: parsed.action === 'approve' ? 'approved' : 'declined' });
