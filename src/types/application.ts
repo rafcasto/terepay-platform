@@ -365,6 +365,7 @@ export interface Loan {
 // ---------------------------------------------------------------------------
 export interface AffordabilityIncomeRow {
   category: string;
+  declaredAmount?: number;    // fortnightly figure from the applicant's application (reference)
   centrixAmount: number;      // lender enters from Centrix
   verifiedAmount: number;     // lender enters from payslips
   adjustment: number;         // lender enters
@@ -374,11 +375,12 @@ export interface AffordabilityIncomeRow {
 
 export interface AffordabilityExpenseRow {
   category: string;
+  declaredAmount?: number;    // fortnightly figure from the applicant's application
   centrixAmount: number;      // lender enters from bank analysis
   benchmarkAmount: number;    // auto from catalog × multiplier
   adjustment: number;         // lender enters with reason
   adjustmentReason?: string;
-  finalAmount: number;        // auto: MAX(centrix, benchmark) + adjustment
+  finalAmount: number;        // auto: MAX(centrix || declared, benchmark) + adjustment
   benchmarkOverrideAcknowledged?: boolean;
 }
 
@@ -479,6 +481,7 @@ export interface AffordabilityDraftData {
   };
   incomeRows: Array<{
     category: string;
+    declaredAmount?: number;
     centrixAmount: number;
     verifiedAmount: number;
     adjustment: number;
@@ -487,6 +490,7 @@ export interface AffordabilityDraftData {
   }>;
   expenseRows: Array<{
     category: string;
+    declaredAmount?: number;
     centrixAmount: number;
     benchmarkAmount: number;
     adjustment: number;

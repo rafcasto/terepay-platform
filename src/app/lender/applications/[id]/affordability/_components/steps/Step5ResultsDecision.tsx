@@ -10,6 +10,10 @@ interface Props {
   totalExpenses: number;
   netDisposable: number;
   loanPayment: number;
+  /** Annual interest rate the payment is priced at, e.g. 0.49. */
+  annualRate: number;
+  instalments: number;
+  totalRepayable: number;
   surplus: number;
   hardDeclines: string[];
   recommendation: 'proceed' | 'decline';
@@ -28,6 +32,9 @@ export default function Step5ResultsDecision({
   totalExpenses,
   netDisposable,
   loanPayment,
+  annualRate,
+  instalments,
+  totalRepayable,
   surplus,
   hardDeclines,
   recommendation,
@@ -132,10 +139,13 @@ export default function Step5ResultsDecision({
             />
           </div>
           <SummaryRow
-            label={`Loan Fortnightly Payment (${fmt(assessedAmount)} × 1.047 ÷ 4)`}
+            label={`Loan Fortnightly Payment (${fmt(assessedAmount)} at ${(annualRate * 100).toFixed(0)}% p.a. over ${instalments} fortnightly instalments)`}
             value={fmt(loanPayment)}
             color="text-[var(--text-muted)]"
           />
+          <p className="pl-1 text-xs text-[var(--text-muted)]">
+            Same reducing-balance pricing shown to the applicant. Total repayable {fmt(totalRepayable)} (excludes establishment fee).
+          </p>
           <div className="border-t border-[var(--border-default)] pt-3">
             <div className={['flex items-center justify-between rounded-[var(--radius-lg)] border px-4 py-3.5', surplusStyle.pill].join(' ')}>
               <div className="flex items-center gap-2.5">

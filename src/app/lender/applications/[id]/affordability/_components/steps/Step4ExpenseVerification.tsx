@@ -34,8 +34,10 @@ export default function Step4ExpenseVerification({
       <div className="rounded-[var(--radius-lg)] border border-[var(--info-700)]/20 bg-[var(--info-50)] p-4">
         <p className="mb-2 text-sm font-semibold text-[var(--info-700)]">Important:</p>
         <ul className="list-inside list-disc space-y-1 text-sm text-[var(--info-700)]">
+          <li>&ldquo;Declared&rdquo; is the fortnightly figure the applicant entered on their application</li>
           <li>Use benchmarks when borrower&apos;s stated expenses seem unrealistically low</li>
-          <li>Final amount = MAX(Centrix Amount, Benchmark) + Adjustment</li>
+          <li>Final amount = MAX(Centrix Amount or Declared, Benchmark) + Adjustment</li>
+          <li>Once a Centrix amount is entered it replaces the declared figure in the calculation</li>
           <li>Document all adjustments in the Notes column</li>
         </ul>
       </div>
@@ -45,6 +47,7 @@ export default function Step4ExpenseVerification({
           <thead>
             <tr className="border-b border-[var(--border-default)] bg-[var(--slate-50)]">
               <th className={`${thCls} min-w-[200px] text-left`}>Expense Category</th>
+              <th className={`${thCls} min-w-[100px] text-right`}>Declared</th>
               <th className={`${thCls} min-w-[110px] text-right`}>Centrix Amount</th>
               <th className="min-w-[100px] px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-[var(--warning-700)]">
                 Benchmark
@@ -68,7 +71,7 @@ export default function Step4ExpenseVerification({
           </tbody>
           <tfoot>
             <tr className="bg-[var(--ink-900)]">
-              <td colSpan={4} className="px-4 py-3 text-right text-sm font-bold uppercase tracking-wide text-white">
+              <td colSpan={5} className="px-4 py-3 text-right text-sm font-bold uppercase tracking-wide text-white">
                 Total Fortnightly Expenses
               </td>
               <td className="bg-[var(--ink-900)] px-3 py-3 text-right font-mono text-base font-bold tabular-nums text-[var(--orange-400)]">
@@ -95,7 +98,7 @@ export default function Step4ExpenseVerification({
 function SectionHeader({ label }: { label: string }) {
   return (
     <tr className="border-t border-[var(--border-default)] bg-[var(--slate-50)]">
-      <td colSpan={6} className="px-4 py-2 text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
+      <td colSpan={7} className="px-4 py-2 text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
         {label}
       </td>
     </tr>
@@ -113,7 +116,8 @@ function ExpenseRowTr({
 }) {
   const displayName = EXPENSE_DISPLAY_NAMES[row.category] ?? row.category;
   const hasBenchmark = row.benchmarkAmount > 0;
-  const benchmarkActive = hasBenchmark && row.benchmarkAmount > row.centrixAmount;
+  const observed = row.centrixAmount > 0 ? row.centrixAmount : (row.declaredAmount ?? 0);
+  const benchmarkActive = hasBenchmark && row.benchmarkAmount > observed;
 
   return (
     <tr
@@ -123,6 +127,11 @@ function ExpenseRowTr({
       ].join(' ')}
     >
       <td className="px-4 py-2.5 text-sm font-medium text-[var(--text-body)]">{displayName}</td>
+
+      {/* Declared (from application, read-only) */}
+      <td className="px-3 py-2.5 text-right font-mono text-xs tabular-nums text-[var(--text-muted)]">
+        {row.declaredAmount ? fmt(row.declaredAmount) : <span className="text-[var(--slate-400)]">—</span>}
+      </td>
 
       {/* Centrix */}
       <td className="px-3 py-2.5">
@@ -154,7 +163,7 @@ function ExpenseRowTr({
               {row.benchmarkAmount.toFixed(0)}
             </span>
             {benchmarkActive && (
-              <span title="Benchmark exceeds Centrix — benchmark is being used" className="text-[var(--warning-700)]">
+              <span title="Benchmark exceeds the Centrix/declared figure — benchmark is being used" className="text-[var(--warning-700)]">
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor">
                   <path
                     strokeLinecap="round"

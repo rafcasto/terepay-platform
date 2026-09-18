@@ -421,6 +421,7 @@ export const affordabilityChecklistSchema = z.object({
 
 const incomeRowSchema = z.object({
   category: z.string(),
+  declaredAmount: z.number().min(0).optional(),
   centrixAmount: z.number().min(0),
   verifiedAmount: z.number().min(0),
   adjustment: z.number(),
@@ -430,6 +431,7 @@ const incomeRowSchema = z.object({
 
 const expenseRowSchema = z.object({
   category: z.string(),
+  declaredAmount: z.number().min(0).optional(),
   centrixAmount: z.number().min(0),
   benchmarkAmount: z.number().min(0),
   adjustment: z.number(),

@@ -20,6 +20,8 @@ import {
   calcExpenseRow,
 } from './_components/types';
 import type { AffordabilityDraftData } from '@/types/application';
+import { affordabilityLoanPayment } from '@/lib/loan/affordability-calc';
+import { buildSchedule, DEFAULT_INSTALMENTS } from '@/lib/loan/repayment';
 
 interface BenchmarkEntry {
   benchmarkId: string;
@@ -113,32 +115,60 @@ export default function AffordabilityForm({
         },
   );
 
+  // Rows are seeded from what the applicant declared on their application
+  // (fortnightly, no conversion). Drafts saved before the declared column
+  // existed get it back-filled so the reference figure is always visible.
   const [incomeRows, setIncomeRows] = useState<IncomeRow[]>(() => {
     if (initialDraft?.incomeRows?.length) {
-      return initialDraft.incomeRows as IncomeRow[];
+      return (initialDraft.incomeRows as IncomeRow[]).map((row) =>
+        calcIncomeRow({ ...row, declaredAmount: row.declaredAmount ?? preFillIncome[row.category] ?? 0 }),
+      );
     }
-    return INCOME_CATEGORIES.map((cat) => ({
-      category: cat,
-      centrixAmount: 0,
-      verifiedAmount: preFillIncome[cat] ?? 0,
-      adjustment: 0,
-      adjustmentReason: '',
-      finalAmount: preFillIncome[cat] ?? 0,
-    }));
+    return INCOME_CATEGORIES.map((cat) =>
+      calcIncomeRow({
+        category: cat,
+        declaredAmount: preFillIncome[cat] ?? 0,
+        centrixAmount: 0,
+        // Seed "verified" with the declared figure; the lender confirms or
+        // replaces it against payslips in Step 3.
+        verifiedAmount: preFillIncome[cat] ?? 0,
+        adjustment: 0,
+        adjustmentReason: '',
+        finalAmount: 0,
+      }),
+    );
   });
 
   const [expenseRows, setExpenseRows] = useState<ExpenseRow[]>(() => {
     if (initialDraft?.expenseRows?.length) {
-      return initialDraft.expenseRows as ExpenseRow[];
+      return (initialDraft.expenseRows as ExpenseRow[]).map((row) => {
+        const declared = preFillExpenses[row.category] ?? 0;
+        if (row.declaredAmount !== undefined) return calcExpenseRow(row);
+        // Legacy draft: the declared figure used to be seeded into Adjustment,
+        // where it was added on top of the benchmark. Move it back to the
+        // declared column unless the lender has since edited/annotated it.
+        const legacySeed =
+          row.centrixAmount === 0 && row.adjustment === declared && declared > 0 && !row.adjustmentReason;
+        return calcExpenseRow({
+          ...row,
+          declaredAmount: declared,
+          adjustment: legacySeed ? 0 : row.adjustment,
+        });
+      });
     }
-    return EXPENSE_CATEGORIES.map((cat) => ({
-      category: cat,
-      centrixAmount: 0,
-      benchmarkAmount: 0,
-      adjustment: preFillExpenses[cat] ?? 0,
-      adjustmentReason: '',
-      finalAmount: preFillExpenses[cat] ?? 0,
-    }));
+    return EXPENSE_CATEGORIES.map((cat) =>
+      calcExpenseRow({
+        category: cat,
+        // Declared feeds the MAX(observed, benchmark) base until the lender
+        // enters a Centrix figure — it is never added on top as an adjustment.
+        declaredAmount: preFillExpenses[cat] ?? 0,
+        centrixAmount: 0,
+        benchmarkAmount: 0,
+        adjustment: 0,
+        adjustmentReason: '',
+        finalAmount: 0,
+      }),
+    );
   });
 
   const [recommendation, setRecommendation] = useState<'proceed' | 'decline'>(
@@ -194,7 +224,10 @@ export default function AffordabilityForm({
   const totalIncome = incomeRows.reduce((s, r) => s + r.finalAmount, 0);
   const totalExpenses = expenseRows.reduce((s, r) => s + r.finalAmount, 0);
   const netDisposable = totalIncome - totalExpenses;
-  const loanPayment = (assessedAmount * 1.047) / 4;
+  // Same pricing as the applicant's quote and the persisted assessment:
+  // reducing-balance annuity at the configured annual rate, 4 fortnightly instalments.
+  const loanPayment = affordabilityLoanPayment(assessedAmount);
+  const loanQuote = buildSchedule({ principal: Math.max(assessedAmount, 0), startDate: new Date() });
   const surplus = netDisposable - loanPayment;
 
   const daysOfData = checklist.firstTransactionDate
@@ -389,6 +422,9 @@ export default function AffordabilityForm({
                 totalExpenses={totalExpenses}
                 netDisposable={netDisposable}
                 loanPayment={loanPayment}
+                annualRate={loanQuote.annualRate}
+                instalments={DEFAULT_INSTALMENTS}
+                totalRepayable={loanQuote.totalRepayable}
                 surplus={surplus}
                 hardDeclines={hardDeclines}
                 recommendation={recommendation}

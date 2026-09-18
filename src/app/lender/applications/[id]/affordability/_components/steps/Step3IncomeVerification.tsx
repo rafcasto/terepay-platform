@@ -25,7 +25,8 @@ export default function Step3IncomeVerification({
       <div>
         <h2 className="font-display text-xl font-bold text-[var(--text-strong)]">Income Verification</h2>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
-          All amounts in NZD per fortnight. Verify income with payslips and bank statements.
+          All amounts in NZD per fortnight. &ldquo;Declared&rdquo; is what the applicant entered on their
+          application; verify it against payslips and bank statements. Final = MIN(Centrix, Verified) + Adjustment.
         </p>
       </div>
 
@@ -44,6 +45,7 @@ export default function Step3IncomeVerification({
           <thead>
             <tr className="border-b border-[var(--border-default)] bg-[var(--slate-50)]">
               <th className={`${thCls} min-w-[160px] text-left`}>Income Source</th>
+              <th className={`${thCls} min-w-[100px] text-right`}>Declared</th>
               <th className={`${thCls} min-w-[110px] text-right`}>Centrix Amount</th>
               <th className={`${thCls} min-w-[110px] text-right`}>Verified Amount</th>
               <th className={`${thCls} min-w-[100px] text-right`}>Adjustment</th>
@@ -57,6 +59,9 @@ export default function Step3IncomeVerification({
             {incomeRows.map((row, i) => (
               <tr key={row.category} className="border-b border-[var(--border-subtle)] transition-colors hover:bg-[var(--slate-50)]">
                 <td className="px-4 py-3 font-medium text-[var(--text-body)]">{row.category}</td>
+                <td className="px-3 py-3 text-right font-mono text-xs tabular-nums text-[var(--text-muted)]">
+                  {row.declaredAmount ? fmt(row.declaredAmount) : <span className="text-[var(--slate-400)]">—</span>}
+                </td>
                 <td className="px-3 py-3">
                   <NumInput value={row.centrixAmount} onChange={(v) => onUpdate(i, 'centrixAmount', v)} />
                 </td>
@@ -83,7 +88,7 @@ export default function Step3IncomeVerification({
           </tbody>
           <tfoot>
             <tr className="bg-[var(--ink-900)]">
-              <td colSpan={4} className="px-4 py-3 text-right text-sm font-bold uppercase tracking-wide text-white">
+              <td colSpan={5} className="px-4 py-3 text-right text-sm font-bold uppercase tracking-wide text-white">
                 Total Fortnightly Income
               </td>
               <td className="bg-[var(--ink-900)] px-3 py-3 text-right font-mono text-base font-bold tabular-nums text-[var(--orange-400)]">

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { getAdminDb, verifySessionOrIdToken } from '@/lib/firebase/admin';
 import type { LoanApplication } from '@/types/application';
+import { LOAN_TERM_WEEKS } from '@/lib/loan/status-display';
 import AffordabilityForm from './AffordabilityForm';
 
 export const dynamic = 'force-dynamic';
@@ -103,18 +104,17 @@ export default async function AffordabilityPage(props: {
   const expenses = application.livingExpenses;
   const debts = application.existingDebts;
 
-  // Pre-fill income map (fortnightly — form stores fortnightly figures)
+  // Applicant-declared figures. The application form collects BOTH income and
+  // living expenses per fortnight ("Fortnightly Income (NZD)" / "Enter your
+  // regular fortnightly costs"), so they map 1:1 onto the wizard's fortnightly
+  // rows — no frequency conversion.
   const preFillIncome: Record<string, number> = {};
   if (emp?.income) {
-    // Salary/Wages: convert monthly after-tax to fortnightly
-    preFillIncome['Salary/Wages'] = emp.income.salaryAfterTax
-      ? Math.round((emp.income.salaryAfterTax / 12) * 26) / 26 * 2
-      : 0;
+    preFillIncome['Salary/Wages'] = emp.income.salaryAfterTax ?? 0;
     preFillIncome['Government Benefits'] = emp.income.winz ?? 0;
     preFillIncome['Other Income'] = emp.income.otherIncome ?? 0;
   }
 
-  // Pre-fill expense map
   const preFillExpenses: Record<string, number> = {};
   if (expenses?.nonDiscretionary) {
     const nd = expenses.nonDiscretionary;
@@ -140,14 +140,15 @@ export default async function AffordabilityPage(props: {
     preFillExpenses['Home Improvement'] = d.homeImprovement ?? 0;
     preFillExpenses['Cash Withdrawals'] = d.cashWithdrawals ?? 0;
     preFillExpenses['Other'] = d.other ?? 0;
-    // Subscriptions: sum up known subscriptions
-    if (expenses.subscriptionDetails) {
-      const subs = expenses.subscriptionDetails;
-      preFillExpenses['Subscriptions'] =
-        (subs.gym?.amount ?? 0) + (subs.netflix?.amount ?? 0) +
+    // Subscriptions: use the declared fortnightly total; if it wasn't entered,
+    // fall back to summing the itemised subscriptions.
+    const subs = expenses.subscriptionDetails;
+    const itemised = subs
+      ? (subs.gym?.amount ?? 0) + (subs.netflix?.amount ?? 0) +
         (subs.spotify?.amount ?? 0) + (subs.sports?.amount ?? 0) +
-        (subs.others?.amount ?? 0);
-    }
+        (subs.others?.amount ?? 0)
+      : 0;
+    preFillExpenses['Subscriptions'] = (d.subscriptions ?? 0) > 0 ? d.subscriptions : itemised;
   }
   if (expenses?.bnpl) {
     preFillExpenses['Buy Now Pay Later'] =
@@ -165,7 +166,7 @@ export default async function AffordabilityPage(props: {
   }
 
   const loanAmount = application.loanDetails?.requestedAmount ?? 0;
-  const loanTerm = 8; // Fixed 8-week product
+  const loanTerm = LOAN_TERM_WEEKS;
   const householdType = application.personalInfo?.householdType ?? 'single';
   const visaExpiryDate = application.personalInfo?.visaExpiryDate;
   const customerName =
