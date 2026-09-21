@@ -623,6 +623,9 @@ export default async function LenderApplicationDetailPage({
       submittedLabel: fmtDate(app.timeline?.submittedAt as TS),
     },
     snapshot: {
+      name: name || '—',
+      email: pi?.email || '—',
+      phone: pi?.phone || '—',
       dob: pi?.dateOfBirth ?? '—',
       address: pi ? `${pi.city ?? ''}${pi.city && pi.postCode ? ', ' : ''}${pi.postCode ?? ''}`.trim() || (pi.address ?? '—') : '—',
       visa: pi

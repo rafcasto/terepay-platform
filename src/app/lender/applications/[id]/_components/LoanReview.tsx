@@ -207,6 +207,9 @@ function Sidebar({ data, onOpenDocuments }: { data: ReviewData; onOpenDocuments:
         </div>
 
         <div className="grid grid-cols-2 gap-x-3 gap-y-4">
+          <SnapItem icon="user" label="Full name" value={s.name} />
+          <SnapItem icon="mail" label="Email" value={s.email} />
+          <SnapItem icon="phoneCall" label="Phone" value={s.phone} />
           <SnapItem icon="calendar" label="Date of birth" value={s.dob} />
           <SnapItem icon="mapPin" label="Address" value={s.address} />
           <SnapItem icon="shield" label="Visa status" value={s.visa} />
