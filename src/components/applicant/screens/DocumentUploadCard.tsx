@@ -181,6 +181,12 @@ function RequestSlot({
   const tone = fulfilled ? 'success' : needsReupload ? 'danger' : 'warn';
   const label = fulfilled ? 'Provided' : needsReupload ? 'Please upload again' : 'Needed';
   const rejected = files.filter((f) => f.status === 'rejected');
+  // Once the page refreshes, a finished upload appears in `files` from the
+  // server — drop it from the local list so it isn't shown twice. Failed
+  // uploads stay visible so the applicant can see what to retry.
+  const pendingUploads = uploading.filter(
+    (u) => u.status !== 'done' || !files.some((f) => f.fileName === u.name),
+  );
 
   return (
     <li className={`rounded-2xl border p-4 ${fulfilled ? 'border-border bg-surface-2/30' : 'border-border bg-surface'}`}>
@@ -246,7 +252,7 @@ function RequestSlot({
             multiple
             maxSizeMb={10}
             onFiles={handleFiles}
-            files={uploading}
+            files={pendingUploads}
             hint={`${(item.accept ?? DEFAULT_ACCEPT).replace(/\./g, '').toUpperCase().replace(/,/g, ', ')} · up to 10 MB each`}
           />
           {fulfilled && (
