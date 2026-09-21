@@ -113,7 +113,16 @@ export function buildRequestItems(
     if (cat) {
       if (seen.has(cat.key)) return;
       seen.add(cat.key);
-      out.push({ key: cat.key, label: cat.label, types: [...cat.types], hint: cat.hint, typical: cat.typical, accept: cat.accept });
+      // Only copy optional fields that are set — Firestore rejects `undefined`
+      // values, and most catalogue items have no `typical` line.
+      out.push({
+        key: cat.key,
+        label: cat.label,
+        types: [...cat.types],
+        ...(cat.hint ? { hint: cat.hint } : {}),
+        ...(cat.typical ? { typical: cat.typical } : {}),
+        ...(cat.accept ? { accept: cat.accept } : {}),
+      });
       return;
     }
     if (sel.key === CUSTOM_REQUEST_KEY || sel.key.startsWith(CUSTOM_REQUEST_PREFIX)) {
