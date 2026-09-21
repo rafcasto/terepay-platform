@@ -91,6 +91,9 @@ export type ReviewData = {
     submittedLabel: string;
   };
   snapshot: {
+    name: string;
+    email: string;
+    phone: string;
     dob: string;
     address: string;
     visa: string;
