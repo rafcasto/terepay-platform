@@ -7,6 +7,7 @@ import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { auditLog, getClientIp } from '@/lib/utils/audit';
 import { defaultLimiter, checkRateLimit } from '@/lib/rate-limit/limiter';
 import { buildCreditAssessmentPayload } from '@/lib/assessment/inputs';
+import { evaluateEvidenceGate, loadPreviousApplications, reuseSources } from '@/lib/loan/evidence-gate';
 import {
   enqueueAssessmentJob,
   getAssessmentJob,
@@ -96,7 +97,17 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       }
     }
 
-    const payload = await buildCreditAssessmentPayload(app, input); // throws MISSING_INPUTS (422)
+    // Evidence gate: the documents must have been reviewed before the agent
+    // sees them. For a returning customer inside the 6-month window, the
+    // accepted statements / payslips from the previous loan are sent too.
+    const gate = evaluateEvidenceGate(app, await loadPreviousApplications(adminDb, app));
+    if (!gate.ok) {
+      throw new AppError('EVIDENCE_REQUIRED', 409, `Review the applicant's documents first: ${gate.reasons.join('; ')}`, {
+        reasons: gate.reasons,
+      });
+    }
+
+    const payload = await buildCreditAssessmentPayload(app, input, { reuseFrom: reuseSources(gate) }); // throws MISSING_INPUTS (422)
 
     if (!(await isAssessmentWorkerOnline())) {
       throw new AppError('WORKER_OFFLINE', 503, 'The assessment worker is offline — start it on the assessment machine and try again');

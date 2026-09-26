@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { fmtDate } from '@/lib/loan/format';
 
 interface Application {
   id: string;
@@ -213,7 +214,7 @@ export default function AdminApplicationsPage() {
                     </td>
                     <td className="px-4 py-3 text-slate-400 text-xs font-tabular">
                       {app.submittedAt
-                        ? new Date(app.submittedAt).toLocaleDateString('en-NZ')
+                        ? fmtDate(new Date(app.submittedAt))
                         : '—'}
                     </td>
                   </tr>

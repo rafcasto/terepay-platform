@@ -1,7 +1,7 @@
 import { AppError } from '@/lib/utils/api-error';
 import { calcExpenseFinal, calcIncomeFinal, affordabilityLoanPayment } from '@/lib/loan/affordability-calc';
 import { buildSchedule } from '@/lib/loan/repayment';
-import type { LoanApplication } from '@/types/application';
+import type { ApplicationDocument, LoanApplication } from '@/types/application';
 import type { AffordabilityIncomeRowInput, AffordabilityExpenseRowInput } from '@/lib/loan/affordability-calc';
 import {
   CREDIT_ASSESSMENT_PAYLOAD_VERSION,
@@ -40,9 +40,18 @@ function toIso(v: unknown): string | undefined {
  * collected and reported together as one `MISSING_INPUTS` (422) error — the
  * agent is never asked to guess.
  */
+export interface BuildPayloadOptions {
+  /**
+   * Accepted documents from a previous loan that the evidence gate allows to
+   * be reused for this application (returning customer inside the window).
+   */
+  reuseFrom?: { applicationId: string; documents: ApplicationDocument[] }[];
+}
+
 export async function buildCreditAssessmentPayload(
   app: LoanApplication,
   wizard: AssessmentWizardInput,
+  options: BuildPayloadOptions = {},
 ): Promise<CreditAssessmentPayload> {
   const missing: string[] = [];
 
@@ -102,7 +111,7 @@ export async function buildCreditAssessmentPayload(
   if (!applicationDate) missing.push('Application submission date');
 
   const firstTransactionDate = wizard.checklist.firstTransactionDate?.trim() ?? '';
-  if (!firstTransactionDate) missing.push('First transaction date (Step 2 checklist)');
+  if (!firstTransactionDate) missing.push('First transaction date (bank statement coverage on the income step)');
   const daysOfData =
     wizard.checklist.daysOfTransactionData ??
     (firstTransactionDate
@@ -111,7 +120,7 @@ export async function buildCreditAssessmentPayload(
 
   // --- Documents + TerePay loan history (independent lookups) -------------
   const [docs, behaviour] = await Promise.all([
-    resolveAssessmentDocuments(app.applicationId, app.documents),
+    resolveAssessmentDocuments(app.applicationId, app.documents, options.reuseFrom),
     deriveBehaviourFlags(app.applicantId, app.applicationId, assessedAmount ?? 0),
   ]);
   missing.push(...docs.missing);

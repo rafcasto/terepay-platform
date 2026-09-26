@@ -40,8 +40,12 @@ export default function ReviewProgress({ data, onSelect }: { data: ReviewData; o
       n: 2,
       label: 'Affordability',
       icon: 'wallet',
-      state: data.affordability.complete ? 'done' : 'todo',
-      detail: data.affordability.complete ? 'Assessed' : 'Not assessed',
+      state: data.affordability.complete ? 'done' : !data.affordability.gate.ok ? 'attention' : 'todo',
+      detail: data.affordability.complete
+        ? 'Assessed'
+        : !data.affordability.gate.ok
+          ? 'Blocked — review documents'
+          : 'Not assessed',
     },
     {
       key: 'kyc',

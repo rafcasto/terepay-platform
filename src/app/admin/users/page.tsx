@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import type { AdminLenderView } from '@/types/admin';
 import type { UserRole } from '@/types/user';
+import { fmtDate } from '@/lib/loan/format';
 
 type StaffRole = 'lender' | 'content_editor';
 
@@ -273,7 +274,7 @@ export default function AdminUsersPage() {
                   <td className="px-4 py-3">{statusBadge(u.status)}</td>
                   <td className="px-4 py-3 text-slate-400 text-xs font-tabular">
                     {u.createdAt
-                      ? new Date(u.createdAt as unknown as number).toLocaleDateString('en-NZ')
+                      ? fmtDate(new Date(u.createdAt as unknown as number))
                       : '—'}
                   </td>
                   <td className="px-4 py-3 text-right">

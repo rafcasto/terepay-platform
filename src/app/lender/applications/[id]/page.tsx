@@ -23,10 +23,13 @@ import {
   isWithinReuseWindow,
   reuseExpiry,
 } from '@/lib/loan/evidence-reuse';
+import { evaluateEvidenceGate, loadPreviousApplications } from '@/lib/loan/evidence-gate';
+import { fmtDate, fmtDateTime, fmtYmd } from '@/lib/loan/format';
 import LoanReview from './_components/LoanReview';
 import type {
   ApplicantHistory,
   CommunicationItem,
+  EvidenceGateView,
   PreviousApplication,
   ReportItem,
   ReuseItem,
@@ -136,15 +139,8 @@ function toDate(ts: TS): Date | null {
   return null;
 }
 
-const fmtTs = (ts: TS) => {
-  const d = toDate(ts);
-  return d ? new Intl.DateTimeFormat('en-NZ', { dateStyle: 'medium', timeStyle: 'short' }).format(d) : '—';
-};
-
-const fmtDate = (ts: TS) => {
-  const d = toDate(ts);
-  return d ? new Intl.DateTimeFormat('en-NZ', { dateStyle: 'medium' }).format(d) : '—';
-};
+/** Timestamps shown with time use the shared NZ `dd/MM/yyyy HH:mm` format. */
+const fmtTs = (ts: TS) => fmtDateTime(ts);
 
 function initialsOf(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -322,32 +318,7 @@ export default async function LenderApplicationDetailPage({
   // ---- Previous applications by the same customer ------------------------
   // Lets the lender reuse evidence (bank statements, payslips, credit report)
   // instead of asking a returning applicant for everything again.
-  const previousApps: LoanApplication[] = [];
-  try {
-    const seen = new Set<string>([id]);
-    const queries = [];
-    if (app.applicantId) {
-      queries.push(db.collection('loanApplications').where('applicantId', '==', app.applicantId).get());
-    }
-    if (app.offlineCustomerId) {
-      queries.push(db.collection('loanApplications').where('offlineCustomerId', '==', app.offlineCustomerId).get());
-    }
-    const results = await Promise.all(queries);
-    for (const qs of results) {
-      qs.forEach((doc) => {
-        if (seen.has(doc.id)) return;
-        seen.add(doc.id);
-        const data = { applicationId: doc.id, ...doc.data() } as LoanApplication;
-        if (data.status === 'draft') return;
-        previousApps.push(data);
-      });
-    }
-    const sortKey = (a: LoanApplication) =>
-      toDate((a.timeline?.submittedAt ?? a.timeline?.createdAt) as TS)?.getTime() ?? 0;
-    previousApps.sort((a, b) => sortKey(b) - sortKey(a));
-  } catch {
-    // Best-effort — history panel shows nothing on failure.
-  }
+  const previousApps: LoanApplication[] = await loadPreviousApplications(db, app).catch(() => []);
 
   const previous: PreviousApplication[] = previousApps.slice(0, 8).map((p) => ({
     id: p.applicationId,
@@ -443,6 +414,27 @@ export default async function LenderApplicationDetailPage({
     previous,
     lastLoanLabel,
     reuse,
+  };
+
+  // ---- Evidence gate for the credit assessment ---------------------------
+  // Documents must be reviewed (statements + payslips accepted here, or
+  // reusable from a loan paid out within 6 months) before the wizard opens.
+  const gate = evaluateEvidenceGate(app, previousApps);
+  const gateView: EvidenceGateView = {
+    ok: gate.ok,
+    pendingCount: gate.pendingCount,
+    reasons: gate.reasons,
+    reused: gate.reused.map((r) => ({
+      label: r.label,
+      fileName: r.fileName,
+      fromReference: r.fromReference,
+      loanDate: fmtDate(r.loanDate),
+      viewUrl: `/api/applications/${r.fromApplicationId}/documents/${r.documentId}`,
+    })),
+    previousLoanLabel: gate.previousLoan
+      ? `${gate.previousLoan.reference} · ${fmtDate(gate.previousLoan.date)} (${gate.previousLoan.monthsAgo} month${gate.previousLoan.monthsAgo === 1 ? '' : 's'} before this application)`
+      : undefined,
+    repeatWithinWindow: gate.repeatWithinWindow,
   };
 
   // ---- Communication log --------------------------------------------------
@@ -626,10 +618,15 @@ export default async function LenderApplicationDetailPage({
       name: name || '—',
       email: pi?.email || '—',
       phone: pi?.phone || '—',
-      dob: pi?.dateOfBirth ?? '—',
-      address: pi ? `${pi.city ?? ''}${pi.city && pi.postCode ? ', ' : ''}${pi.postCode ?? ''}`.trim() || (pi.address ?? '—') : '—',
+      dob: fmtYmd(pi?.dateOfBirth),
+      // Full residential address: street, then city + post code.
+      address: pi
+        ? [pi.address?.trim(), [pi.city?.trim(), pi.postCode?.trim()].filter(Boolean).join(' ')].filter(Boolean).join(', ') || '—'
+        : '—',
       visa: pi
-        ? `${VISA_LABEL[pi.visaStatus] ?? pi.visaStatus?.replace(/_/g, ' ') ?? '—'}${pi.visaExpiryDate ? ` · valid to ${pi.visaExpiryDate}` : ''}`
+        ? `${VISA_LABEL[pi.visaStatus] ?? pi.visaStatus?.replace(/_/g, ' ') ?? '—'}${
+            pi.visaStatus !== 'citizen' && pi.visaExpiryDate ? ` · valid to ${fmtYmd(pi.visaExpiryDate)}` : ''
+          }`
         : '—',
       employer: emp?.employerName ?? '—',
       monthlyIncome: monthlyIncome !== null ? fmt(monthlyIncome) : '—',
@@ -646,9 +643,10 @@ export default async function LenderApplicationDetailPage({
       statusLabel: app.affordabilityStatus?.replace(/_/g, ' ') ?? 'not started',
       complete: app.affordabilityStatus === 'complete',
       assessmentCount: app.affordabilityAssessmentIds?.length ?? 0,
-      canAssess: isAssigned && ASSESSMENT_STATUSES.includes(status),
+      canAssess: isAssigned && ASSESSMENT_STATUSES.includes(status) && gate.ok,
       pdfUrl: `/api/applications/${id}/affordability/pdf`,
       assessUrl: `/lender/applications/${id}/affordability`,
+      gate: gateView,
     },
     estimatedFee: ld?.applicationFee !== undefined ? fmt(ld.applicationFee) : fmt(computeApplicationFee(app.isExistingCustomer)),
     feeIsEstimated: ld?.applicationFee === undefined,

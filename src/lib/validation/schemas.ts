@@ -439,6 +439,8 @@ export const affordabilityChecklistSchema = z.object({
   employmentVerificationMethod: z.string().optional(),
   visaConfirmed: z.boolean(),
   visaExpiryDate: z.string().optional(),
+  passportConfirmed: z.boolean().optional(),
+  passportExpiryDate: z.string().optional(),
   daysOfTransactionData: z.number().int().min(0).optional(),
 });
 

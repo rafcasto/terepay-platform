@@ -8,6 +8,7 @@ import {
   renderToBuffer,
 } from '@react-pdf/renderer';
 import type { Loan } from '@/types/application';
+import { fmtYmd } from '@/lib/loan/format';
 
 // TerePay brand palette (mirrors the handoff tokens — kept inline since PDF
 // renderer doesn't read CSS variables).
@@ -57,12 +58,7 @@ const styles = StyleSheet.create({
 
 const fmtNZD = (n: number) =>
   new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(n);
-const fmtDate = (d?: string | null) => {
-  if (!d) return '—';
-  const date = new Date(d);
-  if (isNaN(date.getTime())) return '—';
-  return new Intl.DateTimeFormat('en-NZ', { dateStyle: 'medium' }).format(date);
-};
+const fmtDate = (d?: string | null) => fmtYmd(d);
 
 interface StatementProps {
   loan: Loan;

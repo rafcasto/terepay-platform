@@ -440,6 +440,9 @@ export interface AffordabilityAssessment {
     employmentVerificationMethod?: string;
     visaConfirmed: boolean;
     visaExpiryDate?: string;
+    /** NZ citizens have no visa — the lender confirms the passport instead. */
+    passportConfirmed?: boolean;
+    passportExpiryDate?: string;
   };
 
   // Data
@@ -503,6 +506,11 @@ export interface HouseholdMultiplier {
 // Affordability Assessment Draft (persisted step-by-step)
 // ---------------------------------------------------------------------------
 export interface AffordabilityDraftData {
+  /**
+   * Which step order the draft was saved under. Drafts without it (or with an
+   * older value) pre-date the current wizard layout and resume from the start.
+   */
+  layoutVersion?: number;
   currentStep: number;
   checklist: {
     centrixReportObtained: boolean;
@@ -515,6 +523,8 @@ export interface AffordabilityDraftData {
     employmentVerificationMethod: string;
     visaConfirmed: boolean;
     visaExpiryDate: string;
+    passportConfirmed?: boolean;
+    passportExpiryDate?: string;
   };
   incomeRows: Array<{
     category: string;

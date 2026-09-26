@@ -160,7 +160,7 @@ export default function LoanReview({ data }: { data: ReviewData }) {
           <div className="space-y-5">
             {tab === 'overview' && <OverviewTab data={data} onSelect={setTab} />}
             {tab === 'documents' && <DocumentsTab data={data} />}
-            {tab === 'affordability' && <AffordabilityTab data={data} />}
+            {tab === 'affordability' && <AffordabilityTab data={data} onSelect={setTab} />}
             {tab === 'kyc' && <KycTab data={data} />}
             {tab === 'credit' && <CreditCard data={data} full />}
             {tab === 'communication' && <CommunicationTab data={data} />}
@@ -173,6 +173,7 @@ export default function LoanReview({ data }: { data: ReviewData }) {
           applicationId={data.applicationId}
           affordabilityComplete={data.affordability.complete}
           docsPending={data.docsPending}
+          evidenceBlocked={!data.affordability.gate.ok}
           requestedAmount={data.decisionInput.requestedAmount}
           assessedAmount={data.decisionInput.assessedAmount}
         />
@@ -238,6 +239,8 @@ function Sidebar({ data, onOpenDocuments }: { data: ReviewData; onOpenDocuments:
         <div className="mt-4">
           {data.affordability.complete ? (
             <ConsolePill tone="success" dot>Affordability assessed</ConsolePill>
+          ) : !data.affordability.gate.ok ? (
+            <ConsolePill tone="danger" dot>Assessment blocked — review documents</ConsolePill>
           ) : (
             <ConsolePill tone="warning" dot>Affordability not yet assessed</ConsolePill>
           )}
@@ -407,20 +410,106 @@ function OverviewTab({ data, onSelect }: { data: ReviewData; onSelect: (tab: Tab
   );
 }
 
-function AffordabilityTab({ data }: { data: ReviewData }) {
+function AffordabilityTab({ data, onSelect }: { data: ReviewData; onSelect: (tab: TabKey) => void }) {
   const a = data.affordability;
+  const gate = a.gate;
+  const assessable = data.isAssigned && ASSESSMENT_STATUSES.includes(data.status);
   return (
     <>
+      {/* Evidence gate — the credit assessment cannot start until the documents are reviewed */}
+      {assessable && !gate.ok && (
+        <section className="rounded-[var(--radius-lg)] border-2 border-[var(--danger-700)]/30 bg-[var(--danger-50)] p-5">
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 text-[var(--danger-700)]">
+              <ConsoleIcon name="alert" size={18} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <h2 className="font-display text-[15px] font-bold text-[var(--danger-700)]">
+                Credit assessment blocked — review the documents first
+              </h2>
+              <p className="mt-1 text-sm text-[var(--danger-700)]">
+                Payslips and bank statements must be accepted before the affordability assessment or the AI credit
+                assessment can run.
+                {gate.previousLoanLabel && !gate.repeatWithinWindow && (
+                  <> Last paid-out loan: {gate.previousLoanLabel} — outside the 6-month reuse window.</>
+                )}
+              </p>
+              <ul className="mt-3 list-inside list-disc space-y-1 text-sm text-[var(--danger-700)]">
+                {gate.reasons.map((r) => (
+                  <li key={r}>{r}</li>
+                ))}
+              </ul>
+              <button
+                type="button"
+                onClick={() => onSelect('documents')}
+                className="mt-4 inline-flex items-center gap-1.5 rounded-[10px] bg-[var(--ink-800)] px-3.5 py-2 text-sm font-semibold text-white transition-[filter] hover:brightness-110"
+              >
+                <ConsoleIcon name="fileText" size={16} />
+                Review documents
+                <ConsoleIcon name="chevRight" size={16} />
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Returning customer — evidence carried over from the previous loan */}
+      {gate.reused.length > 0 && (
+        <Card title="Evidence reused from previous loan" icon="users">
+          <p className="mb-3 text-sm text-[var(--text-body)]">
+            This application was lodged within 6 months of the customer&apos;s last paid-out loan
+            {gate.previousLoanLabel ? ` (${gate.previousLoanLabel})` : ''}. The accepted documents below satisfy the
+            evidence requirement and are sent to the AI credit assessment.
+          </p>
+          <ul className="space-y-2">
+            {gate.reused.map((r) => (
+              <li
+                key={r.viewUrl}
+                className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-white p-3"
+              >
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-[var(--success-50)] text-[var(--success-700)]">
+                    <ConsoleIcon name="check" size={16} />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-[var(--text-body)]">{r.label}</p>
+                    <p className="truncate text-xs text-[var(--text-muted)]">
+                      {r.fileName} · {r.fromReference} · loan {r.loanDate}
+                    </p>
+                  </div>
+                </div>
+                <a
+                  href={r.viewUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex shrink-0 items-center gap-1 rounded-[8px] border border-[var(--border-default)] bg-white px-2 py-1 text-xs font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--surface-sunken)]"
+                >
+                  <ConsoleIcon name="search" size={14} />
+                  View
+                </a>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
       <Card
         title="Affordability assessment"
         icon="shield"
         action={
           <div className="flex items-center gap-3">
-            {a.canAssess && (
+            {a.canAssess ? (
               <Link href={a.assessUrl} className="text-sm font-semibold text-[var(--orange-700)] hover:underline">
                 {a.complete ? 'Re-assess →' : 'Start assessment →'}
               </Link>
-            )}
+            ) : assessable && !gate.ok ? (
+              <span
+                className="cursor-not-allowed text-sm font-semibold text-[var(--text-muted)]"
+                title="Review the applicant's documents first"
+              >
+                {a.complete ? 'Re-assess →' : 'Start assessment →'}
+              </span>
+            ) : null}
             {a.complete && (
               <a
                 href={a.pdfUrl}
@@ -862,12 +951,15 @@ function ActionBar({
   applicationId,
   affordabilityComplete,
   docsPending,
+  evidenceBlocked,
   requestedAmount,
   assessedAmount,
 }: {
   applicationId: string;
   affordabilityComplete: boolean;
   docsPending: number;
+  /** Evidence gate closed — documents must be reviewed before the assessment. */
+  evidenceBlocked: boolean;
   requestedAmount: number;
   assessedAmount?: number;
 }) {
@@ -884,6 +976,13 @@ function ActionBar({
                   <ConsoleIcon name="alert" size={16} />
                 </span>
                 {docsPending} document{docsPending === 1 ? '' : 's'} still to review
+              </>
+            ) : evidenceBlocked && !affordabilityComplete ? (
+              <>
+                <span className="text-[var(--danger-700)]">
+                  <ConsoleIcon name="alert" size={16} />
+                </span>
+                Accept payslips and bank statements before assessing
               </>
             ) : affordabilityComplete ? (
               <>

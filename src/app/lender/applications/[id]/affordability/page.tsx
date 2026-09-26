@@ -4,6 +4,8 @@ import { cookies } from 'next/headers';
 import { getAdminDb, verifySessionOrIdToken } from '@/lib/firebase/admin';
 import type { LoanApplication } from '@/types/application';
 import { LOAN_TERM_WEEKS } from '@/lib/loan/status-display';
+import { evaluateEvidenceGate, loadPreviousApplications } from '@/lib/loan/evidence-gate';
+import { fmtDate } from '@/lib/loan/format';
 import AffordabilityForm from './AffordabilityForm';
 
 export const dynamic = 'force-dynamic';
@@ -100,6 +102,31 @@ export default async function AffordabilityPage(props: {
     );
   }
 
+  // Evidence gate: no assessment until the documents have been reviewed
+  // (bank statements + payslips accepted here, or reusable from a loan paid
+  // out within the last 6 months).
+  const previousApps = await loadPreviousApplications(getAdminDb(), application).catch(() => []);
+  const gate = evaluateEvidenceGate(application, previousApps);
+  if (!gate.ok) {
+    return (
+      <Gate id={id} tone="warning" title="Review the documents first">
+        The credit assessment cannot start until the applicant&apos;s evidence has been reviewed:
+        <span className="mt-3 block text-left">
+          {gate.reasons.map((r) => (
+            <span key={r} className="mb-1 block rounded-[var(--radius-md)] bg-[var(--warning-50)] px-3 py-2 text-[var(--warning-700)]">
+              {r}
+            </span>
+          ))}
+        </span>
+        {gate.previousLoan && !gate.repeatWithinWindow && (
+          <span className="mt-2 block text-xs">
+            Last paid-out loan {gate.previousLoan.reference} on {fmtDate(gate.previousLoan.date)}.
+          </span>
+        )}
+      </Gate>
+    );
+  }
+
   const emp = application.employment;
   const expenses = application.livingExpenses;
   const debts = application.existingDebts;
@@ -168,7 +195,8 @@ export default async function AffordabilityPage(props: {
   const loanAmount = application.loanDetails?.requestedAmount ?? 0;
   const loanTerm = LOAN_TERM_WEEKS;
   const householdType = application.personalInfo?.householdType ?? 'single';
-  const visaExpiryDate = application.personalInfo?.visaExpiryDate;
+  const isCitizen = application.personalInfo?.visaStatus === 'citizen';
+  const visaExpiryDate = isCitizen ? undefined : application.personalInfo?.visaExpiryDate;
   const customerName =
     `${application.personalInfo?.firstName ?? ''} ${application.personalInfo?.lastName ?? ''}`.trim();
   const referenceNumber = application.referenceNumber ?? id;
@@ -200,6 +228,7 @@ export default async function AffordabilityPage(props: {
       preFillIncome={preFillIncome}
       preFillExpenses={preFillExpenses}
       visaExpiryDate={visaExpiryDate}
+      isCitizen={isCitizen}
       catalogVersionId={catalogVersionId}
       isReassessment={isReassessment}
       initialDraft={initialDraft}

@@ -44,22 +44,12 @@ function isReadable(name: string, mimeType: string | null | undefined): boolean 
   return READABLE.test(name) || (!!mimeType && READABLE_MIME.has(mimeType));
 }
 
-/**
- * Cross-check the application's `documents[]` against what actually sits in
- * its Drive folder and turn them into the list the worker downloads. Returns
- * `missing` entries instead of throwing so the caller can report every gap at
- * once.
- */
-export async function resolveAssessmentDocuments(
+async function findApplicationFolder(
+  drive: ReturnType<typeof getDriveClient>,
+  rootFolderId: string,
   applicationId: string,
-  documents: ApplicationDocument[] | undefined,
-): Promise<ResolvedDocuments> {
-  const rootFolderId = getApplicationsRootFolderId();
-  const drive = getDriveClient();
+): Promise<string | undefined> {
   const folderName = `app_${applicationId}`.replace(/[^a-zA-Z0-9_-]/g, '');
-  const skipped: { name: string; reason: string }[] = [];
-  const missing: string[] = [];
-
   const folderRes = await drive.files.list({
     q: `'${rootFolderId}' in parents and name = '${folderName}' and mimeType = '${FOLDER_MIME}' and trashed = false`,
     fields: 'files(id)',
@@ -67,18 +57,16 @@ export async function resolveAssessmentDocuments(
     supportsAllDrives: true,
     includeItemsFromAllDrives: true,
   });
-  const folderId = folderRes.data.files?.[0]?.id;
-  if (!folderId) {
-    return {
-      folderId: '',
-      rootFolderId,
-      documents: [],
-      skipped,
-      missing: ['Bank statement (PDF or CSV) — the applicant has not uploaded any documents for this application'],
-    };
-  }
+  return folderRes.data.files?.[0]?.id ?? undefined;
+}
 
-  const inDrive = new Map<string, { name: string; mimeType?: string | null; size?: string | null }>();
+type DriveFileMeta = { name: string; mimeType?: string | null; size?: string | null };
+
+async function listFolder(
+  drive: ReturnType<typeof getDriveClient>,
+  folderId: string,
+): Promise<Map<string, DriveFileMeta>> {
+  const inDrive = new Map<string, DriveFileMeta>();
   let pageToken: string | undefined;
   do {
     const res = await drive.files.list({
@@ -94,36 +82,89 @@ export async function resolveAssessmentDocuments(
     }
     pageToken = res.data.nextPageToken ?? undefined;
   } while (pageToken);
+  return inDrive;
+}
 
+/**
+ * Cross-check the application's `documents[]` against what actually sits in
+ * its Drive folder and turn them into the list the worker downloads. Returns
+ * `missing` entries instead of throwing so the caller can report every gap at
+ * once.
+ *
+ * `reuseFrom` carries accepted documents from a previous loan (returning
+ * customer inside the evidence-reuse window); they live in that application's
+ * own `app_<id>` folder under the same root, so the worker's root check still
+ * holds.
+ */
+export async function resolveAssessmentDocuments(
+  applicationId: string,
+  documents: ApplicationDocument[] | undefined,
+  reuseFrom: { applicationId: string; documents: ApplicationDocument[] }[] = [],
+): Promise<ResolvedDocuments> {
+  const rootFolderId = getApplicationsRootFolderId();
+  const drive = getDriveClient();
+  const skipped: { name: string; reason: string }[] = [];
+  const missing: string[] = [];
   const out: CreditAssessmentDocument[] = [];
-  for (const doc of documents ?? []) {
-    const kind = KIND_BY_TYPE[doc.type];
-    if (!kind) continue; // identity documents are not part of the assessment
-    if (doc.status === 'rejected') {
-      skipped.push({ name: doc.fileName, reason: 'rejected by the lender' });
+
+  const sources: { applicationId: string; documents: ApplicationDocument[]; label: string }[] = [
+    { applicationId, documents: documents ?? [], label: '' },
+    ...reuseFrom
+      .filter((r) => r.applicationId !== applicationId && r.documents.length > 0)
+      .map((r) => ({ ...r, label: ' (reused from a previous loan)' })),
+  ];
+
+  let folderId = '';
+  for (const source of sources) {
+    const sourceFolder = await findApplicationFolder(drive, rootFolderId, source.applicationId);
+    if (!sourceFolder) {
+      for (const doc of source.documents) {
+        if (KIND_BY_TYPE[doc.type]) skipped.push({ name: doc.fileName, reason: `application Drive folder not found${source.label}` });
+      }
       continue;
     }
-    const file = inDrive.get(doc.documentId);
-    if (!file) {
-      skipped.push({ name: doc.fileName, reason: 'not found in the application Drive folder' });
-      continue;
+    if (!folderId) folderId = sourceFolder;
+    const inDrive = await listFolder(drive, sourceFolder);
+
+    for (const doc of source.documents) {
+      const kind = KIND_BY_TYPE[doc.type];
+      if (!kind) continue; // identity documents are not part of the assessment
+      if (doc.status === 'rejected') {
+        skipped.push({ name: doc.fileName, reason: 'rejected by the lender' });
+        continue;
+      }
+      const file = inDrive.get(doc.documentId);
+      if (!file) {
+        skipped.push({ name: doc.fileName, reason: `not found in the application Drive folder${source.label}` });
+        continue;
+      }
+      if (!isReadable(file.name, file.mimeType)) {
+        skipped.push({ name: doc.fileName, reason: 'not a PDF/CSV — the statement parser cannot read images' });
+        continue;
+      }
+      out.push({
+        driveId: doc.documentId,
+        name: file.name,
+        kind,
+        type: doc.type,
+        mimeType: file.mimeType ?? undefined,
+        size: file.size ? Number(file.size) : undefined,
+      });
     }
-    if (!isReadable(file.name, file.mimeType)) {
-      skipped.push({ name: doc.fileName, reason: 'not a PDF/CSV — the statement parser cannot read images' });
-      continue;
-    }
-    out.push({
-      driveId: doc.documentId,
-      name: file.name,
-      kind,
-      type: doc.type,
-      mimeType: file.mimeType ?? undefined,
-      size: file.size ? Number(file.size) : undefined,
-    });
+  }
+
+  if (!folderId) {
+    return {
+      folderId: '',
+      rootFolderId,
+      documents: [],
+      skipped,
+      missing: ['Bank statement (PDF or CSV) — the applicant has not uploaded any documents for this application'],
+    };
   }
 
   if (!out.some((d) => d.kind === 'statement')) {
-    missing.push('Bank statement (PDF or CSV) uploaded to this application and not rejected');
+    missing.push('Bank statement (PDF or CSV) accepted on this application (or reusable from a loan within the last 6 months) and not rejected');
   }
 
   return { folderId, rootFolderId, documents: out, skipped, missing };
