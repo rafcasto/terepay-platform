@@ -18,22 +18,54 @@ export function fmtNZDCompact(n: number | undefined | null): string {
 
 type DateInput = Date | string | FirestoreTsLike | null | undefined;
 
+/** Every customer-facing date in TerePay is rendered in NZ local time. */
+export const NZ_TIME_ZONE = 'Pacific/Auckland';
+
+const NZ_DATE = new Intl.DateTimeFormat('en-NZ', {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  timeZone: NZ_TIME_ZONE,
+});
+const NZ_TIME = new Intl.DateTimeFormat('en-NZ', {
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+  timeZone: NZ_TIME_ZONE,
+});
+
+/** `dd/MM/yyyy` — the NZ date format used everywhere a date is shown. */
 export function fmtDate(d: DateInput): string {
   const date = toDate(d);
   if (!date) return '—';
-  return new Intl.DateTimeFormat('en-NZ', { dateStyle: 'medium' }).format(date);
+  return NZ_DATE.format(date);
 }
 
+/** `dd/MM/yyyy HH:mm` (24-hour, NZ time). */
 export function fmtDateTime(d: DateInput): string {
   const date = toDate(d);
   if (!date) return '—';
-  return new Intl.DateTimeFormat('en-NZ', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+  return `${NZ_DATE.format(date)} ${NZ_TIME.format(date)}`;
 }
 
+/** `dd/MM` — for tight layouts where the year is obvious from context. */
 export function fmtDateShort(d: DateInput): string {
   const date = toDate(d);
   if (!date) return '—';
-  return new Intl.DateTimeFormat('en-NZ', { day: 'numeric', month: 'short' }).format(date);
+  return NZ_DATE.format(date).slice(0, 5);
+}
+
+/**
+ * Format a calendar-date string (`YYYY-MM-DD`, as stored for DOB, visa /
+ * passport expiry, statement dates, instalment due dates) as `dd/MM/yyyy`
+ * without going through a timezone conversion. Anything that isn't a plain
+ * calendar date falls back to {@link fmtDate}.
+ */
+export function fmtYmd(ymd: string | null | undefined): string {
+  if (!ymd) return '—';
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(ymd.trim());
+  if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+  return fmtDate(ymd);
 }
 
 export function daysUntil(d: DateInput): number | null {

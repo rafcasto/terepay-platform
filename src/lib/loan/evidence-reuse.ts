@@ -10,11 +10,18 @@
  * Windows are policy values — adjust here, not in the UI.
  */
 
-/** Bank statements from a previous application can be reused if the new loan is within this window. */
-export const BANK_STATEMENT_REUSE_MONTHS = 6;
+/**
+ * A returning customer who applies again within this many months of their last
+ * paid-out loan may be assessed on that loan's accepted bank statements and
+ * payslips instead of re-sending them (see `evidence-gate.ts`).
+ */
+export const REPEAT_CUSTOMER_EVIDENCE_REUSE_MONTHS = 6;
 
-/** Payslips age out faster than bank statements — income can change quickly. */
-export const PAYSLIP_REUSE_MONTHS = 3;
+/** Bank statements from a previous application can be reused if the new loan is within this window. */
+export const BANK_STATEMENT_REUSE_MONTHS = REPEAT_CUSTOMER_EVIDENCE_REUSE_MONTHS;
+
+/** Payslips follow the same repeat-customer window as bank statements. */
+export const PAYSLIP_REUSE_MONTHS = REPEAT_CUSTOMER_EVIDENCE_REUSE_MONTHS;
 
 /** A comprehensive credit report (Centrix) does not need to be re-pulled inside this window. */
 export const CREDIT_REPORT_REUSE_MONTHS = 6;

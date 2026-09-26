@@ -28,14 +28,61 @@ export interface Checklist {
   centrixReportObtained: boolean;
   centrixReportNumber: string;
   firstTransactionVerified: boolean;
+  /** `YYYY-MM-DD` — earliest transaction on the bank statements (drives days-of-data). */
   firstTransactionDate: string;
   payslipsReceived: boolean;
+  /** "Centrix affordability report obtained". */
   creditReportObtained: boolean;
   employmentVerified: boolean;
   employmentVerificationMethod: string;
+  /** Non-citizens: visa sighted + expiry. */
   visaConfirmed: boolean;
   visaExpiryDate: string;
+  /** NZ citizens have no visa — passport sighted + expiry instead. */
+  passportConfirmed: boolean;
+  passportExpiryDate: string;
 }
+
+export const EMPTY_CHECKLIST: Checklist = {
+  centrixReportObtained: false,
+  centrixReportNumber: '',
+  firstTransactionVerified: false,
+  firstTransactionDate: '',
+  payslipsReceived: false,
+  creditReportObtained: false,
+  employmentVerified: false,
+  employmentVerificationMethod: '',
+  visaConfirmed: false,
+  visaExpiryDate: '',
+  passportConfirmed: false,
+  passportExpiryDate: '',
+};
+
+// ─── Wizard layout ───────────────────────────────────────────────────────────
+// The Data Collection Checklist is deliberately the LAST step: it is the
+// lender's sign-off immediately before the assessment is submitted and the
+// loan can be approved.
+
+export const WIZARD_LAYOUT_VERSION = 2;
+
+export const STEP = {
+  customer: 0,
+  income: 1,
+  expense: 2,
+  results: 3,
+  checklist: 4,
+} as const;
+
+export const STEP_LABELS = [
+  'Customer Information',
+  'Income Verification',
+  'Expense Verification',
+  'Results & Decision',
+  'Data Collection Checklist',
+] as const;
+
+/** CCCFA affordability needs at least this much bank-statement history. */
+export const MIN_DAYS_OF_DATA = 90;
 
 // ─── Income categories (Excel order) ────────────────────────────────────────
 

@@ -5,6 +5,7 @@ import { adminDb, verifySessionOrIdToken } from '@/lib/firebase/admin';
 import { loanPurposeLabel } from '@/lib/constants/loan-purposes';
 import ConsoleIcon, { type ConsoleIconName } from '@/components/lender/ConsoleIcon';
 import WorklistTable, { type WorklistRow } from './_components/WorklistTable';
+import { fmtDate as fmtNzDate } from '@/lib/loan/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,10 +25,7 @@ function tsToDate(ts: TS): Date | null {
   return null;
 }
 
-const fmtDate = (ts: TS) => {
-  const d = tsToDate(ts);
-  return d ? new Intl.DateTimeFormat('en-NZ', { dateStyle: 'medium' }).format(d) : '—';
-};
+const fmtDate = (ts: TS) => fmtNzDate(tsToDate(ts));
 
 function daysPending(ts: TS): number | null {
   const d = tsToDate(ts);

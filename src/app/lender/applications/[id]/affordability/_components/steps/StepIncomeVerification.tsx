@@ -1,25 +1,34 @@
 'use client';
 
 import type { IncomeRow } from '../types';
-import { fmt } from '../types';
+import { fmt, MIN_DAYS_OF_DATA } from '../types';
 
 interface Props {
   incomeRows: IncomeRow[];
   onUpdate: (index: number, field: keyof IncomeRow, value: number | string) => void;
   totalIncome: number;
+  /** `YYYY-MM-DD` — earliest transaction on the statements being verified. */
+  firstTransactionDate: string;
+  onFirstTransactionDateChange: (v: string) => void;
+  daysOfData: number;
   onNext: () => void;
   onBack: () => void;
   validationErrors?: string[];
 }
 
-export default function Step3IncomeVerification({
+export default function StepIncomeVerification({
   incomeRows,
   onUpdate,
   totalIncome,
+  firstTransactionDate,
+  onFirstTransactionDateChange,
+  daysOfData,
   onNext,
   onBack,
   validationErrors,
 }: Props) {
+  const hasEnoughData = daysOfData >= MIN_DAYS_OF_DATA;
+
   return (
     <div className="space-y-6">
       <div>
@@ -39,6 +48,42 @@ export default function Step3IncomeVerification({
           </ul>
         </div>
       )}
+
+      {/* Bank statement coverage — feeds the 90-day rule and the AI assessment */}
+      <div className="rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-white p-5 shadow-[var(--shadow-xs)]">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div className="min-w-0">
+            <h3 className="text-sm font-semibold text-[var(--text-strong)]">Bank statement coverage</h3>
+            <p className="mt-1 text-xs text-[var(--text-muted)]">
+              Enter the date of the earliest transaction on the accepted bank statements. At least {MIN_DAYS_OF_DATA} days
+              of data are required; less than that is a hard decline.
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <label className="text-sm font-medium text-[var(--text-body)]" htmlFor="first-transaction-date">
+              First transaction date
+            </label>
+            <input
+              id="first-transaction-date"
+              type="date"
+              value={firstTransactionDate}
+              onChange={(e) => onFirstTransactionDateChange(e.target.value)}
+              className={dateInputCls}
+            />
+            {daysOfData > 0 && (
+              <span
+                className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                  hasEnoughData
+                    ? 'bg-[var(--success-50)] text-[var(--success-700)]'
+                    : 'bg-[var(--danger-50)] text-[var(--danger-700)]'
+                }`}
+              >
+                {daysOfData} days — {hasEnoughData ? 'OK' : 'INSUFFICIENT'}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
 
       <div className="overflow-x-auto rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-white shadow-[var(--shadow-xs)]">
         <table className="w-full text-sm">
@@ -139,6 +184,8 @@ function NumInput({
 const thCls = 'px-3 py-3 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]';
 const noteCls =
   'w-full rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-white px-2 py-1.5 text-xs text-[var(--text-body)] focus:border-[var(--orange-400)] focus:outline-none focus:ring-1 focus:ring-[var(--orange-400)]';
+const dateInputCls =
+  'rounded-[var(--radius-md)] border border-[var(--border-default)] bg-white px-3 py-2 text-sm text-[var(--text-body)] focus:border-[var(--orange-400)] focus:outline-none focus:ring-2 focus:ring-[var(--orange-400)]';
 const nextBtnCls =
   'rounded-[10px] bg-[var(--ink-800)] px-6 py-2.5 text-sm font-semibold text-white transition-[filter] hover:brightness-110';
 const backBtnCls =

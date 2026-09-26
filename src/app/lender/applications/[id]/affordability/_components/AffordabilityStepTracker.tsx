@@ -1,12 +1,8 @@
 'use client';
 
-const STEPS = [
-  'Customer Information',
-  'Data Collection Checklist',
-  'Income Verification',
-  'Expense Verification',
-  'Results & Decision',
-];
+import { STEP_LABELS } from './types';
+
+const STEPS = STEP_LABELS;
 
 export default function AffordabilityStepTracker({ currentStep }: { currentStep: number }) {
   return (

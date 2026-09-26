@@ -4,19 +4,24 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import AffordabilityStepTracker from './_components/AffordabilityStepTracker';
-import Step1CustomerInfo from './_components/steps/Step1CustomerInfo';
-import Step2DataChecklist from './_components/steps/Step2DataChecklist';
-import Step3IncomeVerification from './_components/steps/Step3IncomeVerification';
-import Step4ExpenseVerification from './_components/steps/Step4ExpenseVerification';
-import Step5ResultsDecision from './_components/steps/Step5ResultsDecision';
+import StepCustomerInfo from './_components/steps/StepCustomerInfo';
+import StepIncomeVerification from './_components/steps/StepIncomeVerification';
+import StepExpenseVerification from './_components/steps/StepExpenseVerification';
+import StepResultsDecision from './_components/steps/StepResultsDecision';
+import StepDataChecklist from './_components/steps/StepDataChecklist';
 import AiAssessmentPanel from './_components/steps/AiAssessmentPanel';
 import {
   type IncomeRow,
   type ExpenseRow,
   type Checklist,
+  EMPTY_CHECKLIST,
   INCOME_CATEGORIES,
   EXPENSE_CATEGORIES,
   HOUSEHOLD_MULTIPLIERS,
+  MIN_DAYS_OF_DATA,
+  STEP,
+  STEP_LABELS,
+  WIZARD_LAYOUT_VERSION,
   calcIncomeRow,
   calcExpenseRow,
 } from './_components/types';
@@ -31,32 +36,44 @@ interface BenchmarkEntry {
   fortnightlyAmount: number;
 }
 
+const LAST_STEP = STEP_LABELS.length - 1;
+
 // ─── Per-step validation ─────────────────────────────────────────────────────
 
-function validateStep1(checklist: Checklist, daysOfData: number): string[] {
+/** Income step: at least one figure, and the statement coverage date the 90-day rule and the AI assessment need. */
+function validateIncome(incomeRows: IncomeRow[], checklist: Checklist): string[] {
+  const errors: string[] = [];
+  if (!incomeRows.some((r) => r.centrixAmount > 0 || r.verifiedAmount > 0)) {
+    errors.push('At least one income source must have a Centrix or Verified amount entered');
+  }
+  if (!checklist.firstTransactionDate) {
+    errors.push('Enter the first transaction date on the bank statements (bank statement coverage)');
+  }
+  return errors;
+}
+
+/** Final checklist: every item ticked and its supporting detail supplied. */
+function validateChecklist(checklist: Checklist, isCitizen: boolean): string[] {
   const errors: string[] = [];
   if (!checklist.centrixReportObtained) errors.push('Centrix report must be obtained');
   if (!checklist.centrixReportNumber.trim()) errors.push('Centrix report number is required');
   if (!checklist.firstTransactionVerified) errors.push('First transaction date must be verified');
   if (!checklist.firstTransactionDate) errors.push('First transaction date is required');
-  if (daysOfData > 0 && daysOfData < 90) errors.push('At least 90 days of transaction data required');
   if (!checklist.payslipsReceived) errors.push('Payslips must be received');
-  if (!checklist.creditReportObtained) errors.push('Credit report must be obtained');
+  if (!checklist.creditReportObtained) errors.push('Centrix affordability report must be obtained');
   if (!checklist.employmentVerified) errors.push('Employment must be verified');
   if (checklist.employmentVerified && !checklist.employmentVerificationMethod.trim())
     errors.push('Employment verification method is required');
-  if (!checklist.visaConfirmed) errors.push('Visa status must be confirmed');
-  if (checklist.visaConfirmed && !checklist.visaExpiryDate)
-    errors.push('Visa expiry date is required when visa is confirmed');
-  return errors;
-}
-
-function validateStep2(incomeRows: IncomeRow[]): string[] {
-  const hasIncome = incomeRows.some((r) => r.centrixAmount > 0 || r.verifiedAmount > 0);
-  if (!hasIncome) {
-    return ['At least one income source must have a Centrix or Verified amount entered'];
+  if (isCitizen) {
+    if (!checklist.passportConfirmed) errors.push('Passport must be sighted for an NZ citizen');
+    if (checklist.passportConfirmed && !checklist.passportExpiryDate)
+      errors.push('Passport expiry date is required');
+  } else {
+    if (!checklist.visaConfirmed) errors.push('Visa status must be confirmed');
+    if (checklist.visaConfirmed && !checklist.visaExpiryDate)
+      errors.push('Visa expiry date is required when visa is confirmed');
   }
-  return [];
+  return errors;
 }
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -73,6 +90,8 @@ interface Props {
   preFillIncome: Partial<Record<string, number>>;
   preFillExpenses: Partial<Record<string, number>>;
   visaExpiryDate?: string;
+  /** NZ citizen — the checklist asks for the passport instead of a visa, and the visa hard-decline does not apply. */
+  isCitizen: boolean;
   catalogVersionId: string;
   isReassessment: boolean;
   initialDraft?: AffordabilityDraftData | null;
@@ -90,6 +109,7 @@ export default function AffordabilityForm({
   preFillIncome,
   preFillExpenses,
   visaExpiryDate,
+  isCitizen,
   catalogVersionId,
   isReassessment,
   initialDraft,
@@ -97,25 +117,18 @@ export default function AffordabilityForm({
   const router = useRouter();
   const hMult = HOUSEHOLD_MULTIPLIERS[householdType] ?? 1.0;
 
-  const [currentStep, setCurrentStep] = useState(initialDraft?.currentStep ?? 0);
+  // A draft saved under an older step order resumes from the start (its data is kept).
+  const [currentStep, setCurrentStep] = useState(() => {
+    if (!initialDraft || initialDraft.layoutVersion !== WIZARD_LAYOUT_VERSION) return 0;
+    return Math.min(Math.max(initialDraft.currentStep ?? 0, 0), LAST_STEP);
+  });
   const [nowMs] = useState(() => Date.now());
 
-  const [checklist, setChecklist] = useState<Checklist>(() =>
-    initialDraft?.checklist
-      ? (initialDraft.checklist as Checklist)
-      : {
-          centrixReportObtained: false,
-          centrixReportNumber: '',
-          firstTransactionVerified: false,
-          firstTransactionDate: '',
-          payslipsReceived: false,
-          creditReportObtained: false,
-          employmentVerified: false,
-          employmentVerificationMethod: '',
-          visaConfirmed: false,
-          visaExpiryDate: visaExpiryDate ?? '',
-        },
-  );
+  const [checklist, setChecklist] = useState<Checklist>(() => ({
+    ...EMPTY_CHECKLIST,
+    visaExpiryDate: isCitizen ? '' : (visaExpiryDate ?? ''),
+    ...(initialDraft?.checklist ?? {}),
+  }));
 
   // Rows are seeded from what the applicant declared on their application
   // (fortnightly, no conversion). Drafts saved before the declared column
@@ -132,7 +145,7 @@ export default function AffordabilityForm({
         declaredAmount: preFillIncome[cat] ?? 0,
         centrixAmount: 0,
         // Seed "verified" with the declared figure; the lender confirms or
-        // replaces it against payslips in Step 3.
+        // replaces it against payslips on the income step.
         verifiedAmount: preFillIncome[cat] ?? 0,
         adjustment: 0,
         adjustmentReason: '',
@@ -242,18 +255,43 @@ export default function AffordabilityForm({
     : 0;
 
   const hardDeclines: string[] = [];
-  if (daysOfData > 0 && daysOfData < 90)
-    hardDeclines.push('< 90 days of transaction data');
+  if (daysOfData > 0 && daysOfData < MIN_DAYS_OF_DATA)
+    hardDeclines.push(`< ${MIN_DAYS_OF_DATA} days of transaction data`);
   if (surplus <= 0)
     hardDeclines.push('Surplus ≤ $0 — not affordable');
-  if (checklist.visaExpiryDate) {
+  // Citizens have no visa to expire.
+  if (!isCitizen && checklist.visaExpiryDate) {
     const loanEnd = new Date();
     loanEnd.setDate(loanEnd.getDate() + 56 + 90);
     if (new Date(checklist.visaExpiryDate) < loanEnd)
       hardDeclines.push('Visa expires before loan completion + 3-month buffer');
   }
+  const effectiveRecommendation: 'proceed' | 'decline' = hardDeclines.length > 0 ? 'decline' : recommendation;
+
+  const saveDraft = (step: number) => {
+    // Fire-and-forget — the wizard never blocks on the draft write.
+    fetch(`/api/applications/${applicationId}/affordability`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        layoutVersion: WIZARD_LAYOUT_VERSION,
+        currentStep: step,
+        checklist,
+        incomeRows,
+        expenseRows,
+        recommendation,
+        assessedAmount,
+      }),
+    }).catch(() => undefined);
+  };
 
   const submit = async () => {
+    const errors = validateChecklist(checklist, isCitizen);
+    if (errors.length > 0) {
+      setStepErrors(errors);
+      return;
+    }
+    setStepErrors([]);
     setLoading(true);
     setError(null);
     try {
@@ -267,7 +305,7 @@ export default function AffordabilityForm({
           householdMultiplier: hMult,
           catalogVersionId,
           redFlagsAcknowledged: {},
-          recommendation: hardDeclines.length > 0 ? 'decline' : recommendation,
+          recommendation: effectiveRecommendation,
           assessedAmount,
           // Attach the AI assessment only when it finished (and for this amount).
           creditAssessmentId:
@@ -295,8 +333,7 @@ export default function AffordabilityForm({
   const next = () => {
     // Validate the current step before advancing
     let errors: string[] = [];
-    if (currentStep === 1) errors = validateStep1(checklist, daysOfData);
-    else if (currentStep === 2) errors = validateStep2(incomeRows);
+    if (currentStep === STEP.income) errors = validateIncome(incomeRows, checklist);
 
     if (errors.length > 0) {
       setStepErrors(errors);
@@ -304,22 +341,9 @@ export default function AffordabilityForm({
     }
     setStepErrors([]);
 
-    const nextStep = Math.min(currentStep + 1, 4);
+    const nextStep = Math.min(currentStep + 1, LAST_STEP);
     setCurrentStep(nextStep);
-
-    // Persist draft after each successful advance (fire-and-forget)
-    fetch(`/api/applications/${applicationId}/affordability`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        currentStep: nextStep,
-        checklist,
-        incomeRows,
-        expenseRows,
-        recommendation,
-        assessedAmount,
-      }),
-    }).catch(() => undefined);
+    saveDraft(nextStep);
   };
 
   const back = () => {
@@ -370,7 +394,7 @@ export default function AffordabilityForm({
             <span className="text-sm">Back</span>
           </Link>
           <span className="text-sm font-semibold text-white">Affordability assessment</span>
-          <span className="text-xs text-white/50">{currentStep + 1}/5</span>
+          <span className="text-xs text-white/50">{currentStep + 1}/{STEP_LABELS.length}</span>
         </header>
 
         {/* Mobile step progress */}
@@ -381,8 +405,8 @@ export default function AffordabilityForm({
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto bg-[var(--surface-page)]">
           <div className="mx-auto max-w-5xl px-4 py-8 pb-24 sm:px-8 sm:pb-12">
-            {currentStep === 0 && (
-              <Step1CustomerInfo
+            {currentStep === STEP.customer && (
+              <StepCustomerInfo
                 customerName={customerName}
                 referenceNumber={referenceNumber}
                 loanAmount={loanAmount}
@@ -393,28 +417,21 @@ export default function AffordabilityForm({
                 onNext={next}
               />
             )}
-            {currentStep === 1 && (
-              <Step2DataChecklist
-                checklist={checklist}
-                onChange={setChecklist}
+            {currentStep === STEP.income && (
+              <StepIncomeVerification
+                incomeRows={incomeRows}
+                onUpdate={updateIncomeRow}
+                totalIncome={totalIncome}
+                firstTransactionDate={checklist.firstTransactionDate}
+                onFirstTransactionDateChange={(v) => setChecklist((c) => ({ ...c, firstTransactionDate: v }))}
                 daysOfData={daysOfData}
                 onNext={next}
                 onBack={back}
                 validationErrors={stepErrors}
               />
             )}
-            {currentStep === 2 && (
-              <Step3IncomeVerification
-                incomeRows={incomeRows}
-                onUpdate={updateIncomeRow}
-                totalIncome={totalIncome}
-                onNext={next}
-                onBack={back}
-                validationErrors={stepErrors}
-              />
-            )}
-            {currentStep === 3 && (
-              <Step4ExpenseVerification
+            {currentStep === STEP.expense && (
+              <StepExpenseVerification
                 expenseRows={expenseRows}
                 onUpdate={updateExpenseRow}
                 totalExpenses={totalExpenses}
@@ -422,8 +439,8 @@ export default function AffordabilityForm({
                 onBack={back}
               />
             )}
-            {currentStep === 4 && (
-              <Step5ResultsDecision
+            {currentStep === STEP.results && (
+              <StepResultsDecision
                 requestedAmount={loanAmount}
                 assessedAmount={assessedAmount}
                 onAssessedAmountChange={setAssessedAmount}
@@ -438,9 +455,7 @@ export default function AffordabilityForm({
                 hardDeclines={hardDeclines}
                 recommendation={recommendation}
                 onRecommendationChange={setRecommendation}
-                onSubmit={submit}
-                loading={loading}
-                error={error}
+                onNext={next}
                 onBack={back}
                 aiPanel={
                   <AiAssessmentPanel
@@ -454,6 +469,21 @@ export default function AffordabilityForm({
                     onChange={setCreditAssessment}
                   />
                 }
+              />
+            )}
+            {currentStep === STEP.checklist && (
+              <StepDataChecklist
+                checklist={checklist}
+                onChange={setChecklist}
+                daysOfData={daysOfData}
+                isCitizen={isCitizen}
+                hardDeclines={hardDeclines}
+                effectiveRecommendation={effectiveRecommendation}
+                onSubmit={submit}
+                loading={loading}
+                error={error}
+                onBack={back}
+                validationErrors={stepErrors}
               />
             )}
           </div>

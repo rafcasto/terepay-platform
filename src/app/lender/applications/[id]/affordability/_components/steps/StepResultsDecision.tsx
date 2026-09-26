@@ -18,15 +18,18 @@ interface Props {
   hardDeclines: string[];
   recommendation: 'proceed' | 'decline';
   onRecommendationChange: (r: 'proceed' | 'decline') => void;
-  onSubmit: () => Promise<void>;
-  loading: boolean;
-  error: string | null;
+  onNext: () => void;
   onBack: () => void;
   /** AI credit assessment panel (rendered between the calculation and the recommendation). */
   aiPanel?: React.ReactNode;
 }
 
-export default function Step5ResultsDecision({
+/**
+ * Affordability result + the lender's provisional recommendation. Nothing is
+ * submitted here — the Data Collection Checklist that follows is the final
+ * sign-off before the assessment is recorded.
+ */
+export default function StepResultsDecision({
   requestedAmount,
   assessedAmount,
   onAssessedAmountChange,
@@ -41,9 +44,7 @@ export default function Step5ResultsDecision({
   hardDeclines,
   recommendation,
   onRecommendationChange,
-  onSubmit,
-  loading,
-  error,
+  onNext,
   onBack,
   aiPanel,
 }: Props) {
@@ -67,14 +68,13 @@ export default function Step5ResultsDecision({
         ? { pill: 'bg-[var(--warning-50)] text-[var(--warning-700)] border-[var(--warning-700)]/20', dot: 'bg-[var(--warning-500)]' }
         : { pill: 'bg-[var(--danger-50)] text-[var(--danger-700)] border-[var(--danger-700)]/20', dot: 'bg-[var(--danger-500)]' };
 
-  const effectiveRecommendation = forced ? 'decline' : recommendation;
-
   return (
     <div className="space-y-6">
       <div>
         <h2 className="font-display text-xl font-bold text-[var(--text-strong)]">Results &amp; Decision</h2>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Affordability calculation summary based on verified income and expenses.
+          Affordability calculation summary based on verified income and expenses. You confirm and submit on the
+          Data Collection Checklist that follows.
         </p>
       </div>
 
@@ -197,33 +197,19 @@ export default function Step5ResultsDecision({
         )}
       </div>
 
-      {/* Submission error */}
-      {error && (
-        <div className="rounded-[var(--radius-lg)] border-2 border-[var(--danger-700)]/30 bg-[var(--danger-50)] p-4">
-          <p className="mb-1 font-semibold text-[var(--danger-700)]">Submission failed</p>
-          <p className="text-sm text-[var(--danger-700)]">{error}</p>
-        </div>
-      )}
-
       {/* Navigation */}
       <div className="flex items-center justify-between pt-2">
-        <button type="button" onClick={onBack} className={backBtnCls} disabled={loading}>
+        <button type="button" onClick={onBack} className={backBtnCls}>
           ← Back
         </button>
         <button
           type="button"
-          onClick={onSubmit}
-          disabled={loading || outOfRange}
-          className={[
-            'rounded-[10px] px-7 py-2.5 text-sm font-semibold text-white transition-[filter] hover:brightness-110 disabled:opacity-50',
-            effectiveRecommendation === 'decline' ? 'bg-[var(--danger-700)]' : 'bg-[var(--success-700)]',
-          ].join(' ')}
+          onClick={onNext}
+          disabled={outOfRange}
+          title={outOfRange ? 'Amount must be between $200 and $2,000' : undefined}
+          className={nextBtnCls}
         >
-          {loading
-            ? 'Submitting…'
-            : effectiveRecommendation === 'decline'
-              ? 'Submit Decline'
-              : 'Submit & Proceed'}
+          Next: Data Collection Checklist →
         </button>
       </div>
     </div>
@@ -281,5 +267,7 @@ function RecommendationBtn({
   );
 }
 
+const nextBtnCls =
+  'rounded-[10px] bg-[var(--ink-800)] px-6 py-2.5 text-sm font-semibold text-white transition-[filter] hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50';
 const backBtnCls =
-  'rounded-[10px] border border-[var(--border-default)] px-6 py-2.5 text-sm font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--surface-sunken)] disabled:opacity-50';
+  'rounded-[10px] border border-[var(--border-default)] px-6 py-2.5 text-sm font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--surface-sunken)]';

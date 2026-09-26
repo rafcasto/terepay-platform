@@ -51,6 +51,17 @@ export type PreviousApplication = {
   href: string;
 };
 
+/** Client-safe view of `evaluateEvidenceGate()`. */
+export type EvidenceGateView = {
+  ok: boolean;
+  pendingCount: number;
+  reasons: string[];
+  /** Previous-loan evidence that satisfies this application (returning customer inside the 6-month window). */
+  reused: { label: string; fileName: string; fromReference: string; loanDate: string; viewUrl: string }[];
+  previousLoanLabel?: string;
+  repeatWithinWindow: boolean;
+};
+
 export type ApplicantHistory = {
   previousCount: number;
   previous: PreviousApplication[];
@@ -127,9 +138,12 @@ export type ReviewData = {
     statusLabel: string;
     complete: boolean;
     assessmentCount: number;
+    /** Assigned lender, assessable status AND the evidence gate is open. */
     canAssess: boolean;
     pdfUrl: string;
     assessUrl: string;
+    /** Evidence gate — documents must be reviewed before the credit assessment can start. */
+    gate: EvidenceGateView;
   };
   estimatedFee: string;
   feeIsEstimated: boolean;

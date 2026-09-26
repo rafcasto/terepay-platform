@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import type { ScheduledPayment } from '@/types/application';
 import ConsoleIcon from '@/components/lender/ConsoleIcon';
 import ConsolePill, { type PillTone } from '@/components/lender/ConsolePill';
+import { fmtDateTime, fmtYmd } from '@/lib/loan/format';
 
 type Props = {
   applicationId: string;
@@ -30,14 +31,7 @@ type RowView = { label: string; tone: PillTone; note?: string; suffix?: string }
 
 /** Test-cadence instalments carry an exact time — show it in NZ local time. */
 function fmtDueAt(iso: string): string {
-  return new Date(iso).toLocaleString('en-NZ', {
-    timeZone: 'Pacific/Auckland',
-    day: 'numeric',
-    month: 'short',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  });
+  return fmtDateTime(iso);
 }
 
 /**
@@ -251,7 +245,7 @@ export default function ScheduledPaymentsPanel({
                         <span className="block text-[11px] text-[var(--text-muted)]">Test cadence</span>
                       </>
                     ) : (
-                      p.dueDate
+                      fmtYmd(p.dueDate)
                     )}
                   </td>
                   <td className="py-2.5 text-right font-mono font-semibold tabular-nums text-[var(--text-strong)]">

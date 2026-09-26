@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { CreditAssessmentJob, CreditAssessmentResult } from '@/types/credit-assessment';
 import { fmt, type Checklist, type ExpenseRow, type IncomeRow } from '../types';
+import { fmtDateTime } from '@/lib/loan/format';
 
 interface Props {
   applicationId: string;
@@ -363,7 +364,7 @@ export default function AiAssessmentPanel({
               Documents: {result.documents.map((d) => `${d.name} (${d.kind}${d.unreadable ? ', unreadable' : ''})`).join(', ') || 'none'}
               {' · '}
               {result.model} · framework v{result.framework_version} · {Math.round(result.processing_ms / 1000)}s ·{' '}
-              {new Date(result.completed_at).toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland', hour12: false })}
+              {fmtDateTime(result.completed_at)}
               {logLines.length > 0 && (
                 <>
                   {' · '}

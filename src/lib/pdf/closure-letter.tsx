@@ -8,6 +8,7 @@ import {
   renderToBuffer,
 } from '@react-pdf/renderer';
 import type { Loan } from '@/types/application';
+import { fmtDate as fmtNzDate } from '@/lib/loan/format';
 
 const ACCENT = '#f5a623';
 const INK = '#0c1620';
@@ -30,12 +31,7 @@ const styles = StyleSheet.create({
 
 const fmtNZD = (n: number) =>
   new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(n);
-const fmtDate = (d?: string | null) => {
-  if (!d) return '—';
-  const date = new Date(d);
-  if (isNaN(date.getTime())) return '—';
-  return new Intl.DateTimeFormat('en-NZ', { dateStyle: 'long' }).format(date);
-};
+const fmtDate = (d?: string | null) => fmtNzDate(d);
 
 interface Props {
   loan: Loan;
