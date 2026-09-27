@@ -96,6 +96,13 @@ export interface CreditAssessmentPayload {
   folderId: string;
   /** Its parent (the KYC / applications root) — the worker refuses files outside it. */
   rootFolderId: string;
+  /**
+   * Ollama model the administrator selected (`/admin/credit-assessment`).
+   * Absent when no choice has been made — the worker then uses its own
+   * default (`OLLAMA_MODEL`). Compare with `result.model` to confirm the
+   * worker honoured it.
+   */
+  model?: string;
 }
 
 export type CreditAssessmentJobStatus = 'queued' | 'running' | 'done' | 'failed' | 'cancelled';

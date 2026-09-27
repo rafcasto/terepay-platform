@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { LOAN_PURPOSE_VALUES } from '@/lib/constants/loan-purposes';
+import { ASSESSMENT_MODEL_MAX_LENGTH, ASSESSMENT_MODEL_PATTERN } from '@/lib/assessment/model';
 
 // ---------------------------------------------------------------------------
 // Auth schemas
@@ -746,3 +747,14 @@ export const adminSetPayTestSchema = z.object({
 });
 
 export type AdminSetPayTestInput = z.infer<typeof adminSetPayTestSchema>;
+
+/** Admin — which Ollama model the assessment worker is asked to use. `null` = worker default. */
+export const adminCreditAssessmentModelSchema = z.object({
+  model: z
+    .string()
+    .max(ASSESSMENT_MODEL_MAX_LENGTH)
+    .regex(ASSESSMENT_MODEL_PATTERN, 'Not a valid model name')
+    .nullable(),
+});
+
+export type AdminCreditAssessmentModelInput = z.infer<typeof adminCreditAssessmentModelSchema>;

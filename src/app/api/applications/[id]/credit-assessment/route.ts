@@ -16,8 +16,9 @@ import {
   isAssessmentWorkerOnline,
 } from '@/lib/assessment/queue';
 import { createAssessmentRecord, finaliseAssessmentRecord, getAssessmentRecord } from '@/lib/assessment/persist';
+import { getCreditAssessmentModelSettings } from '@/lib/admin/credit-assessment-settings';
 import type { LoanApplication } from '@/types/application';
-import type { CreditAssessmentJob, CreditAssessmentRecord } from '@/types/credit-assessment';
+import type { CreditAssessmentJob, CreditAssessmentPayload, CreditAssessmentRecord } from '@/types/credit-assessment';
 
 export const dynamic = 'force-dynamic';
 
@@ -107,7 +108,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       });
     }
 
-    const payload = await buildCreditAssessmentPayload(app, input, { reuseFrom: reuseSources(gate) }); // throws MISSING_INPUTS (422)
+    const inputs = await buildCreditAssessmentPayload(app, input, { reuseFrom: reuseSources(gate) }); // throws MISSING_INPUTS (422)
+
+    // The administrator's model choice travels with the job so it is on the
+    // audit record. Nothing is sent when no choice has been made, which keeps
+    // the payload identical to what the worker has always received.
+    const { model } = await getCreditAssessmentModelSettings();
+    const payload: CreditAssessmentPayload = model ? { ...inputs, model } : inputs;
 
     if (!(await isAssessmentWorkerOnline())) {
       throw new AppError('WORKER_OFFLINE', 503, 'The assessment worker is offline — start it on the assessment machine and try again');
@@ -132,6 +139,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         assessedAmount: payload.application.loan_amount,
         documents: payload.documents.map((d) => ({ driveId: d.driveId, kind: d.kind })),
         loanHistoryCount: payload.application.loan_history_count,
+        model: payload.model ?? 'worker_default',
       },
       ipAddress: ip,
       userAgent: request.headers.get('user-agent') ?? '',
