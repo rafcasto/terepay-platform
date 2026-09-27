@@ -73,6 +73,28 @@ attaches `creditAssessmentId` to the submission when the amounts match. The affo
 belongs to the application and is complete before storing `creditAssessmentId` + a `creditAssessment` summary on the
 `affordabilityAssessments` document.
 
+## Choosing the model (admin)
+
+`/admin/credit-assessment` lets the system administrator pick which Ollama model writes the analyst note. The
+choice is stored in Firestore `systemConfig/creditAssessment` (`{ model, updatedAt, updatedBy }`) and read by the
+assessment route each time a lender presses **Run AI assessment**.
+
+- The dropdown lists the models the worker last published in `training:state.models` (the same list the Model
+  Training page shows). Only a model in that list can be saved; *Worker default* clears the choice.
+- The route adds `model` to the job payload **only when a choice has been made**. With no choice the payload is
+  unchanged and the worker uses its own `OLLAMA_MODEL`.
+- The choice is copied into `creditAssessments/<jobId>.inputs.model`, so the audit record shows which model was
+  requested. `result.model` is what the worker reports it actually ran.
+- If the two differ, the lender's panel shows a notice. `x` and `x:latest` are treated as the same model.
+- The setting read is not fail-open: if Firestore cannot be read the assessment request fails rather than running
+  on a model the administrator did not select.
+- `GET`/`PATCH /api/admin/credit-assessment` are `withAuth(request, ['admin'])`, rate limited, and the change is
+  audit-logged as `admin_update_credit_assessment_model` with `from` / `to`.
+
+**Worker contract.** The worker must read `payload.model` and use it in place of `OLLAMA_MODEL` when present
+(the `exam` training job already takes a `model` in its payload the same way). A worker that ignores the field
+keeps running its default, and the mismatch notice is how that shows up. Change both sides together.
+
 ## Redis key contract (shared with the worker)
 
 | Key | Type | Purpose |
@@ -91,7 +113,7 @@ Types: `src/types/credit-assessment.ts` · queue: `src/lib/assessment/queue.ts` 
 | Vercel + Pi | `GOOGLE_DRIVE_SERVICE_ACCOUNT_EMAIL`, `…_PRIVATE_KEY` | already set (KYC uploads / training) |
 | Vercel | `GOOGLE_DRIVE_KYC_FOLDER_ID` (or `GOOGLE_DRIVE_APPLICATIONS_FOLDER_ID`) | already set — where `app_<id>` folders live |
 | Pi | `GOOGLE_DRIVE_KYC_FOLDER_ID` | same id; the worker refuses documents outside it |
-| Pi (optional) | `OLLAMA_MODEL` (default `llama3.2:3b`), `LLM_BACKEND`, `ASSESSMENT_LLM_TIMEOUT_MS` | see the agent's `.env.example` |
+| Pi (optional) | `OLLAMA_MODEL` (default `llama3.2:3b`), `LLM_BACKEND`, `ASSESSMENT_LLM_TIMEOUT_MS` | see the agent's `.env.example`. `OLLAMA_MODEL` is the fallback when the admin has not chosen a model (see *Choosing the model*) |
 
 ## Security & compliance
 

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import type { CreditAssessmentJob, CreditAssessmentResult } from '@/types/credit-assessment';
 import { fmt, type Checklist, type ExpenseRow, type IncomeRow } from '../types';
 import { fmtDateTime } from '@/lib/loan/format';
+import { isSameAssessmentModel } from '@/lib/assessment/model';
 
 interface Props {
   applicationId: string;
@@ -161,6 +162,10 @@ export default function AiAssessmentPanel({
   const result: CreditAssessmentResult | null = job?.status === 'done' ? (job.result ?? null) : null;
   const ranFor = job?.payload?.application.loan_amount;
   const stale = !!result && ranFor !== undefined && ranFor !== assessedAmount;
+  // The administrator's model choice travels in the payload; the worker reports what it actually ran.
+  const requestedModel = job?.payload?.model;
+  const modelMismatch =
+    !!result && !!requestedModel && !!result.model && !isSameAssessmentModel(requestedModel, result.model);
   const elapsed = isActive(job) ? Math.max(0, Math.round((now - (job.startedAt ?? job.createdAt)) / 1000)) : 0;
   const logLines = (job?.log ?? '').trim().split('\n').filter(Boolean);
 
@@ -252,6 +257,14 @@ export default function AiAssessmentPanel({
             <div className="rounded-[var(--radius-md)] border border-[var(--warning-700)]/30 bg-[var(--warning-50)] px-4 py-2.5 text-sm text-[var(--warning-700)]">
               This result was produced for {fmt(ranFor ?? 0)}. The amount under assessment is now {fmt(assessedAmount)} — re-run
               before relying on it.
+            </div>
+          )}
+
+          {modelMismatch && (
+            <div className="rounded-[var(--radius-md)] border border-[var(--warning-700)]/30 bg-[var(--warning-50)] px-4 py-2.5 text-sm text-[var(--warning-700)]">
+              The administrator selected the model <span className="font-mono">{requestedModel}</span>, but this
+              assessment was produced by <span className="font-mono">{result.model}</span>. Let your administrator
+              know — the assessment machine may need updating.
             </div>
           )}
 

@@ -228,3 +228,18 @@ export const DEFAULT_SETPAY_TEST_SETTINGS: SetPayTestSettings = {
 
 export const SETPAY_TEST_INTERVAL_MIN = 1;
 export const SETPAY_TEST_INTERVAL_MAX = 1440;
+
+// ---------------------------------------------------------------------------
+// AI credit assessment — model selection
+// ---------------------------------------------------------------------------
+
+/**
+ * Firestore `systemConfig/creditAssessment`. The Ollama model the assessment
+ * worker is asked to use for the analyst note. `null` = no choice made, the
+ * worker uses its own default (`OLLAMA_MODEL`). Admin only.
+ */
+export interface CreditAssessmentModelSettings {
+  model: string | null;
+  updatedAt?: Timestamp;
+  updatedBy?: string;
+}
