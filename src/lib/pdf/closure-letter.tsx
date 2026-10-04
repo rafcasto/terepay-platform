@@ -89,7 +89,7 @@ const ClosureLetterDocument: React.FC<Props> = ({
       </View>
 
       <Text style={styles.footer}>
-        TerePay · This letter was issued automatically. Reach out at support@terepay.co.nz if you have any questions.
+        TerePay · This letter was issued automatically. Reach out at support@terepay.com if you have any questions.
       </Text>
     </Page>
   </Document>

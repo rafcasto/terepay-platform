@@ -14,6 +14,7 @@ import {
   type FulfilmentDoc,
 } from '@/lib/loan/document-requests';
 import { logSystemCommunication } from '@/lib/loan/communication-log';
+import { isValidYmd, PASSPORT_DOC_TYPES } from '@/lib/validation/schemas';
 
 export const dynamic = 'force-dynamic';
 
@@ -65,6 +66,7 @@ const UPLOAD_ALLOWED_STATUSES = new Set([
  *       never classifies the upload), and `type` may only pick between the
  *       item's allowed types (e.g. passport vs driver licence for photo ID).
  *   - type?: DocumentType  — required when no requestKey is given.
+ *   - passportExpiryDate?: YYYY-MM-DD — required when the document is a passport.
  *
  * Once every item of an outstanding request has a file, the application
  * moves back from `waiting_for_docs` to `under_assessment` automatically.
@@ -141,6 +143,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       throw new AppError('VALIDATION_ERROR', 422, `"${requestItem.label}" cannot be satisfied by a ${docType.replace(/_/g, ' ')}`);
     }
 
+    // A passport must come with its expiry date.
+    const passportExpiryDate = ((form.get('passportExpiryDate') as string | null) ?? '').trim();
+    const isPassport = PASSPORT_DOC_TYPES.has(docType);
+    if (isPassport && !isValidYmd(passportExpiryDate)) {
+      throw new AppError('VALIDATION_ERROR', 422, 'Enter the passport expiry date before uploading');
+    }
+
     const parentFolderId = process.env.GOOGLE_DRIVE_APPLICATIONS_FOLDER_ID
       ?? process.env.GOOGLE_DRIVE_KYC_FOLDER_ID;
     if (!parentFolderId) {
@@ -178,6 +187,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       uploadedBy: auth.uid,
       status: 'pending',
       ...(requestItem ? { requestKey: requestItem.key } : {}),
+      ...(isPassport ? { expiryDate: passportExpiryDate } : {}),
     };
 
     await appRef.update({

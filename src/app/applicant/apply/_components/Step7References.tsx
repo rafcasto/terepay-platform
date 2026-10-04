@@ -3,6 +3,7 @@
 import { useFormContext, type UseFormRegister } from 'react-hook-form';
 import type { TerepayApplicationInput } from '@/lib/validation/schemas';
 import { useSiteContent } from '@/lib/content/SiteContentContext';
+import { useRepeatBorrower } from './RepeatBorrowerContext';
 
 const inputCls =
   'w-full px-3 h-11 border border-border-default rounded-xl text-sm focus:ring-2 focus:ring-[var(--focus-ring)] focus:border-brand focus:outline-none transition-colors bg-surface-card text-ink-strong placeholder:text-[var(--text-disabled)]';
@@ -13,22 +14,30 @@ function ReferenceCard({
   index,
   register,
   errors,
+  required,
 }: {
   index: 1 | 2;
+  /** This reference must be completed (name + a phone number or email). */
+  required: boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   register: UseFormRegister<any>;
   errors: ReturnType<typeof useFormContext>['formState']['errors'];
 }) {
   const key = `reference${index}` as 'reference1' | 'reference2';
   const e = (errors.references as Record<string, unknown> | undefined)?.[key] as
-    | { name?: { message?: string }; email?: { message?: string } }
+    | { name?: { message?: string }; email?: { message?: string }; phone?: { message?: string } }
     | undefined;
 
   return (
     <div className="bg-surface-sunken border border-border-default rounded-xl p-5 space-y-4">
-      <h3 className="text-sm font-semibold text-ink-strong">Reference {index}</h3>
+      <h3 className="text-sm font-semibold text-ink-strong">
+        Reference {index}{' '}
+        <span className="font-normal text-[var(--text-muted)]">{required ? '(required)' : '(optional)'}</span>
+      </h3>
       <div>
-        <label className={labelCls}>Name</label>
+        <label className={labelCls}>
+          Name {required && <span className="text-danger-text">*</span>}
+        </label>
         <input
           {...register(`references.${key}.name` as Parameters<typeof register>[0])}
           className={inputCls}
@@ -55,8 +64,12 @@ function ReferenceCard({
             className={inputCls}
             placeholder="+64 21 000 0000"
           />
+          {e?.phone && <p className={errorCls}>{e.phone.message}</p>}
         </div>
       </div>
+      {required && (
+        <p className="text-xs text-[var(--text-muted)]">Give us a phone number or an email we can reach them on.</p>
+      )}
     </div>
   );
 }
@@ -67,6 +80,7 @@ export default function Step7References() {
     formState: { errors },
   } = useFormContext<TerepayApplicationInput>();
   const c = useSiteContent('apply.step7');
+  const { referenceRequired } = useRepeatBorrower();
 
   return (
     <div className="space-y-6">
@@ -82,8 +96,8 @@ export default function Step7References() {
         <p className="text-xs text-brand-text">{c.note}</p>
       </div>
 
-      <ReferenceCard index={1} register={register} errors={errors} />
-      <ReferenceCard index={2} register={register} errors={errors} />
+      <ReferenceCard index={1} register={register} errors={errors} required={referenceRequired} />
+      <ReferenceCard index={2} register={register} errors={errors} required={false} />
     </div>
   );
 }

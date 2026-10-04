@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Card, CardHeader, DropZone, Pill, SelectField, Icons } from '@/components/ui';
 import type { DocumentType } from '@/types/application';
 import type { PlainApplicationDocument } from '@/lib/utils/plain-document';
+import { fmtYmd } from '@/lib/loan/format';
 import {
   DOCUMENT_TYPE_LABELS,
   fulfilRequest,
@@ -63,11 +64,15 @@ export default function DocumentUploadCard({
   const structured = Boolean(items && items.length > 0);
   const legacyRequest = !structured && Boolean(requiredDocuments && requiredDocuments.length > 0);
 
-  const upload = async (file: File, body: { requestKey?: string; type?: DocumentType }) => {
+  const upload = async (
+    file: File,
+    body: { requestKey?: string; type?: DocumentType; passportExpiryDate?: string },
+  ) => {
     const fd = new FormData();
     fd.append('file', file);
     if (body.requestKey) fd.append('requestKey', body.requestKey);
     if (body.type) fd.append('type', body.type);
+    if (body.passportExpiryDate) fd.append('passportExpiryDate', body.passportExpiryDate);
     const res = await fetch(`/api/applications/${applicationId}/documents`, { method: 'POST', body: fd });
     const json = await res.json().catch(() => ({} as { error?: { message?: string } }));
     if (!res.ok) throw new Error(json.error?.message ?? 'Upload failed');
@@ -121,7 +126,9 @@ export default function DocumentUploadCard({
               index={i + 1}
               fulfilment={f}
               reasonById={reasonById}
-              onUpload={(file, type) => upload(file, { requestKey: f.item.key, type })}
+              onUpload={(file, type, passportExpiryDate) =>
+                upload(file, { requestKey: f.item.key, type, passportExpiryDate })
+              }
               onSettled={() => router.refresh()}
             />
           ))}
@@ -137,11 +144,46 @@ export default function DocumentUploadCard({
       requiredDocuments={legacyRequest ? requiredDocuments : undefined}
       message={message}
       existingDocuments={existingDocuments}
-      onUpload={(file, type) => upload(file, { type })}
+      onUpload={(file, type, passportExpiryDate) => upload(file, { type, passportExpiryDate })}
       onSettled={() => router.refresh()}
     />
   );
 }
+
+// ---------------------------------------------------------------------------
+// Passport expiry date — required alongside any passport upload
+// ---------------------------------------------------------------------------
+function PassportExpiryField({
+  id,
+  value,
+  onChange,
+  error,
+}: {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+  error?: string;
+}) {
+  return (
+    <div className="mb-3">
+      <label htmlFor={id} className="mb-1.5 block text-sm font-semibold text-text">
+        Passport expiry date <span className="text-danger-text">*</span>
+      </label>
+      <input
+        id={id}
+        type="date"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        aria-invalid={Boolean(error)}
+        className="h-11 w-full max-w-[220px] rounded-xl border border-border bg-surface px-3 text-sm text-text focus:border-accent focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
+      />
+      <p className="mt-1 text-xs text-muted">As printed on the photo page of the passport.</p>
+      {error && <p className="mt-1 text-xs font-medium text-danger-text">{error}</p>}
+    </div>
+  );
+}
+
+const PASSPORT_EXPIRY_MISSING = 'Enter the passport expiry date, then add the file again.';
 
 // ---------------------------------------------------------------------------
 // One slot per requested item
@@ -156,19 +198,27 @@ function RequestSlot({
   index: number;
   fulfilment: ItemFulfilment;
   reasonById: Record<string, string>;
-  onUpload: (file: File, type: DocumentType) => Promise<void>;
+  onUpload: (file: File, type: DocumentType, passportExpiryDate?: string) => Promise<void>;
   onSettled: () => void;
 }) {
   const { item, files, fulfilled, needsReupload } = fulfilment;
   const [type, setType] = useState<DocumentType>(item.types[0]);
   const [uploading, setUploading] = useState<UploadingFile[]>([]);
   const [open, setOpen] = useState(!fulfilled);
+  const [passportExpiry, setPassportExpiry] = useState('');
+  const [expiryError, setExpiryError] = useState('');
+  const isPassport = type === 'passport';
 
   const handleFiles = async (picked: File[]) => {
+    if (isPassport && !passportExpiry) {
+      setExpiryError(PASSPORT_EXPIRY_MISSING);
+      return;
+    }
+    setExpiryError('');
     setUploading((prev) => [...prev, ...picked.map((f) => ({ name: f.name, size: f.size, status: 'uploading' as const }))]);
     for (const file of picked) {
       try {
-        await onUpload(file, type);
+        await onUpload(file, type, isPassport ? passportExpiry : undefined);
         setUploading((prev) => prev.map((u) => (u.name === file.name ? { ...u, status: 'done' as const } : u)));
       } catch (err) {
         const error = err instanceof Error ? err.message : 'Upload failed';
@@ -246,6 +296,17 @@ function RequestSlot({
                 </button>
               ))}
             </div>
+          )}
+          {isPassport && (
+            <PassportExpiryField
+              id={`passport-expiry-${item.key}`}
+              value={passportExpiry}
+              onChange={(v) => {
+                setPassportExpiry(v);
+                setExpiryError('');
+              }}
+              error={expiryError}
+            />
           )}
           <DropZone
             accept={item.accept ?? DEFAULT_ACCEPT}
@@ -326,18 +387,26 @@ function GenericUpload({
   requiredDocuments?: string[];
   message?: string;
   existingDocuments: PlainApplicationDocument[];
-  onUpload: (file: File, type: DocumentType) => Promise<void>;
+  onUpload: (file: File, type: DocumentType, passportExpiryDate?: string) => Promise<void>;
   onSettled: () => void;
 }) {
   const [docType, setDocType] = useState<DocumentType>('bank_statement');
   const [uploading, setUploading] = useState<UploadingFile[]>([]);
+  const [passportExpiry, setPassportExpiry] = useState('');
+  const [expiryError, setExpiryError] = useState('');
+  const isPassport = docType === 'passport';
   const hasRequest = Boolean(requiredDocuments && requiredDocuments.length > 0);
 
   const handleFiles = async (picked: File[]) => {
+    if (isPassport && !passportExpiry) {
+      setExpiryError(PASSPORT_EXPIRY_MISSING);
+      return;
+    }
+    setExpiryError('');
     setUploading((prev) => [...prev, ...picked.map((f) => ({ name: f.name, size: f.size, status: 'uploading' as const }))]);
     for (const file of picked) {
       try {
-        await onUpload(file, docType);
+        await onUpload(file, docType, isPassport ? passportExpiry : undefined);
         setUploading((prev) => prev.map((u) => (u.name === file.name ? { ...u, status: 'done' as const } : u)));
       } catch (err) {
         const error = err instanceof Error ? err.message : 'Upload failed';
@@ -381,6 +450,17 @@ function GenericUpload({
       </div>
 
       <div className="mt-4">
+        {isPassport && (
+          <PassportExpiryField
+            id="passport-expiry-generic"
+            value={passportExpiry}
+            onChange={(v) => {
+              setPassportExpiry(v);
+              setExpiryError('');
+            }}
+            error={expiryError}
+          />
+        )}
         <DropZone
           accept={DEFAULT_ACCEPT}
           multiple
@@ -401,7 +481,10 @@ function GenericUpload({
                   <Icons.File size={18} className="shrink-0 text-muted" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-text">{doc.fileName}</p>
-                    <p className="text-xs text-muted">{DOCUMENT_TYPE_LABELS[doc.type] ?? doc.type}</p>
+                    <p className="text-xs text-muted">
+                      {DOCUMENT_TYPE_LABELS[doc.type] ?? doc.type}
+                      {doc.expiryDate && ` · Expires ${fmtYmd(doc.expiryDate)}`}
+                    </p>
                   </div>
                   <Pill tone={doc.status === 'accepted' ? 'success' : doc.status === 'rejected' ? 'danger' : 'muted'}>
                     {doc.status === 'accepted' ? 'Accepted' : doc.status === 'rejected' ? 'Please re-upload' : 'Being reviewed'}

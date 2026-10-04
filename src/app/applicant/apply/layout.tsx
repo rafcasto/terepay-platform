@@ -38,6 +38,9 @@ export default async function ApplyLayout({ children }: Props) {
   const layout = content['apply.layout'];
   const compliance = content['borrower.compliance'];
 
+  // Repeat customers are not asked for references — the tracker hides that step.
+  let isRepeatCustomer = false;
+
   const cookieStore = await cookies();
   const session = cookieStore.get('__session')?.value;
   if (session) {
@@ -55,6 +58,8 @@ export default async function ApplyLayout({ children }: Props) {
       if (activeApp) {
         redirect(`/applicant/applications/${activeApp.id}`);
       }
+      const userSnap = await db.collection('users').doc(decoded.uid).get();
+      isRepeatCustomer = userSnap.data()?.isExistingCustomer === true;
     }
   }
 
@@ -77,7 +82,7 @@ export default async function ApplyLayout({ children }: Props) {
             </p>
           </div>
 
-          <LoanStepTracker />
+          <LoanStepTracker hideReferences={isRepeatCustomer} />
 
           <div className="mt-auto pt-10 flex flex-col gap-4">
             <Link
@@ -117,7 +122,7 @@ export default async function ApplyLayout({ children }: Props) {
           </header>
 
           <div className="sm:hidden">
-            <LoanStepTracker />
+            <LoanStepTracker hideReferences={isRepeatCustomer} />
           </div>
 
           <main className="flex-1 overflow-auto">{children}</main>

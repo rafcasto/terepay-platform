@@ -72,8 +72,8 @@ export default function ScreenRejected({ app, status, applicationId }: Props) {
           </li>
           <li>
             <span className="font-semibold">Talk to us.</span> Email{' '}
-            <a className="font-semibold text-accent-2 hover:underline" href="mailto:support@terepay.co.nz">
-              support@terepay.co.nz
+            <a className="font-semibold text-accent-2 hover:underline" href="mailto:support@terepay.com">
+              support@terepay.com
             </a>{' '}
             if you have questions.
           </li>

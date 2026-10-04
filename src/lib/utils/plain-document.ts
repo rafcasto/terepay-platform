@@ -47,6 +47,7 @@ export function toPlainApplicationDocuments(
       ...(d.rejectionReason ? { rejectionReason: d.rejectionReason } : {}),
       ...(d.reviewedBy ? { reviewedBy: d.reviewedBy } : {}),
       ...(d.requestKey ? { requestKey: d.requestKey } : {}),
+      ...(d.expiryDate ? { expiryDate: d.expiryDate } : {}),
       ...(uploadedAt ? { uploadedAt } : {}),
       ...(reviewedAt ? { reviewedAt } : {}),
     };

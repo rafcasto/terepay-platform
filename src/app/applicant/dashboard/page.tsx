@@ -159,8 +159,8 @@ export default async function ApplicantDashboard() {
 
       <p className="pt-2 text-center text-[12.5px] text-muted">
         {content.helpText}{' '}
-        <a href="mailto:support@terepay.co.nz" className="font-semibold text-accent-2 hover:underline">
-          support@terepay.co.nz
+        <a href="mailto:support@terepay.com" className="font-semibold text-accent-2 hover:underline">
+          support@terepay.com
         </a>
       </p>
     </div>

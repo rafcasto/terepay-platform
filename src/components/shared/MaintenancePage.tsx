@@ -50,10 +50,10 @@ export default function MaintenancePage({
           <p className="text-xs text-[--text-muted]">
             For urgent queries, please contact{' '}
             <a
-              href="mailto:support@terepay.co.nz"
+              href="mailto:support@terepay.com"
               className="text-[--orange-700] hover:underline"
             >
-              support@terepay.co.nz
+              support@terepay.com
             </a>
           </p>
         </div>

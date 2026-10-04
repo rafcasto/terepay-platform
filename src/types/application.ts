@@ -284,6 +284,8 @@ export interface ApplicationDocument {
   reviewedBy?: string; // lender uid
   /** Which item of the lender's document request this upload satisfies (see documentRequest.items). */
   requestKey?: string;
+  /** Passport expiry date (YYYY-MM-DD), given by the applicant when uploading a passport. */
+  expiryDate?: string;
 }
 
 export interface InternalNote {
@@ -733,6 +735,8 @@ export interface TerePayEmployment {
   timeAtEmployer: string;
   previousEmployer?: string;
   previousEmployerPeriod?: string;
+  /** Repeat borrowers: whether they changed jobs since their last application (false = details carried over). */
+  changedSinceLastApplication?: boolean;
   income: {
     salaryBeforeTax: number;
     salaryAfterTax: number;
@@ -792,6 +796,8 @@ export interface TerePayBankDetails {
   accountHolderName: string;
   accountNumber: string; // store encrypted in production
   paymentMethod?: 'direct_debit' | 'bank_transfer';
+  /** Repeat borrowers: whether their bank account changed since their last application (false = carried over). */
+  changedSinceLastApplication?: boolean;
 }
 
 export interface TerePayReferences {
