@@ -9,6 +9,19 @@ import type { PillTone } from '@/components/lender/ConsolePill';
 
 export type ReportItem = { id: string; fileName: string; uploadedAt: string; uploadedBy: string };
 
+/** Client-safe view of the lender-entered Centrix credit summary. */
+export type CreditSummaryView = {
+  /** YYYY-MM-DD, for pre-filling the edit form. */
+  reportDate: string;
+  reportDateLabel: string;
+  score: number;
+  defaults: number;
+  enquiries: number;
+  utilisation?: number;
+  updatedBy: string;
+  updatedAt: string;
+};
+
 /** A document the lender can accept / reject. Used for both application uploads and onboarding KYC evidence. */
 export type ReviewableDocument = {
   id: string;
@@ -183,14 +196,10 @@ export type ReviewData = {
   credit: {
     reports: ReportItem[];
     affordabilityReports: ReportItem[];
-    score: number;
-    band: string;
-    min: number;
-    max: number;
-    defaults: number;
-    enquiries: number;
-    utilisation: string;
-    dti: string;
+    /** Lender-entered figures from the Centrix report; undefined until entered. */
+    summary?: CreditSummaryView;
+    /** Debt-to-income from the application's own figures, when available. */
+    dti?: string;
   };
   history: ApplicantHistory;
   communications: CommunicationItem[];

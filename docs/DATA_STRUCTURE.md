@@ -89,6 +89,21 @@ interface ApplicantProfile {
 
 ---
 
+### 1a-ii. Credit Summary Subcollection (lender-entered)
+**Path**: `/users/{customerId}/creditSummary/centrix`
+
+Figures the assigned lender keys in by hand from the borrower's Centrix comprehensive credit report (manual data entry — nothing is parsed from the uploaded file). Lives on the customer profile, next to `lenderReports`, so it is reused across the customer's applications. Written only by `PUT /api/applications/{id}/credit-summary`; helper in `src/lib/loan/credit-summary.ts`.
+
+```json
+{
+  "data": "v1:…",                      // 🔒 Encrypted JSON: { reportDate, score, defaults, enquiries, utilisation? }
+  "updatedBy": "lender_uid",
+  "updatedByName": "Jane Lender",
+  "updatedFromApplicationId": "application_id",
+  "updatedAt": "timestamp"
+}
+```
+
 ### 1b. Lender Profile Subcollection
 
 **Path:** `users/{userId}/lenderProfile/profile` (single document)

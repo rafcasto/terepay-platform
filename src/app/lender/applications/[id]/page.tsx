@@ -24,6 +24,7 @@ import {
   reuseExpiry,
 } from '@/lib/loan/evidence-reuse';
 import { evaluateEvidenceGate, loadPreviousApplications } from '@/lib/loan/evidence-gate';
+import { loadCreditSummary } from '@/lib/loan/credit-summary';
 import { fmtDate, fmtDateTime, fmtYmd } from '@/lib/loan/format';
 import LoanReview from './_components/LoanReview';
 import type {
@@ -581,18 +582,26 @@ export default async function LenderApplicationDetailPage({
     borrowerDocuments: borrowerKycDocuments,
     reports: datazooReports,
   };
-  // Credit summary metrics are still sample values until a report parser exists.
-  const credit = {
+  // Lender-entered Centrix summary, stored encrypted on the customer profile.
+  const storedSummary = app.applicantId
+    ? await loadCreditSummary(app.applicantId).catch(() => null)
+    : null;
+  const credit: ReviewData['credit'] = {
     reports: centrixReports,
     affordabilityReports,
-    score: 643,
-    band: 'Fair',
-    min: 380,
-    max: 800,
-    defaults: 0,
-    enquiries: 2,
-    utilisation: '38%',
-    dti: typeof fin?.debtToIncomeRatio === 'number' ? `${Math.round(fin.debtToIncomeRatio)}%` : '27%',
+    summary: storedSummary
+      ? {
+          reportDate: storedSummary.reportDate,
+          reportDateLabel: fmtYmd(storedSummary.reportDate),
+          score: storedSummary.score,
+          defaults: storedSummary.defaults,
+          enquiries: storedSummary.enquiries,
+          utilisation: storedSummary.utilisation,
+          updatedBy: storedSummary.updatedByName,
+          updatedAt: storedSummary.updatedAt ? fmtDate(storedSummary.updatedAt) : '',
+        }
+      : undefined,
+    dti: typeof fin?.debtToIncomeRatio === 'number' ? `${Math.round(fin.debtToIncomeRatio)}%` : undefined,
   };
 
   const data: ReviewData = {
