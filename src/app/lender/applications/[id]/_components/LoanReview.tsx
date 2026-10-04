@@ -10,6 +10,7 @@ import ExistingCustomerToggle from '../ExistingCustomerToggle';
 import ScheduledPaymentsPanel from '../ScheduledPaymentsPanel';
 import { Card, Field, SECTION_LABEL } from './Card';
 import CommunicationTab from './CommunicationTab';
+import CreditSummary from './CreditSummary';
 import DecisionModal, { type DecisionMode } from './DecisionModal';
 import DocumentReviewList from './DocumentReviewList';
 import DocumentsTab from './DocumentsTab';
@@ -809,7 +810,6 @@ function CreditCard({ data, full = false }: { data: ReviewData; full?: boolean }
   const bothOnFile = creditReports.length > 0 && affordabilityReports.length > 0;
   const anyReport = creditReports.length > 0 || affordabilityReports.length > 0;
   const creditReuse = data.history.reuse.find((r) => r.key === 'credit');
-  const pct = Math.max(0, Math.min(1, (c.score - c.min) / (c.max - c.min)));
   return (
     <Card
       title="Credit reports"
@@ -866,33 +866,12 @@ function CreditCard({ data, full = false }: { data: ReviewData; full?: boolean }
 
       {full && (
         <div className="mt-5 border-t border-[var(--border-subtle)] pt-5">
-          <p className={`${SECTION_LABEL} mb-3`}>Summary — sample, populated from the uploaded report</p>
-          <div className="opacity-70" aria-hidden="true">
-            <div className="flex items-end gap-3">
-              <span className="font-mono text-4xl font-bold tabular-nums text-[var(--text-muted)]">{c.score}</span>
-              <span className="mb-1 text-sm font-semibold text-[var(--text-muted)]">{c.band}</span>
-            </div>
-            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-[var(--slate-100)]">
-              <div className="h-full rounded-full bg-[var(--orange-400)]" style={{ width: `${pct * 100}%` }} />
-            </div>
-            <div className="mt-1 flex justify-between text-[11px] text-[var(--slate-400)]">
-              <span>{c.min}</span>
-              <span>{c.max}</span>
-            </div>
-            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {[
-                { label: 'Defaults', value: String(c.defaults) },
-                { label: 'Credit enquiries (6m)', value: String(c.enquiries) },
-                { label: 'Credit utilisation', value: c.utilisation },
-                { label: 'Debt-to-income', value: c.dti },
-              ].map((m) => (
-                <div key={m.label} className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-white/60 p-3">
-                  <p className={SECTION_LABEL}>{m.label}</p>
-                  <p className="mt-0.5 font-semibold text-[var(--text-muted)]">{m.value}</p>
-                </div>
-              ))}
-            </div>
-          </div>
+          <CreditSummary
+            applicationId={data.applicationId}
+            summary={c.summary}
+            dti={c.dti}
+            canEdit={data.isAssigned}
+          />
         </div>
       )}
     </Card>

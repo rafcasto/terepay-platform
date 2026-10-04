@@ -429,6 +429,28 @@ export const logCommunicationSchema = z.object({
   occurredAt: z.string().datetime({ offset: true }).optional(),
 });
 
+/**
+ * Credit summary the lender keys in by hand from the borrower's Centrix
+ * comprehensive credit report. Manual data entry — nothing is parsed from the
+ * uploaded file.
+ */
+export const creditSummarySchema = z.object({
+  /** Date printed on the Centrix report (YYYY-MM-DD). */
+  reportDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Enter the report date')
+    .refine((d) => !Number.isNaN(Date.parse(`${d}T00:00:00Z`)), 'Enter a valid date')
+    // One day of slack so an NZ "today" is never rejected by a UTC server.
+    .refine((d) => Date.parse(`${d}T00:00:00Z`) <= Date.now() + 86_400_000, 'Report date cannot be in the future'),
+  /** Centrix credit score (0–1000). */
+  score: z.number({ message: 'Enter the credit score' }).int('Whole number only').min(0).max(1000, 'Centrix scores run from 0 to 1000'),
+  defaults: z.number({ message: 'Enter the number of defaults' }).int('Whole number only').min(0).max(99),
+  /** Credit enquiries in the last 6 months. */
+  enquiries: z.number({ message: 'Enter the number of enquiries' }).int('Whole number only').min(0).max(99),
+  /** Credit utilisation as a percentage. Optional — not every report shows it. */
+  utilisation: z.number().min(0).max(999).optional(),
+});
+
 export const affordabilityChecklistSchema = z.object({
   centrixReportObtained: z.boolean(),
   centrixReportNumber: z.string().optional(),
@@ -521,6 +543,7 @@ export const benchmarkEntrySchema = z.object({
 
 export type ClaimApplicationInput = z.infer<typeof claimApplicationSchema>;
 export type AddNoteInput = z.infer<typeof addNoteSchema>;
+export type CreditSummaryInput = z.infer<typeof creditSummarySchema>;
 export type RequestDocumentsInput = z.infer<typeof requestDocumentsSchema>;
 export type ReviewDocumentInput = z.infer<typeof reviewDocumentSchema>;
 export type ReviewKycDocumentInput = z.infer<typeof reviewKycDocumentSchema>;
