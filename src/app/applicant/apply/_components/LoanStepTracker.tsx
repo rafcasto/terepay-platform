@@ -16,11 +16,27 @@ const STEP_KEYS = [
   'step8Label',
 ] as const;
 
-function LoanStepTrackerInner() {
+/** Position of the References step in the application flow (see apply/page.tsx). */
+const REFERENCES_INDEX = 6;
+
+interface Props {
+  /** Repeat customers are not asked for references, so the step is left out. */
+  hideReferences?: boolean;
+}
+
+function LoanStepTrackerInner({ hideReferences = false }: Props) {
   const searchParams = useSearchParams();
   const c = useSiteContent('apply.layout');
-  const steps = STEP_KEYS.map((k) => c[k]);
-  const activeIndex = Math.min(Math.max(Number(searchParams.get('step') ?? 0), 0), steps.length - 1);
+  const requested = Math.min(Math.max(Number(searchParams.get('step') ?? 0), 0), STEP_KEYS.length - 1);
+  const visible = STEP_KEYS.map((key, flowIndex) => ({ key, flowIndex })).filter(
+    ({ flowIndex }) => !(hideReferences && flowIndex === REFERENCES_INDEX),
+  );
+  const steps = visible.map(({ key }) => c[key]);
+  // The URL carries the flow index; map it onto the steps actually shown.
+  const activeIndex = Math.max(
+    0,
+    visible.findIndex(({ flowIndex }) => flowIndex >= requested),
+  );
 
   return (
     <>
@@ -31,7 +47,7 @@ function LoanStepTrackerInner() {
           const isActive = index === activeIndex;
           const isLast = index === steps.length - 1;
           return (
-            <li key={STEP_KEYS[index]} className="flex gap-4">
+            <li key={visible[index].key} className="flex gap-4">
               <div className="flex flex-col items-center">
                 <span
                   className={[
@@ -72,7 +88,7 @@ function LoanStepTrackerInner() {
         <div className="flex gap-1.5">
           {steps.map((label, index) => (
             <div
-              key={STEP_KEYS[index]}
+              key={visible[index].key}
               className={[
                 'h-1.5 flex-1 rounded-pill transition-colors',
                 index <= activeIndex ? 'bg-brand' : 'bg-[var(--border-default)]',
@@ -90,10 +106,10 @@ function LoanStepTrackerInner() {
   );
 }
 
-export default function LoanStepTracker() {
+export default function LoanStepTracker(props: Props) {
   return (
     <Suspense fallback={null}>
-      <LoanStepTrackerInner />
+      <LoanStepTrackerInner {...props} />
     </Suspense>
   );
 }

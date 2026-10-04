@@ -130,7 +130,7 @@ export default function Step8Declarations() {
           27 Henry Partington Place, Greenhithe 0632, New Zealand
         </p>
         <p className="text-xs text-[var(--text-disabled)]">
-          www.terepay.co.nz | info@terepay.co.nz
+          www.terepay.com | info@terepay.com
         </p>
       </div>
     </div>

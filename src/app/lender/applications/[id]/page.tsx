@@ -13,7 +13,8 @@ import type { PillTone } from '@/components/lender/ConsolePill';
 import { loanPurposeLabel } from '@/lib/constants/loan-purposes';
 import { computeApplicationFee } from '@/lib/constants/fees';
 import { reconcileConsent } from '@/lib/qippay/reconcile-consent';
-import { toPlainScheduledPayments } from '@/lib/loan/active-loan';
+import { deriveLoanSummary, toPlainScheduledPayments } from '@/lib/loan/active-loan';
+import { summariseArrearsCharges } from '@/lib/loan/arrears-charges';
 import { DOCUMENT_TYPE_LABELS, fulfilRequest, catalogueItem } from '@/lib/loan/document-requests';
 import {
   BANK_STATEMENT_REUSE_MONTHS,
@@ -232,7 +233,7 @@ export default async function LenderApplicationDetailPage({
   const documents: ReviewableDocument[] = (app.documents ?? []).map((d) => ({
     id: d.documentId,
     title: DOC_LABEL[d.type] ?? 'Document',
-    subtitle: d.fileName,
+    subtitle: d.expiryDate ? `${d.fileName} · Passport expires ${fmtYmd(d.expiryDate)}` : d.fileName,
     uploadedAt: fmtDate(d.uploadedAt as TS),
     status: d.status,
     viewUrl: `/api/applications/${id}/documents/${d.documentId}`,
@@ -277,7 +278,9 @@ export default async function LenderApplicationDetailPage({
           borrowerKycDocuments.push({
             id: fileId,
             title: kycDocLabel(d.docType as string | undefined),
-            subtitle: (d.fileName as string) ?? 'Document',
+            subtitle: `${(d.fileName as string) ?? 'Document'}${
+              typeof d.expiryDate === 'string' && d.expiryDate ? ` · Passport expires ${fmtYmd(d.expiryDate)}` : ''
+            }`,
             uploadedAt: fmtDate(d.uploadedAt as TS),
             status: normaliseDocStatus(d.status as string | undefined),
             viewUrl: `/api/applications/${id}/kyc-documents/${fileId}`,
@@ -473,6 +476,23 @@ export default async function LenderApplicationDetailPage({
         { label: 'Salary (after tax)', value: fmt(emp.income?.salaryAfterTax) },
         { label: 'WINZ', value: fmt(emp.income?.winz) },
         { label: 'Other income', value: fmt(emp.income?.otherIncome) },
+        // Repeat borrowers only — shows whether these details were re-entered or carried over.
+        ...(typeof emp.changedSinceLastApplication === 'boolean'
+          ? [
+              {
+                label: 'Changed jobs since last application',
+                value: emp.changedSinceLastApplication ? 'Yes — details re-entered' : 'No — kept from last application',
+              },
+            ]
+          : []),
+        ...(typeof app.bankDetails?.changedSinceLastApplication === 'boolean'
+          ? [
+              {
+                label: 'Bank account changed since last application',
+                value: app.bankDetails.changedSinceLastApplication ? 'Yes — new account entered' : 'No — kept from last application',
+              },
+            ]
+          : []),
       ]
     : [];
 
@@ -604,6 +624,8 @@ export default async function LenderApplicationDetailPage({
     dti: typeof fin?.debtToIncomeRatio === 'number' ? `${Math.round(fin.debtToIncomeRatio)}%` : undefined,
   };
 
+  const loanSummary = deriveLoanSummary(app);
+
   const data: ReviewData = {
     applicationId: id,
     status,
@@ -669,6 +691,13 @@ export default async function LenderApplicationDetailPage({
     payments: {
       show: PAYMENT_STATUSES.has(status),
       scheduled: toPlainScheduledPayments((app.scheduledPayments ?? []) as ScheduledPayment[]),
+      charges: summariseArrearsCharges({
+        installments: loanSummary.installments,
+        feeAssessments: app.feeAssessments,
+        arrears: app.arrears,
+        policyApplies: Boolean(app.feePolicyVersion),
+      }),
+      remainingBalance: loanSummary.remainingBalance,
     },
     disburse,
     decisionInput: {

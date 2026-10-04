@@ -180,13 +180,32 @@ export const kycProfileSchema = z.object({
   country: z.string().max(100).optional(),
 });
 
+/** Document types that are a passport, and so must carry an expiry date. */
+export const PASSPORT_DOC_TYPES: ReadonlySet<string> = new Set(['passport', 'nz_passport', 'foreign_passport']);
+
+/** A real calendar date in YYYY-MM-DD form (as produced by `<input type="date">`). */
+export function isValidYmd(value: string | null | undefined): value is string {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const d = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === value;
+}
+
 export const kycDocumentSchema = z.object({
-  documents: z.array(z.object({
-    docType: z.string().min(1),
-    driveFileId: z.string().min(1),
-    fileName: z.string().min(1),
-    mimeType: z.string().min(1),
-  })).min(1, 'At least one document is required'),
+  documents: z.array(
+    z
+      .object({
+        docType: z.string().min(1),
+        driveFileId: z.string().min(1),
+        fileName: z.string().min(1),
+        mimeType: z.string().min(1),
+        /** Passport expiry (YYYY-MM-DD) — required when the document is a passport. */
+        expiryDate: z.string().refine(isValidYmd, 'Enter a valid expiry date').optional(),
+      })
+      .refine((d) => !PASSPORT_DOC_TYPES.has(d.docType) || Boolean(d.expiryDate), {
+        path: ['expiryDate'],
+        message: 'Passport expiry date is required',
+      }),
+  ).min(1, 'At least one document is required'),
 });
 
 export type SendSmsOtpInput = z.infer<typeof sendSmsOtpSchema>;
@@ -231,6 +250,12 @@ export const terepayApplicationSchema = z.object({
     timeAtEmployer: z.string().min(1, 'Required'),
     previousEmployer: z.string().optional(),
     previousEmployerPeriod: z.string().optional(),
+    /**
+     * Repeat borrowers only: "Have you changed jobs since your last
+     * application?" `false` means the employment details were carried over
+     * from their previous application; `true` means they were re-entered.
+     */
+    changedSinceLastApplication: z.boolean().optional(),
     income: z.object({
       salaryBeforeTax: currencyField,
       salaryAfterTax: currencyField,
@@ -333,9 +358,18 @@ export const terepayApplicationSchema = z.object({
     accountHolderName: z.string().min(1, 'Account holder name is required'),
     accountNumber: z.string().min(1, 'Account number is required'),
     paymentMethod: z.enum(['direct_debit', 'bank_transfer']).optional(),
+    /**
+     * Repeat borrowers only: "Has your bank account changed since your last
+     * application?" `false` means the account was carried over unchanged.
+     */
+    changedSinceLastApplication: z.boolean().optional(),
   }),
 
-  // ── Section 7: References (optional) ───────────────────────────────────
+  // ── Section 7: References ──────────────────────────────────────────────
+  // New customers must give one complete reference (enforced by the apply
+  // flow and POST /api/applications, which know whether the applicant is a
+  // repeat customer). Repeat customers skip this section entirely, so the
+  // object itself is optional.
   references: z.object({
     reference1: z
       .object({
@@ -351,7 +385,7 @@ export const terepayApplicationSchema = z.object({
         phone: z.string().optional(),
       })
       .optional(),
-  }),
+  }).optional(),
 
   // ── Section 8: Declarations & Consent ──────────────────────────────────
   declarations: z.object({
@@ -368,6 +402,20 @@ export const terepayApplicationSchema = z.object({
 });
 
 export type TerepayApplicationInput = z.infer<typeof terepayApplicationSchema>;
+
+/**
+ * What is missing from a reference for it to count as complete: a name plus a
+ * phone number or email to reach them on. Returns null when complete.
+ */
+export function referenceGap(
+  ref: { name?: string; email?: string; phone?: string } | null | undefined,
+): { field: 'name' | 'phone'; message: string } | null {
+  if (!ref?.name?.trim()) return { field: 'name', message: 'Enter your reference\'s full name' };
+  if (!ref.phone?.trim() && !ref.email?.trim()) {
+    return { field: 'phone', message: 'Add a phone number or email for your reference' };
+  }
+  return null;
+}
 
 // Schema for incremental draft step saves — all sections optional, no full validation required
 export const draftApplicationSchema = z.object({

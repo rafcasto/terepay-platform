@@ -202,4 +202,4 @@ Date: \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
 **TerePay Neophile Limited**
 
 FSP1007414 | NZBN 9429052055232  
-27 Henry Partington Place, Greenhithe 0632, New Zealand www.terepay.co.nz | info@terepay.co.nz 
+27 Henry Partington Place, Greenhithe 0632, New Zealand www.terepay.com | info@terepay.com 

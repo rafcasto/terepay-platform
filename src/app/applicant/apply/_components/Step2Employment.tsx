@@ -4,6 +4,8 @@ import React from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
 import type { TerepayApplicationInput } from '@/lib/validation/schemas';
 import { useSiteContent } from '@/lib/content/SiteContentContext';
+import { useRepeatBorrower } from './RepeatBorrowerContext';
+import YesNoQuestion from './YesNoQuestion';
 
 const inputCls =
   'w-full px-3 h-11 border border-border-default rounded-xl text-sm focus:ring-2 focus:ring-[var(--focus-ring)] focus:border-brand focus:outline-none transition-colors bg-surface-card text-ink-strong placeholder:text-[var(--text-disabled)]';
@@ -44,13 +46,59 @@ const NzdInput = React.forwardRef<
 ));
 NzdInput.displayName = 'NzdInput';
 
+const STATUS_LABELS: Record<string, string> = {
+  permanent: 'Permanent',
+  fixed_term: 'Fixed Term',
+  casual: 'Casual',
+  part_time: 'Part-time',
+};
+
+/** Empty employment section, used when a repeat borrower has changed jobs. */
+const BLANK_EMPLOYMENT = {
+  employerName: '',
+  employerAddress: '',
+  occupation: '',
+  hoursPerWeek: undefined,
+  employmentStatus: '',
+  timeAtEmployer: '',
+  previousEmployer: '',
+  previousEmployerPeriod: '',
+  income: { salaryBeforeTax: 0, salaryAfterTax: 0, winz: 0, otherIncome: 0, otherIncomeDescription: '' },
+} as unknown as TerepayApplicationInput['employment'];
+
+const nzd = (n: number | undefined) =>
+  new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(n ?? 0);
+
 export default function Step2Employment() {
   const {
     register,
     control,
+    setValue,
+    clearErrors,
     formState: { errors },
   } = useFormContext<TerepayApplicationInput>();
   const c = useSiteContent('apply.step2');
+  const { isRepeat, previous } = useRepeatBorrower();
+
+  // Repeat borrowers are asked whether their job has changed. "No" carries the
+  // employment details over from their last application; "Yes" starts the
+  // section again from blank.
+  const askJobChange = isRepeat && Boolean(previous.employment);
+  const jobChanged = useWatch({ control, name: 'employment.changedSinceLastApplication' });
+  const retained = askJobChange && jobChanged === false;
+  const showForm = !askJobChange || jobChanged === true;
+
+  const answerJobChange = (changed: boolean) => {
+    if (changed === jobChanged) return;
+    clearErrors('employment');
+    setValue(
+      'employment',
+      changed
+        ? { ...BLANK_EMPLOYMENT, changedSinceLastApplication: true }
+        : { ...previous.employment!, changedSinceLastApplication: false },
+      { shouldDirty: true },
+    );
+  };
 
   const e = errors.employment;
 
@@ -70,6 +118,43 @@ export default function Step2Employment() {
         <p className="text-sm text-[var(--text-muted)] mt-1">{c.intro}</p>
       </div>
 
+      {askJobChange && (
+        <YesNoQuestion
+          name="employment-changed"
+          question="Have you changed jobs since your last application?"
+          hint="If nothing has changed, we'll keep the employment and income details from your last application."
+          value={jobChanged}
+          onChange={answerJobChange}
+          error={e?.changedSinceLastApplication?.message}
+        />
+      )}
+
+      {retained && previous.employment && (
+        <div className="rounded-xl border border-border-default bg-surface-card p-4">
+          <h3 className="text-sm font-semibold text-ink-strong">Details kept from your last application</h3>
+          <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+            {[
+              ['Employer', previous.employment.employerName],
+              ['Employer address', previous.employment.employerAddress],
+              ['Occupation', previous.employment.occupation],
+              ['Hours per week', String(previous.employment.hoursPerWeek)],
+              ['Employment status', STATUS_LABELS[previous.employment.employmentStatus] ?? previous.employment.employmentStatus],
+              ['Fortnightly income (after tax)', nzd(total)],
+            ].map(([label, value]) => (
+              <div key={label}>
+                <dt className="text-xs text-[var(--text-muted)]">{label}</dt>
+                <dd className="mt-0.5 font-medium text-ink-strong break-words">{value}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="mt-3 text-xs text-[var(--text-muted)]">
+            If your pay, hours or employer are different now, choose &ldquo;Yes&rdquo; above and enter your current details.
+          </p>
+        </div>
+      )}
+
+      {showForm && (
+      <>
       {/* Employer details */}
       <div>
         <label className={labelCls}>
@@ -249,6 +334,8 @@ export default function Step2Employment() {
           </span>
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }

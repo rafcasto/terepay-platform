@@ -121,7 +121,7 @@ const TableRow = ({ cells, bold, shade }: { cells: string[]; bold?: number; shad
 // ---------------------------------------------------------------------------
 const PageFooter = () => (
   <View style={styles.footer} fixed>
-    <Text style={styles.footerText}>TerePay Neophile Limited | 27 Henry Partington Place, Greenhithe, Auckland | info@terepay.com | www.terepay.co.nz</Text>
+    <Text style={styles.footerText}>TerePay Neophile Limited | 27 Henry Partington Place, Greenhithe, Auckland | info@terepay.com | www.terepay.com</Text>
     <Text style={styles.footerText} render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
   </View>
 );

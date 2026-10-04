@@ -90,7 +90,7 @@ export default function AdminSettingsPage() {
             {
               key: 'public' as const,
               label: 'Public Site',
-              description: 'The landing page at terepay.co.nz',
+              description: 'The landing page at terepay.com',
             },
             {
               key: 'applicants' as const,

@@ -6,6 +6,7 @@ import type {
   ScheduledPayment,
 } from '@/types/application';
 import type { PillTone } from '@/components/lender/ConsolePill';
+import type { ArrearsChargesSummary } from '@/lib/loan/arrears-charges';
 
 export type ReportItem = { id: string; fileName: string; uploadedAt: string; uploadedBy: string };
 
@@ -173,7 +174,14 @@ export type ReviewData = {
     declineReasons?: string[];
   };
   applicantRejection?: { rejectedAt: string; reason: string };
-  payments: { show: boolean; scheduled: ScheduledPayment[] };
+  payments: {
+    show: boolean;
+    scheduled: ScheduledPayment[];
+    /** Late fees, default fee and accrued interest charged by the arrears engine. */
+    charges: ArrearsChargesSummary;
+    /** Outstanding loan balance before arrears charges (NZD). */
+    remainingBalance: number;
+  };
   disburse?: {
     approvedAmount: number;
     applicationFee: number;

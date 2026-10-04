@@ -641,7 +641,7 @@ All communications must be triggered automatically by status transitions.
 | Application expired | Email | Applicant | Expiry notice + re-apply option |
 
 **Communication Requirements:**
-- F-COM-001: All email communications must be sent from `info@terepay.co.nz`.
+- F-COM-001: All email communications must be sent from `info@terepay.com`.
 - F-COM-002: All communications must include TerePay branding, FSP number, and NZBN.
 - F-COM-003: SMS messages must be concise (< 160 characters) with a portal link.
 - F-COM-004: All communications sent must be logged against the application record (timestamp, channel, recipient, content).
@@ -729,7 +729,7 @@ All communications must be triggered automatically by status transitions.
 - The system must comply with the **New Zealand Privacy Act 2020**.
 - Applicant data must only be accessible by authorised roles.
 - Applicants must be able to request access to their own data.
-- The Privacy Policy URL must be surfaced on the application form (www.terepay.co.nz).
+- The Privacy Policy URL must be surfaced on the application form (www.terepay.com).
 
 ---
 
@@ -855,4 +855,4 @@ Step 8: Final Decision
 **TerePay Neophile Limited**  
 FSP1007414 | NZBN 9429052055232  
 27 Henry Partington Place, Greenhithe 0632, New Zealand  
-www.terepay.co.nz | info@terepay.co.nz
+www.terepay.com | info@terepay.com

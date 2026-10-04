@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useForm, FormProvider } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { terepayApplicationSchema, type TerepayApplicationInput } from '@/lib/validation/schemas';
+import { referenceGap, terepayApplicationSchema, type TerepayApplicationInput } from '@/lib/validation/schemas';
 import { useAuth } from '@/hooks/useAuth';
 import { normalizeLoanPurpose } from '@/lib/constants/loan-purposes';
 import { Button, ButtonLink, Card, Icons } from '@/components/ui';
@@ -17,6 +17,7 @@ import Step6BankDetails from './_components/Step6BankDetails';
 import Step7References from './_components/Step7References';
 import Step8Declarations from './_components/Step8Declarations';
 import { useSiteContent } from '@/lib/content/SiteContentContext';
+import { RepeatBorrowerProvider, type RepeatBorrowerState } from './_components/RepeatBorrowerContext';
 
 export default function ApplyPage() {
   return (
@@ -109,14 +110,48 @@ const STEP_COMPONENTS = [
   Step8Declarations,
 ];
 
+const EMPLOYMENT_STEP = 1;
+const BANK_STEP = 5;
+const REFERENCES_STEP = 6;
+
+/**
+ * Employment and bank details from the applicant's most recent submitted
+ * application, for repeat borrowers to carry over. A section is only offered
+ * when it still passes today's validation, so "keep my previous details" can
+ * never leave the applicant stuck on errors in fields they cannot see.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function previousDetails(applications: any[] | undefined): RepeatBorrowerState['previous'] {
+  const previous: RepeatBorrowerState['previous'] = {};
+  for (const a of applications ?? []) {
+    if (a.status === 'draft') continue;
+    if (!previous.employment) {
+      const parsed = terepayApplicationSchema.shape.employment.safeParse(a.employment);
+      if (parsed.success) previous.employment = parsed.data;
+    }
+    if (!previous.bankDetails) {
+      const parsed = terepayApplicationSchema.shape.bankDetails.safeParse(a.bankDetails);
+      if (parsed.success) previous.bankDetails = parsed.data;
+    }
+  }
+  return previous;
+}
+
 function ApplyPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, loading } = useAuth();
   const c = useSiteContent('apply.layout');
-  const [currentStep, setCurrentStep] = useState(
+  const [requestedStep, setCurrentStep] = useState(
     () => Math.min(Math.max(Number(searchParams.get('step') ?? 0), 0), STEPS.length - 1)
   );
+  const [previous, setPrevious] = useState<RepeatBorrowerState['previous']>({});
+
+  // Repeat customers (the same flag that sets their application fee) are not
+  // asked for references, so that step is skipped in both directions.
+  const isRepeat = user?.isExistingCustomer === true;
+  const currentStep = isRepeat && requestedStep === REFERENCES_STEP ? REFERENCES_STEP + 1 : requestedStep;
+  const repeatBorrower: RepeatBorrowerState = { isRepeat, referenceRequired: !isRepeat, previous };
   const [draftLoading, setDraftLoading] = useState(true);
   const [draftId, setDraftId] = useState<string | null>(null);
 
@@ -144,6 +179,7 @@ function ApplyPageInner() {
         if (!res.ok) return;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data } = await res.json() as { data: any[] };
+        setPrevious(previousDetails(data));
         const draft = data?.find((a) => a.status === 'draft');
         if (!draft) {
           // Create a draft immediately so it appears in Firestore from the first visit
@@ -215,7 +251,48 @@ function ApplyPageInner() {
     }
   };
 
+  const scrollToFirstError = () => {
+    // Bring the first validation error into view (errors render as <p> in the card)
+    requestAnimationFrame(() => {
+      document
+        .querySelector('p.text-danger-text')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  };
+
+  /**
+   * Rules that depend on who is applying, which the shared Zod schema cannot
+   * know: repeat borrowers must answer the "has this changed?" questions, and
+   * new customers must give one complete reference. Returns false (after
+   * flagging the field) when the step cannot be left yet.
+   */
+  const checkStepRules = (step: number): boolean => {
+    const values = methods.getValues();
+    if (step === EMPLOYMENT_STEP && isRepeat && previous.employment
+      && typeof values.employment?.changedSinceLastApplication !== 'boolean') {
+      methods.setError('employment.changedSinceLastApplication', { type: 'required', message: 'Please choose Yes or No' });
+      return false;
+    }
+    if (step === BANK_STEP && isRepeat && previous.bankDetails
+      && typeof values.bankDetails?.changedSinceLastApplication !== 'boolean') {
+      methods.setError('bankDetails.changedSinceLastApplication', { type: 'required', message: 'Please choose Yes or No' });
+      return false;
+    }
+    if (step === REFERENCES_STEP && !isRepeat) {
+      const gap = referenceGap(values.references?.reference1);
+      if (gap) {
+        methods.setError(`references.reference1.${gap.field}`, { type: 'required', message: gap.message });
+        return false;
+      }
+    }
+    return true;
+  };
+
   const handleNext = async () => {
+    if (!checkStepRules(currentStep)) {
+      scrollToFirstError();
+      return;
+    }
     const fields = STEPS[currentStep].fields;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const valid = await trigger(fields as any);
@@ -227,15 +304,10 @@ function ApplyPageInner() {
           window.setTimeout(() => setJustSaved(false), 2500);
         })
         .catch(() => {});
-      setCurrentStep((s) => s + 1);
+      setCurrentStep(currentStep + 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
-      // Bring the first validation error into view (errors render as <p> in the card)
-      requestAnimationFrame(() => {
-        document
-          .querySelector('p.text-danger-text')
-          ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      });
+      scrollToFirstError();
     }
   };
 
@@ -244,12 +316,20 @@ function ApplyPageInner() {
       router.push('/applicant/dashboard');
       return;
     }
-    setCurrentStep((s) => s - 1);
+    const back = currentStep - 1;
+    setCurrentStep(isRepeat && back === REFERENCES_STEP ? back - 1 : back);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const onSubmit = async (data: TerepayApplicationInput) => {
     setServerError(null);
+    // Final guard for the applicant-specific rules, in case a step was skipped.
+    const failedStep = [EMPLOYMENT_STEP, BANK_STEP, REFERENCES_STEP].find((step) => !checkStepRules(step));
+    if (failedStep !== undefined) {
+      setCurrentStep(failedStep);
+      scrollToFirstError();
+      return;
+    }
     try {
       const res = await fetch('/api/applications', {
         method: 'POST',
@@ -336,7 +416,9 @@ function ApplyPageInner() {
 
   const StepComponent = STEP_COMPONENTS[currentStep];
 
-  if (draftLoading) {
+  // Wait for the profile too: whether this is a repeat customer decides which
+  // steps and questions are shown.
+  if (draftLoading || loading) {
     return (
       <div className="min-h-screen bg-[var(--surface-page)] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
@@ -366,6 +448,7 @@ function ApplyPageInner() {
 
   return (
     <div className="min-h-screen bg-[var(--surface-page)]">
+      <RepeatBorrowerProvider value={repeatBorrower}>
       <FormProvider {...methods}>
         <div className="max-w-[880px] mx-auto px-4 py-8 pb-12 screen-in">
           {serverError && (
@@ -416,6 +499,7 @@ function ApplyPageInner() {
           </div>
         </div>
       </FormProvider>
+      </RepeatBorrowerProvider>
     </div>
   );
 }

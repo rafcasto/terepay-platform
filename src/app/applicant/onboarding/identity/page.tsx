@@ -8,6 +8,7 @@ import { SegmentedRadio } from '../_components/SegmentedRadio';
 import { obPrimaryBtn, obLabel, obAlert } from '../_components/onboarding-styles';
 import { useSiteContent } from '@/lib/content/SiteContentContext';
 import type { ContentSectionValues } from '@/types/content';
+import { PASSPORT_DOC_TYPES } from '@/lib/validation/schemas';
 
 type ImmigrationStatus = 'student' | 'work_visa' | 'resident' | 'permanent_resident' | 'citizen';
 type PrimaryDocType = 'nz_drivers_licence' | 'nz_passport';
@@ -75,6 +76,14 @@ export default function KycIdentityPage() {
   const [primaryDocType, setPrimaryDocType] = useState<PrimaryDocType>('nz_drivers_licence');
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  // Expiry date of the passport being provided — required with any passport.
+  const [passportExpiry, setPassportExpiry] = useState('');
+  const [passportExpiryError, setPassportExpiryError] = useState('');
+
+  /** The document type a slot was (or will be) uploaded as. */
+  const effectiveType = (slot: FileSlot) =>
+    slot.uploaded?.docType ?? (slot.docType === 'nz_id_primary' ? primaryDocType : slot.docType);
+  const needsPassportExpiry = slots.some((s) => PASSPORT_DOC_TYPES.has(effectiveType(s)));
 
   // Skip this step if already submitted; fetch immigration status and restore any upload draft
   useEffect(() => {
@@ -209,12 +218,20 @@ export default function KycIdentityPage() {
       setSubmitError('Please upload all required documents before continuing.');
       return;
     }
+    if (needsPassportExpiry && !passportExpiry) {
+      setPassportExpiryError('Enter your passport expiry date.');
+      setSubmitError('Please enter your passport expiry date before continuing.');
+      return;
+    }
 
     setSubmitting(true);
     try {
       const documents = slots
         .filter((s) => s.uploaded !== null)
-        .map((s) => s.uploaded!);
+        .map((s) => ({
+          ...s.uploaded!,
+          ...(PASSPORT_DOC_TYPES.has(s.uploaded!.docType) ? { expiryDate: passportExpiry } : {}),
+        }));
 
       const res = await fetch('/api/kyc/documents', {
         method: 'POST',
@@ -284,6 +301,18 @@ export default function KycIdentityPage() {
                 uploadCta={c.uploadCta}
                 onFileChange={handleFileChange}
                 onRemove={handleRemove}
+                passportExpiry={
+                  PASSPORT_DOC_TYPES.has(effectiveType(slot))
+                    ? {
+                        value: passportExpiry,
+                        error: passportExpiryError,
+                        onChange: (v) => {
+                          setPassportExpiry(v);
+                          setPassportExpiryError('');
+                        },
+                      }
+                    : undefined
+                }
               />
             ))}
           </div>
@@ -310,7 +339,10 @@ function FileUploadSlot({
   uploadCta,
   onFileChange,
   onRemove,
+  passportExpiry,
 }: {
+  /** Set when this slot is a passport: its expiry date must be given too. */
+  passportExpiry?: { value: string; error: string; onChange: (value: string) => void };
   slot: FileSlot;
   index: number;
   label: string;
@@ -386,6 +418,24 @@ function FileUploadSlot({
         )}
         {slot.error && <p className="mt-1 text-xs text-danger-text">{slot.error}</p>}
       </div>
+
+      {passportExpiry && (
+        <div className="mt-3">
+          <label htmlFor={`passport-expiry-${index}`} className="block text-sm font-semibold text-ink-strong">
+            Passport expiry date <span className="text-danger-text">*</span>
+          </label>
+          <input
+            id={`passport-expiry-${index}`}
+            type="date"
+            value={passportExpiry.value}
+            onChange={(e) => passportExpiry.onChange(e.target.value)}
+            aria-invalid={Boolean(passportExpiry.error)}
+            className="mt-1.5 h-11 w-full max-w-[220px] rounded-xl border border-border-default bg-surface-card px-3 text-sm text-ink-strong focus:border-brand focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
+          />
+          <p className="mt-1 text-xs text-[var(--text-muted)]">As printed on the photo page of your passport.</p>
+          {passportExpiry.error && <p className="mt-1 text-xs text-danger-text">{passportExpiry.error}</p>}
+        </div>
+      )}
     </div>
   );
 }

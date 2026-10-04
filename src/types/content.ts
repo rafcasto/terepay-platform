@@ -997,8 +997,8 @@ export const DEFAULT_CONTENT: Record<string, ContentSectionValues> = {
   },
   'apply.step7': {
     title: 'References',
-    intro: 'Optional — provide up to two references (not family members).',
-    note: 'References must not be family members. They may be colleagues, employers, or friends. Providing references is optional but may support your application.',
+    intro: 'Provide at least one reference (not a family member). A second reference is optional.',
+    note: 'References must not be family members. They may be colleagues, employers, or friends. We need at least one reference with a name and a phone number or email.',
   },
   'apply.step8': {
     title: 'Declarations & Consent',

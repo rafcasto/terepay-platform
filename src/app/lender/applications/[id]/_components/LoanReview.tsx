@@ -16,6 +16,8 @@ import DocumentReviewList from './DocumentReviewList';
 import DocumentsTab from './DocumentsTab';
 import ReviewProgress from './ReviewProgress';
 import type { ReportItem, ReviewData, TabKey } from './review-types';
+import { ARREARS_POLICY } from '@/lib/loan/arrears-charges';
+import { fmtDate, fmtYmd } from '@/lib/loan/format';
 
 export type { ReportItem, ReviewData } from './review-types';
 
@@ -393,6 +395,10 @@ function OverviewTab({ data, onSelect }: { data: ReviewData; onSelect: (tab: Tab
         <ScheduledPaymentsPanel applicationId={data.applicationId} scheduledPayments={data.payments.scheduled} />
       )}
 
+      {data.payments.show && (data.payments.charges.isOverdue || data.payments.charges.hasCharges) && (
+        <ArrearsChargesCard charges={data.payments.charges} remainingBalance={data.payments.remainingBalance} />
+      )}
+
       <KycCard data={data} />
       <CreditCard data={data} />
 
@@ -750,6 +756,104 @@ function ReportUploader({
         applications.
       </p>
     </div>
+  );
+}
+
+const nzd = (cents: number) =>
+  new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(cents / 100);
+
+/** Late fees, the default fee and post-default interest charged on an overdue loan. */
+function ArrearsChargesCard({
+  charges,
+  remainingBalance,
+}: {
+  charges: ReviewData['payments']['charges'];
+  remainingBalance: number;
+}) {
+  const balanceCents = Math.round(remainingBalance * 100);
+  const inDays = (n: number) => (n === 0 ? 'from today' : `in ${n} ${n === 1 ? 'day' : 'days'}`);
+  const rows: { key: string; label: string; note?: string; cents: number }[] = [
+    { key: 'balance', label: 'Loan balance', cents: balanceCents },
+    ...charges.lines.map((l) => ({
+      key: l.id,
+      label: l.label,
+      note: l.assessedAt ? `Charged ${fmtDate(l.assessedAt)}` : undefined,
+      cents: l.amountCents,
+    })),
+    ...(charges.accruedInterestCents > 0
+      ? [
+          {
+            key: 'interest',
+            label: `Accrued interest on overdue balance (${ARREARS_POLICY.annualInterestRatePct}% p.a., daily)`,
+            note: charges.interestAccruedTo ? `Accrued to ${fmtYmd(charges.interestAccruedTo)}` : undefined,
+            cents: charges.accruedInterestCents,
+          },
+        ]
+      : []),
+  ];
+  return (
+    <Card
+      title="Overdue, fees and accrual"
+      icon="wallet"
+      action={
+        charges.isOverdue ? (
+          <ConsolePill tone={charges.daysPastDue > ARREARS_POLICY.defaultFeeGraceDays ? 'danger' : 'warning'} dot>
+            {charges.daysPastDue} {charges.daysPastDue === 1 ? 'day' : 'days'} overdue
+          </ConsolePill>
+        ) : (
+          <ConsolePill tone="neutral">No payment overdue</ConsolePill>
+        )
+      }
+    >
+      {charges.isOverdue && (
+        <p className="mb-3 text-sm text-[var(--text-body)]">
+          {nzd(charges.overdueAmountCents)} overdue since {fmtYmd(charges.earliestMissDate)}.
+        </p>
+      )}
+      <table className="w-full text-sm">
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.key} className="border-b border-[var(--border-subtle)] align-top">
+              <td className="py-2.5 text-[var(--text-body)]">
+                {r.label}
+                {r.note && <span className="block text-[11px] text-[var(--text-muted)]">{r.note}</span>}
+              </td>
+              <td className="py-2.5 text-right font-mono font-semibold tabular-nums text-[var(--text-strong)]">
+                {nzd(r.cents)}
+              </td>
+            </tr>
+          ))}
+          <tr>
+            <td className={`py-2.5 ${SECTION_LABEL}`}>Total owing including charges</td>
+            <td className="py-2.5 text-right font-mono text-base font-bold tabular-nums text-[var(--text-strong)]">
+              {nzd(balanceCents + charges.totalChargesCents)}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <ul className="mt-3 space-y-1 text-xs text-[var(--text-muted)]">
+        {!charges.hasCharges && <li>No late fee, default fee or interest has been charged yet.</li>}
+        {!charges.policyApplies && (
+          <li>This loan was disbursed before the late / default fee policy, so no arrears fees or interest are assessed on it.</li>
+        )}
+        {charges.daysUntilLateFee !== null && (
+          <li>
+            Late payment fee ({nzd(ARREARS_POLICY.lateFee * 100)}) applies {inDays(charges.daysUntilLateFee)} — once an
+            instalment is more than {ARREARS_POLICY.lateFeeGraceDays} days overdue.
+          </li>
+        )}
+        {charges.daysUntilDefaultFee !== null && (
+          <li>
+            Payment default fee ({nzd(ARREARS_POLICY.defaultFee * 100)}, one-off) applies{' '}
+            {inDays(charges.daysUntilDefaultFee)} — once an instalment is more than {ARREARS_POLICY.defaultFeeGraceDays}{' '}
+            days overdue.
+          </li>
+        )}
+        {charges.policyApplies && (
+          <li>Fees and interest are assessed by the daily payment refresh, so today&apos;s charges appear after it runs.</li>
+        )}
+      </ul>
+    </Card>
   );
 }
 
