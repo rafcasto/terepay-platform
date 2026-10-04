@@ -5,6 +5,9 @@ import { getAdminDb, verifySessionOrIdToken } from '@/lib/firebase/admin';
 import { loanPurposeLabel } from '@/lib/constants/loan-purposes';
 import ConsoleIcon, { type ConsoleIconName } from '@/components/lender/ConsoleIcon';
 import ConsolePill, { type PillTone } from '@/components/lender/ConsolePill';
+import { buildAccountDashboard, type AccountDashboardSource } from '@/lib/loan/account-dashboard';
+import { NZ_TIME_ZONE } from '@/lib/loan/format';
+import AccountDashboard from './_components/AccountDashboard';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +17,17 @@ const fmt = (n: number) =>
 function daysSince(ts: { _seconds: number } | null): number {
   if (!ts) return 0;
   return Math.floor((Date.now() - ts._seconds * 1000) / (1000 * 60 * 60 * 24));
+}
+
+/** Disbursed loans (live + settled) aggregated into the money / arrears view. */
+async function getAccountDashboard() {
+  const snap = await getAdminDb()
+    .collection('loanApplications')
+    .where('status', 'in', ['disbursed', 'active', 'funded', 'closed_repaid', 'completed'])
+    .get();
+  const apps = snap.docs.map((d) => ({ ...d.data(), id: d.id }) as AccountDashboardSource);
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: NZ_TIME_ZONE });
+  return buildAccountDashboard(apps, today);
 }
 
 async function getDashboardData(lenderUid: string) {
@@ -126,8 +140,8 @@ export default async function LenderDashboardPage() {
   if (!decoded) redirect('/auth/login');
 
   const lenderUid: string = decoded.uid;
-  const { counts, totalDisbursed, avgDecisionDays, approvalRate, decisionCount, pending, myApps } =
-    await getDashboardData(lenderUid);
+  const [{ counts, totalDisbursed, avgDecisionDays, approvalRate, decisionCount, pending, myApps }, accounts] =
+    await Promise.all([getDashboardData(lenderUid), getAccountDashboard()]);
 
   const totalActive =
     (counts.pending_review ?? 0) +
@@ -195,6 +209,8 @@ export default async function LenderDashboardPage() {
           );
         })}
       </div>
+
+      <AccountDashboard data={accounts} />
 
       {/* Pipeline breakdown */}
       <div className="mb-[18px] rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-white shadow-[var(--shadow-xs)]">
