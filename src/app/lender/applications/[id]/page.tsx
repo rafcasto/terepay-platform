@@ -33,6 +33,7 @@ import type {
   CommunicationItem,
   EvidenceGateView,
   PreviousApplication,
+  ReferenceContact,
   ReportItem,
   ReuseItem,
   ReviewData,
@@ -496,6 +497,28 @@ export default async function LenderApplicationDetailPage({
       ]
     : [];
 
+  // References — only new customers are asked for these; repeat customers skip
+  // the section (POST /api/applications drops any draft references for them).
+  const referenceContacts: ReferenceContact[] = (
+    [
+      ['Reference 1', app.references?.reference1],
+      ['Reference 2', app.references?.reference2],
+    ] as const
+  ).flatMap(([label, ref]) => {
+    const name = ref?.name?.trim();
+    const email = ref?.email?.trim();
+    const phone = ref?.phone?.trim();
+    if (!name && !email && !phone) return [];
+    return [
+      {
+        label,
+        name: name || 'Name not given',
+        ...(email ? { email } : {}),
+        ...(phone ? { phone } : {}),
+      },
+    ];
+  });
+
   const expenseRows = expenses?.nonDiscretionary
     ? Object.entries(expenses.nonDiscretionary)
         .filter(([, v]) => v > 0)
@@ -711,6 +734,10 @@ export default async function LenderApplicationDetailPage({
     credit,
     history,
     communications,
+    references: {
+      contacts: referenceContacts,
+      waived: referenceContacts.length === 0 && Boolean(app.isExistingCustomer),
+    },
   };
 
   return <LoanReview data={data} />;
