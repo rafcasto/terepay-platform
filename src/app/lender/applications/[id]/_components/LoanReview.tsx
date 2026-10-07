@@ -409,6 +409,7 @@ function OverviewTab({ data, onSelect }: { data: ReviewData; onSelect: (tab: Tab
 
       <KycCard data={data} />
       <CreditCard data={data} />
+      <ReferencesCard data={data} />
 
       {/* Timeline */}
       <Card title="Timeline" icon="clock">
@@ -949,6 +950,69 @@ function ArrearsChargesCard({
           <li>Fees and interest are assessed by the daily payment refresh, so today&apos;s charges appear after it runs.</li>
         )}
       </ul>
+    </Card>
+  );
+}
+
+function ReferencesCard({ data }: { data: ReviewData }) {
+  const { contacts, waived } = data.references;
+  const contactBtn =
+    'inline-flex items-center gap-1.5 rounded-[10px] border border-[var(--border-default)] bg-white px-3 py-1.5 text-sm font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--surface-sunken)]';
+
+  if (contacts.length === 0) {
+    return (
+      <Card title="References" icon="users" muted>
+        <p className="text-sm text-[var(--text-muted)]">
+          {waived
+            ? 'Not collected — repeat customers are not asked for references.'
+            : 'The applicant has not supplied any references.'}
+        </p>
+      </Card>
+    );
+  }
+
+  return (
+    <Card title="References" icon="users">
+      <div className="space-y-3">
+        {contacts.map((r) => (
+          <div
+            key={r.label}
+            className="flex flex-col gap-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--slate-50)] p-4 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <div className="min-w-0">
+              <p className={SECTION_LABEL}>{r.label}</p>
+              <p className="mt-1 text-sm font-semibold text-[var(--text-strong)]">{r.name}</p>
+              <dl className="mt-1 space-y-0.5 text-sm text-[var(--text-body)]">
+                <div className="flex gap-2">
+                  <dt className="w-12 shrink-0 text-[var(--text-muted)]">Phone</dt>
+                  <dd className="break-all font-mono text-xs leading-5">{r.phone ?? '—'}</dd>
+                </div>
+                <div className="flex gap-2">
+                  <dt className="w-12 shrink-0 text-[var(--text-muted)]">Email</dt>
+                  <dd className="break-all">{r.email ?? '—'}</dd>
+                </div>
+              </dl>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              {r.phone && (
+                <a href={`tel:${r.phone}`} className={contactBtn}>
+                  <ConsoleIcon name="phoneCall" size={16} />
+                  Call
+                </a>
+              )}
+              {r.email && (
+                <a href={`mailto:${r.email}`} className={contactBtn}>
+                  <ConsoleIcon name="mail" size={16} />
+                  Email
+                </a>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="mt-3 text-xs text-[var(--text-muted)]">
+        Supplied by the applicant, who authorised TerePay to contact them. References must not be family members.
+      </p>
     </Card>
   );
 }

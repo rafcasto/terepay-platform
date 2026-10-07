@@ -85,6 +85,15 @@ export type ApplicantHistory = {
   reuse: ReuseItem[];
 };
 
+/** A personal reference supplied by the applicant (step 7 of the apply flow). */
+export type ReferenceContact = {
+  /** "Reference 1" / "Reference 2". */
+  label: string;
+  name: string;
+  email?: string;
+  phone?: string;
+};
+
 export type CommunicationItem = {
   id: string;
   channel: CommunicationChannel;
@@ -219,6 +228,11 @@ export type ReviewData = {
   };
   history: ApplicantHistory;
   communications: CommunicationItem[];
+  /**
+   * Applicant-supplied references. `waived` is true when the section was not
+   * collected because the applicant is a repeat customer.
+   */
+  references: { contacts: ReferenceContact[]; waived: boolean };
 };
 
 export type TabKey = 'overview' | 'documents' | 'affordability' | 'kyc' | 'credit' | 'communication';
