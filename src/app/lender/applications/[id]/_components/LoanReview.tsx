@@ -391,8 +391,16 @@ function OverviewTab({ data, onSelect }: { data: ReviewData; onSelect: (tab: Tab
         </Card>
       )}
 
+      {data.payments.show && data.payments.settlement && (
+        <EarlySettlementCard settlement={data.payments.settlement} ledger={data.payments.ledger} />
+      )}
+
       {data.payments.show && (
-        <ScheduledPaymentsPanel applicationId={data.applicationId} scheduledPayments={data.payments.scheduled} />
+        <ScheduledPaymentsPanel
+          applicationId={data.applicationId}
+          scheduledPayments={data.payments.scheduled}
+          settledEarlyInstalments={data.payments.settlement?.instalmentsCleared ?? []}
+        />
       )}
 
       {data.payments.show && (data.payments.charges.isOverdue || data.payments.charges.hasCharges) && (
@@ -761,6 +769,94 @@ function ReportUploader({
 
 const nzd = (cents: number) =>
   new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(cents / 100);
+
+/**
+ * How an early payoff settled the loan. Figures come from the quote the
+ * borrower's bank actually paid — the instalments it replaced read as "paid"
+ * in the schedule but were not collected at face value.
+ */
+function EarlySettlementCard({
+  settlement,
+  ledger,
+}: {
+  settlement: NonNullable<ReviewData['payments']['settlement']>;
+  ledger: ReviewData['payments']['ledger'];
+}) {
+  const nzdAmt = (n: number) =>
+    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(n);
+  const settledOn = settlement.settlementDate
+    ? fmtYmd(settlement.settlementDate)
+    : settlement.settledAt
+      ? fmtDate(settlement.settledAt)
+      : '—';
+  const rows: { key: string; label: string; note?: string; amount: number }[] = [
+    ...(typeof settlement.outstandingPrincipal === 'number'
+      ? [{ key: 'principal', label: 'Principal outstanding at settlement', amount: settlement.outstandingPrincipal }]
+      : [{ key: 'balance', label: 'Instalments replaced (face value)', amount: settlement.instalmentsReplaced }]),
+    ...(typeof settlement.accruedInterest === 'number'
+      ? [
+          {
+            key: 'accrued',
+            label: 'Interest accrued to settlement',
+            note:
+              typeof settlement.accrualDays === 'number'
+                ? `${settlement.accrualDays} day${settlement.accrualDays === 1 ? '' : 's'}${settlement.accrualFromDate ? ` from ${fmtYmd(settlement.accrualFromDate)}` : ''}`
+                : undefined,
+            amount: settlement.accruedInterest,
+          },
+        ]
+      : [{ key: 'rebate', label: 'Less: unearned interest rebate', amount: -settlement.interestRebate }]),
+    { key: 'fee', label: 'Early repayment fee', amount: settlement.fee },
+    ...(settlement.arrearsCharges > 0
+      ? [{ key: 'arrears', label: 'Late fees, default fee and overdue interest collected', amount: settlement.arrearsCharges }]
+      : []),
+  ];
+  return (
+    <Card
+      title="Early settlement"
+      icon="wallet"
+      action={
+        <ConsolePill tone="success" dot>
+          Settled {settledOn}
+        </ConsolePill>
+      }
+    >
+      <p className="mb-3 text-sm text-[var(--text-body)]">
+        Borrower paid {nzdAmt(settlement.amountPaid)} via PayBy to clear instalment
+        {settlement.instalmentsCleared.length === 1 ? '' : 's'} {settlement.instalmentsCleared.join(', ')}.
+        Interest stopped on the settlement date; {nzdAmt(settlement.interestRebate)} of scheduled interest was
+        not charged. Total received on this loan: {nzdAmt(ledger.totalPaid)} against a contractual{' '}
+        {nzdAmt(ledger.principal + ledger.scheduledInterest)}.
+      </p>
+      <table className="w-full text-sm">
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.key} className="border-b border-[var(--border-subtle)] align-top">
+              <td className="py-2.5 text-[var(--text-body)]">
+                {r.label}
+                {r.note && <span className="block text-[11px] text-[var(--text-muted)]">{r.note}</span>}
+              </td>
+              <td className="py-2.5 text-right font-mono font-semibold tabular-nums text-[var(--text-strong)]">
+                {r.amount < 0 ? `−${nzdAmt(-r.amount)}` : nzdAmt(r.amount)}
+              </td>
+            </tr>
+          ))}
+          <tr>
+            <td className={`py-2.5 ${SECTION_LABEL}`}>Settlement amount paid</td>
+            <td className="py-2.5 text-right font-mono text-base font-bold tabular-nums text-[var(--text-strong)]">
+              {nzdAmt(settlement.amountPaid)}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      {settlement.method && (
+        <p className="mt-3 text-xs text-[var(--text-muted)]">
+          Settlement basis: {settlement.method.replace(/_/g, ' ')}.
+        </p>
+      )}
+    </Card>
+  );
+}
 
 /** Late fees, the default fee and post-default interest charged on an overdue loan. */
 function ArrearsChargesCard({

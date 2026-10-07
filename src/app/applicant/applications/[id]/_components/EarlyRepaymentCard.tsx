@@ -12,6 +12,8 @@ export type EarlyRepaymentQuoteView = {
   unearnedInterestRebate: number;
   netOutstanding: number;
   prepaymentFee: number;
+  /** Late fees, default fee and overdue interest already charged and collected with the payoff. */
+  arrearsCharges: number;
   totalPayoff: number;
 };
 
@@ -205,6 +207,12 @@ export default function EarlyRepaymentCard({ applicationId, quote, status }: Pro
               <dt className="text-muted">Prepayment fee</dt>
               <dd className="font-semibold text-text tabular-nums">{fmtNZD(quote.prepaymentFee)}</dd>
             </div>
+            {quote.arrearsCharges > 0 && (
+              <div className="flex justify-between">
+                <dt className="text-muted">Late fees and interest on overdue payments</dt>
+                <dd className="font-semibold text-text tabular-nums">{fmtNZD(quote.arrearsCharges)}</dd>
+              </div>
+            )}
             <div className="flex justify-between border-t border-border-2 pt-2">
               <dt className="font-semibold text-text">Total to pay today</dt>
               <dd className="text-base font-bold text-text tabular-nums">{fmtNZD(quote.totalPayoff)}</dd>
@@ -224,6 +232,15 @@ export default function EarlyRepaymentCard({ applicationId, quote, status }: Pro
               <span className="font-semibold">{fmtNZD(quote.unearnedInterestRebate)}</span>), plus a fixed{' '}
               <span className="font-semibold">{fmtNZD(quote.prepaymentFee)}</span> prepayment fee that covers
               the administrative cost of settling ahead of schedule. The prepayment fee is non-refundable.
+              {quote.arrearsCharges > 0 && (
+                <>
+                  {' '}
+                  It also includes{' '}
+                  <span className="font-semibold">{fmtNZD(quote.arrearsCharges)}</span> in late payment
+                  fees and interest already charged on overdue payments.
+                </>
+              )}
+              {' '}
               Once your payment is approved by your bank, your loan is settled in full, your remaining
               scheduled instalments are cancelled, and no further payments are collected. All loans are
               charged interest.

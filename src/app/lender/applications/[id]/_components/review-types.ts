@@ -7,6 +7,8 @@ import type {
 } from '@/types/application';
 import type { PillTone } from '@/components/lender/ConsolePill';
 import type { ArrearsChargesSummary } from '@/lib/loan/arrears-charges';
+import type { EarlySettlement } from '@/lib/loan/active-loan';
+import type { LoanLedger } from '@/types/application';
 
 export type ReportItem = { id: string; fileName: string; uploadedAt: string; uploadedBy: string };
 
@@ -181,6 +183,12 @@ export type ReviewData = {
     charges: ArrearsChargesSummary;
     /** Outstanding loan balance before arrears charges (NZD). */
     remainingBalance: number;
+    /** Cash actually received — an early payoff counts at the amount paid. */
+    totalPaid: number;
+    /** Present once the borrower settled the loan early via PayBy. */
+    settlement: EarlySettlement | null;
+    /** Itemised cost of the loan (principal, interest, fees, credits). */
+    ledger: LoanLedger;
   };
   disburse?: {
     approvedAmount: number;

@@ -82,6 +82,35 @@ describe('computeEarlyPayoff — amortised loans settle on an actuarial basis', 
   });
 });
 
+describe('computeEarlyPayoff — arrears charges are collected with the payoff', () => {
+  const inArrears = {
+    ...loan(1, true),
+    feeAssessments: [
+      { id: 'late:2', type: 'late_payment', amountCents: 1000, installmentNumber: 2, reason: '', assessedAt: null },
+      { id: 'default', type: 'payment_default', amountCents: 2500, reason: '', assessedAt: null },
+    ],
+    arrears: { accruedInterestCents: 450, dailyRate: 0.49 / 365, earliestMissDate: '2026-09-21', lastAssessedDate: '2026-09-30' },
+  } as unknown as LoanSummarySource;
+
+  it('adds late fees, the default fee and overdue interest on top of the settlement', () => {
+    const q = computeEarlyPayoff(inArrears, { settlementDate: '2026-09-21' })!;
+    expect(q.netOutstanding).toBe(771.16);
+    expect(q.arrearsCharges).toBe(39.5);
+    expect(q.arrearsChargesCents).toBe(3950);
+    expect(q.totalPayoff).toBe(835.66);
+    expect(q.totalPayoffCents).toBe(83566);
+    expect(q.breakdown.arrearsLateFees).toBe(10);
+    expect(q.breakdown.arrearsDefaultFee).toBe(25);
+    expect(q.breakdown.arrearsOverdueInterest).toBe(4.5);
+  });
+
+  it('charges nothing extra when no arrears have been assessed', () => {
+    const q = computeEarlyPayoff(loan(1, true), { settlementDate: '2026-09-21' })!;
+    expect(q.arrearsCharges).toBe(0);
+    expect(q.totalPayoff).toBe(796.16);
+  });
+});
+
 describe('computeEarlyPayoff — legacy flat-rate loans keep their contracted basis', () => {
   it('uses the straight-line rebate they were sold under', () => {
     const q = computeEarlyPayoff(loan(0, false), { settlementDate: '2026-09-07' })!;

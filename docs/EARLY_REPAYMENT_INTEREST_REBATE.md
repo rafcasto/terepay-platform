@@ -38,7 +38,7 @@ requirements before we enable it in production. The whole calculation lives in
 When a borrower settles the whole loan early, we charge:
 
 ```
-totalPayoff = netOutstanding + prepaymentFee
+totalPayoff = netOutstanding + prepaymentFee + arrearsCharges
 ```
 
 where
@@ -48,11 +48,29 @@ grossRemaining         = Σ (not-yet-paid instalments)          // principal + i
 unearnedInterestRebate = interest for the period after settlement (refunded)
 netOutstanding         = grossRemaining − unearnedInterestRebate
 prepaymentFee          = EARLY_REPAYMENT_FEE = $25              // fixed admin fee, non-refundable
+arrearsCharges         = late payment fees + payment default fee
+                         + post-default interest already assessed   // src/lib/loan/arrears.ts
 ```
 
 So the borrower pays: **principal still owed + interest earned up to the
-settlement date + a fixed $25 admin fee.** Interest for the future (unearned)
-portion of the term is **refunded**.
+settlement date + a fixed $25 admin fee + any arrears charges already on the
+loan.** Interest for the future (unearned) portion of the term is **refunded**.
+Arrears charges are disclosed charges the borrower already owes; settling
+early collects them rather than writing them off. They are stored on the
+quote as `arrearsChargesCents` (absent on payoffs taken before this applied).
+
+### How the payoff is recorded
+
+When the PayBy payment lands, the instalments it clears are marked `success`
+at **face value** so the schedule reads as complete — but the cash received is
+`totalPayoffCents`, not the face value. `deriveLoanSummary()`
+([`src/lib/loan/active-loan.ts`](../src/lib/loan/active-loan.ts)) reconciles
+this: `totalPaid` counts the payoff at the amount paid, `settlement` exposes
+the working from the stored quote, and `ledger` itemises principal, scheduled
+interest, the interest not charged (credit), the early repayment fee and any
+arrears charges. Every surface — borrower dashboard, loan statement, closure
+letter, lender review and account dashboard — renders from that summary, so
+none of them ever report the full contractual interest as paid.
 
 ---
 

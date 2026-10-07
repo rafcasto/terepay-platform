@@ -698,6 +698,9 @@ export default async function LenderApplicationDetailPage({
         policyApplies: Boolean(app.feePolicyVersion),
       }),
       remainingBalance: loanSummary.remainingBalance,
+      totalPaid: loanSummary.totalPaid,
+      settlement: loanSummary.settlement,
+      ledger: loanSummary.ledger,
     },
     disburse,
     decisionInput: {
