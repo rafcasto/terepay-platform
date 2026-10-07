@@ -3,6 +3,7 @@ import { deriveLoanSummary, type LoanSummarySource } from './active-loan';
 import type { DerivedInstallmentStatus } from './active-loan';
 import type { LoanApplication } from '@/types/application';
 import { buildSchedule, payoffBasis, RATE_MODEL, type PayoffBasis } from './repayment';
+import { arrearsChargeTotals } from './arrears-charges';
 
 /**
  * Method used to price an early full repayment on the current (amortised)
@@ -37,7 +38,12 @@ export type InterestRebateMethod =
  *
  *   netOutstanding  = outstandingPrincipal
  *                     + outstandingPrincipal × dailyRate × daysSinceLastCharge
- *   totalPayoff     = netOutstanding + EARLY_REPAYMENT_FEE
+ *   totalPayoff     = netOutstanding + EARLY_REPAYMENT_FEE + arrearsCharges
+ *
+ * `arrearsCharges` are the late payment fees, the payment default fee and the
+ * post-default interest the arrears engine has already assessed on the loan
+ * (src/lib/loan/arrears.ts). They are disclosed charges the borrower owes, so
+ * settling early collects them rather than writing them off.
  *
  * Interest simply stops accruing at settlement, so nothing needs rebating; the
  * `unearnedInterestRebate` field is reported as the difference between running
@@ -78,6 +84,10 @@ export interface EarlyPayoffBreakdown {
   accrualFromDate?: string;
   /** Actuarial only: days of accrual applied. */
   accrualDays?: number;
+  /** Arrears charges collected in the payoff (NZD). */
+  arrearsLateFees: number;
+  arrearsDefaultFee: number;
+  arrearsOverdueInterest: number;
 }
 
 export interface EarlyPayoffQuote {
@@ -94,7 +104,10 @@ export interface EarlyPayoffQuote {
   /** Fixed prepayment/administrative fee, in NZD. */
   prepaymentFee: number;
   prepaymentFeeCents: number;
-  /** netOutstanding + prepaymentFee, in NZD — the amount charged via PayBy. */
+  /** Late fees, default fee and overdue interest already assessed and still owing, in NZD. */
+  arrearsCharges: number;
+  arrearsChargesCents: number;
+  /** netOutstanding + prepaymentFee + arrearsCharges, in NZD — the amount charged via PayBy. */
   totalPayoff: number;
   totalPayoffCents: number;
   /** installmentNumbers this payoff would clear. */
@@ -241,7 +254,12 @@ export function computeEarlyPayoff(
   }
 
   const prepaymentFee = EARLY_REPAYMENT_FEE;
-  const totalPayoff = round2(netOutstanding + prepaymentFee);
+
+  // Disclosed arrears charges already on the loan are collected with the payoff.
+  const charges = arrearsChargeTotals(app.feeAssessments, app.arrears);
+  const arrearsCharges = round2(charges.totalCents / 100);
+
+  const totalPayoff = round2(netOutstanding + prepaymentFee + arrearsCharges);
 
   return {
     currency: 'NZD',
@@ -253,6 +271,8 @@ export function computeEarlyPayoff(
     netOutstandingCents: toCents(netOutstanding),
     prepaymentFee,
     prepaymentFeeCents: toCents(prepaymentFee),
+    arrearsCharges,
+    arrearsChargesCents: charges.totalCents,
     totalPayoff,
     totalPayoffCents: toCents(totalPayoff),
     installmentsCleared: unpaid.map((i) => i.installmentNumber),
@@ -272,6 +292,9 @@ export function computeEarlyPayoff(
       accruedInterest: actuarial?.accruedInterest,
       accrualFromDate: actuarial?.accrualFromDate,
       accrualDays: actuarial?.accrualDays,
+      arrearsLateFees: round2(charges.lateFeeCents / 100),
+      arrearsDefaultFee: round2(charges.defaultFeeCents / 100),
+      arrearsOverdueInterest: round2(charges.accruedInterestCents / 100),
     },
   };
 }

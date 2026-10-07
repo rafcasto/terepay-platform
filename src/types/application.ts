@@ -155,6 +155,12 @@ export interface EarlyRepaymentQuote {
   /** installmentNumbers this payoff clears. */
   installmentsCleared: number[];
   /**
+   * Late payment fees, the payment default fee and post-default interest
+   * outstanding at initiation and collected as part of the payoff. Absent on
+   * payoffs initiated before arrears charges were included in the quote.
+   */
+  arrearsChargesCents?: number;
+  /**
    * Snapshot of the interest-rebate working at initiation time, retained for
    * audit / dispute resolution. Mirrors EarlyPayoffBreakdown (amounts in NZD).
    */
@@ -170,6 +176,15 @@ export interface EarlyRepaymentQuote {
     loanStartDate: string;
     finalDueDate: string;
     settlementDate: string;
+    /** Actuarial (amortised) loans only. */
+    outstandingPrincipal?: number;
+    accruedInterest?: number;
+    accrualFromDate?: string;
+    accrualDays?: number;
+    /** Arrears charges folded into the payoff (NZD). */
+    arrearsLateFees?: number;
+    arrearsDefaultFee?: number;
+    arrearsOverdueInterest?: number;
   };
 }
 
@@ -362,6 +377,59 @@ export interface RepaymentSchedule {
 // ---------------------------------------------------------------------------
 export type LoanStatus = 'disbursed' | 'active' | 'delinquent' | 'closed_repaid';
 
+/**
+ * One line of the borrower-facing cost ledger: what the loan has cost and
+ * why. Built by `deriveLoanSummary()` (src/lib/loan/active-loan.ts) from the
+ * application document and rendered verbatim by the statement, the closure
+ * letter and the borrower/lender screens so every surface tells one story.
+ */
+export type LoanLedgerLineKind =
+  | 'principal'
+  | 'scheduled_interest'
+  | 'late_fee'
+  | 'default_fee'
+  | 'overdue_interest'
+  | 'interest_rebate'
+  | 'early_repayment_fee';
+
+export interface LoanLedgerLine {
+  id: string;
+  kind: LoanLedgerLineKind;
+  label: string;
+  /** NZD. Credits to the borrower (the early-settlement interest rebate) are negative. */
+  amount: number;
+  /** ISO 8601 datetime or YYYY-MM-DD, when known. */
+  date?: string;
+  note?: string;
+}
+
+export interface LoanLedger {
+  /** Amount financed (`loanDetails.approvedAmount`), NZD. */
+  principal: number;
+  /** Interest built into the contractual schedule (totalRepayable − principal). */
+  scheduledInterest: number;
+  /** Interest not charged because the loan was settled early (≥ 0). */
+  interestRebate: number;
+  earlyRepaymentFee: number;
+  lateFees: number;
+  lateFeeCount: number;
+  defaultFee: number;
+  /** Post-default interest accrued on the overdue balance. */
+  overdueInterest: number;
+  /** scheduledInterest − interestRebate + overdueInterest. */
+  interestCharged: number;
+  /** earlyRepaymentFee + lateFees + defaultFee. */
+  feesCharged: number;
+  /** principal + interestCharged + feesCharged — the full cost of the loan as it stands. */
+  totalCost: number;
+  /** Cash actually received from the borrower. */
+  totalPaid: number;
+  /** Still owing including arrears charges (0 once settled). */
+  outstanding: number;
+  /** Ordered for display: principal, interest, charges, then settlement adjustments. */
+  lines: LoanLedgerLine[];
+}
+
 export interface Loan {
   loanId: string;
   applicationId: string;
@@ -372,9 +440,14 @@ export interface Loan {
   // Money
   principal: number; // disbursedAmount (cash given to applicant)
   totalRepayable: number; // sum of all instalments (principal + fee + interest)
+  /** Cash actually received — an early payoff counts at the amount paid, not instalment face value. */
   totalPaid: number;
   remainingBalance: number;
   fortnightlyPayment: number;
+  /** True once the borrower settled the loan early via PayBy. */
+  settledEarly?: boolean;
+  /** Snapshot of the cost ledger at the last sync (see `LoanLedger`). */
+  ledger?: LoanLedger;
 
   // Schedule (mirrors loanApplications.repaymentSchedule but lives here for fast reads)
   installments: RepaymentInstallment[];

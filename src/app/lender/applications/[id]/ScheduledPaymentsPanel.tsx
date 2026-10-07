@@ -9,6 +9,8 @@ import { fmtDateTime, fmtYmd } from '@/lib/loan/format';
 type Props = {
   applicationId: string;
   scheduledPayments: ScheduledPayment[];
+  /** Instalments cleared by an early payoff — shown as settled, not collected at face value. */
+  settledEarlyInstalments?: number[];
 };
 
 const fmtNzd = (cents: number) =>
@@ -41,10 +43,12 @@ function fmtDueAt(iso: string): string {
  *   - `Needs attention`  → its window is open but Qippay rejected it (real issue).
  *   - `Missed window`    → its due date passed before it could be lodged.
  */
-function describe(p: ScheduledPayment, today: string): RowView {
+function describe(p: ScheduledPayment, today: string, settledEarly: boolean): RowView {
   switch (p.status) {
     case 'success':
-      return { label: 'Paid', tone: 'success' };
+      return settledEarly
+        ? { label: 'Settled early', tone: 'success', note: 'Replaced by the early payoff — not collected at face value' }
+        : { label: 'Paid', tone: 'success' };
     case 'scheduled':
       return { label: 'Scheduled', tone: 'info', note: 'Lodged with bank' };
     case 'retrying':
@@ -85,6 +89,7 @@ function describe(p: ScheduledPayment, today: string): RowView {
 export default function ScheduledPaymentsPanel({
   applicationId,
   scheduledPayments: initial,
+  settledEarlyInstalments = [],
 }: Props) {
   const [payments, setPayments] = useState<ScheduledPayment[]>(initial);
   const [isChecking, startChecking] = useTransition();
@@ -94,7 +99,11 @@ export default function ScheduledPaymentsPanel({
   const [notice, setNotice] = useState<string | null>(null);
 
   const today = nzToday();
-  const rows = payments.map((p) => ({ p, view: describe(p, today) }));
+  const settledEarly = new Set(settledEarlyInstalments);
+  const rows = payments.map((p) => ({
+    p,
+    view: describe(p, today, settledEarly.has(p.installmentNumber)),
+  }));
 
   const paidCount = payments.filter((p) => p.status === 'success').length;
   const lodgedCount = payments.filter(

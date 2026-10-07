@@ -3,7 +3,7 @@ import { adminDb } from '@/lib/firebase/admin';
 import { auditLog } from '@/lib/utils/audit';
 import { ANNUAL_INTEREST_RATE } from '@/lib/constants/fees';
 import { deriveLoanSummary, type ActiveLoanSummary, type DerivedInstallmentStatus } from './active-loan';
-import type { LoanApplication, InstallmentStatus, PaymentConsent } from '@/types/application';
+import type { Loan, LoanApplication, InstallmentStatus, PaymentConsent } from '@/types/application';
 
 /** Map a derived schedule status onto the loan-record instalment status. */
 function toInstallmentStatus(status: DerivedInstallmentStatus): InstallmentStatus {
@@ -34,6 +34,33 @@ function loanStatusFor(summary: ActiveLoanSummary): 'active' | 'delinquent' | 'c
   if (summary.isFullyPaid) return 'closed_repaid';
   if (summary.isDelinquent) return 'delinquent';
   return 'active';
+}
+
+/**
+ * The loan summary the statement and closure-letter PDFs render. The
+ * application document is the source of truth for what was paid and charged
+ * (an early payoff, arrears fees and overdue interest all live there), so
+ * derive from it whenever it exists. The stored `loans` record is only a
+ * fallback for orphaned records — its instalments feed the legacy schedule
+ * path, so the figures stay consistent with every other surface.
+ */
+export function summaryForLoan(
+  loan: Loan,
+  app: LoanApplication | null | undefined,
+): ActiveLoanSummary {
+  if (app) return deriveLoanSummary(app);
+  return deriveLoanSummary({
+    loanDetails: {
+      requestedAmount: loan.principal,
+      currency: 'NZD',
+      loanPurpose: 'other',
+      purposeDescription: '',
+      approvedAmount: loan.principal,
+      totalRepayment: loan.totalRepayable,
+      fortnightlyPayment: loan.fortnightlyPayment,
+    },
+    repaymentSchedule: { installments: loan.installments, totalRepayment: loan.totalRepayable },
+  });
 }
 
 /**
@@ -71,6 +98,8 @@ export async function createLoanRecord(params: {
       totalRepayable: summary.totalRepayable,
       totalPaid: summary.totalPaid,
       remainingBalance: summary.remainingBalance,
+      settledEarly: summary.settledEarly,
+      ledger: summary.ledger,
       fortnightlyPayment: app.loanDetails?.fortnightlyPayment ?? installments[0]?.amount ?? 0,
       installments,
       mandateId: consent?.mandateId ?? '',
@@ -140,8 +169,12 @@ export async function syncLoanRecord(applicationId: string): Promise<void> {
 
     const updates: Record<string, unknown> = {
       status: loanStatusFor(summary),
+      // Cash received — an early payoff counts at the amount paid, so the
+      // record never reports the full contractual interest as collected.
       totalPaid: summary.totalPaid,
       remainingBalance: summary.remainingBalance,
+      settledEarly: summary.settledEarly,
+      ledger: summary.ledger,
       installments: buildInstallments(summary),
       nextPaymentDate: summary.nextPaymentDate
         ? Timestamp.fromDate(new Date(summary.nextPaymentDate))

@@ -120,6 +120,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           unearnedInterestRebateCents: payoff.unearnedInterestRebateCents,
           netOutstandingCents: payoff.netOutstandingCents,
           prepaymentFeeCents: payoff.prepaymentFeeCents,
+          arrearsChargesCents: payoff.arrearsChargesCents,
           totalPayoffCents: payoff.totalPayoffCents,
           installmentsCleared: payoff.installmentsCleared,
           rebateBreakdown: payoff.breakdown,
@@ -158,6 +159,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           outstandingBalanceCents: result.quote.outstandingBalanceCents,
           unearnedInterestRebateCents: result.quote.unearnedInterestRebateCents,
           prepaymentFeeCents: result.quote.prepaymentFeeCents,
+          arrearsChargesCents: result.quote.arrearsChargesCents ?? 0,
           disclaimerVersion: EARLY_REPAYMENT_DISCLAIMER_VERSION,
         },
       });

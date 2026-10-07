@@ -48,6 +48,8 @@ export type AccountDashboardSource = Pick<
   | 'paymentConsent'
   | 'repaymentSchedule'
   | 'earlyRepayment'
+  | 'feeAssessments'
+  | 'arrears'
 > & { id: string };
 
 export interface AccountRow {
@@ -94,21 +96,11 @@ function ageBucket(daysPastDue: number): AccountCategory | null {
 }
 
 /**
- * Cash actually received on a loan. An early payoff marks its cleared
- * instalments as paid at face value, but the borrower paid the payoff quote
- * (interest rebate deducted, prepayment fee added) — so count the quote instead.
+ * Cash actually received on a loan. `deriveLoanSummary` already counts an
+ * early payoff at the amount the borrower paid (not instalment face value).
  */
 function collectedCents(app: AccountDashboardSource): number {
-  const summary = deriveLoanSummary(app);
-  const er = app.earlyRepayment;
-  const paidEarly = er?.status === 'paid' && typeof er.quote?.totalPayoffCents === 'number';
-  const cleared = new Set(paidEarly ? er.quote.installmentsCleared ?? [] : []);
-
-  const fromInstalments = summary.installments
-    .filter((i) => i.status === 'paid' && !cleared.has(i.installmentNumber))
-    .reduce((sum, i) => sum + toCents(i.amount), 0);
-
-  return fromInstalments + (paidEarly ? er.quote.totalPayoffCents : 0);
+  return toCents(deriveLoanSummary(app).totalPaid);
 }
 
 export function buildAccountDashboard(

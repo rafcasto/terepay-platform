@@ -111,7 +111,7 @@ export default function LoanHero({
           <Confetti />
           <StatGrid
             stats={[
-              { label: 'Total repaid', value: fmtNZD(data.loan.totalPaid + data.loan.remainingBalance) },
+              { label: 'Total repaid', value: fmtNZD(data.loan.totalPaid) },
             ]}
             columns={2}
           />

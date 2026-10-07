@@ -342,8 +342,10 @@ interface Loan {
   lastPaymentDate?: Timestamp;
   
   // Financial Summary
-  totalPaid: number;
+  totalPaid: number;                     // Cash actually received — an early payoff counts at the amount paid, not instalment face value
   remainingBalance: number;
+  settledEarly?: boolean;                // True once settled early via PayBy
+  ledger?: LoanLedger;                   // Snapshot of the cost breakdown (principal, interest, fees, credits) at last sync
   totalInterestPaid: number;
   estimatedTotalInterest: number;
   

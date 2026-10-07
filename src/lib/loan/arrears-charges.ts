@@ -91,6 +91,40 @@ function toIso(value: unknown): string | undefined {
   return typeof s === 'number' ? new Date(s * 1000).toISOString() : undefined;
 }
 
+export interface ArrearsChargeTotals {
+  lateFeeCents: number;
+  lateFeeCount: number;
+  defaultFeeCents: number;
+  accruedInterestCents: number;
+  /** Late fees + default fee + accrued interest (cents). */
+  totalCents: number;
+}
+
+/**
+ * Sum what the arrears engine has charged on a loan so far. Shared by the
+ * loan summary (so charges form part of the balance), the early-payoff quote
+ * (so settling early collects them) and the detailed summary below.
+ */
+export function arrearsChargeTotals(
+  feeAssessments: FeeAssessment[] | null | undefined,
+  arrears: ArrearsState | null | undefined,
+): ArrearsChargeTotals {
+  const fees = Array.isArray(feeAssessments) ? feeAssessments : [];
+  const lateFees = fees.filter((f) => f.type === 'late_payment');
+  const lateFeeCents = lateFees.reduce((sum, f) => sum + f.amountCents, 0);
+  const defaultFeeCents = fees
+    .filter((f) => f.type === 'payment_default')
+    .reduce((sum, f) => sum + f.amountCents, 0);
+  const accruedInterestCents = Math.max(0, arrears?.accruedInterestCents ?? 0);
+  return {
+    lateFeeCents,
+    lateFeeCount: lateFees.length,
+    defaultFeeCents,
+    accruedInterestCents,
+    totalCents: lateFeeCents + defaultFeeCents + accruedInterestCents,
+  };
+}
+
 export function summariseArrearsCharges(input: {
   installments: DerivedInstallment[];
   feeAssessments?: FeeAssessment[] | null;
@@ -116,10 +150,9 @@ export function summariseArrearsCharges(input: {
 
   const lateFees = fees.filter((f) => f.type === 'late_payment');
   const defaultFees = fees.filter((f) => f.type === 'payment_default');
-  const lateFeeCents = lateFees.reduce((sum, f) => sum + f.amountCents, 0);
-  const defaultFeeCents = defaultFees.reduce((sum, f) => sum + f.amountCents, 0);
-  const accruedInterestCents = Math.max(0, input.arrears?.accruedInterestCents ?? 0);
-  const totalChargesCents = lateFeeCents + defaultFeeCents + accruedInterestCents;
+  const totals = arrearsChargeTotals(fees, input.arrears);
+  const { lateFeeCents, defaultFeeCents, accruedInterestCents } = totals;
+  const totalChargesCents = totals.totalCents;
 
   const lines: ArrearsChargeLine[] = fees
     .map((f) => ({

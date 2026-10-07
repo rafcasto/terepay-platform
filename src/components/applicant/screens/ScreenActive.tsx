@@ -61,8 +61,8 @@ export default function ScreenActive({ app, status, applicationId, scheduledPaym
     arrears: app.arrears as ArrearsState | undefined,
     policyApplies: Boolean(app.feePolicyVersion),
   });
-  const chargesTotal = charges.totalChargesCents / 100;
-  const owing = remaining + chargesTotal;
+  const chargesTotal = summary.arrearsChargesOutstanding;
+  const owing = summary.totalOwing;
 
   return (
     <div className="space-y-5">
@@ -218,6 +218,7 @@ export default function ScreenActive({ app, status, applicationId, scheduledPaym
             unearnedInterestRebate: payoff.unearnedInterestRebate,
             netOutstanding: payoff.netOutstanding,
             prepaymentFee: payoff.prepaymentFee,
+            arrearsCharges: payoff.arrearsCharges,
             totalPayoff: payoff.totalPayoff,
           }}
           status={earlyRepaymentStatus}
