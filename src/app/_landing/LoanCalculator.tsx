@@ -21,7 +21,7 @@ export default function LoanCalculator({ ctaLabel, disclosure }: { ctaLabel: str
 
   const rows = [
     { label: 'Amount borrowed', value: fmtNZD(amount) },
-    { label: 'Interest (49% p.a. over eight weeks)', value: fmtNZD(r.interest) },
+    { label: 'Interest (4.74% over eight weeks)', value: fmtNZD(r.interest) },
     {
       label: existing ? 'Application fee' : 'Establishment fee (once only)',
       sub: 'Deducted from the amount paid to you',
@@ -87,7 +87,7 @@ export default function LoanCalculator({ ctaLabel, disclosure }: { ctaLabel: str
           </div>
           <div className="min-w-0 flex-[1_1_140px] rounded-[12px] border border-border-default bg-surface-card px-4 py-3.5">
             <div className="text-xs uppercase tracking-[.06em] text-ink-muted">Interest rate</div>
-            <div className="mt-1 font-display text-[17px] font-semibold text-ink-strong">49% p.a.</div>
+            <div className="mt-1 font-display text-[17px] font-semibold text-ink-strong">4.74%</div>
           </div>
         </div>
       </div>

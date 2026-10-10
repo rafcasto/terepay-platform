@@ -22,18 +22,22 @@ export default function HeroSection({ content }: { content?: ContentSectionValue
       <div className="relative mx-auto flex max-w-[1180px] flex-wrap items-center gap-[clamp(32px,5vw,56px)] px-6 pb-[clamp(88px,10vw,132px)] pt-[clamp(56px,8vw,104px)]">
         {/* Copy */}
         <div className="min-w-0 flex-[1_1_320px]">
-          <span className="inline-block rounded-pill border border-[rgba(251,199,141,0.35)] px-3.5 py-[7px] font-display text-xs font-semibold uppercase tracking-[.14em] text-gold-light">
+          <span className="mb-[22px] inline-block rounded-pill border border-[rgba(251,199,141,0.35)] px-3.5 py-[7px] font-display text-xs font-semibold uppercase tracking-[.14em] text-gold-light">
             {c.badge}
           </span>
-          <h1 className="mt-[22px] font-display text-[clamp(38px,5.6vw,66px)] font-bold leading-[1.02] tracking-[-0.025em] text-white text-balance">
+          <h1 className="font-display text-[clamp(38px,5.6vw,66px)] font-bold leading-[1.02] tracking-[-0.025em] text-white text-balance">
             {c.titleLead}{' '}
             <span className="font-serif font-semibold text-gold-light">{c.titleHighlight}</span>
             {c.titleTail ? ` ${c.titleTail}` : null}
           </h1>
-          <p className="mt-5 max-w-[520px] text-[clamp(17px,1.6vw,20px)] leading-[1.55] text-[rgba(234,240,247,0.78)] text-pretty">
-            {c.subtitle}
-          </p>
-          <p className="mt-4 text-sm font-semibold text-gold-light">{c.disclaimer}</p>
+          <div className="mt-5 max-w-[520px]">
+            <p className="text-[clamp(17px,1.6vw,20px)] leading-[1.55] text-[rgba(234,240,247,0.78)] text-pretty">
+              {c.subtitle}
+            </p>
+          </div>
+          <div className="mt-4">
+            <p className="text-sm font-semibold text-gold-light">{c.disclaimer}</p>
+          </div>
 
           <div className="mt-[30px] flex flex-wrap gap-3">
             <Link href="/auth/signup" className="tp-btn tp-btn--accent tp-btn--lg">
