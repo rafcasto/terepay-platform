@@ -4,9 +4,16 @@ import { verifySessionOrIdToken, getAdminDb } from '@/lib/firebase/admin';
 import { resolveOnboardingStep } from '@/lib/auth/onboarding';
 import { toDisplayState, type LoanDisplayState } from '@/lib/loan/status-display';
 import { toDate } from '@/lib/loan/format';
+import {
+  deriveLoanSummary,
+  isLiveLoanStatus,
+  isClosedLoanStatus,
+} from '@/lib/loan/active-loan';
+import type { LoanApplication } from '@/types/application';
 import LoanHero, { type DashboardHeroData } from './_components/LoanHero';
 import LoanCalculatorCard from './_components/LoanCalculatorCard';
 import QuickActions from './_components/QuickActions';
+import { getContentSections } from '@/lib/content/site-content';
 
 function getGreeting(): string {
   const hour = new Date().getUTCHours();
@@ -14,6 +21,8 @@ function getGreeting(): string {
   if (hour >= 12 && hour < 17) return 'Good afternoon';
   return 'Good evening';
 }
+
+type RecentApp = LoanApplication & { id: string };
 
 async function getDashboardData(uid: string) {
   const db = getAdminDb();
@@ -23,14 +32,17 @@ async function getDashboardData(uid: string) {
     db.collection('loans').where('applicantId', '==', uid).get(),
   ]);
 
-  // Most recent active / delinquent loan
+  // Most recent active / delinquent loan (from the dedicated loans collection,
+  // when present). The application document remains the source of truth for the
+  // repayment schedule and balance — see derivation below.
   const loanDoc = loansSnap.docs
     .map((d) => d.data())
     .find((l) => l.status === 'active' || l.status === 'delinquent' || l.status === 'closed_repaid');
 
-  // Most recent application (any status), to drive review/approved/rejected hero
+  // Most recent application (any status), to drive review/approved/rejected and
+  // — crucially — the disbursed/active loan hero.
   const allApps = appsSnap.docs
-    .map((d) => ({ id: d.id, ...d.data() } as { id: string; status?: string; timeline?: { createdAt?: unknown; submittedAt?: unknown }; referenceNumber?: string; loanDetails?: { requestedAmount?: number; approvedAmount?: number } }))
+    .map((d) => ({ id: d.id, ...d.data() } as RecentApp))
     .sort((a, b) => {
       const ad = toDate(a.timeline?.createdAt as Parameters<typeof toDate>[0])?.getTime() ?? 0;
       const bd = toDate(b.timeline?.createdAt as Parameters<typeof toDate>[0])?.getTime() ?? 0;
@@ -61,7 +73,27 @@ export default async function ApplicantDashboard() {
   let state: LoanDisplayState = 'new';
   let heroData: DashboardHeroData = { state: 'new' };
 
-  if (loanDoc) {
+  if (recentApp && (isLiveLoanStatus(recentApp.status) || isClosedLoanStatus(recentApp.status))) {
+    // Derive the live loan from the application — the source of truth for the
+    // schedule and balance (scheduledPayments is kept current by the Qippay
+    // webhook). This makes a disbursed loan show its real remaining balance and
+    // stops the dashboard from inviting a second loan while one is outstanding.
+    const summary = deriveLoanSummary(recentApp);
+    const fullyPaid = isClosedLoanStatus(recentApp.status) || summary.isFullyPaid;
+    state = fullyPaid ? 'paid' : 'active';
+    heroData = {
+      state,
+      loan: {
+        remainingBalance: summary.remainingBalance,
+        totalPaid: summary.totalPaid,
+        nextPaymentDate: summary.nextPaymentDate ?? new Date().toISOString(),
+        isDelinquent: !fullyPaid && summary.isDelinquent,
+        applicationId: recentApp.id,
+      },
+    };
+  } else if (loanDoc) {
+    // Fallback: a dedicated loans-collection record with no live application
+    // (e.g. seeded data).
     if (loanDoc.status === 'closed_repaid') {
       state = 'paid';
     } else {
@@ -79,6 +111,7 @@ export default async function ApplicantDashboard() {
         totalPaid: loanDoc.totalPaid as number,
         nextPaymentDate,
         isDelinquent: loanDoc.status === 'delinquent',
+        applicationId: loanDoc.applicationId as string | undefined,
       },
     };
   } else if (recentApp?.status) {
@@ -97,26 +130,37 @@ export default async function ApplicantDashboard() {
 
   const greeting = getGreeting();
   const firstName = (user?.firstName as string | undefined) ?? null;
+  const sections = await getContentSections(['borrower.dashboard', `borrower.status.${state}`]);
+  const content = sections['borrower.dashboard'];
+  const statusContent = sections[`borrower.status.${state}`];
 
   return (
     <div className="px-4 sm:px-5 pt-6 pb-20 max-w-[540px] mx-auto space-y-5">
       <div>
-        <p className="text-sm text-muted">{greeting} 👋</p>
+        <p className="text-sm text-muted">{greeting} {content.greetingSuffix}</p>
         <h1 className="mt-0.5 text-[26px] font-bold tracking-tight text-text">
-          Welcome back{firstName ? `, ${firstName}` : ''}
+          {content.welcomeTitle}{firstName ? `, ${firstName}` : ''}
         </h1>
       </div>
 
-      <LoanHero data={heroData} firstName={firstName} />
+      <LoanHero data={heroData} firstName={firstName} content={statusContent} />
 
-      {state === 'new' && <LoanCalculatorCard />}
+      {/* The loan calculator only invites a new loan when the borrower has no
+          outstanding loan. While a loan is active it stays hidden so a second
+          loan can't be started until the current one is fully repaid. */}
+      {state === 'new' && <LoanCalculatorCard content={content} />}
 
-      <QuickActions state={state} pendingAppId={recentApp?.id ?? null} />
+      <QuickActions
+        state={state}
+        pendingAppId={recentApp?.id ?? null}
+        content={statusContent}
+        heading={content.quickActionsHeading}
+      />
 
       <p className="pt-2 text-center text-[12.5px] text-muted">
-        Need help? Email{' '}
-        <a href="mailto:support@terepay.co.nz" className="font-semibold text-accent-2 hover:underline">
-          support@terepay.co.nz
+        {content.helpText}{' '}
+        <a href="mailto:support@terepay.com" className="font-semibold text-accent-2 hover:underline">
+          support@terepay.com
         </a>
       </p>
     </div>

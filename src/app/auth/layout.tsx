@@ -1,14 +1,17 @@
-'use client';
+import { recaptchaDisabled } from '@/lib/flags/flags';
+import { getContentSections } from '@/lib/content/site-content';
+import { SiteContentProvider } from '@/lib/content/SiteContentContext';
+import { RecaptchaProvider } from './recaptcha-provider';
 
-import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
+export default async function AuthLayout({ children }: { children: React.ReactNode }) {
+  const [disabled, content] = await Promise.all([
+    recaptchaDisabled(),
+    getContentSections(['auth.shared', 'auth.login', 'auth.signup']),
+  ]);
 
-export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <GoogleReCaptchaProvider
-      reCaptchaKey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY ?? ''}
-      scriptProps={{ async: true, defer: true }}
-    >
-      {children}
-    </GoogleReCaptchaProvider>
+    <SiteContentProvider content={content}>
+      <RecaptchaProvider enabled={!disabled}>{children}</RecaptchaProvider>
+    </SiteContentProvider>
   );
 }

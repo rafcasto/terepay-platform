@@ -3,6 +3,9 @@ import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { getAdminDb, verifySessionOrIdToken } from '@/lib/firebase/admin';
 import type { LoanApplication } from '@/types/application';
+import { LOAN_TERM_WEEKS } from '@/lib/loan/status-display';
+import { evaluateEvidenceGate, loadPreviousApplications } from '@/lib/loan/evidence-gate';
+import { fmtDate } from '@/lib/loan/format';
 import AffordabilityForm from './AffordabilityForm';
 
 export const dynamic = 'force-dynamic';
@@ -20,6 +23,39 @@ async function getLenderName(lenderUid: string): Promise<string> {
   if (!snap.exists) return 'Lender';
   const d = snap.data() as { firstName?: string; lastName?: string };
   return `${d.firstName ?? ''} ${d.lastName ?? ''}`.trim() || 'Lender';
+}
+
+function Gate({
+  id,
+  tone,
+  title,
+  children,
+}: {
+  id: string;
+  tone: 'danger' | 'warning';
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[var(--surface-page)] p-8">
+      <div className="max-w-sm text-center">
+        <p
+          className={`font-display text-base font-bold ${
+            tone === 'danger' ? 'text-[var(--danger-700)]' : 'text-[var(--warning-700)]'
+          }`}
+        >
+          {title}
+        </p>
+        <p className="mt-1 text-sm text-[var(--text-muted)]">{children}</p>
+        <Link
+          href={`/lender/applications/${id}`}
+          className="mt-4 inline-block text-sm font-semibold text-[var(--orange-700)] hover:underline"
+        >
+          Back to application
+        </Link>
+      </div>
+    </div>
+  );
 }
 
 export default async function AffordabilityPage(props: {
@@ -50,33 +86,44 @@ export default async function AffordabilityPage(props: {
   // Only the assigned lender can run affordability
   if (application.assignedLenderId !== lenderUid) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-8">
-        <div className="text-center">
-          <p className="font-semibold text-red-700">Access denied.</p>
-          <p className="text-sm text-gray-600 mt-1">Only the assigned lender can complete this affordability assessment.</p>
-          <Link href={`/lender/applications/${id}`} className="text-indigo-600 underline text-sm mt-4 inline-block">
-            Back to application
-          </Link>
-        </div>
-      </div>
+      <Gate id={id} tone="danger" title="Access denied">
+        Only the assigned lender can complete this affordability assessment.
+      </Gate>
     );
   }
 
   const allowedStatuses = ['under_assessment', 'waiting_for_docs', 'credit_check'];
   if (!allowedStatuses.includes(application.status)) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-8">
-        <div className="text-center">
-          <p className="font-semibold text-amber-700">Assessment not available</p>
-          <p className="text-sm text-gray-600 mt-1">
-            Status must be <em>under_assessment</em>, <em>waiting_for_docs</em>, or <em>credit_check</em>.
-            Current: <strong>{application.status}</strong>
-          </p>
-          <Link href={`/lender/applications/${id}`} className="text-indigo-600 underline text-sm mt-4 inline-block">
-            Back to application
-          </Link>
-        </div>
-      </div>
+      <Gate id={id} tone="warning" title="Assessment not available">
+        Status must be <em>under_assessment</em>, <em>waiting_for_docs</em>, or <em>credit_check</em>.
+        Current: <strong>{application.status}</strong>
+      </Gate>
+    );
+  }
+
+  // Evidence gate: no assessment until the documents have been reviewed
+  // (bank statements + payslips accepted here, or reusable from a loan paid
+  // out within the last 6 months).
+  const previousApps = await loadPreviousApplications(getAdminDb(), application).catch(() => []);
+  const gate = evaluateEvidenceGate(application, previousApps);
+  if (!gate.ok) {
+    return (
+      <Gate id={id} tone="warning" title="Review the documents first">
+        The credit assessment cannot start until the applicant&apos;s evidence has been reviewed:
+        <span className="mt-3 block text-left">
+          {gate.reasons.map((r) => (
+            <span key={r} className="mb-1 block rounded-[var(--radius-md)] bg-[var(--warning-50)] px-3 py-2 text-[var(--warning-700)]">
+              {r}
+            </span>
+          ))}
+        </span>
+        {gate.previousLoan && !gate.repeatWithinWindow && (
+          <span className="mt-2 block text-xs">
+            Last paid-out loan {gate.previousLoan.reference} on {fmtDate(gate.previousLoan.date)}.
+          </span>
+        )}
+      </Gate>
     );
   }
 
@@ -84,18 +131,17 @@ export default async function AffordabilityPage(props: {
   const expenses = application.livingExpenses;
   const debts = application.existingDebts;
 
-  // Pre-fill income map (fortnightly — form stores fortnightly figures)
+  // Applicant-declared figures. The application form collects BOTH income and
+  // living expenses per fortnight ("Fortnightly Income (NZD)" / "Enter your
+  // regular fortnightly costs"), so they map 1:1 onto the wizard's fortnightly
+  // rows — no frequency conversion.
   const preFillIncome: Record<string, number> = {};
   if (emp?.income) {
-    // Salary/Wages: convert monthly after-tax to fortnightly
-    preFillIncome['Salary/Wages'] = emp.income.salaryAfterTax
-      ? Math.round((emp.income.salaryAfterTax / 12) * 26) / 26 * 2
-      : 0;
+    preFillIncome['Salary/Wages'] = emp.income.salaryAfterTax ?? 0;
     preFillIncome['Government Benefits'] = emp.income.winz ?? 0;
     preFillIncome['Other Income'] = emp.income.otherIncome ?? 0;
   }
 
-  // Pre-fill expense map
   const preFillExpenses: Record<string, number> = {};
   if (expenses?.nonDiscretionary) {
     const nd = expenses.nonDiscretionary;
@@ -121,14 +167,15 @@ export default async function AffordabilityPage(props: {
     preFillExpenses['Home Improvement'] = d.homeImprovement ?? 0;
     preFillExpenses['Cash Withdrawals'] = d.cashWithdrawals ?? 0;
     preFillExpenses['Other'] = d.other ?? 0;
-    // Subscriptions: sum up known subscriptions
-    if (expenses.subscriptionDetails) {
-      const subs = expenses.subscriptionDetails;
-      preFillExpenses['Subscriptions'] =
-        (subs.gym?.amount ?? 0) + (subs.netflix?.amount ?? 0) +
+    // Subscriptions: use the declared fortnightly total; if it wasn't entered,
+    // fall back to summing the itemised subscriptions.
+    const subs = expenses.subscriptionDetails;
+    const itemised = subs
+      ? (subs.gym?.amount ?? 0) + (subs.netflix?.amount ?? 0) +
         (subs.spotify?.amount ?? 0) + (subs.sports?.amount ?? 0) +
-        (subs.others?.amount ?? 0);
-    }
+        (subs.others?.amount ?? 0)
+      : 0;
+    preFillExpenses['Subscriptions'] = (d.subscriptions ?? 0) > 0 ? d.subscriptions : itemised;
   }
   if (expenses?.bnpl) {
     preFillExpenses['Buy Now Pay Later'] =
@@ -146,9 +193,10 @@ export default async function AffordabilityPage(props: {
   }
 
   const loanAmount = application.loanDetails?.requestedAmount ?? 0;
-  const loanTerm = 8; // Fixed 8-week product
+  const loanTerm = LOAN_TERM_WEEKS;
   const householdType = application.personalInfo?.householdType ?? 'single';
-  const visaExpiryDate = application.personalInfo?.visaExpiryDate;
+  const isCitizen = application.personalInfo?.visaStatus === 'citizen';
+  const visaExpiryDate = isCitizen ? undefined : application.personalInfo?.visaExpiryDate;
   const customerName =
     `${application.personalInfo?.firstName ?? ''} ${application.personalInfo?.lastName ?? ''}`.trim();
   const referenceNumber = application.referenceNumber ?? id;
@@ -180,6 +228,7 @@ export default async function AffordabilityPage(props: {
       preFillIncome={preFillIncome}
       preFillExpenses={preFillExpenses}
       visaExpiryDate={visaExpiryDate}
+      isCitizen={isCitizen}
       catalogVersionId={catalogVersionId}
       isReassessment={isReassessment}
       initialDraft={initialDraft}

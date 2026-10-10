@@ -38,18 +38,18 @@ export default function ExistingCustomerToggle({ applicationId, initialValue }: 
 
   return (
     <div className="col-span-2 sm:col-span-3">
-      <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
+      <dt className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">
         Existing Customer
       </dt>
-      <dd className="flex items-center gap-3 flex-wrap">
+      <dd className="flex flex-wrap items-center gap-3">
         <button
           type="button"
           onClick={toggle}
           disabled={loading}
           aria-pressed={isExisting}
           className={[
-            'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#F5A523] focus:ring-offset-2 disabled:opacity-50',
-            isExisting ? 'bg-[#F5A523]' : 'bg-gray-200',
+            'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--orange-400)] focus:ring-offset-2 disabled:opacity-50',
+            isExisting ? 'bg-[var(--orange-500)]' : 'bg-[var(--slate-200)]',
           ].join(' ')}
         >
           <span
@@ -61,17 +61,17 @@ export default function ExistingCustomerToggle({ applicationId, initialValue }: 
         </button>
         <span
           className={[
-            'text-sm font-medium',
-            isExisting ? 'text-[#E08B00]' : 'text-gray-500',
+            'text-sm font-semibold',
+            isExisting ? 'text-[var(--orange-700)]' : 'text-[var(--text-muted)]',
           ].join(' ')}
         >
           {isExisting
             ? 'Yes — Application fee: $20'
             : 'No — Application fee: $50'}
         </span>
-        {loading && <span className="text-xs text-gray-400">Saving…</span>}
+        {loading && <span className="text-xs text-[var(--text-muted)]">Saving…</span>}
       </dd>
-      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+      {error && <p className="mt-1 text-xs text-[var(--danger-700)]">{error}</p>}
     </div>
   );
 }

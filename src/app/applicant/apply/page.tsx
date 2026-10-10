@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useForm, FormProvider } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { terepayApplicationSchema, type TerepayApplicationInput } from '@/lib/validation/schemas';
+import { referenceGap, terepayApplicationSchema, type TerepayApplicationInput } from '@/lib/validation/schemas';
 import { useAuth } from '@/hooks/useAuth';
 import { normalizeLoanPurpose } from '@/lib/constants/loan-purposes';
 import { Button, ButtonLink, Card, Icons } from '@/components/ui';
@@ -16,6 +16,8 @@ import Step5LoanRequest from './_components/Step5LoanRequest';
 import Step6BankDetails from './_components/Step6BankDetails';
 import Step7References from './_components/Step7References';
 import Step8Declarations from './_components/Step8Declarations';
+import { useSiteContent } from '@/lib/content/SiteContentContext';
+import { RepeatBorrowerProvider, type RepeatBorrowerState } from './_components/RepeatBorrowerContext';
 
 export default function ApplyPage() {
   return (
@@ -108,13 +110,48 @@ const STEP_COMPONENTS = [
   Step8Declarations,
 ];
 
+const EMPLOYMENT_STEP = 1;
+const BANK_STEP = 5;
+const REFERENCES_STEP = 6;
+
+/**
+ * Employment and bank details from the applicant's most recent submitted
+ * application, for repeat borrowers to carry over. A section is only offered
+ * when it still passes today's validation, so "keep my previous details" can
+ * never leave the applicant stuck on errors in fields they cannot see.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function previousDetails(applications: any[] | undefined): RepeatBorrowerState['previous'] {
+  const previous: RepeatBorrowerState['previous'] = {};
+  for (const a of applications ?? []) {
+    if (a.status === 'draft') continue;
+    if (!previous.employment) {
+      const parsed = terepayApplicationSchema.shape.employment.safeParse(a.employment);
+      if (parsed.success) previous.employment = parsed.data;
+    }
+    if (!previous.bankDetails) {
+      const parsed = terepayApplicationSchema.shape.bankDetails.safeParse(a.bankDetails);
+      if (parsed.success) previous.bankDetails = parsed.data;
+    }
+  }
+  return previous;
+}
+
 function ApplyPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, loading } = useAuth();
-  const [currentStep, setCurrentStep] = useState(
+  const c = useSiteContent('apply.layout');
+  const [requestedStep, setCurrentStep] = useState(
     () => Math.min(Math.max(Number(searchParams.get('step') ?? 0), 0), STEPS.length - 1)
   );
+  const [previous, setPrevious] = useState<RepeatBorrowerState['previous']>({});
+
+  // Repeat customers (the same flag that sets their application fee) are not
+  // asked for references, so that step is skipped in both directions.
+  const isRepeat = user?.isExistingCustomer === true;
+  const currentStep = isRepeat && requestedStep === REFERENCES_STEP ? REFERENCES_STEP + 1 : requestedStep;
+  const repeatBorrower: RepeatBorrowerState = { isRepeat, referenceRequired: !isRepeat, previous };
   const [draftLoading, setDraftLoading] = useState(true);
   const [draftId, setDraftId] = useState<string | null>(null);
 
@@ -123,6 +160,7 @@ function ApplyPageInner() {
     router.replace(`/applicant/apply?step=${currentStep}`, { scroll: false });
   }, [currentStep, router]);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [justSaved, setJustSaved] = useState(false);
 
   const methods = useForm<TerepayApplicationInput>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -141,6 +179,7 @@ function ApplyPageInner() {
         if (!res.ok) return;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data } = await res.json() as { data: any[] };
+        setPrevious(previousDetails(data));
         const draft = data?.find((a) => a.status === 'draft');
         if (!draft) {
           // Create a draft immediately so it appears in Firestore from the first visit
@@ -191,7 +230,6 @@ function ApplyPageInner() {
       }
     }
     loadDraft();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reset]);
 
   const isLastStep = currentStep === STEPS.length - 1;
@@ -208,21 +246,68 @@ function ApplyPageInner() {
       body: JSON.stringify({ [sectionKey]: sectionData, lastCompletedStep: step }),
     });
     if (res.ok) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const json = await res.json() as { data: { id: string } };
       setDraftId((prev) => prev ?? json.data.id);
     }
   };
 
+  const scrollToFirstError = () => {
+    // Bring the first validation error into view (errors render as <p> in the card)
+    requestAnimationFrame(() => {
+      document
+        .querySelector('p.text-danger-text')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  };
+
+  /**
+   * Rules that depend on who is applying, which the shared Zod schema cannot
+   * know: repeat borrowers must answer the "has this changed?" questions, and
+   * new customers must give one complete reference. Returns false (after
+   * flagging the field) when the step cannot be left yet.
+   */
+  const checkStepRules = (step: number): boolean => {
+    const values = methods.getValues();
+    if (step === EMPLOYMENT_STEP && isRepeat && previous.employment
+      && typeof values.employment?.changedSinceLastApplication !== 'boolean') {
+      methods.setError('employment.changedSinceLastApplication', { type: 'required', message: 'Please choose Yes or No' });
+      return false;
+    }
+    if (step === BANK_STEP && isRepeat && previous.bankDetails
+      && typeof values.bankDetails?.changedSinceLastApplication !== 'boolean') {
+      methods.setError('bankDetails.changedSinceLastApplication', { type: 'required', message: 'Please choose Yes or No' });
+      return false;
+    }
+    if (step === REFERENCES_STEP && !isRepeat) {
+      const gap = referenceGap(values.references?.reference1);
+      if (gap) {
+        methods.setError(`references.reference1.${gap.field}`, { type: 'required', message: gap.message });
+        return false;
+      }
+    }
+    return true;
+  };
+
   const handleNext = async () => {
+    if (!checkStepRules(currentStep)) {
+      scrollToFirstError();
+      return;
+    }
     const fields = STEPS[currentStep].fields;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const valid = await trigger(fields as any);
     if (valid) {
       // Best-effort background save — does not block navigation
-      saveDraftStep(currentStep).catch(() => {});
-      setCurrentStep((s) => s + 1);
+      saveDraftStep(currentStep)
+        .then(() => {
+          setJustSaved(true);
+          window.setTimeout(() => setJustSaved(false), 2500);
+        })
+        .catch(() => {});
+      setCurrentStep(currentStep + 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      scrollToFirstError();
     }
   };
 
@@ -231,12 +316,20 @@ function ApplyPageInner() {
       router.push('/applicant/dashboard');
       return;
     }
-    setCurrentStep((s) => s - 1);
+    const back = currentStep - 1;
+    setCurrentStep(isRepeat && back === REFERENCES_STEP ? back - 1 : back);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const onSubmit = async (data: TerepayApplicationInput) => {
     setServerError(null);
+    // Final guard for the applicant-specific rules, in case a step was skipped.
+    const failedStep = [EMPLOYMENT_STEP, BANK_STEP, REFERENCES_STEP].find((step) => !checkStepRules(step));
+    if (failedStep !== undefined) {
+      setCurrentStep(failedStep);
+      scrollToFirstError();
+      return;
+    }
     try {
       const res = await fetch('/api/applications', {
         method: 'POST',
@@ -248,7 +341,7 @@ function ApplyPageInner() {
       if (!res.ok) {
         const code = (body.error?.code ?? '') as string;
         let errorMessage: string;
-        if (code === 'FORBIDDEN') {
+        if (code === 'FORBIDDEN' || code === 'ACTIVE_LOAN_EXISTS') {
           errorMessage = body.error.message;
         } else if (code === 'RATE_LIMITED') {
           errorMessage = 'Too many requests. Please wait a moment and try again.';
@@ -323,12 +416,14 @@ function ApplyPageInner() {
 
   const StepComponent = STEP_COMPONENTS[currentStep];
 
-  if (draftLoading) {
+  // Wait for the profile too: whether this is a repeat customer decides which
+  // steps and questions are shown.
+  if (draftLoading || loading) {
     return (
-      <div className="min-h-screen bg-bg flex items-center justify-center">
+      <div className="min-h-screen bg-[var(--surface-page)] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 rounded-full border-2 border-accent border-t-transparent animate-spin" />
-          <p className="text-sm text-muted">Loading your application...</p>
+          <div className="h-8 w-8 rounded-full border-2 border-[var(--orange-700)] border-t-transparent animate-spin" />
+          <p className="text-sm text-[var(--text-muted)]">{c.loadingText}</p>
         </div>
       </div>
     );
@@ -336,17 +431,15 @@ function ApplyPageInner() {
 
   if (!loading && user && !user.emailVerified) {
     return (
-      <div className="min-h-screen bg-bg flex items-center justify-center px-4">
-        <Card className="max-w-md w-full text-center border-accent/40">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-accent-soft">
-            <Icons.AlertTriangle size={28} className="text-accent-2" />
+      <div className="min-h-screen bg-[var(--surface-page)] flex items-center justify-center px-4">
+        <Card className="max-w-md w-full text-center border-[var(--orange-500)]/40">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-brand-soft">
+            <Icons.AlertTriangle size={28} className="text-brand-text" />
           </div>
-          <h2 className="text-lg font-bold mb-2">Email verification required</h2>
-          <p className="text-sm text-muted mb-6">
-            You must verify your email address before you can submit a loan application.
-          </p>
+          <h2 className="text-lg font-bold mb-2">{c.emailRequiredTitle}</h2>
+          <p className="text-sm text-[var(--text-muted)] mb-6">{c.emailRequiredBody}</p>
           <ButtonLink href="/applicant/verify-email" fullWidth>
-            Verify my email
+            {c.emailRequiredCta}
           </ButtonLink>
         </Card>
       </div>
@@ -354,12 +447,13 @@ function ApplyPageInner() {
   }
 
   return (
-    <div className="min-h-screen bg-bg">
+    <div className="min-h-screen bg-[var(--surface-page)]">
+      <RepeatBorrowerProvider value={repeatBorrower}>
       <FormProvider {...methods}>
-        <div className="max-w-2xl mx-auto px-4 py-8 pb-12 screen-in">
+        <div className="max-w-[880px] mx-auto px-4 py-8 pb-12 screen-in">
           {serverError && (
-            <Card className="mb-6 border-danger/40 bg-danger-soft">
-              <p className="text-sm text-[#991b1b] font-medium">{serverError}</p>
+            <Card className="mb-6 border-[var(--danger-500)]/40 bg-danger-soft-ds">
+              <p className="text-sm text-danger-text font-medium">{serverError}</p>
             </Card>
           )}
 
@@ -367,27 +461,45 @@ function ApplyPageInner() {
             <StepComponent />
           </Card>
 
-          <div className="mt-6 flex flex-col gap-3">
-            {isLastStep ? (
-              <Button type="button" onClick={handleSubmit(onSubmit)} disabled={isSubmitting} size="lg" fullWidth>
-                {isSubmitting ? 'Submitting…' : 'Submit application'}
-              </Button>
-            ) : (
-              <Button type="button" onClick={handleNext} size="lg" fullWidth>
-                Continue
-              </Button>
-            )}
-            <button
-              type="button"
-              onClick={handleBack}
-              className="w-full py-3 text-sm font-semibold text-muted hover:text-text transition-colors flex items-center justify-center gap-1.5"
-            >
-              <Icons.ArrowLeft size={16} />
-              {currentStep === 0 ? 'Back to dashboard' : 'Back'}
-            </button>
+          {/* Action bar — sticks to the bottom of the viewport on mobile so the
+              primary action is always reachable on long steps. */}
+          <div className="mt-6 sticky bottom-0 z-10 -mx-4 px-4 py-3 border-t border-border-default bg-[var(--surface-page)]/95 backdrop-blur sm:static sm:mx-0 sm:px-0 sm:py-0 sm:border-0 sm:bg-transparent sm:backdrop-blur-none">
+            <div className="flex flex-col gap-2">
+              {isLastStep ? (
+                <Button type="button" onClick={handleSubmit(onSubmit)} disabled={isSubmitting} size="lg" fullWidth>
+                  {isSubmitting ? c.submittingCta : c.submitCta}
+                </Button>
+              ) : (
+                <Button type="button" onClick={handleNext} size="lg" fullWidth>
+                  {c.continueCta}
+                </Button>
+              )}
+
+              <div className="flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={handleBack}
+                  className="py-2 text-sm font-semibold text-[var(--text-muted)] hover:text-ink-strong transition-colors flex items-center gap-1.5"
+                >
+                  <Icons.ArrowLeft size={16} />
+                  {currentStep === 0 ? c.backToDashboard : c.backCta}
+                </button>
+
+                <span
+                  aria-live="polite"
+                  className={`flex items-center gap-1.5 text-xs font-medium text-[var(--text-muted)] transition-opacity duration-200 ${justSaved ? 'opacity-100' : 'opacity-0'}`}
+                >
+                  <Icons.Check size={14} className="text-[var(--success-700)]" />
+                  {c.draftSaved}
+                </span>
+              </div>
+
+              <p className="text-center sm:text-left text-[11.5px] text-[var(--text-muted)]">{c.autosaveNote}</p>
+            </div>
           </div>
         </div>
       </FormProvider>
+      </RepeatBorrowerProvider>
     </div>
   );
 }

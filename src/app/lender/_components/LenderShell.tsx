@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
 import MobileBottomNav from '@/components/shared/MobileBottomNav';
 import ConsoleIcon, { type ConsoleIconName } from '@/components/lender/ConsoleIcon';
+import RoleSwitcher from '@/components/shared/RoleSwitcher';
 
 type NavItem = { href: string; label: string; icon: ConsoleIconName };
 
@@ -13,9 +14,11 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/lender/applications', label: 'Applications', icon: 'inbox' },
   { href: '/lender/customers', label: 'Customers', icon: 'users' },
   { href: '/lender/portfolio', label: 'Portfolio', icon: 'wallet' },
-  { href: '/lender/settings', label: 'Settings', icon: 'sliders' },
   { href: '/lender/profile', label: 'Profile', icon: 'user' },
 ];
+
+/** Shown only to lenders an admin has granted model-training access. */
+const TRAINING_ITEM: NavItem = { href: '/lender/training', label: 'Model training', icon: 'cpu' };
 
 // Breadcrumb title + subtitle per route.
 const CRUMBS: { match: (p: string) => boolean; t: string; sub: string }[] = [
@@ -27,15 +30,16 @@ const CRUMBS: { match: (p: string) => boolean; t: string; sub: string }[] = [
   { match: (p) => p.startsWith('/lender/customers'), t: 'Customers', sub: 'Manage customer accounts' },
   { match: (p) => p.startsWith('/lender/portfolio'), t: 'Portfolio', sub: 'Active loans' },
   { match: (p) => p.startsWith('/lender/benchmarks'), t: 'Benchmarks', sub: 'Expense benchmark catalog' },
-  { match: (p) => p.startsWith('/lender/settings'), t: 'Settings', sub: 'Account & integrations' },
   { match: (p) => p.startsWith('/lender/profile'), t: 'Profile', sub: 'Your lender account' },
+  { match: (p) => p.startsWith('/lender/training'), t: 'Model training', sub: 'Cases · backtest · labels · fine-tune' },
 ];
 
 function crumbFor(pathname: string) {
   return CRUMBS.find((c) => c.match(pathname)) ?? { t: 'TerePay', sub: '' };
 }
 
-export default function LenderShell({ children }: { children: ReactNode }) {
+export default function LenderShell({ children, showTraining = false }: { children: ReactNode; showTraining?: boolean }) {
+  const navItems = showTraining ? [...NAV_ITEMS, TRAINING_ITEM] : NAV_ITEMS;
   const pathname = usePathname() ?? '';
   const [collapsed, setCollapsed] = useState(false);
 
@@ -56,11 +60,14 @@ export default function LenderShell({ children }: { children: ReactNode }) {
           </span>
           <span className="text-xs font-medium text-[#7f91a6]">Lender</span>
         </div>
-        <form action="/api/auth/logout" method="POST">
-          <button type="submit" className="text-sm text-[#aab8c8] transition-colors hover:text-white">
-            Sign out
-          </button>
-        </form>
+        <div className="flex items-center gap-2">
+          <RoleSwitcher variant="dark" />
+          <form action="/api/auth/logout" method="POST">
+            <button type="submit" className="text-sm text-[#aab8c8] transition-colors hover:text-white">
+              Sign out
+            </button>
+          </form>
+        </div>
       </header>
 
       <div className="flex flex-1">
@@ -96,7 +103,7 @@ export default function LenderShell({ children }: { children: ReactNode }) {
 
           {/* Nav */}
           <nav className="flex flex-1 flex-col gap-[3px] overflow-y-auto px-3 py-1">
-            {NAV_ITEMS.map((item) => {
+            {navItems.map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
               return (
                 <Link
@@ -172,6 +179,8 @@ export default function LenderShell({ children }: { children: ReactNode }) {
 
             <div className="flex-1" />
 
+            <RoleSwitcher />
+
             <button
               type="button"
               aria-label="Notifications"
@@ -186,7 +195,7 @@ export default function LenderShell({ children }: { children: ReactNode }) {
         </div>
       </div>
 
-      <MobileBottomNav items={NAV_ITEMS} />
+      <MobileBottomNav items={navItems} />
     </div>
   );
 }

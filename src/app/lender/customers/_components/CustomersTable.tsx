@@ -6,14 +6,12 @@ import Badge from '@/components/shared/Badge';
 import CustomerStatusToggle from './CustomerStatusToggle';
 import CustomerEditPanel from './CustomerEditPanel';
 import type { MergedCustomer } from '../page';
+import { fmtDate as fmtNzDate } from '@/lib/loan/format';
 
 type SortColumn = 'name' | 'createdAt' | 'customerId';
 type SortDir = 'asc' | 'desc';
 
-const fmtDate = (ts?: string | null) => {
-  if (!ts) return '—';
-  return new Intl.DateTimeFormat('en-NZ', { dateStyle: 'medium' }).format(new Date(ts));
-};
+const fmtDate = (ts?: string | null) => fmtNzDate(ts);
 
 function SortIcon({ column, active, dir }: { column: string; active: boolean; dir: SortDir }) {
   if (!active) {

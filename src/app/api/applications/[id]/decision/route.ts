@@ -8,7 +8,9 @@ import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { auditLog, getClientIp } from '@/lib/utils/audit';
 import { FieldValue } from 'firebase-admin/firestore';
 import { ZodError } from 'zod';
-import { LOAN_INTEREST_RATE, computeApplicationFee } from '@/lib/constants/fees';
+import { computeApplicationFee } from '@/lib/constants/fees';
+import { buildSchedule } from '@/lib/loan/repayment';
+import { logSystemCommunication } from '@/lib/loan/communication-log';
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -115,12 +117,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const applicationFee = computeApplicationFee(isExistingCustomer);
 
-    const fortnightlyPayment = approvedAmount
-      ? Math.round(((approvedAmount * (1 + LOAN_INTEREST_RATE)) / 4) * 100) / 100
+    // Indicative amortisation at approval time. The authoritative schedule is
+    // rebuilt at disbursement, anchored to the date the money actually leaves.
+    const quote = approvedAmount
+      ? buildSchedule({ principal: approvedAmount, startDate: new Date() })
       : undefined;
-    const totalRepayment = approvedAmount
-      ? Math.round((approvedAmount * (1 + LOAN_INTEREST_RATE)) * 100) / 100
-      : undefined;
+    const fortnightlyPayment = quote?.fortnightlyPayment;
+    const totalRepayment = quote?.totalRepayable;
 
     if (parsed.action === 'approve') {
       await appRef.update({
@@ -136,6 +139,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         'loanDetails.applicationFee': applicationFee,
         'loanDetails.fortnightlyPayment': fortnightlyPayment,
         'loanDetails.totalRepayment': totalRepayment,
+        'loanDetails.totalInterest': quote?.totalInterest,
+        'loanDetails.interestRate': quote?.annualRate,
+        // Marks this loan as priced on the reducing-balance annuity. Legacy
+        // loans carry no stamp and keep their stored flat-rate figures.
+        'loanDetails.rateModel': quote?.rateModel,
         'timeline.approvedAt': now,
         'timeline.updatedAt': now,
       });
@@ -172,6 +180,21 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         approvedAmount: parsed.action === 'approve' ? approvedAmount : undefined,
         declineReasons: parsed.declineReasons,
       },
+    });
+
+    // Auto-log the decision as an outbound system notification — the
+    // applicant sees the new status on their tracker immediately.
+    const fmtNzd = (n: number) =>
+      new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(n);
+    await logSystemCommunication({
+      applicationId: id,
+      channel: 'system',
+      event: parsed.action === 'approve' ? 'application_approved' : 'application_declined',
+      summary:
+        parsed.action === 'approve'
+          ? `Application approved${typeof approvedAmount === 'number' ? ` for ${fmtNzd(approvedAmount)}` : ''}. Applicant can now accept the offer on their tracker.`
+          : `Application declined${parsed.declineReasons?.length ? ` — ${parsed.declineReasons.join('; ')}` : ''}.`,
+      outcome: 'Status updated on the applicant\'s tracker.',
     });
 
     return NextResponse.json({ status: parsed.action === 'approve' ? 'approved' : 'declined' });

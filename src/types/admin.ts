@@ -1,4 +1,5 @@
 import type { Timestamp } from 'firebase-admin/firestore';
+import type { UserRole } from '@/types/user';
 
 // ---------------------------------------------------------------------------
 // Site Settings
@@ -74,23 +75,27 @@ export const ADMIN_CONFIG_KEYS: { key: AdminConfigKey; label: string; envVar: st
 // ---------------------------------------------------------------------------
 
 export type EmailTemplateType =
+  | 'email_verification'
   | 'onboarding_followup'
   | 'welcome_sequence'
   | 'loan_submitted'
   | 'loan_under_review'
+  | 'documents_requested'
   | 'loan_approved'
   | 'loan_declined'
   | 'loan_disbursed'
   | 'payment_reminder'
   | 'payment_received';
 
-export type EmailTemplateCategory = 'onboarding' | 'welcome' | 'loan_events' | 'payments';
+export type EmailTemplateCategory = 'account' | 'onboarding' | 'welcome' | 'loan_events' | 'payments';
 
 export const EMAIL_TEMPLATE_TYPE_LABELS: Record<EmailTemplateType, string> = {
+  email_verification: 'Email Verification',
   onboarding_followup: 'Onboarding Follow-up',
   welcome_sequence: 'Welcome Sequence',
   loan_submitted: 'Loan Submitted',
   loan_under_review: 'Loan Under Review',
+  documents_requested: 'Documents Requested',
   loan_approved: 'Loan Approved',
   loan_declined: 'Loan Declined',
   loan_disbursed: 'Loan Disbursed',
@@ -99,6 +104,7 @@ export const EMAIL_TEMPLATE_TYPE_LABELS: Record<EmailTemplateType, string> = {
 };
 
 export const EMAIL_TEMPLATE_CATEGORY_LABELS: Record<EmailTemplateCategory, string> = {
+  account: 'Account & Security',
   onboarding: 'Onboarding Sequence',
   welcome: 'Welcome Sequence',
   loan_events: 'Loan Events',
@@ -106,10 +112,12 @@ export const EMAIL_TEMPLATE_CATEGORY_LABELS: Record<EmailTemplateCategory, strin
 };
 
 export const EMAIL_TEMPLATE_TYPE_CATEGORY: Record<EmailTemplateType, EmailTemplateCategory> = {
+  email_verification: 'account',
   onboarding_followup: 'onboarding',
   welcome_sequence: 'welcome',
   loan_submitted: 'loan_events',
   loan_under_review: 'loan_events',
+  documents_requested: 'loan_events',
   loan_approved: 'loan_events',
   loan_declined: 'loan_events',
   loan_disbursed: 'loan_events',
@@ -146,8 +154,92 @@ export interface AdminLenderView {
   email: string;
   firstName: string;
   lastName: string;
+  /** Primary role. */
+  role: UserRole;
+  /** Full set of roles held (always includes `role`). */
+  roles: UserRole[];
   status: 'active' | 'suspended' | 'inactive';
   profileComplete: boolean;
+  /** Model Training console access (lenders only). */
+  trainingAccess?: boolean;
   createdAt?: Timestamp;
   lastLoginAt?: Timestamp;
+}
+
+// ---------------------------------------------------------------------------
+// Payment Refresh Schedule
+// ---------------------------------------------------------------------------
+
+/**
+ * Controls the daily background sweep that re-checks every active-consent
+ * loan's scheduled payments against Qippay. The Vercel cron fires hourly; the
+ * handler only runs the sweep when the current Pacific/Auckland hour matches
+ * `refreshHourNzt` (and it hasn't already run for that NZT date).
+ */
+export interface PaymentRefreshSettings {
+  /** Master switch for the daily sweep. */
+  enabled: boolean;
+  /** Hour (0-23) in Pacific/Auckland time to run the sweep. 0 = midnight. */
+  refreshHourNzt: number;
+  /** NZT date (YYYY-MM-DD) the sweep last completed - used to dedupe. */
+  lastRunDateNzt?: string;
+  lastRunAt?: Timestamp;
+  /** Number of applications reconciled on the last run. */
+  lastRunCount?: number;
+  updatedAt?: Timestamp;
+  updatedBy?: string;
+}
+
+export const DEFAULT_PAYMENT_REFRESH_SETTINGS: PaymentRefreshSettings = {
+  enabled: true,
+  refreshHourNzt: 0, // midnight NZT
+};
+
+// ---------------------------------------------------------------------------
+// SetPay Test Cadence (non-production only)
+// ---------------------------------------------------------------------------
+
+/**
+ * Compresses the SetPay instalment cadence from fortnightly to a few minutes
+ * apart so a full repayment cycle can be exercised end-to-end in a test
+ * environment. Hard-locked off when NEXT_PUBLIC_ENVIRONMENT=production.
+ *
+ * Applies only to payment consents *created* while enabled; the minute clock
+ * is anchored at disbursement (when instalments are first lodged), not at
+ * consent, so a lender disbursing later doesn't find every window missed.
+ */
+export interface SetPayTestSettings {
+  enabled: boolean;
+  /** Minutes between consecutive instalments (1–1440). */
+  intervalMinutes: number;
+  /** True when the server refuses to honour `enabled` (production build). */
+  lockedInProduction: boolean;
+  lastVerifyAt?: Timestamp;
+  lastVerifyCount?: number;
+  updatedAt?: Timestamp;
+  updatedBy?: string;
+}
+
+export const DEFAULT_SETPAY_TEST_SETTINGS: SetPayTestSettings = {
+  enabled: false,
+  intervalMinutes: 4,
+  lockedInProduction: false,
+};
+
+export const SETPAY_TEST_INTERVAL_MIN = 1;
+export const SETPAY_TEST_INTERVAL_MAX = 1440;
+
+// ---------------------------------------------------------------------------
+// AI credit assessment — model selection
+// ---------------------------------------------------------------------------
+
+/**
+ * Firestore `systemConfig/creditAssessment`. The Ollama model the assessment
+ * worker is asked to use for the analyst note. `null` = no choice made, the
+ * worker uses its own default (`OLLAMA_MODEL`). Admin only.
+ */
+export interface CreditAssessmentModelSettings {
+  model: string | null;
+  updatedAt?: Timestamp;
+  updatedBy?: string;
 }

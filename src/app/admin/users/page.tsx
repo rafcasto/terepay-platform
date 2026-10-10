@@ -2,15 +2,55 @@
 
 import { useState, useEffect } from 'react';
 import type { AdminLenderView } from '@/types/admin';
+import type { UserRole } from '@/types/user';
+import { fmtDate } from '@/lib/loan/format';
 
-type FormState = {
+type StaffRole = 'lender' | 'content_editor';
+
+const ROLE_OPTIONS: { value: StaffRole; label: string; hint: string }[] = [
+  { value: 'lender', label: 'Lender', hint: 'Reviews & funds loan applications' },
+  { value: 'content_editor', label: 'Content Editor', hint: 'Edits public & borrower copy and emails' },
+];
+
+const ROLE_LABELS: Record<UserRole, string> = {
+  applicant: 'Borrower',
+  lender: 'Lender',
+  admin: 'Admin',
+  content_editor: 'Content Editor',
+};
+
+type CreateFormState = {
   email: string;
   password: string;
   firstName: string;
   lastName: string;
+  roles: StaffRole[];
 };
 
-const EMPTY_FORM: FormState = { email: '', password: '', firstName: '', lastName: '' };
+const EMPTY_FORM: CreateFormState = {
+  email: '',
+  password: '',
+  firstName: '',
+  lastName: '',
+  roles: ['lender'],
+};
+
+function RoleBadges({ roles }: { roles: UserRole[] }) {
+  return (
+    <div className="flex flex-wrap gap-1">
+      {roles.map((r) => (
+        <span
+          key={r}
+          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+            r === 'content_editor' ? 'bg-[#F5A523]/15 text-[#B45600]' : 'bg-slate-100 text-slate-600'
+          }`}
+        >
+          {ROLE_LABELS[r]}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<AdminLenderView[]>([]);
@@ -20,13 +60,19 @@ export default function AdminUsersPage() {
 
   // Create modal
   const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [form, setForm] = useState<CreateFormState>(EMPTY_FORM);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
   // Edit modal
   const [editUser, setEditUser] = useState<AdminLenderView | null>(null);
-  const [editForm, setEditForm] = useState({ firstName: '', lastName: '', status: 'active' as AdminLenderView['status'] });
+  const [editForm, setEditForm] = useState<{
+    firstName: string;
+    lastName: string;
+    status: AdminLenderView['status'];
+    roles: StaffRole[];
+    trainingAccess: boolean;
+  }>({ firstName: '', lastName: '', status: 'active', roles: ['lender'], trainingAccess: false });
   const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
@@ -44,10 +90,20 @@ export default function AdminUsersPage() {
       .finally(() => setLoading(false));
   };
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot data fetch on mount
   useEffect(() => { load(); }, []);
+
+  const toggleRole = (
+    roles: StaffRole[],
+    role: StaffRole,
+  ): StaffRole[] => (roles.includes(role) ? roles.filter((r) => r !== role) : [...roles, role]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (form.roles.length === 0) {
+      setCreateError('Select at least one role.');
+      return;
+    }
     setCreating(true);
     setCreateError(null);
     try {
@@ -62,7 +118,7 @@ export default function AdminUsersPage() {
       }
       setShowCreate(false);
       setForm(EMPTY_FORM);
-      setSuccess('Lender account created.');
+      setSuccess('Staff account created.');
       setTimeout(() => setSuccess(null), 4000);
       load();
     } catch (err) {
@@ -74,12 +130,23 @@ export default function AdminUsersPage() {
 
   const openEdit = (user: AdminLenderView) => {
     setEditUser(user);
-    setEditForm({ firstName: user.firstName, lastName: user.lastName, status: user.status });
+    const staffRoles = user.roles.filter((r): r is StaffRole => r === 'lender' || r === 'content_editor');
+    setEditForm({
+      firstName: user.firstName,
+      lastName: user.lastName,
+      status: user.status,
+      roles: staffRoles.length ? staffRoles : ['lender'],
+      trainingAccess: user.trainingAccess === true,
+    });
     setEditError(null);
   };
 
   const handleSaveEdit = async () => {
     if (!editUser) return;
+    if (editForm.roles.length === 0) {
+      setEditError('A staff user must keep at least one role.');
+      return;
+    }
     setSaving(true);
     setEditError(null);
     try {
@@ -93,8 +160,8 @@ export default function AdminUsersPage() {
         throw new Error(data.error?.message ?? 'Failed to update user');
       }
       setEditUser(null);
-      setSuccess('User updated.');
-      setTimeout(() => setSuccess(null), 4000);
+      setSuccess('User updated. Role changes take effect next time they sign in.');
+      setTimeout(() => setSuccess(null), 5000);
       load();
     } catch (err) {
       setEditError(err instanceof Error ? err.message : 'Something went wrong');
@@ -116,12 +183,40 @@ export default function AdminUsersPage() {
     );
   };
 
+  const RoleCheckboxes = ({
+    selected,
+    onToggle,
+  }: {
+    selected: StaffRole[];
+    onToggle: (role: StaffRole) => void;
+  }) => (
+    <div className="space-y-2">
+      {ROLE_OPTIONS.map((opt) => (
+        <label
+          key={opt.value}
+          className="flex items-start gap-3 rounded-lg border border-gray-200 px-3 py-2.5 cursor-pointer hover:border-[#F5A523]"
+        >
+          <input
+            type="checkbox"
+            checked={selected.includes(opt.value)}
+            onChange={() => onToggle(opt.value)}
+            className="mt-0.5 h-4 w-4 accent-[#F5A523]"
+          />
+          <span>
+            <span className="block text-sm font-medium text-[#16263B]">{opt.label}</span>
+            <span className="block text-xs text-slate-500">{opt.hint}</span>
+          </span>
+        </label>
+      ))}
+    </div>
+  );
+
   return (
     <div className="p-6 max-w-5xl mx-auto">
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="font-display text-2xl font-semibold text-[#16263B]">Users</h1>
-          <p className="text-sm text-slate-500 mt-1">Manage lender accounts.</p>
+          <p className="text-sm text-slate-500 mt-1">Manage staff accounts — lenders &amp; content editors.</p>
         </div>
         <button
           type="button"
@@ -131,7 +226,7 @@ export default function AdminUsersPage() {
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
           </svg>
-          New Lender
+          New Staff User
         </button>
       </div>
 
@@ -151,12 +246,12 @@ export default function AdminUsersPage() {
             </svg>
           </div>
         ) : users.length === 0 ? (
-          <div className="py-16 text-center text-sm text-slate-500">No lender accounts yet.</div>
+          <div className="py-16 text-center text-sm text-slate-500">No staff accounts yet.</div>
         ) : (
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-100">
               <tr>
-                {['Name', 'Email', 'Status', 'Profile', 'Created', ''].map((h) => (
+                {['Name', 'Email', 'Roles', 'Status', 'Created', ''].map((h) => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">
                     {h}
                   </th>
@@ -170,15 +265,16 @@ export default function AdminUsersPage() {
                     {u.firstName} {u.lastName}
                   </td>
                   <td className="px-4 py-3 text-slate-500">{u.email}</td>
-                  <td className="px-4 py-3">{statusBadge(u.status)}</td>
                   <td className="px-4 py-3">
-                    <span className={`text-xs ${u.profileComplete ? 'text-green-600' : 'text-slate-400'}`}>
-                      {u.profileComplete ? 'Complete' : 'Incomplete'}
-                    </span>
+                    <RoleBadges roles={u.roles} />
+                    {u.trainingAccess && (
+                      <span className="mt-1 inline-block rounded-full bg-orange-50 px-2 py-0.5 text-[11px] font-medium text-[#B45600] border border-orange-200">Model training</span>
+                    )}
                   </td>
+                  <td className="px-4 py-3">{statusBadge(u.status)}</td>
                   <td className="px-4 py-3 text-slate-400 text-xs font-tabular">
                     {u.createdAt
-                      ? new Date(u.createdAt as unknown as number).toLocaleDateString('en-NZ')
+                      ? fmtDate(new Date(u.createdAt as unknown as number))
                       : '—'}
                   </td>
                   <td className="px-4 py-3 text-right">
@@ -200,8 +296,8 @@ export default function AdminUsersPage() {
       {/* Create Modal */}
       {showCreate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
-            <h2 className="font-display text-lg font-semibold text-[#16263B] mb-5">Create Lender Account</h2>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
+            <h2 className="font-display text-lg font-semibold text-[#16263B] mb-5">Create Staff Account</h2>
             <form onSubmit={handleCreate} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -245,7 +341,15 @@ export default function AdminUsersPage() {
                   onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-[#F5A523] focus:outline-none focus:ring-1 focus:ring-[#F5A523]"
                 />
-                <p className="text-xs text-slate-400 mt-1">Minimum 8 characters. Share with the lender securely.</p>
+                <p className="text-xs text-slate-400 mt-1">Minimum 8 characters. Share securely.</p>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-2">Roles</label>
+                {/* eslint-disable-next-line react-hooks/static-components -- presentational, reads only module constants + props */}
+                <RoleCheckboxes
+                  selected={form.roles}
+                  onToggle={(role) => setForm((p) => ({ ...p, roles: toggleRole(p.roles, role) }))}
+                />
               </div>
               {createError && (
                 <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
@@ -282,8 +386,8 @@ export default function AdminUsersPage() {
       {/* Edit Modal */}
       {editUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
-            <h2 className="font-display text-lg font-semibold text-[#16263B] mb-1">Edit Lender</h2>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
+            <h2 className="font-display text-lg font-semibold text-[#16263B] mb-1">Edit Staff User</h2>
             <p className="text-sm text-slate-500 mb-5">{editUser.email}</p>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
@@ -306,6 +410,33 @@ export default function AdminUsersPage() {
                   />
                 </div>
               </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-2">Roles</label>
+                {/* eslint-disable-next-line react-hooks/static-components -- presentational, reads only module constants + props */}
+                <RoleCheckboxes
+                  selected={editForm.roles}
+                  onToggle={(role) => setEditForm((p) => ({ ...p, roles: toggleRole(p.roles, role) }))}
+                />
+                <p className="text-xs text-slate-400 mt-1">
+                  Role changes sign the user out; new access applies at their next sign-in.
+                </p>
+              </div>
+              {editForm.roles.includes('lender') && (
+                <label className="flex items-start gap-3 rounded-lg border border-gray-200 px-3 py-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editForm.trainingAccess}
+                    onChange={(e) => setEditForm((p) => ({ ...p, trainingAccess: e.target.checked }))}
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300"
+                  />
+                  <span>
+                    <span className="block text-sm font-medium text-slate-800">Model training access</span>
+                    <span className="block text-xs text-slate-500">
+                      Adds the Model Training console to this lender&apos;s portal: upload cases, backtest, label, run exams. Applies immediately.
+                    </span>
+                  </span>
+                </label>
+              )}
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1">Status</label>
                 <select

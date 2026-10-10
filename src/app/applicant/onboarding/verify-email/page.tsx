@@ -2,11 +2,19 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged, sendEmailVerification, type User } from 'firebase/auth';
+import { onAuthStateChanged, type User } from 'firebase/auth';
 import { clientAuth } from '@/lib/firebase/client';
+import { Icons } from '@/components/ui';
+import { Spinner } from '../_components/Spinner';
+import { obField, obPrimaryBtn, obSecondaryBtn, obAlert } from '../_components/onboarding-styles';
+import { useSiteContent } from '@/lib/content/SiteContentContext';
+
+const CHANNEL = 'terepay-email-verify';
+const NEXT_STEP = '/applicant/onboarding/verify-mobile';
 
 export default function VerifyEmailPage() {
   const router = useRouter();
+  const c = useSiteContent('onboarding.verifyEmail');
   const [user, setUser]             = useState<User | null>(null);
   const [sent, setSent]             = useState(false);
   const [error, setError]           = useState('');
@@ -35,33 +43,12 @@ export default function VerifyEmailPage() {
     }, 1000);
   }, []);
 
-  // ── Send verification email ─────────────────────────────────────────────
-  const sendVerification = useCallback(async (currentUser: User) => {
-    try {
-      const continueUrl = typeof window !== 'undefined'
-        ? `${window.location.origin}/applicant/onboarding/verify-email`
-        : '/applicant/onboarding/verify-email';
-      await sendEmailVerification(currentUser, { url: continueUrl, handleCodeInApp: false });
-      setSent(true);
-      startCooldown();
-    } catch (err: unknown) {
-      const code = (err as { code?: string }).code;
-      if (code === 'auth/too-many-requests') {
-        setError('Too many requests. Please wait before requesting another email.');
-        // Still mark as sent so the UI shows the waiting state
-        setSent(true);
-      } else {
-        setError('Failed to send verification email. Please try again.');
-      }
-    }
-  }, [startCooldown]);
-
   // ── Advance after verification ──────────────────────────────────────────
   const handleVerified = useCallback(async (currentUser: User) => {
     setVerified(true);
     if (pollRef.current) clearInterval(pollRef.current);
-    // Refresh session cookie — the /api/auth/session endpoint already sets
-    // emailVerified: true in Firestore when email_verified claim is present.
+    // Refresh session cookie — the /api/auth/session endpoint sets
+    // emailVerified: true in Firestore when the email_verified claim is present.
     try {
       const idToken = await currentUser.getIdToken(true);
       await fetch('/api/auth/session', {
@@ -70,8 +57,39 @@ export default function VerifyEmailPage() {
         body: JSON.stringify({ idToken }),
       });
     } catch { /* non-critical — session refresh failure won't block navigation */ }
-    router.push('/applicant/onboarding/verify-mobile');
+    router.push(NEXT_STEP);
   }, [router]);
+
+  // ── Send verification email (branded, via our API) ──────────────────────
+  const sendVerification = useCallback(async () => {
+    try {
+      const res = await fetch('/api/auth/send-verification-email', { method: 'POST' });
+      if (!res.ok) {
+        if (res.status === 429) {
+          setError('Too many requests. Please wait a little before requesting another email.');
+          setSent(true);
+          return;
+        }
+        setError('Failed to send verification email. Please try again.');
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      if (data?.alreadyVerified) {
+        const current = clientAuth.currentUser;
+        if (current) await handleVerified(current);
+        return;
+      }
+      // Dev convenience: when no email provider is configured the API returns
+      // the link so the flow can be completed against the emulator.
+      if (data?.devVerificationUrl) {
+        console.log('[dev] Open this verification link:', data.devVerificationUrl);
+      }
+      setSent(true);
+      startCooldown();
+    } catch {
+      setError('Failed to send verification email. Please try again.');
+    }
+  }, [startCooldown, handleVerified]);
 
   // ── Initialize: wait for Firebase auth, then send email ─────────────────
   useEffect(() => {
@@ -89,11 +107,37 @@ export default function VerifyEmailPage() {
       }
 
       // Send on first load only
-      await sendVerification(currentUser);
+      await sendVerification();
     });
     return unsubscribe;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ── Listen for the branded action handler verifying in another tab ───────
+  useEffect(() => {
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel(CHANNEL);
+      channel.onmessage = async (e: MessageEvent) => {
+        if (e.data?.type !== 'email-verified') return;
+        // Acknowledge so the other tab knows we'll drive — and can close itself.
+        channel?.postMessage({ type: 'verify-ack' });
+        const current = clientAuth.currentUser;
+        if (current) {
+          try { await current.reload(); } catch { /* ignore */ }
+          const refreshed = clientAuth.currentUser;
+          if (refreshed) {
+            await handleVerified(refreshed);
+            return;
+          }
+        }
+        router.push(NEXT_STEP);
+      };
+    } catch {
+      channel = null;
+    }
+    return () => channel?.close();
+  }, [handleVerified, router]);
 
   // ── Poll for email verification every 3 seconds ─────────────────────────
   useEffect(() => {
@@ -125,7 +169,7 @@ export default function VerifyEmailPage() {
   const handleResend = async () => {
     if (cooldown > 0 || !user) return;
     setError('');
-    await sendVerification(user);
+    await sendVerification();
   };
 
   // ── Update email address ────────────────────────────────────────────────
@@ -155,7 +199,7 @@ export default function VerifyEmailPage() {
       setError('');
       setShowEmailForm(false);
       setNewEmailInput('');
-      await sendVerification(refreshed);
+      await sendVerification();
     } catch {
       setEmailUpdateError('Network error. Please check your connection.');
     } finally {
@@ -165,83 +209,69 @@ export default function VerifyEmailPage() {
 
   return (
     <div className="flex items-center justify-center min-h-full py-10 px-4">
-      <div className="w-full max-w-md text-center">
+      <div className="w-full max-w-md text-center screen-in">
         {verified ? (
           /* ── Verified state ── */
           <div>
-            <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-success" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-              </svg>
+            <div className="w-16 h-16 rounded-full bg-success-soft-ds flex items-center justify-center mx-auto mb-4">
+              <Icons.CheckCircle size={32} className="text-success-text" />
             </div>
-            <h2 className="text-xl font-bold text-text mb-1">Email verified!</h2>
-            <p className="text-sm text-muted">Redirecting you to the next step…</p>
+            <h2 className="font-display text-xl font-bold text-ink-strong mb-1">{c.verifiedTitle}</h2>
+            <p className="text-sm text-[var(--text-muted)]">{c.verifiedBody}</p>
           </div>
         ) : (
           /* ── Waiting state ── */
           <>
             {/* Envelope icon */}
-            <div className="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center mx-auto mb-6">
-              <svg className="w-8 h-8 text-accent-2" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <div className="w-16 h-16 rounded-full bg-brand-soft flex items-center justify-center mx-auto mb-6">
+              <svg className="w-8 h-8 text-brand-text" fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
               </svg>
             </div>
 
-            <h2 className="text-2xl font-bold text-text mb-2">Check your inbox</h2>
-            <p className="text-muted text-sm mb-1">
-              {sent ? 'We sent a verification link to' : 'Sending a verification link to'}
+            <h2 className="font-display text-2xl font-bold text-ink-strong mb-2">{c.title}</h2>
+            <p className="text-[var(--text-muted)] text-sm mb-1">
+              {sent ? c.sentText : c.sendingText}
             </p>
             {user?.email && (
-              <p className="font-semibold text-text text-sm mb-6">{user.email}</p>
+              <p className="font-semibold text-ink-strong text-sm mb-6">{user.email}</p>
             )}
 
-            <p className="text-muted/70 text-xs mb-8 leading-relaxed">
-              Click the link in the email to verify your address.
-              <br />This page will automatically move forward once you do.
+            <p className="text-[var(--text-muted)] text-xs mb-8 leading-relaxed whitespace-pre-line">
+              {c.instructions}
             </p>
 
             {/* Spinner — waiting indicator */}
-            <div className="flex items-center justify-center gap-2 text-xs text-muted/70 mb-8">
-              <svg className="animate-spin h-4 w-4 text-accent-2" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              Waiting for verification…
+            <div className="flex items-center justify-center gap-2 text-xs text-[var(--text-muted)] mb-8">
+              <Spinner size={16} className="text-brand-text" />
+              {c.waitingText}
             </div>
 
-            {error && (
-              <p className="text-xs text-danger bg-danger-soft border border-danger/40 rounded-xl px-4 py-3 mb-4">
-                {error}
-              </p>
-            )}
+            {error && <p className={`${obAlert} mb-4`}>{error}</p>}
 
             <button
               onClick={handleResend}
               disabled={cooldown > 0}
-              className="text-sm text-accent-2 hover:text-accent-2 disabled:text-muted/70 disabled:cursor-not-allowed font-medium transition-colors"
+              className="text-sm font-semibold text-brand-text hover:underline disabled:text-[var(--text-disabled)] disabled:no-underline disabled:cursor-not-allowed transition-colors"
             >
-              {cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend verification email'}
+              {cooldown > 0 ? `Resend in ${cooldown}s` : c.resendCta}
             </button>
 
-            <p className="text-xs text-muted/70 mt-4">
-              Can&apos;t find it? Check your spam or junk folder.
-            </p>
+            <p className="text-xs text-[var(--text-muted)] mt-4">{c.spamHint}</p>
 
             {/* ── Wrong email? update form ─────────────────────────── */}
-            <div className="mt-6 border-t border-border-2 pt-5">
+            <div className="mt-6 border-t border-border-subtle pt-5">
               {!showEmailForm ? (
                 <button
                   onClick={() => { setShowEmailForm(true); setEmailUpdateError(''); }}
-                  className="text-xs text-muted/70 hover:text-muted transition-colors underline underline-offset-2"
+                  className="text-xs text-[var(--text-muted)] hover:text-ink-strong transition-colors underline underline-offset-2"
                 >
-                  Wrong email address?
+                  {c.wrongEmailCta}
                 </button>
               ) : (
                 <form onSubmit={handleEmailUpdate} className="text-left space-y-3">
-                  <p className="text-sm font-medium text-text">Update your email address</p>
-                  <p className="text-xs text-muted">
-                    Enter the correct email address. We&apos;ll send a new verification link there, and it will also become your login email.
-                  </p>
+                  <p className="text-sm font-semibold text-ink-strong">{c.updateTitle}</p>
+                  <p className="text-xs text-[var(--text-muted)]">{c.updateBody}</p>
                   <input
                     type="email"
                     value={newEmailInput}
@@ -249,27 +279,23 @@ export default function VerifyEmailPage() {
                     placeholder="new@example.com"
                     autoComplete="email"
                     required
-                    className="w-full px-3 py-2.5 border border-border rounded-xl text-sm focus:ring-2 focus:ring-accent focus:border-accent focus:outline-none transition-colors bg-white"
+                    className={obField}
                   />
-                  {emailUpdateError && (
-                    <p className="text-xs text-danger bg-danger-soft border border-danger/40 rounded-xl px-3 py-2">
-                      {emailUpdateError}
-                    </p>
-                  )}
-                  <div className="flex gap-2">
+                  {emailUpdateError && <p className={obAlert}>{emailUpdateError}</p>}
+                  <div className="flex gap-2.5">
                     <button
                       type="submit"
                       disabled={emailUpdateLoading || !newEmailInput.trim()}
-                      className="flex-1 bg-accent hover:bg-accent-2 disabled:opacity-60 text-white text-sm font-semibold rounded-full py-2.5 transition-colors"
+                      className={`${obPrimaryBtn} h-11 flex-1`}
                     >
-                      {emailUpdateLoading ? 'Updating…' : 'Update email'}
+                      {emailUpdateLoading ? 'Updating…' : c.updateCta}
                     </button>
                     <button
                       type="button"
                       onClick={() => { setShowEmailForm(false); setNewEmailInput(''); setEmailUpdateError(''); }}
-                      className="flex-1 border border-border text-muted text-sm font-medium rounded-full py-2.5 hover:bg-surface-2 transition-colors"
+                      className={`${obSecondaryBtn} flex-1`}
                     >
-                      Cancel
+                      {c.cancelCta}
                     </button>
                   </div>
                 </form>

@@ -1,7 +1,11 @@
 // ─── Shared types & helpers for the Affordability Assessment wizard ──────────
 
+import { calcIncomeFinal, calcExpenseFinal } from '@/lib/loan/affordability-calc';
+
 export interface IncomeRow {
   category: string;
+  /** Fortnightly figure the applicant declared on their application (read-only reference). */
+  declaredAmount?: number;
   centrixAmount: number;
   verifiedAmount: number;
   adjustment: number;
@@ -11,6 +15,8 @@ export interface IncomeRow {
 
 export interface ExpenseRow {
   category: string;
+  /** Fortnightly figure the applicant declared on their application. */
+  declaredAmount?: number;
   centrixAmount: number;
   benchmarkAmount: number;
   adjustment: number;
@@ -22,14 +28,61 @@ export interface Checklist {
   centrixReportObtained: boolean;
   centrixReportNumber: string;
   firstTransactionVerified: boolean;
+  /** `YYYY-MM-DD` — earliest transaction on the bank statements (drives days-of-data). */
   firstTransactionDate: string;
   payslipsReceived: boolean;
+  /** "Centrix affordability report obtained". */
   creditReportObtained: boolean;
   employmentVerified: boolean;
   employmentVerificationMethod: string;
+  /** Non-citizens: visa sighted + expiry. */
   visaConfirmed: boolean;
   visaExpiryDate: string;
+  /** NZ citizens have no visa — passport sighted + expiry instead. */
+  passportConfirmed: boolean;
+  passportExpiryDate: string;
 }
+
+export const EMPTY_CHECKLIST: Checklist = {
+  centrixReportObtained: false,
+  centrixReportNumber: '',
+  firstTransactionVerified: false,
+  firstTransactionDate: '',
+  payslipsReceived: false,
+  creditReportObtained: false,
+  employmentVerified: false,
+  employmentVerificationMethod: '',
+  visaConfirmed: false,
+  visaExpiryDate: '',
+  passportConfirmed: false,
+  passportExpiryDate: '',
+};
+
+// ─── Wizard layout ───────────────────────────────────────────────────────────
+// The Data Collection Checklist is deliberately the LAST step: it is the
+// lender's sign-off immediately before the assessment is submitted and the
+// loan can be approved.
+
+export const WIZARD_LAYOUT_VERSION = 2;
+
+export const STEP = {
+  customer: 0,
+  income: 1,
+  expense: 2,
+  results: 3,
+  checklist: 4,
+} as const;
+
+export const STEP_LABELS = [
+  'Customer Information',
+  'Income Verification',
+  'Expense Verification',
+  'Results & Decision',
+  'Data Collection Checklist',
+] as const;
+
+/** CCCFA affordability needs at least this much bank-statement history. */
+export const MIN_DAYS_OF_DATA = 90;
 
 // ─── Income categories (Excel order) ────────────────────────────────────────
 
@@ -93,29 +146,18 @@ export const HOUSEHOLD_MULTIPLIERS: Record<string, number> = {
   couple_children: 1.8,
 };
 
-// ─── Calculation helpers (must match Excel logic) ────────────────────────────
+// ─── Calculation helpers ─────────────────────────────────────────────────────
+// The maths lives in src/lib/loan/affordability-calc.ts and is shared with the
+// submit route, so the on-screen surplus and the persisted surplus can't drift.
 
-/**
- * Income final = MIN(centrix, verified) + adjustment
- * If only one source has data, use that source + adjustment.
- */
+/** Income final = MIN(centrix, verified) + adjustment. */
 export function calcIncomeRow(row: IncomeRow): IncomeRow {
-  const c = row.centrixAmount;
-  const v = row.verifiedAmount;
-  let base = 0;
-  if (c > 0 && v > 0) base = Math.min(c, v);
-  else if (c > 0) base = c;
-  else if (v > 0) base = v;
-  return { ...row, finalAmount: Math.max(0, base + row.adjustment) };
+  return { ...row, finalAmount: calcIncomeFinal(row) };
 }
 
-/**
- * Expense final = MAX(centrix, benchmark) + adjustment
- * Excel formula: the adjustment is ADDED on top, not included in the MAX.
- */
+/** Expense final = MAX(centrix || declared, benchmark) + adjustment. */
 export function calcExpenseRow(row: ExpenseRow): ExpenseRow {
-  const base = Math.max(row.centrixAmount, row.benchmarkAmount);
-  return { ...row, finalAmount: Math.max(0, base + row.adjustment) };
+  return { ...row, finalAmount: calcExpenseFinal(row) };
 }
 
 // ─── Formatting ──────────────────────────────────────────────────────────────

@@ -414,6 +414,13 @@ img { max-width: 100%; display: block; }
   border-radius: 0;
 }
 
+/* Native select option lists inherit the control font-size on some platforms.
+   Keep selects at 16px on small screens so option text stays legible and iOS
+   doesn't zoom the page on focus. */
+@media (max-width: 640px) {
+  select { font-size: 16px !important; }
+}
+
 /* ==========================================================================
    Component animations
    ========================================================================== */
@@ -545,6 +552,41 @@ img { max-width: 100%; display: block; }
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 48' preserveAspectRatio='none'%3E%3Cpath d='M0 48 V20 C240 -8 480 -8 720 14 C960 36 1200 36 1440 12 V48 Z'/%3E%3C/svg%3E") no-repeat center / 100% 100%;
           mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 48' preserveAspectRatio='none'%3E%3Cpath d='M0 48 V20 C240 -8 480 -8 720 14 C960 36 1200 36 1440 12 V48 Z'/%3E%3C/svg%3E") no-repeat center / 100% 100%;
 }
+
+/* Button — mirrors the design-system Button component. Default = ink,
+   `--accent` = orange CTA (orange-700 keeps white text AA on all sizes),
+   `--secondary` = white with a hairline border. */
+.tp-btn {
+  --_bg: var(--ink-800); --_bgh: var(--ink-700); --_bga: var(--ink-900);
+  --_fg: #fff; --_bd: transparent;
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
+  font-family: var(--font-poppins), 'Public Sans', system-ui, sans-serif;
+  font-weight: var(--weight-semibold);
+  line-height: 1; white-space: nowrap; text-decoration: none; cursor: pointer;
+  border: var(--border-w-strong) solid var(--_bd); border-radius: var(--radius-md);
+  background: var(--_bg); color: var(--_fg);
+  transition: background var(--dur-fast) var(--ease-standard),
+              transform var(--dur-fast) var(--ease-standard),
+              border-color var(--dur-fast) var(--ease-standard);
+  height: var(--control-h-md); padding: 0 var(--space-5); font-size: var(--text-body-sm);
+}
+.tp-btn:hover { background: var(--_bgh); color: var(--_fg); text-decoration: none; }
+.tp-btn:active { background: var(--_bga); transform: translateY(1px); }
+.tp-btn--sm { height: var(--control-h-sm); padding: 0 var(--space-4); font-size: var(--text-caption); }
+.tp-btn--lg { height: var(--control-h-lg); padding: 0 var(--space-6); font-size: var(--text-body-size, 1rem); }
+.tp-btn--block { width: 100%; }
+.tp-btn--accent { --_bg: var(--orange-700); --_bgh: var(--orange-800); --_bga: var(--orange-900, #6E3400); --_fg: #fff; }
+.tp-btn--secondary { --_bg: #fff; --_bgh: var(--slate-50); --_bga: var(--slate-100); --_fg: var(--text-strong); --_bd: var(--slate-300); }
+.tp-btn[aria-disabled="true"], .tp-btn:disabled {
+  background: var(--slate-200); color: var(--slate-400); border-color: transparent;
+  cursor: not-allowed; transform: none; pointer-events: none;
+}
+
+/* Partner-logo marquee (homepage). Pauses on hover; the global
+   reduced-motion rule below stops it entirely. */
+@keyframes tp-marquee-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.tp-marquee { animation: tp-marquee-scroll 36s linear infinite; }
+.tp-marquee:hover { animation-play-state: paused; }
 
 /* ==========================================================================
    Reduced-motion respect

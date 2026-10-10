@@ -9,7 +9,9 @@ import {
   renderToBuffer,
 } from '@react-pdf/renderer';
 import type { AffordabilityAssessment, LoanApplication } from '@/types/application';
+import type { CreditAssessmentRecord, CreditAssessmentResult } from '@/types/credit-assessment';
 import { loanPurposeLabel } from '@/lib/constants/loan-purposes';
+import { fmtDate, fmtDateTime, fmtYmd } from '@/lib/loan/format';
 
 // ---------------------------------------------------------------------------
 // Styles
@@ -56,6 +58,10 @@ const styles = StyleSheet.create({
   footerText: { fontSize: 7, color: '#9CA3AF' },
   // Sign-off
   signatureBox: { borderWidth: 1, borderColor: '#E5E7EB', height: 40, marginTop: 4, marginBottom: 12 },
+  // AI assessment
+  quoteBox: { borderLeftWidth: 3, borderLeftColor: orange, paddingLeft: 8, paddingVertical: 4, marginBottom: 8, fontSize: 8 },
+  mono: { fontFamily: 'Courier', fontSize: 7, lineHeight: 1.35 },
+  bullet: { fontSize: 8, marginBottom: 2 },
 });
 
 // ---------------------------------------------------------------------------
@@ -66,17 +72,9 @@ function fmt(val: number | undefined | null, decimals = 2): string {
   return `$${val.toFixed(decimals).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
 }
 
-function fmtDate(d?: string | { toDate?: () => Date } | null): string {
-  if (!d) return '-';
-  if (typeof d === 'string') return d;
-  if (d && typeof d === 'object' && 'toDate' in d && typeof d.toDate === 'function') {
-    return d.toDate().toLocaleDateString('en-NZ', { day: '2-digit', month: 'long', year: 'numeric' });
-  }
-  return '-';
-}
-
+/** Assessment / print dates: dd/MM/yyyy (NZ). */
 function todayFmt(): string {
-  return new Date().toLocaleDateString('en-NZ', { day: '2-digit', month: 'long', year: 'numeric' });
+  return fmtDate(new Date());
 }
 
 function refFromAssessment(a: AffordabilityAssessment): string {
@@ -123,10 +121,163 @@ const TableRow = ({ cells, bold, shade }: { cells: string[]; bold?: number; shad
 // ---------------------------------------------------------------------------
 const PageFooter = () => (
   <View style={styles.footer} fixed>
-    <Text style={styles.footerText}>TerePay Neophile Limited | 27 Henry Partington Place, Greenhithe, Auckland | info@terepay.com | www.terepay.co.nz</Text>
+    <Text style={styles.footerText}>TerePay Neophile Limited | 27 Henry Partington Place, Greenhithe, Auckland | info@terepay.com | www.terepay.com</Text>
     <Text style={styles.footerText} render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
   </View>
 );
+
+// ---------------------------------------------------------------------------
+// AI credit assessment (advisory) — printed from the creditAssessments record
+// ---------------------------------------------------------------------------
+const yesNo = (v: boolean) => (v ? 'Yes' : 'No');
+
+const MAX_EVIDENCE_LINES = 40;
+
+const ESCALATION_LABEL: Record<string, string> = {
+  none: 'No escalation required',
+  credit_officer: 'Refer to credit officer',
+  senior_credit_officer: 'Refer to senior credit officer',
+  decline: 'Decline - document reasons per CCCFA s.9CA',
+};
+
+function parserLabel(r: CreditAssessmentResult): string {
+  if (r.parser_mode === 'deterministic') {
+    const tx = r.statement?.transactions ?? 0;
+    const days = r.statement?.period_days;
+    return `Deterministic - ${tx} transactions${days ? ` over ${days} days` : ''}`;
+  }
+  if (r.parser_mode === 'fallback') return 'Fallback - statements could not be parsed; automatic approval blocked';
+  return 'No documents parsed';
+}
+
+const AiAssessmentSection = ({
+  assessment,
+  record,
+}: {
+  assessment: AffordabilityAssessment;
+  record: CreditAssessmentRecord | null;
+}) => {
+  if (!assessment.creditAssessmentId) {
+    return (
+      <Text style={{ fontSize: 8 }}>
+        No AI credit assessment was attached to this version of the affordability assessment.
+      </Text>
+    );
+  }
+  if (!record) {
+    return (
+      <Text style={{ fontSize: 8 }}>
+        {`AI credit assessment ${assessment.creditAssessmentId} was attached but its record could not be loaded.`}
+      </Text>
+    );
+  }
+  const r = record.result;
+  if (record.status !== 'done' || !r) {
+    return (
+      <Text style={{ fontSize: 8 }}>
+        {`AI credit assessment ${record.assessmentId} did not complete (status: ${record.status})${record.error ? ` - ${record.error}` : ''}.`}
+      </Text>
+    );
+  }
+
+  const evidence = r.evidence ?? [];
+  const ruleHits = (['immediate_decline', 'critical', 'high', 'moderate'] as const)
+    .flatMap((sev) => (r.rule_hits?.[sev] ?? []).map((h) => ({ sev, rule: h.rule, value: h.value })));
+
+  return (
+    <View>
+      <Text style={{ fontSize: 8, marginBottom: 6 }}>
+        {`Produced by TerePay's credit-assessment engine (${r.model}, framework v${r.framework_version}) from the accepted bank statements and the verified figures above. Advisory only - the decision and its reasons remain with the approving officer.`}
+      </Text>
+
+      <View style={styles.overviewTable}>
+        <OverviewRow label="Risk Rating" value={r.risk_rating} />
+        <OverviewRow label="Recommendation" value={r.recommendation} />
+        <OverviewRow label="Confidence" value={`${r.confidence_score}%`} />
+        <OverviewRow label="Escalation" value={ESCALATION_LABEL[r.escalation] ?? r.escalation} />
+        <OverviewRow label="Pathway" value={r.pathway || '-'} />
+        <OverviewRow label="Expense Red-Flag Tier" value={r.expense_risk_tier} />
+        <OverviewRow label="Behaviour Score" value={`${r.behaviour_score >= 0 ? '+' : ''}${r.behaviour_score} - ${r.behaviour_tier}`} />
+        <OverviewRow label="Statement Parsing" value={parserLabel(r)} />
+        <OverviewRow
+          label="Observed Net Income (monthly)"
+          value={
+            r.affordability.observed_income !== null
+              ? `${fmt(r.affordability.observed_income)}${r.affordability.income_mismatch_pct !== null ? ` (${r.affordability.income_mismatch_pct}% from declared)` : ''}`
+              : '-'
+          }
+        />
+        <OverviewRow label="Payslip Income" value={r.affordability.payslip_income !== null ? `${fmt(r.affordability.payslip_income)} - ${r.affordability.payslip_status.replace(/_/g, ' ')}` : r.affordability.payslip_status.replace(/_/g, ' ')} />
+        <OverviewRow label="Affordability Hold" value={r.affordability.hold ? 'YES - declared surplus / income did not reconcile with the statements' : 'No'} />
+        <OverviewRow label="Amount Assessed" value={fmt(record.inputs?.application?.loan_amount)} />
+        <OverviewRow label="Requested By" value={`${record.requestedByName || '-'} - ${fmtDateTime(new Date(record.requestedAt))}`} />
+        <OverviewRow label="Completed" value={fmtDateTime(new Date(r.completed_at))} />
+        <OverviewRow label="Assessment ID" value={record.assessmentId} />
+      </View>
+
+      {r.analyst_note ? (
+        <View>
+          <Text style={styles.subHeading}>Analyst Note</Text>
+          <View style={styles.quoteBox}>
+            <Text>{r.analyst_note}</Text>
+          </View>
+        </View>
+      ) : null}
+
+      {r.reasoning ? (
+        <View>
+          <Text style={styles.subHeading}>Reasoning</Text>
+          <Text style={{ fontSize: 8, marginBottom: 6 }}>{r.reasoning}</Text>
+        </View>
+      ) : null}
+
+      <Text style={styles.subHeading}>Findings</Text>
+      <TableHeaderRow cols={['Factor', 'Assessment', 'Impact']} />
+      {(r.factors ?? []).map((f, i) => (
+        <TableRow key={i} shade={i % 2 === 0} cells={[f.name, f.assessment, f.impact]} />
+      ))}
+      {(r.factors ?? []).length === 0 && <TableRow shade cells={['No factors reported', '-', '-']} />}
+
+      <Text style={styles.subHeading}>Rule Hits</Text>
+      <TableHeaderRow cols={['Severity', 'Rule', 'Value']} />
+      {ruleHits.map((h, i) => (
+        <TableRow key={i} shade={i % 2 === 0} cells={[h.sev.replace(/_/g, ' '), h.rule, typeof h.value === 'object' ? JSON.stringify(h.value) : String(h.value ?? '-')]} />
+      ))}
+      {ruleHits.length === 0 && <TableRow shade cells={['None', 'No red-flag rules were triggered', '-']} />}
+
+      {(r.data_gaps ?? []).length > 0 && (
+        <View>
+          <Text style={styles.subHeading}>Data Gaps Noted</Text>
+          {r.data_gaps.map((g, i) => (
+            <Text key={i} style={styles.bullet}>{`- ${g}`}</Text>
+          ))}
+        </View>
+      )}
+
+      <Text style={styles.subHeading}>Documents Assessed</Text>
+      {(r.documents ?? []).length === 0 ? (
+        <Text style={styles.bullet}>None</Text>
+      ) : (
+        r.documents.map((d, i) => (
+          <Text key={i} style={styles.bullet}>{`- ${d.name} (${d.kind}, ${d.transactions} transactions${d.unreadable ? ', unreadable' : ''})`}</Text>
+        ))
+      )}
+
+      {evidence.length > 0 && (
+        <View>
+          <Text style={styles.subHeading}>{`Statement Evidence (${Math.min(evidence.length, MAX_EVIDENCE_LINES)} of ${evidence.length} flagged lines)`}</Text>
+          {evidence.slice(0, MAX_EVIDENCE_LINES).map((line, i) => (
+            <Text key={i} style={styles.mono}>{line}</Text>
+          ))}
+        </View>
+      )}
+
+      <Text style={{ fontSize: 8, fontStyle: 'italic', marginTop: 8 }}>
+        {`Processing time ${Math.round((r.processing_ms ?? 0) / 1000)}s. The AI output is an input to, not a substitute for, the assessor's own affordability and suitability inquiries under CCCFA s.9C.`}
+      </Text>
+    </View>
+  );
+};
 
 // ---------------------------------------------------------------------------
 // Main Document
@@ -134,9 +285,11 @@ const PageFooter = () => (
 interface Props {
   assessment: AffordabilityAssessment;
   application: LoanApplication;
+  /** Full AI credit assessment record linked to this version (advisory), when one was run. */
+  creditAssessment?: CreditAssessmentRecord | null;
 }
 
-const AffordabilityReportDocument = ({ assessment, application }: Props) => {
+const AffordabilityReportDocument = ({ assessment, application, creditAssessment }: Props) => {
   const pi = application.personalInfo;
   const emp = application.employment;
   const expenses = application.livingExpenses;
@@ -144,10 +297,8 @@ const AffordabilityReportDocument = ({ assessment, application }: Props) => {
   const loanReq = application.loanRequest;
   const bank = application.bankDetails;
 
-  const assessedAt = assessment.assessedAt as unknown as { toDate?: () => Date };
-  const assessedAtStr = assessedAt?.toDate?.()
-    ? assessedAt.toDate()!.toLocaleDateString('en-NZ', { day: '2-digit', month: 'long', year: 'numeric' })
-    : '-';
+  const assessedAtStr = fmtDate(assessment.assessedAt as unknown as { toDate?: () => Date });
+  const checklist = assessment.checklist;
 
   // Household description
   const householdMap: Record<string, string> = {
@@ -167,7 +318,15 @@ const AffordabilityReportDocument = ({ assessment, application }: Props) => {
     student_visa: 'Student Visa', other: 'Other',
   };
   const visaStr = pi?.visaStatus ? (visaMap[pi.visaStatus] ?? pi.visaStatus) : '-';
-  const visaFull = pi?.visaExpiryDate ? `${visaStr} - Expires ${pi.visaExpiryDate}` : visaStr;
+  const isCitizen = pi?.visaStatus === 'citizen';
+  // Citizens have no visa: the checklist records the passport sighted instead.
+  const visaFull = isCitizen
+    ? checklist.passportExpiryDate
+      ? `${visaStr} - Passport expires ${fmtYmd(checklist.passportExpiryDate)}`
+      : visaStr
+    : pi?.visaExpiryDate || checklist.visaExpiryDate
+      ? `${visaStr} - Expires ${fmtYmd(checklist.visaExpiryDate || pi?.visaExpiryDate)}`
+      : visaStr;
 
   // Tenancy
   const tenancyMap: Record<string, string> = { rent: 'Renting', own: 'Owning', flatmates: 'Flatmates', other: 'Other' };
@@ -282,8 +441,8 @@ const AffordabilityReportDocument = ({ assessment, application }: Props) => {
         <SectionTitle title="1. CLIENT OVERVIEW" />
         <View style={styles.overviewTable}>
           <OverviewRow label="Full Name" value={pi ? `${pi.firstName} ${pi.lastName}` : '-'} />
-          <OverviewRow label="Date of Birth" value={pi?.dateOfBirth ?? '-'} />
-          <OverviewRow label="Residential Address" value={pi ? `${pi.address}, ${pi.city} ${pi.postCode}` : '-'} />
+          <OverviewRow label="Date of Birth" value={fmtYmd(pi?.dateOfBirth)} />
+          <OverviewRow label="Residential Address" value={pi ? [pi.address, [pi.city, pi.postCode].filter(Boolean).join(' ')].filter(Boolean).join(', ') : '-'} />
           <OverviewRow label="Tenancy Status" value={tenancy} />
           <OverviewRow label="Household Type" value={householdDesc} />
           <OverviewRow label="No. of Dependants" value={pi ? `${pi.numberOfChildren} children, ${pi.numberOfDependents} total dependants` : '-'} />
@@ -444,7 +603,7 @@ const AffordabilityReportDocument = ({ assessment, application }: Props) => {
       </Page>
 
       {/* ------------------------------------------------------------------ */}
-      {/* PAGE 4 – Sections 8-9                                              */}
+      {/* PAGE 4 – Sections 8-9 (checklist sign-off + AI assessment)          */}
       {/* ------------------------------------------------------------------ */}
       <Page size="A4" style={styles.page}>
         <PageFooter />
@@ -458,8 +617,45 @@ const AffordabilityReportDocument = ({ assessment, application }: Props) => {
         <Text style={styles.fspLine}>FSP1007414 | NZBN: 9429052055232</Text>
         <View style={styles.divider} />
 
-        {/* Section 8 – Regulatory Compliance */}
-        <SectionTitle title="8. REGULATORY COMPLIANCE" />
+        {/* Section 8 – Data Collection Checklist (final sign-off before approval) */}
+        <SectionTitle title="8. DATA COLLECTION CHECKLIST" />
+        <Text style={{ fontSize: 8, marginBottom: 6 }}>
+          Completed by the assessor as the final step before the assessment was recorded.
+        </Text>
+        <TableHeaderRow cols={['Item', 'Status', 'Detail']} />
+        <TableRow shade cells={['Centrix Report obtained', yesNo(checklist.centrixReportObtained), checklist.centrixReportNumber || '-']} />
+        <TableRow cells={['First transaction date verified (90+ days)', yesNo(checklist.firstTransactionVerified), `${fmtYmd(checklist.firstTransactionDate)} - ${checklist.daysOfTransactionData ?? '-'} days of data`]} />
+        <TableRow shade cells={['Payslips received (last 2-3)', yesNo(checklist.payslipsReceived), '-']} />
+        <TableRow cells={['Centrix affordability report obtained', yesNo(checklist.creditReportObtained), '-']} />
+        <TableRow shade cells={['Employment verified', yesNo(checklist.employmentVerified), checklist.employmentVerificationMethod || '-']} />
+        {isCitizen ? (
+          <TableRow cells={['Passport sighted (NZ citizen)', yesNo(checklist.passportConfirmed ?? false), checklist.passportExpiryDate ? `Expires ${fmtYmd(checklist.passportExpiryDate)}` : '-']} />
+        ) : (
+          <TableRow cells={['Visa status confirmed', yesNo(checklist.visaConfirmed), checklist.visaExpiryDate ? `Expires ${fmtYmd(checklist.visaExpiryDate)}` : '-']} />
+        )}
+
+        {/* Section 9 – AI Credit Assessment (advisory) */}
+        <SectionTitle title="9. AI CREDIT ASSESSMENT (ADVISORY)" />
+        <AiAssessmentSection assessment={assessment} record={creditAssessment ?? null} />
+      </Page>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* PAGE 5 – Sections 10-11                                            */}
+      {/* ------------------------------------------------------------------ */}
+      <Page size="A4" style={styles.page}>
+        <PageFooter />
+        <View style={styles.headerRow}>
+          <TerePayLogo />
+          <View>
+            <Text style={styles.headerTitle}>AFFORDABILITY ASSESSMENT REPORT</Text>
+            <Text style={styles.headerSub}>Date: {todayFmt()} | Ref: {refFromAssessment(assessment)}</Text>
+          </View>
+        </View>
+        <Text style={styles.fspLine}>FSP1007414 | NZBN: 9429052055232</Text>
+        <View style={styles.divider} />
+
+        {/* Section 10 – Regulatory Compliance */}
+        <SectionTitle title="10. REGULATORY COMPLIANCE" />
         <TableHeaderRow cols={['Requirement', 'Status']} />
         <TableRow shade cells={['Reasonable Inquiries (CCCFA s.9C)', 'Completed']} />
         <TableRow cells={['Identity Verification (AML/CFT)', assessment.checklist.employmentVerificationMethod ? `${assessment.checklist.employmentVerificationMethod} sighted` : 'Completed']} />
@@ -470,8 +666,8 @@ const AffordabilityReportDocument = ({ assessment, application }: Props) => {
         <TableRow shade cells={['Responsible Lending Code (July 2024)', 'Approval supported and documented']} />
         <TableRow cells={['Data Zoo AML/CFT Screening', 'Confirm completed separately']} />
 
-        {/* Section 9 – Assessor Sign-Off */}
-        <SectionTitle title="9. ASSESSOR SIGN-OFF" />
+        {/* Section 11 – Assessor Sign-Off */}
+        <SectionTitle title="11. ASSESSOR SIGN-OFF" />
         <View style={styles.overviewTable}>
           <OverviewRow label="Assessed By" value={`${assessment.lenderName ?? '-'} - TerePay`} />
           <OverviewRow label="Approving Officer Override" value={assessment.redFlagsAcknowledged && Object.keys(assessment.redFlagsAcknowledged).length > 0 ? 'Yes - see red flags section' : 'No'} />
@@ -498,12 +694,22 @@ const AffordabilityReportDocument = ({ assessment, application }: Props) => {
 // ---------------------------------------------------------------------------
 // Export: server-side buffer generation
 // ---------------------------------------------------------------------------
+export interface AffordabilityPdfOptions {
+  /** Full AI credit assessment record to print in the advisory section. */
+  creditAssessment?: CreditAssessmentRecord | null;
+}
+
 export async function generateAffordabilityPdf(
   assessment: AffordabilityAssessment,
   application: LoanApplication,
+  options: AffordabilityPdfOptions = {},
 ): Promise<Buffer> {
   const buffer = await renderToBuffer(
-    <AffordabilityReportDocument assessment={assessment} application={application} />,
+    <AffordabilityReportDocument
+      assessment={assessment}
+      application={application}
+      creditAssessment={options.creditAssessment ?? null}
+    />,
   );
   return Buffer.from(buffer);
 }

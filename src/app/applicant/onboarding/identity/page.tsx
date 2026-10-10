@@ -2,8 +2,16 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { Icons } from '@/components/ui';
+import { Spinner } from '../_components/Spinner';
+import { SegmentedRadio } from '../_components/SegmentedRadio';
+import { obPrimaryBtn, obLabel, obAlert } from '../_components/onboarding-styles';
+import { useSiteContent } from '@/lib/content/SiteContentContext';
+import type { ContentSectionValues } from '@/types/content';
+import { PASSPORT_DOC_TYPES } from '@/lib/validation/schemas';
 
 type ImmigrationStatus = 'student' | 'work_visa' | 'resident' | 'permanent_resident' | 'citizen';
+type PrimaryDocType = 'nz_drivers_licence' | 'nz_passport';
 
 interface UploadedDoc {
   docType: string;
@@ -14,9 +22,7 @@ interface UploadedDoc {
 
 interface FileSlot {
   docType: string;
-  label: string;
   required: boolean;
-  description: string;
   file: File | null;
   uploaded: UploadedDoc | null;
   uploading: boolean;
@@ -24,54 +30,60 @@ interface FileSlot {
   error: string;
 }
 
-const PERMANENT_SLOTS: Omit<FileSlot, 'file' | 'uploaded' | 'uploading' | 'removing' | 'error'>[] = [
-  {
-    docType: 'nz_id_primary',
-    label: "NZ Driver's Licence or Passport",
-    required: true,
-    description: "Upload your NZ Driver's Licence or NZ Passport (front page).",
-  },
-  {
-    docType: 'proof_of_address',
-    label: 'Proof of Address',
-    required: true,
-    description: 'Bank statement or utility bill showing your name and address — dated within the last 3 months.',
-  },
-];
+// Slot structure is fixed (it drives docType + validation); the label and
+// description shown for each slot are editable copy resolved at render time.
+const PERMANENT_SLOT_TYPES = ['nz_id_primary', 'proof_of_address'] as const;
+const NON_PERMANENT_SLOT_TYPES = ['foreign_passport', 'nz_visa', 'proof_of_address'] as const;
 
-const NON_PERMANENT_SLOTS: Omit<FileSlot, 'file' | 'uploaded' | 'uploading' | 'removing' | 'error'>[] = [
-  {
-    docType: 'foreign_passport',
-    label: 'Passport (country of origin)',
+function makeSlots(docTypes: readonly string[]): FileSlot[] {
+  return docTypes.map((docType) => ({
+    docType,
     required: true,
-    description: 'Upload the photo page of your passport.',
-  },
-  {
-    docType: 'nz_visa',
-    label: 'NZ Visa',
-    required: true,
-    description: 'Upload your current NZ visa (e.g. student visa, work visa permit).',
-  },
-  {
-    docType: 'proof_of_address',
-    label: 'Proof of Address',
-    required: true,
-    description: 'Bank statement or utility bill showing your name and address — dated within the last 3 months.',
-  },
-];
+    file: null,
+    uploaded: null,
+    uploading: false,
+    removing: false,
+    error: '',
+  }));
+}
 
-function makeSlots(templates: typeof PERMANENT_SLOTS): FileSlot[] {
-  return templates.map((t) => ({ ...t, file: null, uploaded: null, uploading: false, removing: false, error: '' }));
+function describeSlot(
+  docType: string,
+  primaryDocType: PrimaryDocType,
+  c: ContentSectionValues,
+): { label: string; description: string } {
+  switch (docType) {
+    case 'nz_id_primary':
+      return primaryDocType === 'nz_drivers_licence'
+        ? { label: "NZ Driver's Licence", description: c.nzLicenceDesc }
+        : { label: 'NZ Passport', description: c.nzPassportDesc };
+    case 'foreign_passport':
+      return { label: c.foreignPassportLabel, description: c.foreignPassportDesc };
+    case 'nz_visa':
+      return { label: c.nzVisaLabel, description: c.nzVisaDesc };
+    case 'proof_of_address':
+    default:
+      return { label: c.proofOfAddressLabel, description: c.proofOfAddressDesc };
+  }
 }
 
 export default function KycIdentityPage() {
   const router = useRouter();
+  const c = useSiteContent('onboarding.identity');
   const [checking, setChecking] = useState(true);
   const [immigrationStatus, setImmigrationStatus] = useState<ImmigrationStatus | null>(null);
   const [slots, setSlots] = useState<FileSlot[]>([]);
-  const [primaryDocType, setPrimaryDocType] = useState<'nz_drivers_licence' | 'nz_passport'>('nz_drivers_licence');
+  const [primaryDocType, setPrimaryDocType] = useState<PrimaryDocType>('nz_drivers_licence');
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  // Expiry date of the passport being provided — required with any passport.
+  const [passportExpiry, setPassportExpiry] = useState('');
+  const [passportExpiryError, setPassportExpiryError] = useState('');
+
+  /** The document type a slot was (or will be) uploaded as. */
+  const effectiveType = (slot: FileSlot) =>
+    slot.uploaded?.docType ?? (slot.docType === 'nz_id_primary' ? primaryDocType : slot.docType);
+  const needsPassportExpiry = slots.some((s) => PASSPORT_DOC_TYPES.has(effectiveType(s)));
 
   // Skip this step if already submitted; fetch immigration status and restore any upload draft
   useEffect(() => {
@@ -89,8 +101,7 @@ export default function KycIdentityPage() {
         setImmigrationStatus(status);
 
         const isPermanent = status === 'permanent_resident' || status === 'citizen';
-        const templates = isPermanent ? PERMANENT_SLOTS : NON_PERMANENT_SLOTS;
-        const builtSlots = makeSlots(templates);
+        const builtSlots = makeSlots(isPermanent ? PERMANENT_SLOT_TYPES : NON_PERMANENT_SLOT_TYPES);
 
         const uploads: Record<string, { driveFileId: string; fileName: string; mimeType: string }> =
           draftData?.data ?? {};
@@ -122,28 +133,10 @@ export default function KycIdentityPage() {
       })
       .catch(() => {
         setImmigrationStatus('resident');
-        setSlots(makeSlots(NON_PERMANENT_SLOTS));
+        setSlots(makeSlots(NON_PERMANENT_SLOT_TYPES));
         setChecking(false);
       });
   }, [router]);
-
-  // Update primary doc label when radio changes (permanent residents only)
-  useEffect(() => {
-    setSlots((prev) =>
-      prev.map((s) =>
-        s.docType === 'nz_id_primary'
-          ? {
-              ...s,
-              label: primaryDocType === 'nz_drivers_licence' ? "NZ Driver's Licence" : 'NZ Passport',
-              description:
-                primaryDocType === 'nz_drivers_licence'
-                  ? "Upload the front and back of your NZ Driver's Licence."
-                  : 'Upload the photo page of your NZ Passport.',
-            }
-          : s,
-      ),
-    );
-  }, [primaryDocType]);
 
   const handleFileChange = async (index: number, file: File | null) => {
     if (!file) return;
@@ -225,12 +218,20 @@ export default function KycIdentityPage() {
       setSubmitError('Please upload all required documents before continuing.');
       return;
     }
+    if (needsPassportExpiry && !passportExpiry) {
+      setPassportExpiryError('Enter your passport expiry date.');
+      setSubmitError('Please enter your passport expiry date before continuing.');
+      return;
+    }
 
     setSubmitting(true);
     try {
       const documents = slots
         .filter((s) => s.uploaded !== null)
-        .map((s) => s.uploaded!);
+        .map((s) => ({
+          ...s.uploaded!,
+          ...(PASSPORT_DOC_TYPES.has(s.uploaded!.docType) ? { expiryDate: passportExpiry } : {}),
+        }));
 
       const res = await fetch('/api/kyc/documents', {
         method: 'POST',
@@ -257,60 +258,37 @@ export default function KycIdentityPage() {
     <div className="flex items-start justify-center min-h-full py-8 px-4">
       {checking ? (
         <div className="flex justify-center w-full py-16">
-          <svg className="animate-spin h-6 w-6 text-accent-2" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-          </svg>
+          <Spinner size={24} className="text-brand-text" />
         </div>
       ) : (
-      <div className="w-full max-w-lg">
+      <div className="w-full max-w-lg screen-in">
         <div className="mb-7">
-          <h2 className="text-2xl font-bold text-text">Verify your identity</h2>
-          <p className="text-muted mt-1 text-sm">
-            Upload clear photos or scans of the required documents. Files must be JPEG, PNG, WebP,
-            or PDF — max 10 MB each.
-          </p>
+          <h2 className="font-display text-2xl font-bold text-ink-strong">{c.title}</h2>
+          <p className="text-[var(--text-muted)] mt-1 text-sm">{c.subtitle}</p>
         </div>
 
         {/* Primary doc selector (permanent resident / citizen only) */}
         {isPermanent && (
           <div className="mb-5">
-            <p className="text-sm font-medium text-text mb-2">
-              Primary ID document <span className="text-danger">*</span>
+            <p className={obLabel}>
+              {c.primaryDocLabel} <span className="text-danger-text">*</span>
             </p>
-            <div className="flex gap-3">
-              {(['nz_drivers_licence', 'nz_passport'] as const).map((opt) => (
-                <label
-                  key={opt}
-                  className={[
-                    'flex-1 text-center py-2.5 px-3 rounded-xl border-2 text-sm font-medium cursor-pointer transition-colors',
-                    primaryDocType === opt
-                      ? 'border-accent bg-[#FEF7E9] text-accent-2'
-                      : 'border-border text-muted hover:border-border',
-                  ].join(' ')}
-                >
-                  <input
-                    type="radio"
-                    name="primaryDoc"
-                    value={opt}
-                    checked={primaryDocType === opt}
-                    onChange={() => setPrimaryDocType(opt)}
-                    className="sr-only"
-                  />
-                  {opt === 'nz_drivers_licence' ? "NZ Driver's Licence" : 'NZ Passport'}
-                </label>
-              ))}
-            </div>
+            <SegmentedRadio
+              name="primaryDoc"
+              value={primaryDocType}
+              options={[
+                { value: 'nz_drivers_licence', label: "NZ Driver's Licence" },
+                { value: 'nz_passport', label: 'NZ Passport' },
+              ]}
+              onChange={(v) => setPrimaryDocType(v as PrimaryDocType)}
+            />
           </div>
         )}
 
         {/* Document upload slots */}
         {slots.length === 0 ? (
           <div className="flex items-center justify-center py-10">
-            <svg className="h-6 w-6 animate-spin text-accent-2" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
+            <Spinner size={24} className="text-brand-text" />
           </div>
         ) : (
           <div className="space-y-4 mb-6">
@@ -319,30 +297,34 @@ export default function KycIdentityPage() {
                 key={slot.docType}
                 slot={slot}
                 index={index}
+                {...describeSlot(slot.docType, primaryDocType, c)}
+                uploadCta={c.uploadCta}
                 onFileChange={handleFileChange}
                 onRemove={handleRemove}
+                passportExpiry={
+                  PASSPORT_DOC_TYPES.has(effectiveType(slot))
+                    ? {
+                        value: passportExpiry,
+                        error: passportExpiryError,
+                        onChange: (v) => {
+                          setPassportExpiry(v);
+                          setPassportExpiryError('');
+                        },
+                      }
+                    : undefined
+                }
               />
             ))}
           </div>
         )}
 
-        {submitError && (
-          <div className="mb-4 rounded-xl bg-danger-soft border border-danger/40 px-4 py-3 text-sm text-danger">
-            {submitError}
-          </div>
-        )}
+        {submitError && <div className={`${obAlert} mb-4`}>{submitError}</div>}
 
-        <button
-          onClick={handleSubmit}
-          disabled={submitting || slots.length === 0}
-          className="w-full bg-accent hover:bg-accent-2 disabled:opacity-60 text-white font-semibold rounded-full py-3.5 transition-colors"
-        >
-          {submitting ? 'Submitting…' : 'Submit & continue'}
+        <button onClick={handleSubmit} disabled={submitting || slots.length === 0} className={obPrimaryBtn}>
+          {submitting ? 'Submitting…' : c.submitCta}
         </button>
 
-        <p className="text-xs text-muted/70 mt-3 text-center">
-          Your documents are reviewed by our compliance team. You&apos;ll receive an update within 1–2 business days.
-        </p>
+        <p className="text-xs text-[var(--text-muted)] mt-3 text-center">{c.footnote}</p>
       </div>
       )}
     </div>
@@ -352,11 +334,20 @@ export default function KycIdentityPage() {
 function FileUploadSlot({
   slot,
   index,
+  label,
+  description,
+  uploadCta,
   onFileChange,
   onRemove,
+  passportExpiry,
 }: {
+  /** Set when this slot is a passport: its expiry date must be given too. */
+  passportExpiry?: { value: string; error: string; onChange: (value: string) => void };
   slot: FileSlot;
   index: number;
+  label: string;
+  description: string;
+  uploadCta: string;
   onFileChange: (i: number, f: File | null) => void;
   onRemove: (i: number) => void;
 }) {
@@ -367,61 +358,54 @@ function FileUploadSlot({
     <div
       className={[
         'rounded-xl border-2 p-4 transition-colors',
-        isDone ? 'border-success/40 bg-success-soft' : 'border-border bg-surface-2',
+        isDone ? 'border-[var(--success-500)]/40 bg-success-soft-ds' : 'border-border-default bg-surface-sunken',
       ].join(' ')}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-gray-800">
-            {slot.label}
-            {slot.required && <span className="text-danger ml-0.5">*</span>}
+          <p className="text-sm font-semibold text-ink-strong">
+            {label}
+            {slot.required && <span className="text-danger-text ml-0.5">*</span>}
           </p>
-          <p className="text-xs text-muted mt-0.5 leading-relaxed">{slot.description}</p>
+          <p className="text-xs text-[var(--text-muted)] mt-0.5 leading-relaxed">{description}</p>
         </div>
         {isDone && (
-          <span className="shrink-0 inline-flex items-center justify-center h-6 w-6 rounded-full bg-green-100">
-            <svg className="h-3.5 w-3.5 text-success" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-            </svg>
+          <span className="shrink-0 inline-flex items-center justify-center h-6 w-6 rounded-full bg-success-soft-ds text-success-text">
+            <Icons.Check size={14} strokeWidth={2.5} />
           </span>
         )}
       </div>
 
       <div className="mt-3">
         {isDone ? (
-          <div className="flex items-center justify-between gap-2 rounded-xl bg-white border border-success/40 px-3 py-2">
+          <div className="flex items-center justify-between gap-2 rounded-md bg-surface-card border border-[var(--success-500)]/40 px-3 py-2">
             <div className="flex items-center gap-2 min-w-0">
-              <FileIcon />
-              <span className="text-xs text-text truncate">{slot.uploaded!.fileName}</span>
+              <Icons.File size={16} className="shrink-0 text-[var(--text-muted)]" />
+              <span className="text-xs text-ink-strong truncate">{slot.uploaded!.fileName}</span>
             </div>
             <button
               type="button"
               onClick={() => onRemove(index)}
               disabled={slot.removing}
-              className="shrink-0 text-xs text-danger hover:text-danger font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              className="shrink-0 text-xs text-danger-text hover:underline font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline"
             >
               {slot.removing ? 'Removing…' : 'Remove'}
             </button>
           </div>
         ) : slot.uploading ? (
-          <div className="flex items-center gap-2 rounded-xl bg-white border border-border px-3 py-2.5">
-            <svg className="h-4 w-4 animate-spin text-accent-2" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-            <span className="text-xs text-muted">Uploading {slot.file?.name}…</span>
+          <div className="flex items-center gap-2 rounded-md bg-surface-card border border-border-default px-3 py-2.5">
+            <Spinner size={16} className="text-brand-text" />
+            <span className="text-xs text-[var(--text-muted)]">Uploading {slot.file?.name}…</span>
           </div>
         ) : (
           <>
             <button
               type="button"
               onClick={() => inputRef.current?.click()}
-              className="flex items-center gap-2 w-full rounded-xl border-2 border-dashed border-border hover:border-accent px-4 py-3 text-sm text-muted hover:text-accent-2 transition-colors"
+              className="flex items-center justify-center gap-2 w-full rounded-md border-2 border-dashed border-border-strong hover:border-brand px-4 py-3 text-sm text-[var(--text-muted)] hover:text-brand-text transition-colors"
             >
-              <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
-              </svg>
-              <span>Choose file or tap to browse</span>
+              <Icons.Upload size={16} className="shrink-0" />
+              <span>{uploadCta}</span>
             </button>
             <input
               ref={inputRef}
@@ -432,16 +416,26 @@ function FileUploadSlot({
             />
           </>
         )}
-        {slot.error && <p className="mt-1 text-xs text-danger">{slot.error}</p>}
+        {slot.error && <p className="mt-1 text-xs text-danger-text">{slot.error}</p>}
       </div>
-    </div>
-  );
-}
 
-function FileIcon() {
-  return (
-    <svg className="h-4 w-4 shrink-0 text-muted/70" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
-    </svg>
+      {passportExpiry && (
+        <div className="mt-3">
+          <label htmlFor={`passport-expiry-${index}`} className="block text-sm font-semibold text-ink-strong">
+            Passport expiry date <span className="text-danger-text">*</span>
+          </label>
+          <input
+            id={`passport-expiry-${index}`}
+            type="date"
+            value={passportExpiry.value}
+            onChange={(e) => passportExpiry.onChange(e.target.value)}
+            aria-invalid={Boolean(passportExpiry.error)}
+            className="mt-1.5 h-11 w-full max-w-[220px] rounded-xl border border-border-default bg-surface-card px-3 text-sm text-ink-strong focus:border-brand focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
+          />
+          <p className="mt-1 text-xs text-[var(--text-muted)]">As printed on the photo page of your passport.</p>
+          {passportExpiry.error && <p className="mt-1 text-xs text-danger-text">{passportExpiry.error}</p>}
+        </div>
+      )}
+    </div>
   );
 }

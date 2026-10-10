@@ -2,22 +2,15 @@
 
 import { useState, useTransition } from 'react';
 import type { ScheduledPayment } from '@/types/application';
+import ConsoleIcon from '@/components/lender/ConsoleIcon';
+import ConsolePill, { type PillTone } from '@/components/lender/ConsolePill';
+import { fmtDateTime, fmtYmd } from '@/lib/loan/format';
 
 type Props = {
   applicationId: string;
   scheduledPayments: ScheduledPayment[];
-};
-
-const STATUS_CONFIG: Record<
-  ScheduledPayment['status'],
-  { label: string; bg: string; text: string }
-> = {
-  pending:   { label: 'Pending',   bg: 'bg-gray-100',   text: 'text-gray-600'   },
-  scheduled: { label: 'Scheduled', bg: 'bg-blue-100',   text: 'text-blue-700'   },
-  success:   { label: 'Paid',      bg: 'bg-green-100',  text: 'text-green-700'  },
-  retrying:  { label: 'Retrying',  bg: 'bg-amber-100',  text: 'text-amber-700'  },
-  failed:    { label: 'Failed',    bg: 'bg-red-100',    text: 'text-red-700'    },
-  cancelled: { label: 'Cancelled', bg: 'bg-gray-100',   text: 'text-gray-500'   },
+  /** Instalments cleared by an early payoff — shown as settled, not collected at face value. */
+  settledEarlyInstalments?: number[];
 };
 
 const fmtNzd = (cents: number) =>
@@ -25,18 +18,108 @@ const fmtNzd = (cents: number) =>
     cents / 100,
   );
 
+/** Today's NZ calendar date (YYYY-MM-DD) — matches the server scheduling rule. */
+function nzToday(): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' });
+}
+
+function daysUntil(due: string, today: string): number {
+  const a = new Date(`${due}T00:00:00Z`).getTime();
+  const b = new Date(`${today}T00:00:00Z`).getTime();
+  return Math.round((a - b) / 86_400_000);
+}
+
+type RowView = { label: string; tone: PillTone; note?: string; suffix?: string };
+
+/** Test-cadence instalments carry an exact time — show it in NZ local time. */
+function fmtDueAt(iso: string): string {
+  return fmtDateTime(iso);
+}
+
+/**
+ * Turn the raw instalment state into something an operator can read at a glance.
+ * The key distinction is *why* an instalment has no Qippay ID yet:
+ *   - `Awaiting window`  → its SetPay rolling period isn't open yet (expected).
+ *   - `Needs attention`  → its window is open but Qippay rejected it (real issue).
+ *   - `Missed window`    → its due date passed before it could be lodged.
+ */
+function describe(p: ScheduledPayment, today: string, settledEarly: boolean): RowView {
+  switch (p.status) {
+    case 'success':
+      return settledEarly
+        ? { label: 'Settled early', tone: 'success', note: 'Replaced by the early payoff — not collected at face value' }
+        : { label: 'Paid', tone: 'success' };
+    case 'scheduled':
+      return { label: 'Scheduled', tone: 'info', note: 'Lodged with bank' };
+    case 'retrying':
+      return {
+        label: 'Retrying',
+        tone: 'warning',
+        suffix: p.retryCount > 0 ? `×${p.retryCount}` : undefined,
+        note: p.failureReason,
+      };
+    case 'failed':
+      return { label: 'Failed', tone: 'danger', note: p.failureReason };
+    case 'cancelled':
+      return { label: 'Cancelled', tone: 'neutral' };
+    case 'pending':
+    default: {
+      const missed = p.dueAt ? Date.parse(p.dueAt) < Date.now() : p.dueDate < today;
+      if (missed) {
+        return {
+          label: 'Missed window',
+          tone: 'danger',
+          note: p.failureReason ?? 'Due date passed before it could be scheduled',
+        };
+      }
+      // A test-cadence instalment's window is always open (Daily consent).
+      const soon = p.dueAt ? true : daysUntil(p.dueDate, today) <= 16;
+      if (p.failureReason && soon) {
+        return { label: 'Needs attention', tone: 'danger', note: p.failureReason };
+      }
+      return {
+        label: 'Awaiting window',
+        tone: 'neutral',
+        note: 'Will be lodged automatically closer to the due date',
+      };
+    }
+  }
+}
+
 export default function ScheduledPaymentsPanel({
   applicationId,
   scheduledPayments: initial,
+  settledEarlyInstalments = [],
 }: Props) {
   const [payments, setPayments] = useState<ScheduledPayment[]>(initial);
-  const [isPending, startTransition] = useTransition();
+  const [isChecking, startChecking] = useTransition();
+  const [isScheduling, startScheduling] = useTransition();
   const [lastChecked, setLastChecked] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const today = nzToday();
+  const settledEarly = new Set(settledEarlyInstalments);
+  const rows = payments.map((p) => ({
+    p,
+    view: describe(p, today, settledEarly.has(p.installmentNumber)),
+  }));
+
+  const paidCount = payments.filter((p) => p.status === 'success').length;
+  const lodgedCount = payments.filter(
+    (p) => p.status === 'scheduled' || p.status === 'success' || p.status === 'retrying',
+  ).length;
+  const awaitingCount = rows.filter((r) => r.view.label === 'Awaiting window').length;
+  const attentionCount = rows.filter(
+    (r) => r.view.label === 'Needs attention' || r.view.label === 'Missed window',
+  ).length;
+  const failedCount = payments.filter((p) => p.status === 'failed').length;
+  const pendingCount = payments.filter((p) => p.status === 'pending').length;
 
   const handleCheckStatus = () => {
     setError(null);
-    startTransition(async () => {
+    setNotice(null);
+    startChecking(async () => {
       try {
         const res = await fetch(`/api/applications/${applicationId}/payment-status`);
         const body = await res.json();
@@ -44,9 +127,7 @@ export default function ScheduledPaymentsPanel({
           setError(body.error?.message ?? 'Failed to check payment status');
           return;
         }
-        if (body.data?.scheduledPayments) {
-          setPayments(body.data.scheduledPayments);
-        }
+        if (body.data?.scheduledPayments) setPayments(body.data.scheduledPayments);
         setLastChecked(new Date().toLocaleTimeString('en-NZ'));
       } catch {
         setError('Network error — could not check payment status');
@@ -54,33 +135,83 @@ export default function ScheduledPaymentsPanel({
     });
   };
 
-  const paidCount = payments.filter((p) => p.status === 'success').length;
-  const failedCount = payments.filter((p) => p.status === 'failed').length;
+  const handleSchedulePending = () => {
+    setError(null);
+    setNotice(null);
+    startScheduling(async () => {
+      try {
+        const res = await fetch(`/api/applications/${applicationId}/schedule-payments`, {
+          method: 'POST',
+        });
+        const body = await res.json();
+        if (!res.ok) {
+          setError(body.error?.message ?? 'Failed to schedule payments');
+          return;
+        }
+        if (body.data?.scheduledPayments) setPayments(body.data.scheduledPayments);
+        const lodged = body.data?.scheduledCount ?? 0;
+        const stillPending = body.data?.pendingCount ?? 0;
+        setNotice(
+          `${lodged} lodged with the bank · ${stillPending} still awaiting their window.`,
+        );
+        setLastChecked(new Date().toLocaleTimeString('en-NZ'));
+      } catch {
+        setError('Network error — could not schedule payments');
+      }
+    });
+  };
 
   return (
-    <section className="bg-white rounded-xl border border-gray-200 p-5">
-      <div className="flex items-center justify-between mb-4">
+    <section className="rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-white p-5 shadow-[var(--shadow-xs)]">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="font-semibold text-gray-900">Scheduled Repayments</h2>
-          <p className="text-xs text-gray-400 mt-0.5">
-            {paidCount} of {payments.length} paid
+          <h2 className="flex items-center gap-2 font-display text-[15px] font-bold text-[var(--text-strong)]">
+            <span className="flex h-7 w-7 items-center justify-center rounded-[8px] bg-[var(--orange-50)] text-[var(--orange-700)]">
+              <ConsoleIcon name="wallet" size={16} />
+            </span>
+            Scheduled Repayments
+          </h2>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
+            {paidCount} of {payments.length} paid · {lodgedCount} lodged with bank
+            {awaitingCount > 0 && (
+              <span className="ml-2 text-[var(--text-muted)]">· {awaitingCount} awaiting window</span>
+            )}
+            {attentionCount > 0 && (
+              <span className="ml-2 font-semibold text-[var(--danger-700)]">· {attentionCount} need attention</span>
+            )}
             {failedCount > 0 && (
-              <span className="ml-2 text-red-500 font-medium">· {failedCount} failed</span>
+              <span className="ml-2 font-semibold text-[var(--danger-700)]">· {failedCount} failed</span>
             )}
           </p>
         </div>
         <div className="flex items-center gap-2">
           {lastChecked && (
-            <span className="text-xs text-gray-400">Checked {lastChecked}</span>
+            <span className="text-xs text-[var(--text-muted)]">Checked {lastChecked}</span>
+          )}
+          {pendingCount > 0 && (
+            <button
+              onClick={handleSchedulePending}
+              disabled={isScheduling}
+              className="rounded-[10px] bg-[var(--orange-600)] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[var(--orange-700)] disabled:opacity-50"
+            >
+              {isScheduling ? (
+                <span className="flex items-center gap-1.5">
+                  <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/60 border-t-transparent" />
+                  Scheduling…
+                </span>
+              ) : (
+                'Schedule pending'
+              )}
+            </button>
           )}
           <button
             onClick={handleCheckStatus}
-            disabled={isPending}
-            className="px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+            disabled={isChecking}
+            className="rounded-[10px] border border-[var(--border-default)] bg-white px-3 py-1.5 text-xs font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--surface-sunken)] disabled:opacity-50"
           >
-            {isPending ? (
+            {isChecking ? (
               <span className="flex items-center gap-1.5">
-                <span className="h-3 w-3 rounded-full border-2 border-gray-400 border-t-transparent animate-spin" />
+                <span className="h-3 w-3 animate-spin rounded-full border-2 border-[var(--slate-400)] border-t-transparent" />
                 Checking…
               </span>
             ) : (
@@ -90,58 +221,71 @@ export default function ScheduledPaymentsPanel({
         </div>
       </div>
 
-      {error && (
-        <p className="text-xs text-red-600 mb-3">{error}</p>
-      )}
+      {error && <p className="mb-3 text-xs text-[var(--danger-700)]">{error}</p>}
+      {notice && <p className="mb-3 text-xs text-[var(--text-muted)]">{notice}</p>}
 
       {payments.length === 0 ? (
-        <p className="text-sm text-gray-400">No payments scheduled yet.</p>
+        <p className="text-sm text-[var(--text-muted)]">No payments scheduled yet.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="border-b border-gray-100">
-                <th className="py-2 text-left font-medium text-gray-500">#</th>
-                <th className="py-2 text-left font-medium text-gray-500">Due Date</th>
-                <th className="py-2 text-right font-medium text-gray-500">Amount</th>
-                <th className="py-2 text-center font-medium text-gray-500">Status</th>
-                <th className="py-2 text-right font-medium text-gray-500 hidden sm:table-cell">
+              <tr className="border-b border-[var(--border-subtle)]">
+                <th className="py-2 text-left text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">#</th>
+                <th className="py-2 text-left text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">Due Date</th>
+                <th className="py-2 text-right text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">Amount</th>
+                <th className="py-2 text-left text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">Status</th>
+                <th className="hidden py-2 text-right text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)] sm:table-cell">
                   Qippay ID
                 </th>
               </tr>
             </thead>
             <tbody>
-              {payments.map((p) => {
-                const cfg = STATUS_CONFIG[p.status] ?? STATUS_CONFIG.pending;
-                return (
-                  <tr key={p.installmentNumber} className="border-b border-gray-50">
-                    <td className="py-2 text-gray-500">{p.installmentNumber}</td>
-                    <td className="py-2 text-gray-700">{p.dueDate}</td>
-                    <td className="py-2 text-right font-medium text-gray-900">
-                      {fmtNzd(p.amountCents)}
-                    </td>
-                    <td className="py-2 text-center">
-                      <span
-                        className={`inline-block text-xs px-2 py-0.5 rounded-full font-medium ${cfg.bg} ${cfg.text}`}
+              {rows.map(({ p, view }) => (
+                <tr
+                  key={p.installmentNumber}
+                  className="border-b border-[var(--border-subtle)] align-top last:border-b-0"
+                >
+                  <td className="py-2.5 text-[var(--text-muted)]">{p.installmentNumber}</td>
+                  <td className="py-2.5 text-[var(--text-body)]">
+                    {p.dueAt ? (
+                      <>
+                        {fmtDueAt(p.dueAt)}
+                        <span className="block text-[11px] text-[var(--text-muted)]">Test cadence</span>
+                      </>
+                    ) : (
+                      fmtYmd(p.dueDate)
+                    )}
+                  </td>
+                  <td className="py-2.5 text-right font-mono font-semibold tabular-nums text-[var(--text-strong)]">
+                    {fmtNzd(p.amountCents)}
+                  </td>
+                  <td className="py-2.5">
+                    <ConsolePill tone={view.tone}>
+                      {view.label}
+                      {view.suffix && <span className="ml-1 opacity-70">{view.suffix}</span>}
+                    </ConsolePill>
+                    {view.note && (
+                      <p
+                        className={`mt-1 max-w-[34ch] text-[11px] leading-snug ${
+                          view.tone === 'danger'
+                            ? 'text-[var(--danger-700)]'
+                            : 'text-[var(--text-muted)]'
+                        }`}
                       >
-                        {cfg.label}
-                        {p.status === 'retrying' && p.retryCount > 0 && (
-                          <span className="ml-1 opacity-70">×{p.retryCount}</span>
-                        )}
-                      </span>
-                    </td>
-                    <td className="py-2 text-right text-gray-400 font-mono hidden sm:table-cell">
-                      {p.qippayPaymentId ? (
-                        <span title={p.qippayPaymentId}>
-                          {p.qippayPaymentId.slice(0, 14)}…
-                        </span>
-                      ) : (
-                        <span className="text-gray-300">—</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
+                        {view.note}
+                      </p>
+                    )}
+                  </td>
+                  <td className="hidden py-2.5 text-right font-mono text-[var(--text-muted)] sm:table-cell">
+                    {p.qippayPaymentId ? (
+                      <span title={p.qippayPaymentId}>{p.qippayPaymentId.slice(0, 14)}…</span>
+                    ) : (
+                      <span className="text-[var(--slate-400)]">—</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

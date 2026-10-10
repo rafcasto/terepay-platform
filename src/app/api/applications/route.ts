@@ -3,10 +3,11 @@ import { adminDb, adminAuth } from '@/lib/firebase/admin';
 
 export const dynamic = 'force-dynamic';
 import { withAuth } from '@/lib/auth/middleware';
-import { createApplicationSchema, terepayApplicationSchema, draftApplicationSchema } from '@/lib/validation/schemas';
+import { createApplicationSchema, terepayApplicationSchema, draftApplicationSchema, referenceGap } from '@/lib/validation/schemas';
 import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { auditLog, getClientIp } from '@/lib/utils/audit';
 import { defaultLimiter, checkRateLimit } from '@/lib/rate-limit/limiter';
+import { hasOutstandingLoan } from '@/lib/loan/outstanding-loan';
 import { FieldValue } from 'firebase-admin/firestore';
 import { ZodError, z } from 'zod';
 import { randomUUID } from 'crypto';
@@ -201,6 +202,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Single-active-loan rule: don't let a borrower start a new application while
+    // an existing loan is still outstanding (not fully repaid).
+    if (await hasOutstandingLoan(uid)) {
+      await auditLog({
+        userId: uid,
+        action: 'application_create_blocked_active_loan',
+        targetType: 'application',
+        outcome: 'failure',
+        ipAddress: ip,
+      });
+      return errorResponse(
+        new AppError(
+          'ACTIVE_LOAN_EXISTS',
+          409,
+          'You already have an active loan. Please repay it in full before applying for another.',
+        ),
+      );
+    }
+
     // Fetch Firestore user doc to inherit the isExistingCustomer flag onto the application
     const userDoc = await adminDb.collection('users').doc(uid).get();
     const applicantIsExistingCustomer: boolean = userDoc.data()?.isExistingCustomer === true;
@@ -215,6 +235,19 @@ export async function POST(request: NextRequest) {
 
     if (isTerePayForm) {
       parsed = terepayApplicationSchema.parse(body);
+
+      // References: a new customer must give one complete reference; a repeat
+      // customer is not asked for any, so none are stored for them.
+      if (!applicantIsExistingCustomer) {
+        const gap = referenceGap(parsed.references?.reference1);
+        if (gap) {
+          return errorResponse(
+            new AppError('VALIDATION_ERROR', 422, 'Please review the following sections: References', {
+              [`references.reference1.${gap.field}`]: [gap.message],
+            }),
+          );
+        }
+      }
 
       const fortnightlyIncome =
         parsed.employment.income.salaryAfterTax +
@@ -271,7 +304,7 @@ export async function POST(request: NextRequest) {
         livingExpenses: parsed.livingExpenses,
         existingDebts: parsed.existingDebts,
         bankDetails: parsed.bankDetails,
-        references: parsed.references,
+        ...(!applicantIsExistingCustomer && parsed.references ? { references: parsed.references } : {}),
         declarations: {
           ...parsed.declarations,
           submittedAt: new Date().toISOString(),
@@ -330,7 +363,12 @@ export async function POST(request: NextRequest) {
       await adminDb
         .collection('loanApplications')
         .doc(savedId)
-        .update({ ...updateFields, 'timeline.updatedAt': FieldValue.serverTimestamp() });
+        .update({
+          ...updateFields,
+          // Drop references saved on the draft before the customer became a repeat customer.
+          ...(isTerePayForm && applicantIsExistingCustomer ? { references: FieldValue.delete() } : {}),
+          'timeline.updatedAt': FieldValue.serverTimestamp(),
+        });
     } else {
       await adminDb.collection('loanApplications').doc(applicationId).set(applicationData);
       savedId = applicationId;

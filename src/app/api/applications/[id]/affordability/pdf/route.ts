@@ -3,6 +3,7 @@ import { adminDb } from '@/lib/firebase/admin';
 import { withAuth } from '@/lib/auth/middleware';
 import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { generateAffordabilityPdf } from '@/lib/pdf/affordability-report';
+import { getAssessmentRecord } from '@/lib/assessment/persist';
 import type { AffordabilityAssessment, LoanApplication } from '@/types/application';
 
 export const dynamic = 'force-dynamic';
@@ -43,7 +44,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const assessmentData = completedAssessments[0];
     const appData = { ...appDoc.data(), applicationId: id } as LoanApplication;
 
-    const pdfBuffer = await generateAffordabilityPdf(assessmentData, appData);
+    // The AI credit assessment attached to this version is printed in the report (advisory section).
+    const creditAssessment = assessmentData.creditAssessmentId
+      ? await getAssessmentRecord(assessmentData.creditAssessmentId).catch(() => null)
+      : null;
+
+    const pdfBuffer = await generateAffordabilityPdf(assessmentData, appData, { creditAssessment });
 
     const dateStr = new Date().toISOString().split('T')[0];
     const fileName = `affordability_assessment_v${assessmentData.version}_${dateStr}.pdf`;

@@ -3,7 +3,8 @@ import { adminDb } from '@/lib/firebase/admin';
 import { withAuth } from '@/lib/auth/middleware';
 import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { renderLoanStatement } from '@/lib/pdf/loan-statement';
-import type { Loan } from '@/types/application';
+import { summaryForLoan } from '@/lib/loan/loan-record';
+import type { Loan, LoanApplication } from '@/types/application';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,24 +30,30 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       throw new AppError('NOT_FOUND', 404, 'Loan not found');
     }
 
-    // Get applicant name + reference number from the application doc.
+    // The application document is the source of truth for what was paid and
+    // charged (early settlement, arrears fees, overdue interest) — derive the
+    // figures from it rather than trusting the synced `loans` snapshot.
     let applicantName: string | undefined;
     let referenceNumber: string | undefined;
+    let app: LoanApplication | null = null;
     const appSnap = await adminDb
       .collection('loanApplications')
       .doc(loan.applicationId)
       .get();
     if (appSnap.exists) {
-      const app = appSnap.data()!;
-      referenceNumber = app.referenceNumber as string | undefined;
-      const pi = app.personalInfo as { firstName?: string; lastName?: string } | undefined;
+      app = appSnap.data() as LoanApplication;
+      referenceNumber = app.referenceNumber;
+      const pi = app.personalInfo;
       if (pi?.firstName) {
         applicantName = pi.lastName ? `${pi.firstName} ${pi.lastName}` : pi.firstName;
       }
     }
+    const summary = summaryForLoan(loan, app);
 
     const pdf = await renderLoanStatement({
       loan,
+      summary,
+      applicationFee: app?.loanDetails?.applicationFee,
       applicantName,
       referenceNumber,
       generatedAt: new Date(),

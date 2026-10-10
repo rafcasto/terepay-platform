@@ -2,10 +2,11 @@ import { Hero, HeroBalance, Pill, StatGrid } from '@/components/ui';
 import { fmtNZD } from '@/lib/loan/format';
 import type { LoanApplication, AnyApplicationStatus, PaymentConsent } from '@/types/application';
 import { computeApplicationFee } from '@/lib/constants/fees';
+import { buildSchedule, RATE_MODEL } from '@/lib/loan/repayment';
 import AcceptOfferButton from '@/app/applicant/applications/[id]/_components/AcceptOfferButton';
 import RejectOfferButton from '@/app/applicant/applications/[id]/_components/RejectOfferButton';
 import InitiatePaymentConsentCard from '@/app/applicant/applications/[id]/_components/InitiatePaymentConsentCard';
-import { SectionCard, Field } from './shared';
+import { SectionCard } from './shared';
 
 interface Props {
   app: LoanApplication & Record<string, unknown>;
@@ -30,7 +31,7 @@ export default function ScreenApproved({ app, status, applicationId, isExistingC
   const pc = app.paymentConsent as PaymentConsent | undefined;
   const consentActive = pc?.status === 'active';
 
-  let title = 'Your loan is approved 🎉';
+  let title = 'Your loan is approved';
   let subtitle = 'Review the offer below, then accept to continue.';
   let pill: React.ReactNode = (
     <Pill tone="success" pulse onInk>
@@ -66,7 +67,7 @@ export default function ScreenApproved({ app, status, applicationId, isExistingC
 
   return (
     <div className="space-y-5">
-      <Hero state="approved" eyebrow={`Application ${refNum}`} pill={pill} emoji="✅" title={title} subtitle={subtitle}>
+      <Hero state="approved" eyebrow={`Application ${refNum}`} pill={pill} title={title} subtitle={subtitle}>
         <HeroBalance amount={approvedAmount} />
         <div className="mt-4">
           <StatGrid
@@ -109,18 +110,54 @@ export default function ScreenApproved({ app, status, applicationId, isExistingC
         />
       )}
 
-      <SectionCard eyebrow="Loan details" title="What you're agreeing to">
-        <dl className="grid grid-cols-2 gap-4">
-          <Field label="Requested amount" value={fmtNZD(ld?.requestedAmount)} />
-          <Field label="Approved amount" value={fmtNZD(approvedAmount)} />
-          <Field label="Application fee" value={fmtNZD(fee)} />
-          {ld?.fortnightlyPayment && (
-            <Field label="Fortnightly payment" value={fmtNZD(ld.fortnightlyPayment)} />
-          )}
-          {ld?.totalRepayment && <Field label="Total repayment" value={fmtNZD(ld.totalRepayment)} />}
-          <Field label="Term" value="8 weeks · 4 fortnightly payments" />
-        </dl>
-      </SectionCard>
+      {(() => {
+        const round2 = (n: number) => Math.round(n * 100) / 100;
+        // Total amount to pay = principal + interest (the fee is deducted at
+        // disbursement, not repaid via instalments). Total amount = that + fee.
+        // Figures agreed at approval win. Only fall back to a fresh quote for
+        // applications approved before pricing was persisted.
+        const quote = buildSchedule({ principal: approvedAmount, startDate: new Date() });
+        const totalToPay = ld?.totalRepayment ?? quote.totalRepayable;
+        const interest = round2(totalToPay - approvedAmount);
+        const totalAmount = round2(totalToPay + fee);
+        const fortnightly = ld?.fortnightlyPayment ?? quote.fortnightlyPayment;
+        // Legacy loans were priced on a flat 4.7%; amortised ones quote the
+        // annual rate. Label whichever this loan was actually written on.
+        const rateLabel =
+          ld?.rateModel === RATE_MODEL || ld?.rateModel === undefined
+            ? `${round2((ld?.interestRate ?? quote.annualRate) * 100)}% p.a.`
+            : `${Math.round((interest / approvedAmount) * 1000) / 10}%`;
+
+        const rows: Array<{ label: string; value: string; strong?: boolean }> = [
+          { label: 'Approved loan amount', value: fmtNZD(approvedAmount) },
+          { label: `Total interest charges (${rateLabel})`, value: fmtNZD(interest) },
+          { label: 'Application fee', value: fmtNZD(fee) },
+          { label: 'Total amount', value: fmtNZD(totalAmount), strong: true },
+          { label: 'Loan disbursed', value: fmtNZD(payout) },
+          { label: 'Total amount to pay', value: fmtNZD(totalToPay), strong: true },
+          { label: 'Fortnightly payment', value: fmtNZD(fortnightly) },
+          { label: 'Term', value: '8 weeks · 4 fortnightly payments' },
+        ];
+
+        return (
+          <SectionCard eyebrow="Loan details" title="What you're agreeing to">
+            <dl className="divide-y divide-border-2">
+              {rows.map((r) => (
+                <div key={r.label} className="flex items-baseline justify-between gap-4 py-2.5 first:pt-0 last:pb-0">
+                  <dt className="text-sm text-muted">{r.label}</dt>
+                  <dd className={`text-sm tabular-nums text-text ${r.strong ? 'font-bold' : 'font-semibold'}`}>
+                    {r.value}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+            <p className="mt-4 text-xs text-muted">
+              All loans are charged interest. The application fee is deducted from your loan amount at
+              disbursement, so you receive {fmtNZD(payout)}.
+            </p>
+          </SectionCard>
+        );
+      })()}
     </div>
   );
 }

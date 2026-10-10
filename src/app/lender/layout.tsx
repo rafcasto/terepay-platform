@@ -5,6 +5,8 @@ import { verifySessionOrIdToken } from '@/lib/firebase/admin';
 import { getSiteSettings } from '@/lib/admin/site-settings';
 import MaintenancePage from '@/components/shared/MaintenancePage';
 import LenderShell from './_components/LenderShell';
+import { hasTrainingAccess } from '@/lib/training/access';
+import { rolesFromClaims } from '@/lib/auth/roles';
 
 // Maintenance mode is read from Firestore per request — never statically prerender
 // this segment, or the flag would be frozen at build time. Applies to all /lender/* routes.
@@ -24,5 +26,7 @@ export default async function LenderLayout({ children }: { children: ReactNode }
     return <MaintenancePage message={settings.maintenanceMessage} />;
   }
 
-  return <LenderShell>{children}</LenderShell>;
+  const showTraining = (await hasTrainingAccess(decoded.uid, rolesFromClaims({ role: decoded.role, roles: decoded.roles })).catch(() => null)) !== null;
+
+  return <LenderShell showTraining={showTraining}>{children}</LenderShell>;
 }

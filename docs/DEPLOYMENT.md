@@ -48,6 +48,8 @@ QIPPAY_CLIENT_SECRET=<server-only bearer>
 QIPPAY_BENEFICIARY_ID=<TerePay beneficiary>
 QIPPAY_MODE=stub                              # 'stub' for local dev; 'live' once SetPay docs arrive
 QIPPAY_RETURN_BASE_URL=http://localhost:3000
+QIPPAY_PAYBY_EMBEDDED=true                     # PayBy embedded (in-app bank picker via POST /v1/pay) — the default; set 'false' to use the Hosted redirect flow
+# QIPPAY_PAYBY_APPROVE_PATH=/v1/pay            # override only if Qippay changes the PayBy Embedded 'continue payment' path (default /v1/pay)
 ```
 
 **Production (set in Vercel Dashboard → Environment Variables):**
@@ -89,12 +91,28 @@ QIPPAY_RETURN_BASE_URL=https://terepay.com
 
 **Qippay SetPay notes:**
 - `QIPPAY_MODE=stub` is hard-blocked when `NEXT_PUBLIC_ENVIRONMENT=production`. Setting `stub` in production raises an error at first call from `src/lib/qippay/setpay-client.ts`.
-- The success/failure URLs registered with Qippay must match `${QIPPAY_RETURN_BASE_URL}/applicant/applications/<id>/consent/return`. Vercel preview deploys use ephemeral hostnames — only test against live Qippay UAT from a stable host; preview QA should use `stub`.
+- The success/failure URLs registered with Qippay must match `${QIPPAY_RETURN_BASE_URL}/applicant/applications/<id>/consent/return`. This same URL is also sent as `success_url` on every `POST /v1/setpay` instalment call — Qippay made it mandatory there (undocumented, confirmed by their support) for the Hosted fallback page; without it the call 500s and instalments stay `pending`. Vercel preview deploys use ephemeral hostnames — only test against live Qippay UAT from a stable host; preview QA should use `stub`.
 - `QIPPAY_BENEFICIARY_ID` resolves to TerePay's platform-wide Qippay merchant account (single beneficiary across all lenders).
+- **Early repayment uses Qippay PayBy Embedded** (in-app bank picker + phone, then CIBA push / on-device redirect straight to the bank — no Hosted proxy page), matching the SetPay repayment UX. Flow: `POST /v1/payment_initiation` -> `POST /v1/pay` (with `pmtId`, `provider_id`, `phone`) -> handle `method` (CIBA/handoff -> poll `GET /v1/payment_status/{id}`; redirect -> send to the bank) . Embedded is the default; set `QIPPAY_PAYBY_EMBEDDED=false` to fall back to the Hosted redirect flow. If `/v1/pay` errors, the approve route still falls back to the payment's Hosted page so the borrower is never dead-ended. The PayBy Embedded approve endpoint is not in the PayBy Hosted spec (rev 9); `QIPPAY_PAYBY_APPROVE_PATH` overrides the assumed path `/v1/approve_payment`. **Confirm the real path/shape against the PayBy Embedded spec before `QIPPAY_MODE=live`.** If the embedded approve endpoint is not available on the account (Qippay returns 4xx), the approve route automatically **falls back to the payment's Hosted page** (the `url` from `payment_initiation`) so the borrower can still complete the payment — no error is surfaced. Success/failure URLs for the redirect variant point at `${QIPPAY_RETURN_BASE_URL}/applicant/applications/<id>/early-repayment/return`. When an early payoff succeeds, the loan's SetPay mandate is cancelled via `POST /v1/enduring_initiation/cancel` — which also cancels any instalments already scheduled with Qippay (SetPay spec p.6) — so the recurring direct debit stops and the borrower is not double-charged.
 - `live` mode hits `POST /v1/enduring_initiation` and `GET /v1/enduring_initiation/{epcId}`. Per the SetPay Integrated v1.0 (rev 1) spec, we use the Hosted-style entry point — a single POST returns a `url` for the applicant's redirect, bypassing the explicit bank-selector / `/v1/approve_enduring` flow.
 - UAT test creds for the hosted page: `user01` / `password`. Three fictitious banks (Orange/Purple/Grey) each test a different approval flow.
 
 ---
+
+### 2.3 Model training (admin console)
+
+```bash
+# Upstash Redis — same database the rate limiter uses; the Pi worker needs the same two values
+UPSTASH_REDIS_REST_URL=
+UPSTASH_REDIS_REST_TOKEN=
+# Google Drive folder the admin drops training batches into (shared with the Drive service account)
+GOOGLE_DRIVE_TRAINING_FOLDER_ID=
+```
+See [MODEL_TRAINING.md](MODEL_TRAINING.md).
+
+### 2.4 AI credit assessment (lender affordability wizard)
+
+No new Vercel variables: it reuses the Upstash pair above and `GOOGLE_DRIVE_KYC_FOLDER_ID` (the applications root). On the Pi, set `GOOGLE_DRIVE_KYC_FOLDER_ID` to the same id so the worker refuses documents outside it. See [AI_CREDIT_ASSESSMENT.md](AI_CREDIT_ASSESSMENT.md).
 
 ## 3. Local Development Setup
 

@@ -1,17 +1,44 @@
 import { cookies } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
-import Link from 'next/link';
 import { getAdminDb, verifySessionOrIdToken } from '@/lib/firebase/admin';
-import type { LoanApplication } from '@/types/application';
-import type { ScheduledPayment } from '@/types/application';
-import ApplicationActions from './ApplicationActions';
-import AddNoteForm from './AddNoteForm';
-import DecisionForm from './DecisionForm';
-import ExistingCustomerToggle from './ExistingCustomerToggle';
-import ScheduledPaymentsPanel from './ScheduledPaymentsPanel';
+import type {
+  ApplicationDocument,
+  CommunicationLogEntry,
+  DocumentStatus,
+  DocumentType,
+  LoanApplication,
+  ScheduledPayment,
+} from '@/types/application';
+import type { PillTone } from '@/components/lender/ConsolePill';
 import { loanPurposeLabel } from '@/lib/constants/loan-purposes';
 import { computeApplicationFee } from '@/lib/constants/fees';
 import { reconcileConsent } from '@/lib/qippay/reconcile-consent';
+import { deriveLoanSummary, toPlainScheduledPayments } from '@/lib/loan/active-loan';
+import { summariseArrearsCharges } from '@/lib/loan/arrears-charges';
+import { DOCUMENT_TYPE_LABELS, fulfilRequest, catalogueItem } from '@/lib/loan/document-requests';
+import {
+  BANK_STATEMENT_REUSE_MONTHS,
+  CREDIT_REPORT_REUSE_MONTHS,
+  PAYSLIP_REUSE_MONTHS,
+  evidenceAge,
+  isWithinReuseWindow,
+  reuseExpiry,
+} from '@/lib/loan/evidence-reuse';
+import { evaluateEvidenceGate, loadPreviousApplications } from '@/lib/loan/evidence-gate';
+import { loadCreditSummary } from '@/lib/loan/credit-summary';
+import { fmtDate, fmtDateTime, fmtYmd } from '@/lib/loan/format';
+import LoanReview from './_components/LoanReview';
+import type {
+  ApplicantHistory,
+  CommunicationItem,
+  EvidenceGateView,
+  PreviousApplication,
+  ReferenceContact,
+  ReportItem,
+  ReuseItem,
+  ReviewData,
+  ReviewableDocument,
+} from './_components/review-types';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,48 +60,125 @@ const STATUS_LABELS: Record<string, string> = {
   expired: 'Expired',
 };
 
-const STATUS_COLOR: Record<string, string> = {
-  draft: 'bg-gray-100 text-gray-600',
-  pending_review: 'bg-amber-100 text-amber-800',
-  under_assessment: 'bg-blue-100 text-blue-800',
-  waiting_for_docs: 'bg-orange-100 text-orange-800',
-  credit_check: 'bg-purple-100 text-purple-800',
-  approved: 'bg-green-100 text-green-700',
-  loan_accepted: 'bg-emerald-100 text-emerald-700',
-  awaiting_payment_consent: 'bg-amber-100 text-amber-800',
-  offer_declined: 'bg-amber-100 text-amber-800',
-  disbursed: 'bg-emerald-100 text-emerald-700',
-  active: 'bg-teal-100 text-teal-700',
-  closed_repaid: 'bg-gray-100 text-gray-600',
-  declined: 'bg-red-100 text-red-700',
-  withdrawn: 'bg-gray-100 text-gray-500',
-  expired: 'bg-gray-100 text-gray-500',
+const STATUS_TONE: Record<string, PillTone> = {
+  draft: 'neutral',
+  pending_review: 'info',
+  under_assessment: 'warning',
+  waiting_for_docs: 'warning',
+  credit_check: 'info',
+  approved: 'success',
+  loan_accepted: 'success',
+  awaiting_payment_consent: 'warning',
+  offer_declined: 'neutral',
+  disbursed: 'success',
+  active: 'success',
+  closed_repaid: 'neutral',
+  declined: 'danger',
+  withdrawn: 'neutral',
+  expired: 'neutral',
 };
 
-function Field({ label, value }: { label: string; value?: string | number | null }) {
-  return (
-    <div>
-      <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide">{label}</dt>
-      <dd className="mt-1 text-sm text-gray-900 break-words">{value ?? '—'}</dd>
-    </div>
-  );
-}
+const DOC_LABEL = DOCUMENT_TYPE_LABELS;
 
-const fmt = (n?: number) =>
-  n !== undefined
+const IDENTITY_TYPES = new Set<DocumentType>(['passport', 'drivers_licence', 'visa']);
+const INCOME_TYPES = new Set<DocumentType>(['payslip', 'bank_statement']);
+const docKind = (t: DocumentType): ReviewableDocument['kind'] =>
+  IDENTITY_TYPES.has(t) ? 'identity' : INCOME_TYPES.has(t) ? 'income' : 'other';
+
+const KYC_DOC_LABEL: Record<string, string> = {
+  nz_passport: 'NZ Passport',
+  passport: 'Passport',
+  nz_drivers_licence: 'NZ Driver Licence',
+  drivers_licence: 'NZ Driver Licence',
+  proof_of_address: 'Proof of address',
+  visa: 'Visa document',
+  birth_certificate: 'Birth certificate',
+  selfie: 'Selfie / liveness photo',
+};
+
+const kycDocLabel = (t?: string) =>
+  (t && KYC_DOC_LABEL[t]) ||
+  (t ? t.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : 'Document');
+
+/** Onboarding docs use `pending_review`; normalise onto the application DocumentStatus. */
+const normaliseDocStatus = (s?: string): DocumentStatus =>
+  s === 'accepted' || s === 'approved' || s === 'verified'
+    ? 'accepted'
+    : s === 'rejected'
+      ? 'rejected'
+      : 'pending';
+
+const VISA_LABEL: Record<string, string> = {
+  work_visa: 'Work visa',
+  resident_visa: 'Resident visa',
+  student_visa: 'Student visa',
+  citizen: 'Citizen',
+  other: 'Other',
+};
+
+const ASSESSMENT_STATUSES = ['under_assessment', 'waiting_for_docs', 'credit_check'];
+const REQUEST_DOCS_STATUSES = ['under_assessment', 'waiting_for_docs'];
+const PAYMENT_STATUSES = new Set(['disbursed', 'active', 'closed_repaid']);
+/** Statuses that count as a real previous loan (money went out). */
+const LOAN_STATUSES = new Set(['disbursed', 'active', 'closed_repaid']);
+
+const fmt = (n?: number | null) =>
+  typeof n === 'number'
     ? new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(n)
     : '—';
 
-const fmtTs = (ts?: { _seconds?: number; toDate?: () => Date } | null) => {
-  if (!ts) return '—';
-  let d: Date;
-  if (typeof ts.toDate === 'function') d = ts.toDate();
-  else if (ts._seconds) d = new Date(ts._seconds * 1000);
-  else return '—';
-  return new Intl.DateTimeFormat('en-NZ', { dateStyle: 'medium', timeStyle: 'short' }).format(d);
-};
+type TS = { _seconds?: number; toDate?: () => Date } | string | Date | null | undefined;
 
-const PAYMENT_STATUSES = new Set(['disbursed', 'active', 'closed_repaid']);
+/** Firestore Timestamp / serialised timestamp / ISO string / Date → Date (or null). */
+function toDate(ts: TS): Date | null {
+  if (!ts) return null;
+  if (ts instanceof Date) return Number.isNaN(ts.getTime()) ? null : ts;
+  if (typeof ts === 'string') {
+    const d = new Date(ts);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  if (typeof ts.toDate === 'function') return ts.toDate();
+  if (ts._seconds) return new Date(ts._seconds * 1000);
+  return null;
+}
+
+/** Timestamps shown with time use the shared NZ `dd/MM/yyyy HH:mm` format. */
+const fmtTs = (ts: TS) => fmtDateTime(ts);
+
+function initialsOf(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function buildReuseItem(args: {
+  key: string;
+  label: string;
+  fileName: string;
+  fromLabel: string;
+  date: Date;
+  windowMonths: number | null;
+  viewUrl: string;
+}): ReuseItem {
+  const age = evidenceAge(args.date);
+  const base = {
+    key: args.key,
+    label: args.label,
+    fileName: args.fileName,
+    fromLabel: args.fromLabel,
+    date: fmtDate(args.date),
+    ageLabel: age.label,
+    viewUrl: args.viewUrl,
+  };
+  if (args.windowMonths === null) return { ...base, reusable: null };
+  return {
+    ...base,
+    reusable: isWithinReuseWindow(args.date, args.windowMonths),
+    windowMonths: args.windowMonths,
+    expiresLabel: fmtDate(reuseExpiry(args.date, args.windowMonths)),
+  };
+}
 
 export default async function LenderApplicationDetailPage({
   params,
@@ -95,8 +199,7 @@ export default async function LenderApplicationDetailPage({
 
   let app = { applicationId: snap.id, ...snap.data() } as LoanApplication;
 
-  // If a SetPay mandate is in flight, reconcile against Qippay before
-  // rendering so the lender sees the up-to-date authorisation state.
+  // Reconcile a SetPay mandate that is still in flight before rendering.
   if (app.status === 'awaiting_payment_consent') {
     const pc = app.paymentConsent;
     const nonTerminal =
@@ -119,358 +222,523 @@ export default async function LenderApplicationDetailPage({
   const pi = app.personalInfo;
   const emp = app.employment;
   const ld = app.loanDetails;
+  const fin = app.financialInformation;
   const expenses = app.livingExpenses;
   const debts = app.existingDebts;
-  const notes = app.internalNotes ?? [];
-  const docs = app.documents ?? [];
-  const decision = app.decision;
-  const timeline = app.timeline as Record<string, unknown>;
-  const docRequest = app.documentRequest as { requiredDocuments?: string[]; message?: string; requestedAt?: unknown } | undefined;
-
-  // Scheduled payments for repayment tracking (populated at disbursement)
-  const scheduledPayments = (app.scheduledPayments ?? []) as ScheduledPayment[];
-
   const isAssigned = app.assignedLenderId === decoded.uid;
+  const decided = Boolean(app.decision);
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-5">
+  // ---- Documents uploaded with this application -------------------------
+  const requestItems = app.documentRequest?.items ?? [];
+  const requestLabel = (key?: string) => (key ? requestItems.find((i) => i.key === key)?.label : undefined);
+  const documents: ReviewableDocument[] = (app.documents ?? []).map((d) => ({
+    id: d.documentId,
+    title: DOC_LABEL[d.type] ?? 'Document',
+    subtitle: d.expiryDate ? `${d.fileName} · Passport expires ${fmtYmd(d.expiryDate)}` : d.fileName,
+    uploadedAt: fmtDate(d.uploadedAt as TS),
+    status: d.status,
+    viewUrl: `/api/applications/${id}/documents/${d.documentId}`,
+    reviewUrl: `/api/applications/${id}/documents/${d.documentId}`,
+    rejectionReason: d.rejectionReason || undefined,
+    reviewedAt: d.reviewedAt ? fmtDate(d.reviewedAt as TS) : undefined,
+    kind: docKind(d.type),
+    requestedAs: requestLabel(d.requestKey),
+  }));
+  const docsVerified = documents.filter((d) => d.status === 'accepted').length;
+  const docsPending = documents.filter((d) => d.status === 'pending').length;
 
-        {/* Header */}
-        <div>
-          <Link href="/lender/applications" className="text-sm text-indigo-600 hover:underline">
-            ← Applications Queue
-          </Link>
-          <div className="flex items-start justify-between gap-4 mt-2">
-            <div>
-              <h1 className="text-xl font-bold text-gray-900 font-mono">
-                {app.referenceNumber ?? id}
-              </h1>
-              {pi && (
-                <p className="text-gray-600 text-sm mt-0.5">
-                  {pi.firstName} {pi.lastName} · {pi.email} · {pi.phone}
-                </p>
-              )}
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <span className={`text-xs font-semibold px-3 py-1 rounded-full ${STATUS_COLOR[status] ?? 'bg-gray-100 text-gray-600'}`}>
-                {STATUS_LABELS[status] ?? status}
-              </span>
-              {app.affordabilityStatus === 'complete' && (
-                <span className="text-xs px-2 py-0.5 bg-green-50 text-green-700 rounded-full border border-green-200 font-medium">
-                  Affordability ✓
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
+  // ---- Customer-profile data: lender reports + onboarding KYC docs ------
+  type RawReport = ReportItem & { provider: string; date: Date | null; fromApplicationId?: string };
+  const rawReports: RawReport[] = [];
+  const borrowerKycDocuments: ReviewableDocument[] = [];
 
-        {/* Claim / disburse actions */}
-        <ApplicationActions
-          applicationId={id}
-          status={status}
-          approvedAmount={ld?.approvedAmount}
-          applicationFee={ld?.applicationFee}
-          paymentConsent={
-            app.paymentConsent
-              ? {
-                  status: app.paymentConsent.status,
-                  mandateId: app.paymentConsent.mandateId,
-                  activatedAt: fmtTs(
-                    app.paymentConsent.activatedAt as unknown as {
-                      _seconds?: number;
-                      toDate?: () => Date;
-                    } | null,
-                  ),
-                }
-              : undefined
-          }
-        />
+  if (app.applicantId) {
+    try {
+      const userRef = db.collection('users').doc(app.applicantId);
+      const [repSnap, kycDocsSnap] = await Promise.all([
+        userRef.collection('lenderReports').get(),
+        userRef.collection('applicantProfile').doc('documents').get(),
+      ]);
+      repSnap.forEach((doc) => {
+        const r = doc.data();
+        rawReports.push({
+          id: doc.id,
+          provider: (r.provider as string) ?? '',
+          fileName: (r.fileName as string) ?? 'Report',
+          uploadedAt: fmtDate(r.uploadedAt as TS),
+          uploadedBy: (r.uploadedByName as string) ?? 'Lender',
+          date: toDate(r.uploadedAt as TS),
+          fromApplicationId: r.uploadedFromApplicationId as string | undefined,
+        });
+      });
+      const onboardingDocs = kycDocsSnap.data()?.documents;
+      if (Array.isArray(onboardingDocs)) {
+        for (const d of onboardingDocs as Array<Record<string, unknown>>) {
+          const fileId = d.driveFileId as string | undefined;
+          if (!fileId) continue;
+          borrowerKycDocuments.push({
+            id: fileId,
+            title: kycDocLabel(d.docType as string | undefined),
+            subtitle: `${(d.fileName as string) ?? 'Document'}${
+              typeof d.expiryDate === 'string' && d.expiryDate ? ` · Passport expires ${fmtYmd(d.expiryDate)}` : ''
+            }`,
+            uploadedAt: fmtDate(d.uploadedAt as TS),
+            status: normaliseDocStatus(d.status as string | undefined),
+            viewUrl: `/api/applications/${id}/kyc-documents/${fileId}`,
+            reviewUrl: `/api/applications/${id}/kyc-documents/${fileId}`,
+            rejectionReason: (d.rejectionReason as string | null | undefined) || undefined,
+            reviewedAt: d.reviewedAt ? fmtDate(d.reviewedAt as TS) : undefined,
+            kind: 'identity',
+          });
+        }
+      }
+    } catch {
+      // Best-effort — panels show empty states on failure.
+    }
+  }
 
-        {/* Loan Summary */}
-        <section className="bg-white rounded-xl border border-gray-200 p-5">
-          <h2 className="font-semibold text-gray-900 mb-4">Loan Details</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 text-center mb-4 bg-indigo-50 rounded-xl p-4">
-            <div>
-              <p className="text-xs text-indigo-500 font-medium">Requested</p>
-              <p className="font-bold text-indigo-900">{fmt(ld?.requestedAmount)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-indigo-500 font-medium">Rate</p>
-              <p className="font-bold text-indigo-900">4.7% / 8 wks</p>
-            </div>
-            <div>
-              <p className="text-xs text-indigo-500 font-medium">Repayments</p>
-              <p className="font-bold text-indigo-900">4 × fortnightly</p>
-            </div>
-            <div>
-              <p className="text-xs text-indigo-500 font-medium">Application Fee</p>
-              {ld?.applicationFee !== undefined ? (
-                <p className="font-bold text-indigo-900">{fmt(ld.applicationFee)}</p>
-              ) : (
-                <>
-                  <p className="font-bold text-indigo-900">
-                    {fmt(computeApplicationFee(app.isExistingCustomer))}
-                  </p>
-                  <p className="text-[10px] text-indigo-500 font-medium uppercase tracking-wide">
-                    Estimated
-                  </p>
-                </>
-              )}
-            </div>
-            <div>
-              <p className="text-xs text-indigo-500 font-medium">Purpose</p>
-              <p className="font-bold text-indigo-900 text-sm">{loanPurposeLabel(ld?.loanPurpose)}</p>
-            </div>
-          </div>
-          {ld?.purposeDescription && (
-            <p className="text-sm text-gray-600 mt-2">{ld.purposeDescription}</p>
-          )}
-        </section>
+  // Most recent first within each provider.
+  rawReports.sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0));
+  const byProvider = (p: string): ReportItem[] =>
+    rawReports.filter((r) => r.provider === p).map(({ id, fileName, uploadedAt, uploadedBy }) => ({ id, fileName, uploadedAt, uploadedBy }));
+  const datazooReports = byProvider('datazoo');
+  const centrixReports = byProvider('centrix');
+  const affordabilityReports = byProvider('affordability');
 
-        {/* Scheduled Repayments — visible once loan is disbursed */}
-        {PAYMENT_STATUSES.has(status) && (
-          <ScheduledPaymentsPanel
-            applicationId={id}
-            scheduledPayments={scheduledPayments}
-          />
-        )}
+  const borrowerKycCount = borrowerKycDocuments.length;
+  const borrowerAllAccepted =
+    borrowerKycCount > 0 && borrowerKycDocuments.every((d) => d.status === 'accepted');
+  const borrowerAnyRejected = borrowerKycDocuments.some((d) => d.status === 'rejected');
+  const borrowerStatusLabel =
+    borrowerKycCount === 0
+      ? 'Not provided'
+      : borrowerAllAccepted
+        ? 'Verified'
+        : borrowerAnyRejected
+          ? 'Action needed'
+          : 'Needs review';
+  const borrowerStatusTone: PillTone =
+    borrowerKycCount === 0 ? 'neutral' : borrowerAllAccepted ? 'success' : borrowerAnyRejected ? 'danger' : 'warning';
 
-        {/* Personal Info */}
-        {pi && (
-          <section className="bg-white rounded-xl border border-gray-200 p-5">
-            <h2 className="font-semibold text-gray-900 mb-4">Personal Information</h2>
-            <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              <Field label="Date of Birth" value={pi.dateOfBirth} />
-              <Field label="Address" value={`${pi.address}, ${pi.city} ${pi.postCode}`} />
-              <Field label="Time at Address" value={pi.timeAtAddress} />
-              <Field label="Housing Status" value={pi.housingStatus} />
-              <Field label="Visa Status" value={pi.visaStatus?.replace(/_/g, ' ')} />
-              {pi.visaExpiryDate && <Field label="Visa Expiry" value={pi.visaExpiryDate} />}
-              <Field label="Household" value={pi.householdType?.replace(/_/g, ' ')} />
-              <Field label="Children" value={pi.numberOfChildren} />
-              <Field label="Dependents" value={pi.numberOfDependents} />
-              <ExistingCustomerToggle
-                applicationId={id}
-                initialValue={Boolean(app.isExistingCustomer)}
-              />
-            </dl>
-          </section>
-        )}
+  // ---- Previous applications by the same customer ------------------------
+  // Lets the lender reuse evidence (bank statements, payslips, credit report)
+  // instead of asking a returning applicant for everything again.
+  const previousApps: LoanApplication[] = await loadPreviousApplications(db, app).catch(() => []);
 
-        {/* Employment */}
-        {emp && (
-          <section className="bg-white rounded-xl border border-gray-200 p-5">
-            <h2 className="font-semibold text-gray-900 mb-4">Employment</h2>
-            <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              <Field label="Employer" value={emp.employerName} />
-              <Field label="Occupation" value={emp.occupation} />
-              <Field label="Status" value={emp?.employmentStatus?.replace(/_/g, ' ')} />
-              <Field label="Hours/Week" value={emp.hoursPerWeek} />
-              <Field label="Time at Employer" value={emp.timeAtEmployer} />
-              <Field label="Salary (after tax)" value={fmt(emp.income?.salaryAfterTax)} />
-              <Field label="WINZ" value={fmt(emp.income?.winz)} />
-              <Field label="Other Income" value={fmt(emp.income?.otherIncome)} />
-            </dl>
-          </section>
-        )}
+  const previous: PreviousApplication[] = previousApps.slice(0, 8).map((p) => ({
+    id: p.applicationId,
+    reference: p.referenceNumber ?? p.applicationId,
+    statusLabel: STATUS_LABELS[p.status] ?? p.status,
+    statusTone: STATUS_TONE[p.status] ?? 'neutral',
+    amount: fmt(p.loanDetails?.approvedAmount ?? p.loanDetails?.requestedAmount),
+    date: fmtDate((p.timeline?.submittedAt ?? p.timeline?.createdAt) as TS),
+    href: `/lender/applications/${p.applicationId}`,
+  }));
 
-        {/* Living Expenses Summary */}
-        {expenses && (
-          <section className="bg-white rounded-xl border border-gray-200 p-5">
-            <h2 className="font-semibold text-gray-900 mb-4">Stated Living Expenses (Fortnightly)</h2>
-            <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              {expenses.nonDiscretionary && Object.entries(expenses.nonDiscretionary)
-                .filter(([, v]) => v > 0)
-                .map(([k, v]) => <Field key={k} label={k.replace(/([A-Z])/g, ' $1').trim()} value={fmt(v)} />)}
-              {expenses.bnpl && (
-                <>
-                  {expenses.bnpl.afterpay > 0 && <Field label="Afterpay" value={fmt(expenses.bnpl.afterpay)} />}
-                  {expenses.bnpl.klarna > 0 && <Field label="Klarna" value={fmt(expenses.bnpl.klarna)} />}
-                  {expenses.bnpl.zip > 0 && <Field label="Zip" value={fmt(expenses.bnpl.zip)} />}
-                </>
-              )}
-            </dl>
-          </section>
-        )}
+  const lastLoan = previousApps.find((p) => LOAN_STATUSES.has(p.status));
+  const lastLoanLabel = lastLoan
+    ? `${STATUS_LABELS[lastLoan.status] ?? lastLoan.status} · ${lastLoan.referenceNumber ?? lastLoan.applicationId} · ${fmt(
+        lastLoan.loanDetails?.approvedAmount ?? lastLoan.loanDetails?.requestedAmount,
+      )} · ${fmtDate((lastLoan.timeline?.disbursedAt ?? lastLoan.timeline?.submittedAt) as TS)}`
+    : undefined;
 
-        {/* Existing Debts */}
-        {debts && (
-          <section className="bg-white rounded-xl border border-gray-200 p-5">
-            <h2 className="font-semibold text-gray-900 mb-4">Existing Debts</h2>
-            <dl className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {(Object.entries(debts) as [string, { totalOwed: number; fortnightlyPayment: number }][])
-                .filter(([k, v]) => k !== 'debtPurposeDescription' && !Array.isArray(v) && v?.totalOwed > 0)
-                .map(([k, v]) => (
-                  <div key={k}>
-                    <dt className="text-xs font-medium text-gray-500 uppercase">{k.replace(/([A-Z])/g, ' $1').trim()}</dt>
-                    <dd className="text-sm text-gray-900 mt-0.5">Owed: {fmt(v.totalOwed)}</dd>
-                    <dd className="text-xs text-gray-500">Fortnightly: {fmt(v.fortnightlyPayment)}</dd>
-                  </div>
-                ))}
-            </dl>
-          </section>
-        )}
+  // Latest *accepted* document of a given type across previous applications.
+  const latestAccepted = (type: DocumentType) => {
+    let best: { doc: ApplicationDocument; app: LoanApplication; date: Date } | null = null;
+    for (const p of previousApps) {
+      for (const d of p.documents ?? []) {
+        if (d.type !== type || d.status !== 'accepted') continue;
+        const date = toDate(d.uploadedAt as TS);
+        if (!date) continue;
+        if (!best || date > best.date) best = { doc: d, app: p, date };
+      }
+    }
+    return best;
+  };
 
-        {/* Assessment Checklist */}
-        <section className="bg-white rounded-xl border border-gray-200 p-5">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold text-gray-900">Affordability Assessment</h2>
-            {isAssigned && ['under_assessment', 'waiting_for_docs', 'credit_check'].includes(status) && (
-              <Link
-                href={`/lender/applications/${id}/affordability`}
-                className="text-sm text-indigo-600 hover:underline font-medium"
-              >
-                {app.affordabilityStatus === 'complete' ? 'Re-assess →' : 'Start Assessment →'}
-              </Link>
-            )}
-            {app.affordabilityStatus === 'complete' && (
-              <a
-                href={`/api/applications/${id}/affordability/pdf`}
-                download
-                className="inline-flex items-center gap-1.5 text-sm text-white bg-orange-600 hover:bg-orange-700 px-3 py-1.5 rounded-lg font-medium transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
-                </svg>
-                Download Assessment PDF
-              </a>
-            )}
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
-            <div className={`rounded-lg p-3 ${app.affordabilityStatus === 'complete' ? 'bg-green-50 text-green-700' : 'bg-gray-50 text-gray-500'}`}>
-              <p className="font-medium">Status</p>
-              <p className="mt-0.5 capitalize">{app.affordabilityStatus?.replace(/_/g, ' ') ?? 'Not started'}</p>
-            </div>
-            <div className="rounded-lg p-3 bg-gray-50 text-gray-600">
-              <p className="font-medium text-gray-500 text-xs">Assessments</p>
-              <p className="mt-0.5 font-semibold text-gray-900">{app.affordabilityAssessmentIds?.length ?? 0}</p>
-            </div>
-          </div>
-        </section>
+  const reuse: ReuseItem[] = [];
+  const bank = latestAccepted('bank_statement');
+  if (bank) {
+    reuse.push(
+      buildReuseItem({
+        key: 'bank_statement',
+        label: 'Bank statements',
+        fileName: bank.doc.fileName,
+        fromLabel: bank.app.referenceNumber ?? 'previous application',
+        date: bank.date,
+        windowMonths: BANK_STATEMENT_REUSE_MONTHS,
+        viewUrl: `/api/applications/${bank.app.applicationId}/documents/${bank.doc.documentId}`,
+      }),
+    );
+  }
+  const pay = latestAccepted('payslip');
+  if (pay) {
+    reuse.push(
+      buildReuseItem({
+        key: 'payslip',
+        label: 'Payslips',
+        fileName: pay.doc.fileName,
+        fromLabel: pay.app.referenceNumber ?? 'previous application',
+        date: pay.date,
+        windowMonths: PAYSLIP_REUSE_MONTHS,
+        viewUrl: `/api/applications/${pay.app.applicationId}/documents/${pay.doc.documentId}`,
+      }),
+    );
+  }
+  const latestCentrix = rawReports.find((r) => r.provider === 'centrix' && r.date);
+  if (latestCentrix?.date) {
+    reuse.push(
+      buildReuseItem({
+        key: 'credit',
+        label: 'Comprehensive credit report',
+        fileName: latestCentrix.fileName,
+        fromLabel: latestCentrix.fromApplicationId === id ? 'this application' : 'customer profile',
+        date: latestCentrix.date,
+        windowMonths: CREDIT_REPORT_REUSE_MONTHS,
+        viewUrl: `/api/applications/${id}/reports/${latestCentrix.id}`,
+      }),
+    );
+  }
+  const latestDatazoo = rawReports.find((r) => r.provider === 'datazoo' && r.date);
+  if (latestDatazoo?.date) {
+    reuse.push(
+      buildReuseItem({
+        key: 'identity',
+        label: 'DataZoo identity verification',
+        fileName: latestDatazoo.fileName,
+        fromLabel: latestDatazoo.fromApplicationId === id ? 'this application' : 'customer profile',
+        date: latestDatazoo.date,
+        windowMonths: null,
+        viewUrl: `/api/applications/${id}/reports/${latestDatazoo.id}`,
+      }),
+    );
+  }
 
-        {/* Documents */}
-        {(docs.length > 0 || docRequest) && (
-          <section className="bg-white rounded-xl border border-gray-200 p-5">
-            <h2 className="font-semibold text-gray-900 mb-4">Documents</h2>
-            {docRequest?.requiredDocuments && (
-              <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-4 text-sm text-orange-800">
-                <p className="font-medium mb-1">Required Documents Requested:</p>
-                <ul className="list-disc list-inside space-y-0.5">
-                  {docRequest.requiredDocuments.map((d) => <li key={d}>{d}</li>)}
-                </ul>
-                {docRequest.message && <p className="mt-2 text-orange-700 text-xs">{docRequest.message}</p>}
-              </div>
-            )}
-            {docs.length > 0 ? (
-              <ul className="space-y-2">
-                {docs.map((doc) => (
-                  <li key={doc.documentId} className="flex items-center justify-between gap-3 text-sm bg-gray-50 rounded-lg p-3">
-                    <div className="min-w-0">
-                      <p className="font-medium text-gray-800 truncate">{doc.fileName}</p>
-                      <p className="text-xs text-gray-400">{doc.type} · Uploaded {fmtTs(doc.uploadedAt as Parameters<typeof fmtTs>[0])}</p>
-                    </div>
-                    <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full font-medium ${
-                      doc.status === 'accepted' ? 'bg-green-100 text-green-700' :
-                      doc.status === 'rejected' ? 'bg-red-100 text-red-700' :
-                      'bg-gray-100 text-gray-500'
-                    }`}>
-                      {doc.status}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-sm text-gray-400">No documents uploaded yet.</p>
-            )}
-          </section>
-        )}
+  const history: ApplicantHistory = {
+    previousCount: previousApps.length,
+    previous,
+    lastLoanLabel,
+    reuse,
+  };
 
-        {/* Applicant declined the offer */}
-        {status === 'offer_declined' && app.applicantRejection && (
-          <section className="rounded-xl border bg-amber-50 border-amber-200 p-5">
-            <h2 className="font-semibold mb-3 text-amber-900">⚠ Applicant Declined Offer</h2>
-            <dl className="grid grid-cols-2 gap-4 text-sm">
-              <Field
-                label="Declined At"
-                value={fmtTs(app.applicantRejection.rejectedAt as Parameters<typeof fmtTs>[0])}
-              />
-              <div className="col-span-2">
-                <Field label="Reason" value={app.applicantRejection.reason || 'No reason provided'} />
-              </div>
-            </dl>
-          </section>
-        )}
+  // ---- Evidence gate for the credit assessment ---------------------------
+  // Documents must be reviewed (statements + payslips accepted here, or
+  // reusable from a loan paid out within 6 months) before the wizard opens.
+  const gate = evaluateEvidenceGate(app, previousApps);
+  const gateView: EvidenceGateView = {
+    ok: gate.ok,
+    pendingCount: gate.pendingCount,
+    reasons: gate.reasons,
+    reused: gate.reused.map((r) => ({
+      label: r.label,
+      fileName: r.fileName,
+      fromReference: r.fromReference,
+      loanDate: fmtDate(r.loanDate),
+      viewUrl: `/api/applications/${r.fromApplicationId}/documents/${r.documentId}`,
+    })),
+    previousLoanLabel: gate.previousLoan
+      ? `${gate.previousLoan.reference} · ${fmtDate(gate.previousLoan.date)} (${gate.previousLoan.monthsAgo} month${gate.previousLoan.monthsAgo === 1 ? '' : 's'} before this application)`
+      : undefined,
+    repeatWithinWindow: gate.repeatWithinWindow,
+  };
 
-        {/* Decision */}
-        {decision ? (
-          <section className={`rounded-xl border p-5 ${decision.action === 'approved' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-            <h2 className={`font-semibold mb-3 ${decision.action === 'approved' ? 'text-green-800' : 'text-red-800'}`}>
-              {decision.action === 'approved' ? '✓ Approved' : '✗ Declined'}
-            </h2>
-            <dl className="grid grid-cols-2 gap-4 text-sm">
-              {decision.approvedAmount && <Field label="Approved Amount" value={fmt(decision.approvedAmount)} />}
-              <Field label="Decided At" value={fmtTs(decision.decidedAt as Parameters<typeof fmtTs>[0])} />
-              <div className="col-span-2"><Field label="Rationale" value={decision.rationale} /></div>
-              {decision.declineReasons && decision.declineReasons.length > 0 && (
-                <div className="col-span-2">
-                  <dt className="text-xs font-medium text-gray-500 uppercase mb-1">Decline Reasons</dt>
-                  <ul className="list-disc list-inside text-sm text-red-700 space-y-0.5">
-                    {decision.declineReasons.map((r) => <li key={r}>{r}</li>)}
-                  </ul>
-                </div>
-              )}
-            </dl>
-          </section>
-        ) : isAssigned && ['under_assessment', 'waiting_for_docs', 'credit_check'].includes(status) ? (
-          <section className="bg-white rounded-xl border border-gray-200 p-5">
-            <h2 className="font-semibold text-gray-900 mb-4">Make Decision</h2>
-            <DecisionForm
-              applicationId={id}
-              affordabilityStatus={app.affordabilityStatus}
-              requestedAmount={ld?.requestedAmount ?? 0}
-              assessedAmount={ld?.assessedAmount}
-            />
-          </section>
-        ) : null}
+  // ---- Communication log --------------------------------------------------
+  const communications: CommunicationItem[] = ((app.communicationLog ?? []) as CommunicationLogEntry[])
+    .map((c) => ({
+      id: c.entryId,
+      channel: c.channel,
+      direction: c.direction,
+      source: c.source ?? 'manual',
+      summary: c.summary,
+      outcome: c.outcome || undefined,
+      occurredAt: fmtTs(c.occurredAt as TS),
+      loggedBy: c.loggedByName,
+      _t: toDate(c.occurredAt as TS)?.getTime() ?? 0,
+    }))
+    .sort((a, b) => b._t - a._t)
+    .map(({ _t, ...rest }) => {
+      void _t;
+      return rest;
+    });
 
-        {/* Internal Notes */}
-        <section className="bg-white rounded-xl border border-gray-200 p-5">
-          <h2 className="font-semibold text-gray-900 mb-4">Internal Notes ({notes.length})</h2>
-          {notes.length > 0 && (
-            <ul className="space-y-3 mb-4">
-              {[...notes].reverse().map((note) => (
-                <li key={note.noteId} className="bg-gray-50 rounded-lg p-3">
-                  <div className="flex items-center justify-between gap-2 mb-1">
-                    <span className="text-xs font-medium text-gray-700">{note.lenderName}</span>
-                    <span className="text-xs text-gray-400">{fmtTs(note.createdAt as Parameters<typeof fmtTs>[0])}</span>
-                  </div>
-                  <p className="text-sm text-gray-800 whitespace-pre-wrap">{note.text}</p>
-                </li>
-              ))}
-            </ul>
-          )}
-          {isAssigned && (
-            <AddNoteForm applicationId={id} />
-          )}
-        </section>
+  // ---- Everything else ----------------------------------------------------
+  const name = pi ? `${pi.firstName ?? ''} ${pi.lastName ?? ''}`.trim() : '';
+  const monthlyIncome = typeof fin?.monthlyIncome === 'number' ? fin.monthlyIncome : null;
+  const monthlyExpenses = typeof fin?.monthlyExpenses === 'number' ? fin.monthlyExpenses : null;
+  const monthlySurplus =
+    monthlyIncome !== null && monthlyExpenses !== null ? monthlyIncome - monthlyExpenses : null;
 
-        {/* Timeline */}
-        <section className="bg-white rounded-xl border border-gray-200 p-5">
-          <h2 className="font-semibold text-gray-900 mb-4">Timeline</h2>
-          <div className="space-y-2">
-            {Object.entries(timeline ?? {}).map(([key, val]) => (
-              <div key={key} className="flex items-center justify-between text-sm">
-                <span className="text-gray-500 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</span>
-                <span className="text-gray-800 font-mono text-xs">
-                  {fmtTs(val as Parameters<typeof fmtTs>[0])}
-                </span>
-              </div>
-            ))}
-          </div>
-        </section>
+  const employment = emp
+    ? [
+        { label: 'Occupation', value: emp.occupation || '—' },
+        { label: 'Status', value: emp.employmentStatus?.replace(/_/g, ' ') ?? '—' },
+        { label: 'Hours / week', value: emp.hoursPerWeek != null ? String(emp.hoursPerWeek) : '—' },
+        { label: 'Time at employer', value: emp.timeAtEmployer || '—' },
+        { label: 'Salary (after tax)', value: fmt(emp.income?.salaryAfterTax) },
+        { label: 'WINZ', value: fmt(emp.income?.winz) },
+        { label: 'Other income', value: fmt(emp.income?.otherIncome) },
+        // Repeat borrowers only — shows whether these details were re-entered or carried over.
+        ...(typeof emp.changedSinceLastApplication === 'boolean'
+          ? [
+              {
+                label: 'Changed jobs since last application',
+                value: emp.changedSinceLastApplication ? 'Yes — details re-entered' : 'No — kept from last application',
+              },
+            ]
+          : []),
+        ...(typeof app.bankDetails?.changedSinceLastApplication === 'boolean'
+          ? [
+              {
+                label: 'Bank account changed since last application',
+                value: app.bankDetails.changedSinceLastApplication ? 'Yes — new account entered' : 'No — kept from last application',
+              },
+            ]
+          : []),
+      ]
+    : [];
 
-      </div>
-    </div>
-  );
+  // References — only new customers are asked for these; repeat customers skip
+  // the section (POST /api/applications drops any draft references for them).
+  const referenceContacts: ReferenceContact[] = (
+    [
+      ['Reference 1', app.references?.reference1],
+      ['Reference 2', app.references?.reference2],
+    ] as const
+  ).flatMap(([label, ref]) => {
+    const name = ref?.name?.trim();
+    const email = ref?.email?.trim();
+    const phone = ref?.phone?.trim();
+    if (!name && !email && !phone) return [];
+    return [
+      {
+        label,
+        name: name || 'Name not given',
+        ...(email ? { email } : {}),
+        ...(phone ? { phone } : {}),
+      },
+    ];
+  });
+
+  const expenseRows = expenses?.nonDiscretionary
+    ? Object.entries(expenses.nonDiscretionary)
+        .filter(([, v]) => v > 0)
+        .map(([k, v]) => ({ label: k.replace(/([A-Z])/g, ' $1').trim(), value: fmt(v) }))
+    : [];
+
+  const debtRows = debts
+    ? (Object.entries(debts) as [string, { totalOwed: number; fortnightlyPayment: number }][])
+        .filter(([k, v]) => k !== 'debtPurposeDescription' && !Array.isArray(v) && v?.totalOwed > 0)
+        .map(([k, v]) => ({
+          label: k.replace(/([A-Z])/g, ' $1').trim(),
+          owed: fmt(v.totalOwed),
+          fortnightly: fmt(v.fortnightlyPayment),
+        }))
+    : [];
+
+  const notes = (app.internalNotes ?? []).map((n) => ({
+    id: n.noteId,
+    author: n.lenderName,
+    date: fmtTs(n.createdAt as TS),
+    text: n.text,
+  }));
+
+  const timeline = Object.entries(app.timeline ?? {}).map(([key, val]) => ({
+    label: key.replace(/([A-Z])/g, ' $1').trim(),
+    date: fmtTs(val as TS),
+  }));
+
+  const decision = app.decision
+    ? {
+        approved: app.decision.action === 'approved',
+        approvedAmount: app.decision.approvedAmount ? fmt(app.decision.approvedAmount) : undefined,
+        decidedAt: fmtTs(app.decision.decidedAt as TS),
+        rationale: app.decision.rationale,
+        declineReasons: app.decision.declineReasons,
+      }
+    : undefined;
+
+  const applicantRejection =
+    status === 'offer_declined' && app.applicantRejection
+      ? {
+          rejectedAt: fmtTs(app.applicantRejection.rejectedAt as TS),
+          reason: app.applicantRejection.reason || 'No reason provided',
+        }
+      : undefined;
+
+  const disburse =
+    (status === 'loan_accepted' || status === 'awaiting_payment_consent') &&
+    typeof ld?.approvedAmount === 'number'
+      ? {
+          approvedAmount: ld.approvedAmount,
+          applicationFee: ld.applicationFee ?? 0,
+          bankDetails: app.bankDetails
+            ? {
+                bankName: app.bankDetails.bankName,
+                accountHolderName: app.bankDetails.accountHolderName,
+                accountNumber: app.bankDetails.accountNumber,
+                paymentMethod: app.bankDetails.paymentMethod,
+              }
+            : undefined,
+          consentStatus:
+            status === 'awaiting_payment_consent'
+              ? (app.paymentConsent?.status ?? 'not_started')
+              : undefined,
+          consentActivatedAt: fmtTs(app.paymentConsent?.activatedAt as TS),
+        }
+      : undefined;
+
+  let documentRequest: ReviewData['documentRequest'];
+  if (app.documentRequest) {
+    const requestedAtMs = toDate(app.documentRequest.requestedAt as TS)?.getTime();
+    const fulfilment = fulfilRequest(
+      requestItems,
+      (app.documents ?? []).map((d) => ({
+        documentId: d.documentId,
+        type: d.type,
+        status: d.status,
+        fileName: d.fileName,
+        requestKey: d.requestKey,
+        uploadedAtMs: toDate(d.uploadedAt as TS)?.getTime(),
+      })),
+      requestedAtMs,
+    );
+    documentRequest = {
+      requestedAt: fmtTs(app.documentRequest.requestedAt as TS),
+      requiredDocuments: app.documentRequest.requiredDocuments ?? requestItems.map((i) => i.label),
+      items: fulfilment.map((f) => ({
+        key: f.item.key,
+        label: f.item.label,
+        fulfilled: f.fulfilled,
+        needsReupload: f.needsReupload,
+        files: f.files.map((x) => ({ id: x.documentId, fileName: x.fileName, status: x.status })),
+      })),
+      // Only catalogue keys can be pre-ticked; custom asks are re-typed.
+      missingKeys: fulfilment.filter((f) => !f.fulfilled && catalogueItem(f.item.key)).map((f) => f.item.key),
+      message: app.documentRequest.message || undefined,
+      outstanding: status === 'waiting_for_docs',
+    };
+  }
+
+  const kyc = {
+    borrowerStatusLabel,
+    borrowerStatusTone,
+    borrowerDocuments: borrowerKycDocuments,
+    reports: datazooReports,
+  };
+  // Lender-entered Centrix summary, stored encrypted on the customer profile.
+  const storedSummary = app.applicantId
+    ? await loadCreditSummary(app.applicantId).catch(() => null)
+    : null;
+  const credit: ReviewData['credit'] = {
+    reports: centrixReports,
+    affordabilityReports,
+    summary: storedSummary
+      ? {
+          reportDate: storedSummary.reportDate,
+          reportDateLabel: fmtYmd(storedSummary.reportDate),
+          score: storedSummary.score,
+          defaults: storedSummary.defaults,
+          enquiries: storedSummary.enquiries,
+          utilisation: storedSummary.utilisation,
+          updatedBy: storedSummary.updatedByName,
+          updatedAt: storedSummary.updatedAt ? fmtDate(storedSummary.updatedAt) : '',
+        }
+      : undefined,
+    dti: typeof fin?.debtToIncomeRatio === 'number' ? `${Math.round(fin.debtToIncomeRatio)}%` : undefined,
+  };
+
+  const loanSummary = deriveLoanSummary(app);
+
+  const data: ReviewData = {
+    applicationId: id,
+    status,
+    statusLabel: STATUS_LABELS[status] ?? status,
+    statusTone: STATUS_TONE[status] ?? 'neutral',
+    isAssigned,
+    isExistingCustomer: Boolean(app.isExistingCustomer),
+    canReviewDocs: isAssigned && !decided,
+    canRequestDocs: isAssigned && REQUEST_DOCS_STATUSES.includes(status),
+    header: {
+      reference: app.referenceNumber ?? id,
+      name: name || 'Applicant',
+      initials: initialsOf(name || 'Applicant'),
+      email: pi?.email ?? '',
+      phone: pi?.phone ?? '',
+      requested: fmt(ld?.requestedAmount),
+      purpose: `${loanPurposeLabel(ld?.loanPurpose)}${ld?.purposeDescription ? ` · ${ld.purposeDescription}` : ''}`,
+      submittedLabel: fmtDate(app.timeline?.submittedAt as TS),
+    },
+    snapshot: {
+      name: name || '—',
+      email: pi?.email || '—',
+      phone: pi?.phone || '—',
+      dob: fmtYmd(pi?.dateOfBirth),
+      // Full residential address: street, then city + post code.
+      address: pi
+        ? [pi.address?.trim(), [pi.city?.trim(), pi.postCode?.trim()].filter(Boolean).join(' ')].filter(Boolean).join(', ') || '—'
+        : '—',
+      visa: pi
+        ? `${VISA_LABEL[pi.visaStatus] ?? pi.visaStatus?.replace(/_/g, ' ') ?? '—'}${
+            pi.visaStatus !== 'citizen' && pi.visaExpiryDate ? ` · valid to ${fmtYmd(pi.visaExpiryDate)}` : ''
+          }`
+        : '—',
+      employer: emp?.employerName ?? '—',
+      monthlyIncome: monthlyIncome !== null ? fmt(monthlyIncome) : '—',
+      monthlyExpenses: monthlyExpenses !== null ? fmt(monthlyExpenses) : '—',
+      monthlySurplus: monthlySurplus !== null ? fmt(monthlySurplus) : '—',
+      surplusTone: monthlySurplus === null ? 'none' : monthlySurplus >= 0 ? 'pos' : 'neg',
+    },
+    documents,
+    docsVerified,
+    docsPending,
+    docsTotal: documents.length,
+    documentRequest,
+    affordability: {
+      statusLabel: app.affordabilityStatus?.replace(/_/g, ' ') ?? 'not started',
+      complete: app.affordabilityStatus === 'complete',
+      assessmentCount: app.affordabilityAssessmentIds?.length ?? 0,
+      canAssess: isAssigned && ASSESSMENT_STATUSES.includes(status) && gate.ok,
+      pdfUrl: `/api/applications/${id}/affordability/pdf`,
+      assessUrl: `/lender/applications/${id}/affordability`,
+      gate: gateView,
+    },
+    estimatedFee: ld?.applicationFee !== undefined ? fmt(ld.applicationFee) : fmt(computeApplicationFee(app.isExistingCustomer)),
+    feeIsEstimated: ld?.applicationFee === undefined,
+    employment,
+    expenses: expenseRows,
+    debts: debtRows,
+    notes,
+    timeline,
+    decision,
+    applicantRejection,
+    payments: {
+      show: PAYMENT_STATUSES.has(status),
+      scheduled: toPlainScheduledPayments((app.scheduledPayments ?? []) as ScheduledPayment[]),
+      charges: summariseArrearsCharges({
+        installments: loanSummary.installments,
+        feeAssessments: app.feeAssessments,
+        arrears: app.arrears,
+        policyApplies: Boolean(app.feePolicyVersion),
+      }),
+      remainingBalance: loanSummary.remainingBalance,
+      totalPaid: loanSummary.totalPaid,
+      settlement: loanSummary.settlement,
+      ledger: loanSummary.ledger,
+    },
+    disburse,
+    decisionInput: {
+      requestedAmount: ld?.requestedAmount ?? 0,
+      assessedAmount: ld?.assessedAmount,
+    },
+    kyc,
+    credit,
+    history,
+    communications,
+    references: {
+      contacts: referenceContacts,
+      waived: referenceContacts.length === 0 && Boolean(app.isExistingCustomer),
+    },
+  };
+
+  return <LoanReview data={data} />;
 }

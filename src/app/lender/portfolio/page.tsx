@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { adminDb, verifySessionOrIdToken } from '@/lib/firebase/admin';
 import Badge from '@/components/shared/Badge';
 import type { LoanStatus } from '@/types/loan';
+import { fmtDate as fmtNzDate } from '@/lib/loan/format';
 
 type BadgeVariant = 'default' | 'success' | 'warning' | 'error' | 'info';
 
@@ -17,10 +18,7 @@ const LOAN_STATUS_VARIANT: Record<LoanStatus, BadgeVariant> = {
 const fmt = (n: number) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
 
-const fmtDate = (ts?: { toDate?: () => Date } | null) => {
-  if (!ts?.toDate) return '—';
-  return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' }).format(ts.toDate());
-};
+const fmtDate = (ts?: { toDate?: () => Date } | null) => fmtNzDate(ts);
 
 export default async function LenderPortfolioPage() {
   const cookieStore = await cookies();

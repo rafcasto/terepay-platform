@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { LOAN_PURPOSE_VALUES } from '@/lib/constants/loan-purposes';
+import { ASSESSMENT_MODEL_MAX_LENGTH, ASSESSMENT_MODEL_PATTERN } from '@/lib/assessment/model';
 
 // ---------------------------------------------------------------------------
 // Auth schemas
@@ -118,9 +119,14 @@ export const patchProfileSchema = z.object({
   timeAtAddress: z.string().max(50).optional(),
   visaStatus: z.string().max(50).optional(),
   visaExpiryDate: z.string().optional(),
+  anniversaryDate: z.string().optional(),
   householdType: z.string().max(50).optional(),
   numberOfChildren: z.number().int().min(0).optional(),
   numberOfDependents: z.number().int().min(0).optional(),
+  // Employment fields (mirrored from the loan application, editable on the profile page)
+  occupation: z.string().max(120).optional(),
+  employerName: z.string().max(120).optional(),
+  employmentStatus: z.string().max(50).optional(),
 });
 
 export type PatchProfileInput = z.infer<typeof patchProfileSchema>;
@@ -174,13 +180,32 @@ export const kycProfileSchema = z.object({
   country: z.string().max(100).optional(),
 });
 
+/** Document types that are a passport, and so must carry an expiry date. */
+export const PASSPORT_DOC_TYPES: ReadonlySet<string> = new Set(['passport', 'nz_passport', 'foreign_passport']);
+
+/** A real calendar date in YYYY-MM-DD form (as produced by `<input type="date">`). */
+export function isValidYmd(value: string | null | undefined): value is string {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const d = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === value;
+}
+
 export const kycDocumentSchema = z.object({
-  documents: z.array(z.object({
-    docType: z.string().min(1),
-    driveFileId: z.string().min(1),
-    fileName: z.string().min(1),
-    mimeType: z.string().min(1),
-  })).min(1, 'At least one document is required'),
+  documents: z.array(
+    z
+      .object({
+        docType: z.string().min(1),
+        driveFileId: z.string().min(1),
+        fileName: z.string().min(1),
+        mimeType: z.string().min(1),
+        /** Passport expiry (YYYY-MM-DD) — required when the document is a passport. */
+        expiryDate: z.string().refine(isValidYmd, 'Enter a valid expiry date').optional(),
+      })
+      .refine((d) => !PASSPORT_DOC_TYPES.has(d.docType) || Boolean(d.expiryDate), {
+        path: ['expiryDate'],
+        message: 'Passport expiry date is required',
+      }),
+  ).min(1, 'At least one document is required'),
 });
 
 export type SendSmsOtpInput = z.infer<typeof sendSmsOtpSchema>;
@@ -224,6 +249,13 @@ export const terepayApplicationSchema = z.object({
     employmentStatus: z.enum(['permanent', 'fixed_term', 'casual', 'part_time'], { message: 'Select an employment status' }),
     timeAtEmployer: z.string().min(1, 'Required'),
     previousEmployer: z.string().optional(),
+    previousEmployerPeriod: z.string().optional(),
+    /**
+     * Repeat borrowers only: "Have you changed jobs since your last
+     * application?" `false` means the employment details were carried over
+     * from their previous application; `true` means they were re-entered.
+     */
+    changedSinceLastApplication: z.boolean().optional(),
     income: z.object({
       salaryBeforeTax: currencyField,
       salaryAfterTax: currencyField,
@@ -231,7 +263,15 @@ export const terepayApplicationSchema = z.object({
       otherIncome: currencyField,
       otherIncomeDescription: z.string().optional(),
     }),
-  }),
+  })
+    .refine(
+      (val) => val.timeAtEmployer !== 'Less than 6 months' || !!val.previousEmployer?.trim(),
+      { path: ['previousEmployer'], message: 'Add your previous employer' },
+    )
+    .refine(
+      (val) => val.timeAtEmployer !== 'Less than 6 months' || !!val.previousEmployerPeriod?.trim(),
+      { path: ['previousEmployerPeriod'], message: 'Select how long you were there' },
+    ),
 
   // ── Section 3: Living Expenses ──────────────────────────────────────────
   livingExpenses: z.object({
@@ -298,8 +338,8 @@ export const terepayApplicationSchema = z.object({
   loanRequest: z.object({
     requestedAmount: z
       .number({ message: 'Enter an amount' })
-      .min(100, 'Minimum loan amount is $100')
-      .max(50000, 'Maximum loan amount is $50,000'),
+      .min(200, 'Minimum loan amount is $200')
+      .max(2000, 'Maximum loan amount is $2,000'),
     purpose: z.enum(LOAN_PURPOSE_VALUES, { message: 'Please select a purpose' }),
     purposeDescription: z.string().min(10, 'Please provide at least 10 characters').max(1000),
     primaryIncomeSource: z.string().min(1, 'Required'),
@@ -317,10 +357,19 @@ export const terepayApplicationSchema = z.object({
     bankName: z.string().min(1, 'Bank name is required'),
     accountHolderName: z.string().min(1, 'Account holder name is required'),
     accountNumber: z.string().min(1, 'Account number is required'),
-    paymentMethod: z.enum(['direct_debit', 'bank_transfer'], { message: 'Select a payment method' }),
+    paymentMethod: z.enum(['direct_debit', 'bank_transfer']).optional(),
+    /**
+     * Repeat borrowers only: "Has your bank account changed since your last
+     * application?" `false` means the account was carried over unchanged.
+     */
+    changedSinceLastApplication: z.boolean().optional(),
   }),
 
-  // ── Section 7: References (optional) ───────────────────────────────────
+  // ── Section 7: References ──────────────────────────────────────────────
+  // New customers must give one complete reference (enforced by the apply
+  // flow and POST /api/applications, which know whether the applicant is a
+  // repeat customer). Repeat customers skip this section entirely, so the
+  // object itself is optional.
   references: z.object({
     reference1: z
       .object({
@@ -336,7 +385,7 @@ export const terepayApplicationSchema = z.object({
         phone: z.string().optional(),
       })
       .optional(),
-  }),
+  }).optional(),
 
   // ── Section 8: Declarations & Consent ──────────────────────────────────
   declarations: z.object({
@@ -353,6 +402,20 @@ export const terepayApplicationSchema = z.object({
 });
 
 export type TerepayApplicationInput = z.infer<typeof terepayApplicationSchema>;
+
+/**
+ * What is missing from a reference for it to count as complete: a name plus a
+ * phone number or email to reach them on. Returns null when complete.
+ */
+export function referenceGap(
+  ref: { name?: string; email?: string; phone?: string } | null | undefined,
+): { field: 'name' | 'phone'; message: string } | null {
+  if (!ref?.name?.trim()) return { field: 'name', message: 'Enter your reference\'s full name' };
+  if (!ref.phone?.trim() && !ref.email?.trim()) {
+    return { field: 'phone', message: 'Add a phone number or email for your reference' };
+  }
+  return null;
+}
 
 // Schema for incremental draft step saves — all sections optional, no full validation required
 export const draftApplicationSchema = z.object({
@@ -382,13 +445,58 @@ export const addNoteSchema = z.object({
 });
 
 export const requestDocumentsSchema = z.object({
-  requiredDocuments: z.array(z.string().min(1)).min(1, 'Specify at least one document'),
+  /** Catalogue keys, or `{ key: 'other', label }` for a custom ask. */
+  items: z
+    .array(
+      z.object({
+        key: z.string().min(1).max(60),
+        label: z.string().min(1).max(120).optional(),
+      }),
+    )
+    .min(1, 'Select at least one document')
+    .max(12),
   message: z.string().max(500).optional(),
 });
 
 export const reviewDocumentSchema = z.object({
   action: z.enum(['accept', 'reject']),
   rejectionReason: z.string().max(500).optional(),
+});
+
+export const reviewKycDocumentSchema = z.object({
+  action: z.enum(['accept', 'reject']),
+  rejectionReason: z.string().max(500).optional(),
+});
+
+export const logCommunicationSchema = z.object({
+  channel: z.enum(['call', 'message', 'email']),
+  direction: z.enum(['inbound', 'outbound']),
+  summary: z.string().min(3, 'Add a short summary').max(1000),
+  outcome: z.string().max(500).optional(),
+  /** ISO datetime of when the contact happened. Defaults to now on the server. */
+  occurredAt: z.string().datetime({ offset: true }).optional(),
+});
+
+/**
+ * Credit summary the lender keys in by hand from the borrower's Centrix
+ * comprehensive credit report. Manual data entry — nothing is parsed from the
+ * uploaded file.
+ */
+export const creditSummarySchema = z.object({
+  /** Date printed on the Centrix report (YYYY-MM-DD). */
+  reportDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Enter the report date')
+    .refine((d) => !Number.isNaN(Date.parse(`${d}T00:00:00Z`)), 'Enter a valid date')
+    // One day of slack so an NZ "today" is never rejected by a UTC server.
+    .refine((d) => Date.parse(`${d}T00:00:00Z`) <= Date.now() + 86_400_000, 'Report date cannot be in the future'),
+  /** Centrix credit score (0–1000). */
+  score: z.number({ message: 'Enter the credit score' }).int('Whole number only').min(0).max(1000, 'Centrix scores run from 0 to 1000'),
+  defaults: z.number({ message: 'Enter the number of defaults' }).int('Whole number only').min(0).max(99),
+  /** Credit enquiries in the last 6 months. */
+  enquiries: z.number({ message: 'Enter the number of enquiries' }).int('Whole number only').min(0).max(99),
+  /** Credit utilisation as a percentage. Optional — not every report shows it. */
+  utilisation: z.number().min(0).max(999).optional(),
 });
 
 export const affordabilityChecklistSchema = z.object({
@@ -402,11 +510,14 @@ export const affordabilityChecklistSchema = z.object({
   employmentVerificationMethod: z.string().optional(),
   visaConfirmed: z.boolean(),
   visaExpiryDate: z.string().optional(),
+  passportConfirmed: z.boolean().optional(),
+  passportExpiryDate: z.string().optional(),
   daysOfTransactionData: z.number().int().min(0).optional(),
 });
 
 const incomeRowSchema = z.object({
   category: z.string(),
+  declaredAmount: z.number().min(0).optional(),
   centrixAmount: z.number().min(0),
   verifiedAmount: z.number().min(0),
   adjustment: z.number(),
@@ -416,6 +527,7 @@ const incomeRowSchema = z.object({
 
 const expenseRowSchema = z.object({
   category: z.string(),
+  declaredAmount: z.number().min(0).optional(),
   centrixAmount: z.number().min(0),
   benchmarkAmount: z.number().min(0),
   adjustment: z.number(),
@@ -433,6 +545,25 @@ export const affordabilityAssessmentSchema = z.object({
   redFlagsAcknowledged: z.record(z.string(), z.string()).optional().default({}),
   recommendation: z.enum(['proceed', 'decline']),
   assessedAmount: z.number().min(200).max(2000).optional(),
+  /** Completed AI credit assessment job to attach to this assessment (see creditAssessmentRequestSchema). */
+  creditAssessmentId: z.string().regex(/^[0-9]{14}-[0-9a-f]{8}$/, 'Invalid assessment id').optional(),
+});
+
+/**
+ * Inputs the wizard sends when the lender runs the AI credit assessment from
+ * the Results & Decision step. Deliberately loose — the server assembles the
+ * full agent payload and reports every missing input in one MISSING_INPUTS
+ * error rather than a field-by-field Zod failure.
+ */
+export const creditAssessmentRequestSchema = z.object({
+  assessedAmount: z.number().optional(),
+  incomeRows: z.array(incomeRowSchema),
+  expenseRows: z.array(expenseRowSchema),
+  householdMultiplier: z.number().min(1),
+  checklist: z.object({
+    firstTransactionDate: z.string().optional(),
+    daysOfTransactionData: z.number().int().min(0).optional(),
+  }),
 });
 
 export const lenderDecisionSchema = z.object({
@@ -460,9 +591,13 @@ export const benchmarkEntrySchema = z.object({
 
 export type ClaimApplicationInput = z.infer<typeof claimApplicationSchema>;
 export type AddNoteInput = z.infer<typeof addNoteSchema>;
+export type CreditSummaryInput = z.infer<typeof creditSummarySchema>;
 export type RequestDocumentsInput = z.infer<typeof requestDocumentsSchema>;
 export type ReviewDocumentInput = z.infer<typeof reviewDocumentSchema>;
+export type ReviewKycDocumentInput = z.infer<typeof reviewKycDocumentSchema>;
+export type LogCommunicationInput = z.infer<typeof logCommunicationSchema>;
 export type AffordabilityAssessmentInput = z.infer<typeof affordabilityAssessmentSchema>;
+export type CreditAssessmentRequestInput = z.infer<typeof creditAssessmentRequestSchema>;
 export type LenderDecisionInput = z.infer<typeof lenderDecisionSchema>;
 export type BenchmarkEntryInput = z.infer<typeof benchmarkEntrySchema>;
 
@@ -475,12 +610,25 @@ export const adminCreateLenderSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters'),
   firstName: z.string().min(1, 'First name is required').max(50),
   lastName: z.string().min(1, 'Last name is required').max(50),
+  // Staff roles to grant. Defaults to lender for backward compatibility.
+  roles: z.array(z.enum(['lender', 'content_editor'])).min(1).max(2).default(['lender']),
 });
 
 export const adminUpdateLenderSchema = z.object({
   firstName: z.string().min(1).max(50).optional(),
   lastName: z.string().min(1).max(50).optional(),
   status: z.enum(['active', 'suspended', 'inactive']).optional(),
+  roles: z.array(z.enum(['lender', 'content_editor'])).min(1).max(2).optional(),
+  /** Per-user grant for the Model Training console (lenders only; admins always have it). */
+  trainingAccess: z.boolean().optional(),
+});
+
+export const adminUpdateUserRolesSchema = z.object({
+  // Assignable staff roles. Admin can grant any combination of these.
+  roles: z
+    .array(z.enum(['lender', 'content_editor']))
+    .min(1, 'A staff user must keep at least one role')
+    .max(2),
 });
 
 export const adminSiteSettingsSchema = z.object({
@@ -508,6 +656,7 @@ export const adminReassignApplicationsSchema = z.object({
 export const adminEmailTemplateSchema = z.object({
   name: z.string().min(1, 'Template name is required').max(100),
   type: z.enum([
+    'email_verification',
     'onboarding_followup',
     'welcome_sequence',
     'loan_submitted',
@@ -531,8 +680,152 @@ export const adminEmailTemplatePatchSchema = adminEmailTemplateSchema.partial();
 
 export type AdminCreateLenderInput = z.infer<typeof adminCreateLenderSchema>;
 export type AdminUpdateLenderInput = z.infer<typeof adminUpdateLenderSchema>;
+export type AdminUpdateUserRolesInput = z.infer<typeof adminUpdateUserRolesSchema>;
 export type AdminSiteSettingsInput = z.infer<typeof adminSiteSettingsSchema>;
 export type AdminConfigInput = z.infer<typeof adminConfigSchema>;
 export type AdminReassignApplicationsInput = z.infer<typeof adminReassignApplicationsSchema>;
 export type AdminEmailTemplateInput = z.infer<typeof adminEmailTemplateSchema>;
 export type AdminEmailTemplatePatchInput = z.infer<typeof adminEmailTemplatePatchSchema>;
+
+export const adminPaymentRefreshSchema = z.object({
+  enabled: z.boolean().optional(),
+  refreshHourNzt: z.number().int().min(0).max(23).optional(),
+});
+
+export type AdminPaymentRefreshInput = z.infer<typeof adminPaymentRefreshSchema>;
+
+// ---------------------------------------------------------------------------
+// Admin — model training jobs (queued to the Pi worker via Upstash Redis)
+// ---------------------------------------------------------------------------
+
+const driveIdSchema = z.string().regex(/^[A-Za-z0-9_-]{10,}$/, 'Invalid Google Drive ID');
+
+export const adminTrainingJobSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('import_batch'), driveId: driveIdSchema, replace: z.boolean().default(true) }),
+  z.object({ type: z.literal('import_outcomes'), driveId: driveIdSchema }),
+  z.object({ type: z.literal('backtest') }),
+  z.object({ type: z.literal('build_dataset') }),
+  z.object({
+    type: z.literal('finetune'),
+    outName: z.string().regex(/^[a-z0-9][a-z0-9-]{1,39}$/, 'Lowercase letters, digits and dashes').optional(),
+  }),
+  z.object({
+    type: z.literal('exam'),
+    model: z.string().min(1).max(80),
+    n: z.number().int().min(1).max(200).default(12),
+  }),
+  z.object({
+    type: z.literal('regenerate_synthetic'),
+    n: z.number().int().min(10).max(2000).default(200),
+    seed: z.number().int().min(0).max(1_000_000).default(11),
+  }),
+]);
+
+export type AdminTrainingJobInput = z.infer<typeof adminTrainingJobSchema>;
+
+// ---------------------------------------------------------------------------
+// Training console — cases uploaded from the site + worker request/reply
+// ---------------------------------------------------------------------------
+
+const trainingIdSchema = z.string().regex(/^[a-z0-9][a-z0-9-]{1,39}$/, 'Lowercase letters, digits and dashes');
+const trainingCaseIdSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$/, 'Invalid case id');
+const money = z.number().min(0).max(10_000_000).nullable().optional();
+const triBool = z.boolean().nullable().optional();
+
+export const trainingCaseApplicationSchema = z.object({
+  applicationId: trainingIdSchema,
+  application: z.object({
+    applicant_name: z.string().max(80).optional(),
+    application_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal('')).optional(),
+    loan_amount: money,
+    interest_rate: z.number().min(0).max(100).nullable().optional(),
+    income: money,
+    expenses: money,
+    existing_debt: money,
+    loan_purpose: z.string().max(200).optional(),
+    decision_made: z.enum(['', 'approved', 'conditional', 'declined']).optional(),
+    decision_by: z.string().max(40).optional(),
+    outcome: z.enum(['unknown', 'repaid', 'repaid_late', 'arrears', 'default', 'written_off', 'current', 'declined']).optional(),
+    max_days_late: z.number().int().min(0).max(5000).nullable().optional(),
+    outcome_notes: z.string().max(1000).optional(),
+    behaviour_paid_previous_loan_early: triBool,
+    behaviour_paid_on_time_consistently: triBool,
+    behaviour_communicates_proactively: triBool,
+    behaviour_missed_payments_before: triBool,
+    behaviour_existing_defaults: triBool,
+    behaviour_write_off_history: triBool,
+    behaviour_requests_bigger_loan_too_fast: triBool,
+    behaviour_provides_multiple_excuses: triBool,
+    behaviour_avoids_communication: triBool,
+  }),
+});
+export type TrainingCaseApplicationInput = z.infer<typeof trainingCaseApplicationSchema>;
+
+const trainingLabelSchema = z.object({
+  judgements: z.record(z.string().regex(/^[a-z_]{3,60}$/), z.boolean()).default({}),
+  behaviour: z.array(z.string().max(60)).max(20).default([]),
+  analyst_note: z.string().max(2000).default(''),
+  confidence: z.number().min(0).max(100).default(70),
+  data_gaps: z.array(z.string().max(200)).max(20).default([]),
+  officer: z.string().max(80).default(''),
+});
+
+export const trainingRpcSchema = z.discriminatedUnion('op', [
+  z.object({ op: z.literal('ping') }),
+  z.object({ op: z.literal('cases.list') }),
+  z.object({ op: z.literal('cases.get'), id: trainingCaseIdSchema }),
+  z.object({ op: z.literal('cases.label'), id: trainingCaseIdSchema, label: trainingLabelSchema }),
+  z.object({ op: z.literal('cases.reanalyse'), id: trainingCaseIdSchema, application: trainingCaseApplicationSchema.shape.application }),
+  z.object({ op: z.literal('cases.delete'), id: trainingCaseIdSchema }),
+  z.object({ op: z.literal('backtest.get') }),
+  z.object({ op: z.literal('gold.list'), profile: z.string().max(60).optional(), status: z.enum(['unreviewed', 'approved', 'edited', 'rejected']).optional() }),
+  z.object({ op: z.literal('gold.get'), id: trainingCaseIdSchema }),
+  z.object({
+    op: z.literal('gold.review'),
+    id: trainingCaseIdSchema,
+    review: z.object({
+      status: z.enum(['approved', 'edited', 'rejected']),
+      judgements: z.record(z.string().regex(/^[a-z_]{3,60}$/), z.boolean()).optional(),
+      behaviour: z.array(z.string().max(60)).max(20).optional(),
+      analyst_note: z.string().max(2000).optional(),
+      officer: z.string().max(80).optional(),
+    }),
+  }),
+  z.object({ op: z.literal('dataset.get') }),
+  z.object({ op: z.literal('exams.list') }),
+  z.object({ op: z.literal('exams.get'), file: z.string().regex(/^exam-[A-Za-z0-9._-]+\.json$/) }),
+  z.object({ op: z.literal('settings.get') }),
+  z.object({
+    op: z.literal('settings.set'),
+    settings: z.object({
+      gpu_mode: z.enum(['ssh', 'local']).optional(),
+      ssh_host: z.string().max(200).optional(),
+      ssh_user: z.string().max(64).optional(),
+      ssh_key: z.string().max(300).optional(),
+      remote_dir: z.string().max(200).optional(),
+      base_model: z.string().max(200).optional(),
+      ollama_name: z.string().regex(/^[a-z0-9][a-z0-9-]{1,39}$/).optional(),
+      epochs: z.number().int().min(1).max(10).optional(),
+    }),
+  }),
+  z.object({ op: z.literal('prompts.list') }),
+]);
+export type TrainingRpcInput = z.infer<typeof trainingRpcSchema>;
+
+export const adminSetPayTestSchema = z.object({
+  enabled: z.boolean().optional(),
+  intervalMinutes: z.number().int().min(1).max(1440).optional(),
+});
+
+export type AdminSetPayTestInput = z.infer<typeof adminSetPayTestSchema>;
+
+/** Admin — which Ollama model the assessment worker is asked to use. `null` = worker default. */
+export const adminCreditAssessmentModelSchema = z.object({
+  model: z
+    .string()
+    .max(ASSESSMENT_MODEL_MAX_LENGTH)
+    .regex(ASSESSMENT_MODEL_PATTERN, 'Not a valid model name')
+    .nullable(),
+});
+
+export type AdminCreditAssessmentModelInput = z.infer<typeof adminCreditAssessmentModelSchema>;

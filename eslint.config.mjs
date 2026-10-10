@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Claude desktop app worktrees live inside the repo; never lint them.
+    ".claude/**",
   ]),
 ]);
 

@@ -12,6 +12,11 @@ import {
   listProviders,
 } from '@/lib/qippay/setpay-client';
 import type { PaymentConsent, PaymentConsentAttempt } from '@/types/application';
+import { buildSchedule } from '@/lib/loan/repayment';
+import {
+  buildTestCadenceTimes,
+  getSetPayTestSettings,
+} from '@/lib/admin/setpay-test-settings';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,6 +52,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const beneficiaryId = getBeneficiaryId();
     const returnBaseUrl = getReturnBaseUrl();
+    // Admin-controlled, non-production only: compress the instalment cadence
+    // from fortnightly to minutes apart so a full cycle can be tested.
+    const testSettings = await getSetPayTestSettings();
+    const testCadence = testSettings.enabled
+      ? {
+          intervalMinutes: testSettings.intervalMinutes,
+          enabledBy: testSettings.updatedBy ?? 'admin',
+        }
+      : undefined;
     const successUrl = `${returnBaseUrl}/applicant/applications/${id}/consent/return?outcome=success`;
     const failureUrl = `${returnBaseUrl}/applicant/applications/${id}/consent/return?outcome=failure`;
 
@@ -115,24 +129,31 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         );
       }
 
-      // TerePay product is 4 × fortnightly. Derive installment amounts when
-      // we don't have a stored schedule yet.
-      const installmentCount = 4;
-      const perInstallmentNzd =
-        typeof fortnightlyPayment === 'number'
-          ? fortnightlyPayment
-          : ((approvedAmount + approvedAmount * 0.047) / installmentCount);
-      const perInstallmentCents = Math.round(perInstallmentNzd * 100);
-
+      // TerePay product is 4 × fortnightly on a reducing balance, so the final
+      // instalment differs from the first three by a few cents. Build the real
+      // amortisation rather than splitting a total four ways.
       const today = new Date();
-      const installments = Array.from({ length: installmentCount }, (_, i) => {
-        const due = new Date(today);
-        due.setDate(today.getDate() + 14 * (i + 1));
-        return {
-          dueDate: due.toISOString().slice(0, 10),
-          amountCents: perInstallmentCents,
-        };
-      });
+      const schedule = buildSchedule({ principal: approvedAmount, startDate: today });
+      const installmentCount = schedule.rows.length;
+
+      // Test cadence keeps the real amortised amounts and only compresses the
+      // timing. These times are provisional — scheduleInstallments re-anchors
+      // the minute clock at disbursement, when instalments are first lodged.
+      const testTimes = testCadence
+        ? buildTestCadenceTimes(installmentCount, testCadence.intervalMinutes, today)
+        : undefined;
+
+      const installments = schedule.rows.map((row, i) => ({
+        dueDate: testTimes ? testTimes[i].dueDate : row.dueDate,
+        amountCents: Math.round(row.amount * 100),
+        ...(testTimes ? { dueAt: testTimes[i].dueAt } : {}),
+      }));
+
+      // Prefer the figures agreed at approval; fall back to this schedule when
+      // an older application predates them.
+      const perInstallmentCents = Math.round(
+        (fortnightlyPayment ?? schedule.fortnightlyPayment) * 100,
+      );
       const totalAmountCents =
         typeof totalRepayment === 'number'
           ? Math.round(totalRepayment * 100)
@@ -140,9 +161,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
       // SetPay consent window covers the full repayment schedule with a
       // small safety buffer past the last installment in case of retries.
+      // Test cadence: a 7-day window so the lender has time to disburse.
       const fromDateTime = today.toISOString();
       const lastDue = new Date(today);
-      lastDue.setDate(today.getDate() + 14 * installmentCount + 7);
+      lastDue.setDate(today.getDate() + (testCadence ? 7 : 14 * installmentCount + 7));
       const toDateTime = lastDue.toISOString();
 
       const mandate = await createMandate({
@@ -153,8 +175,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         customerUserAgent: userAgent,
         merchantCustomerIdentification: auth.uid,
         metadata: { applicationId: id },
-        frequencyPeriod: 'Fortnightly',
-        frequencyTotalAmountCents: perInstallmentCents,
+        // Test cadence lodges every instalment within one day, so the
+        // per-period limit must cover the whole loan, not one instalment.
+        frequencyPeriod: testCadence ? 'Daily' : 'Fortnightly',
+        frequencyTotalAmountCents: testCadence ? totalAmountCents : perInstallmentCents,
         totalAmountCents,
         totalCount: installmentCount,
         fromDateTime,
@@ -187,6 +211,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         initiatedAt: now,
         initiatedBy: auth.uid,
         attempts,
+        ...(testCadence ? { testCadence } : {}),
       };
       if (mandate.expiresAt) {
         nextConsent.expiresAt = Timestamp.fromDate(new Date(mandate.expiresAt));
@@ -222,6 +247,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           mandateId: result.mandateId,
           reused: 'reused' in result ? result.reused : false,
           scheduleTotalCents: result.totalAmountCents,
+          testCadence: testCadence ? testCadence.intervalMinutes : false,
         },
       });
     }

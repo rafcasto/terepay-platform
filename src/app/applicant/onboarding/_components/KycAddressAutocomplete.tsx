@@ -55,6 +55,7 @@ export default function KycAddressAutocomplete({ value, onChange, errors }: Prop
 
   useEffect(() => {
     if (value.address && !hasTyped) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs search box from async-arriving prop; intentional one-shot
       setQuery(value.address);
     }
   }, [value.address, hasTyped]);

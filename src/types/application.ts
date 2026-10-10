@@ -1,5 +1,7 @@
 import type { Timestamp } from 'firebase-admin/firestore';
 import type { LoanPurposeValue } from '@/lib/constants/loan-purposes';
+import type { DocumentRequestItem } from '@/lib/loan/document-requests';
+import type { CreditAssessmentSummary } from '@/types/credit-assessment';
 
 // ---------------------------------------------------------------------------
 // LMS Application Statuses (CCCFA-aligned workflow)
@@ -55,7 +57,23 @@ export interface PaymentConsent {
   scheduleSummary: {
     currency: 'NZD';
     totalAmountCents: number;
-    installments: Array<{ dueDate: string; amountCents: number }>;
+    installments: Array<{
+      dueDate: string;
+      amountCents: number;
+      /** ISO datetime — only set for test-cadence schedules (minutes apart). */
+      dueAt?: string;
+    }>;
+  };
+  /**
+   * Present when this consent was created with the admin SetPay test cadence
+   * on (non-production only). Instalments are re-anchored `intervalMinutes`
+   * apart from the moment they are first lodged, instead of fortnightly.
+   */
+  testCadence?: {
+    intervalMinutes: number;
+    enabledBy: string;
+    /** Set when instalments are first lodged (the minute clock starts here). */
+    anchoredAt?: string;
   };
   verifiedBankAccount?: PaymentConsentVerifiedBank;
   initiatedAt: Timestamp;
@@ -65,6 +83,8 @@ export interface PaymentConsent {
   lastStatusFromProvider?: string;
   expiresAt?: Timestamp;
   failureReason?: string;
+  /** Why the mandate was cancelled, e.g. 'settled_early' after an early payoff. */
+  cancelledReason?: string;
   attempts: PaymentConsentAttempt[];
 }
 
@@ -84,7 +104,9 @@ export type ScheduledPaymentStatus =
 
 export interface ScheduledPayment {
   installmentNumber: number;        // 1-based index
-  dueDate: string;                  // YYYY-MM-DD (the scheduled_for date sent to Qippay)
+  dueDate: string;                  // YYYY-MM-DD (NZ calendar date the instalment falls on)
+  /** ISO datetime sent as scheduled_for — only set for test-cadence schedules. */
+  dueAt?: string;
   amountCents: number;
   qippayPaymentId?: string;         // pmU_... returned by POST /v1/setpay
   status: ScheduledPaymentStatus;
@@ -92,7 +114,153 @@ export interface ScheduledPayment {
   completedAt?: Timestamp;          // when payment.status.success confirmed
   failedAt?: Timestamp;
   failureReason?: string;
+  /** Last time we attempted to schedule this instalment with Qippay (POST /v1/setpay). */
+  lastAttemptAt?: Timestamp;
+  /** How many times we have attempted to schedule this instalment with Qippay. */
+  scheduleAttempts?: number;
   retryCount: number;               // incremented on each setpay.status.retry event
+}
+
+// ---------------------------------------------------------------------------
+// Early Repayment (Qippay PayBy — one-off open-banking payment to settle the
+// loan ahead of its scheduled term). Distinct from the SetPay `paymentConsent`
+// mandate that gates disbursement: PayBy is a single Hosted payment the
+// borrower approves at their bank, used only for a voluntary advance payoff.
+// ---------------------------------------------------------------------------
+export type EarlyRepaymentStatus =
+  | 'not_started'
+  | 'initiated'   // PayBy payment created, borrower redirected to Hosted page
+  | 'pending'     // borrower reached their bank but hasn't approved yet
+  | 'paid'        // approved — loan settled in full
+  | 'expired'
+  | 'failed'
+  | 'cancelled';
+
+/**
+ * Snapshot of the payoff quote taken at initiation. All amounts in cents (NZD).
+ * Recomputed server-side at initiate time — never trusted from the client.
+ */
+export interface EarlyRepaymentQuote {
+  currency: 'NZD';
+  /** Gross outstanding: sum of not-yet-paid instalments (principal + interest). */
+  outstandingBalanceCents: number;
+  /** Unearned interest refunded on early settlement. */
+  unearnedInterestRebateCents: number;
+  /** outstandingBalanceCents − unearnedInterestRebateCents. */
+  netOutstandingCents: number;
+  /** Fixed prepayment/administrative fee (EARLY_REPAYMENT_FEE). */
+  prepaymentFeeCents: number;
+  /** netOutstandingCents + prepaymentFeeCents — the amount charged via PayBy. */
+  totalPayoffCents: number;
+  /** installmentNumbers this payoff clears. */
+  installmentsCleared: number[];
+  /**
+   * Late payment fees, the payment default fee and post-default interest
+   * outstanding at initiation and collected as part of the payoff. Absent on
+   * payoffs initiated before arrears charges were included in the quote.
+   */
+  arrearsChargesCents?: number;
+  /**
+   * Snapshot of the interest-rebate working at initiation time, retained for
+   * audit / dispute resolution. Mirrors EarlyPayoffBreakdown (amounts in NZD).
+   */
+  rebateBreakdown?: {
+    method: string;
+    totalInterest: number;
+    totalInstalments: number;
+    remainingInstalments: number;
+    grossFutureInterest: number;
+    termDays: number;
+    elapsedDays: number;
+    remainingDays: number;
+    loanStartDate: string;
+    finalDueDate: string;
+    settlementDate: string;
+    /** Actuarial (amortised) loans only. */
+    outstandingPrincipal?: number;
+    accruedInterest?: number;
+    accrualFromDate?: string;
+    accrualDays?: number;
+    /** Arrears charges folded into the payoff (NZD). */
+    arrearsLateFees?: number;
+    arrearsDefaultFee?: number;
+    arrearsOverdueInterest?: number;
+  };
+}
+
+export interface EarlyRepayment {
+  provider: 'qippay_payby';
+  status: EarlyRepaymentStatus;
+  /** Qippay PayBy payment id (`pmU_...`) from POST /v1/payment_initiation. */
+  paymentId: string;
+  /** Qippay Hosted payment page URL (fallback only — embedded flow is primary). */
+  hostedUrl: string;
+  beneficiaryId: string;
+  /** Embedded flow: bank the borrower selected (Qippay provider id). */
+  providerId?: string;
+  /** Embedded flow: how the bank approval was delivered ('CIBA' | 'redirect'). */
+  approvalMethod?: string;
+  quote: EarlyRepaymentQuote;
+  /** Records the borrower's acceptance of the advance-payment terms. */
+  disclaimerAcceptedAt: Timestamp;
+  disclaimerVersion: string;
+  initiatedAt: Timestamp;
+  initiatedBy: string;
+  paidAt?: Timestamp;
+  appliedAt?: Timestamp; // when instalments were cleared + loan closed
+  lastStatusCheckedAt?: Timestamp;
+  lastStatusFromProvider?: string;
+  expiresAt?: Timestamp;
+  failureReason?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Arrears — default fees + post-default interest assessed by the arrears engine
+// (src/lib/loan/arrears.ts), driven daily by the payment-refresh cron. Applies
+// only to loans stamped with `feePolicyVersion` (future loans).
+// ---------------------------------------------------------------------------
+export type FeeType = 'late_payment' | 'payment_default';
+
+/** A single default-fee charge. Append-only; `id` is the idempotency key. */
+export interface FeeAssessment {
+  /** Deterministic dedup key: `late:<installmentNumber>` or `default`. */
+  id: string;
+  type: FeeType;
+  amountCents: number;
+  /** Which instalment triggered the fee (late-payment fees only). */
+  installmentNumber?: number;
+  reason: string;
+  assessedAt: Timestamp;
+}
+
+/** Running post-default interest accrual state, recomputed each arrears run. */
+export interface ArrearsState {
+  /** Cumulative additional interest accrued on the overdue balance (cents). */
+  accruedInterestCents: number;
+  /** Daily rate applied (annual / 365), snapshotted for audit. */
+  dailyRate: number;
+  /** Earliest currently-overdue instalment due date (YYYY-MM-DD). */
+  earliestMissDate: string;
+  /** NZ calendar date the arrears engine last accrued interest (YYYY-MM-DD). */
+  lastAssessedDate: string;
+}
+
+/** Dunning-reminder stages sent to the borrower via email (Resend). */
+export type ReminderType =
+  | 'upcoming_payment'
+  | 'payment_missed'
+  | 'late_fee_warning'
+  | 'late_fee_charged'
+  | 'default_warning';
+
+/** Record of a reminder already sent, used to dedupe the sequence. */
+export interface SentReminder {
+  /** Dedup key: `<type>:<installmentNumber>`. */
+  key: string;
+  type: ReminderType;
+  installmentNumber?: number;
+  sentAt: Timestamp;
+  channel: 'email';
 }
 
 // Legacy statuses retained for backward-compat during migration
@@ -111,6 +279,8 @@ export type DocumentType =
   | 'visa'
   | 'payslip'
   | 'bank_statement'
+  | 'proof_of_address'
+  | 'other_income'
   | 'other';
 
 export type DocumentStatus = 'pending' | 'accepted' | 'rejected';
@@ -127,6 +297,10 @@ export interface ApplicationDocument {
   rejectionReason?: string;
   reviewedAt?: Timestamp;
   reviewedBy?: string; // lender uid
+  /** Which item of the lender's document request this upload satisfies (see documentRequest.items). */
+  requestKey?: string;
+  /** Passport expiry date (YYYY-MM-DD), given by the applicant when uploading a passport. */
+  expiryDate?: string;
 }
 
 export interface InternalNote {
@@ -135,6 +309,33 @@ export interface InternalNote {
   lenderName: string;
   text: string;
   createdAt: Timestamp;
+}
+
+// ---------------------------------------------------------------------------
+// Lender communication log (calls / messages / emails with the applicant)
+// ---------------------------------------------------------------------------
+/** `system` = an automatic in-app notification (status change on the applicant's tracker). */
+export type CommunicationChannel = 'call' | 'message' | 'email' | 'system';
+export type CommunicationDirection = 'inbound' | 'outbound';
+/** `manual` = typed in by a lender; `system` = recorded automatically by a workflow action. */
+export type CommunicationSource = 'manual' | 'system';
+
+export interface CommunicationLogEntry {
+  entryId: string;
+  channel: CommunicationChannel;
+  direction: CommunicationDirection;
+  source?: CommunicationSource;
+  /** Workflow event that produced an automatic entry, e.g. `documents_requested`. */
+  event?: string;
+  /** Short summary of what was discussed / sent. Never store PII beyond what's needed. */
+  summary: string;
+  /** Optional outcome / next step (e.g. "Applicant to send payslips by Friday"). */
+  outcome?: string;
+  /** When the contact actually happened (may differ from when it was logged). */
+  occurredAt: Timestamp | string;
+  loggedBy: string; // lender uid
+  loggedByName: string;
+  createdAt: Timestamp | string;
 }
 
 export interface LenderDecision {
@@ -176,6 +377,59 @@ export interface RepaymentSchedule {
 // ---------------------------------------------------------------------------
 export type LoanStatus = 'disbursed' | 'active' | 'delinquent' | 'closed_repaid';
 
+/**
+ * One line of the borrower-facing cost ledger: what the loan has cost and
+ * why. Built by `deriveLoanSummary()` (src/lib/loan/active-loan.ts) from the
+ * application document and rendered verbatim by the statement, the closure
+ * letter and the borrower/lender screens so every surface tells one story.
+ */
+export type LoanLedgerLineKind =
+  | 'principal'
+  | 'scheduled_interest'
+  | 'late_fee'
+  | 'default_fee'
+  | 'overdue_interest'
+  | 'interest_rebate'
+  | 'early_repayment_fee';
+
+export interface LoanLedgerLine {
+  id: string;
+  kind: LoanLedgerLineKind;
+  label: string;
+  /** NZD. Credits to the borrower (the early-settlement interest rebate) are negative. */
+  amount: number;
+  /** ISO 8601 datetime or YYYY-MM-DD, when known. */
+  date?: string;
+  note?: string;
+}
+
+export interface LoanLedger {
+  /** Amount financed (`loanDetails.approvedAmount`), NZD. */
+  principal: number;
+  /** Interest built into the contractual schedule (totalRepayable − principal). */
+  scheduledInterest: number;
+  /** Interest not charged because the loan was settled early (≥ 0). */
+  interestRebate: number;
+  earlyRepaymentFee: number;
+  lateFees: number;
+  lateFeeCount: number;
+  defaultFee: number;
+  /** Post-default interest accrued on the overdue balance. */
+  overdueInterest: number;
+  /** scheduledInterest − interestRebate + overdueInterest. */
+  interestCharged: number;
+  /** earlyRepaymentFee + lateFees + defaultFee. */
+  feesCharged: number;
+  /** principal + interestCharged + feesCharged — the full cost of the loan as it stands. */
+  totalCost: number;
+  /** Cash actually received from the borrower. */
+  totalPaid: number;
+  /** Still owing including arrears charges (0 once settled). */
+  outstanding: number;
+  /** Ordered for display: principal, interest, charges, then settlement adjustments. */
+  lines: LoanLedgerLine[];
+}
+
 export interface Loan {
   loanId: string;
   applicationId: string;
@@ -186,9 +440,14 @@ export interface Loan {
   // Money
   principal: number; // disbursedAmount (cash given to applicant)
   totalRepayable: number; // sum of all instalments (principal + fee + interest)
+  /** Cash actually received — an early payoff counts at the amount paid, not instalment face value. */
   totalPaid: number;
   remainingBalance: number;
   fortnightlyPayment: number;
+  /** True once the borrower settled the loan early via PayBy. */
+  settledEarly?: boolean;
+  /** Snapshot of the cost ledger at the last sync (see `LoanLedger`). */
+  ledger?: LoanLedger;
 
   // Schedule (mirrors loanApplications.repaymentSchedule but lives here for fast reads)
   installments: RepaymentInstallment[];
@@ -214,6 +473,7 @@ export interface Loan {
 // ---------------------------------------------------------------------------
 export interface AffordabilityIncomeRow {
   category: string;
+  declaredAmount?: number;    // fortnightly figure from the applicant's application (reference)
   centrixAmount: number;      // lender enters from Centrix
   verifiedAmount: number;     // lender enters from payslips
   adjustment: number;         // lender enters
@@ -223,11 +483,12 @@ export interface AffordabilityIncomeRow {
 
 export interface AffordabilityExpenseRow {
   category: string;
+  declaredAmount?: number;    // fortnightly figure from the applicant's application
   centrixAmount: number;      // lender enters from bank analysis
   benchmarkAmount: number;    // auto from catalog × multiplier
   adjustment: number;         // lender enters with reason
   adjustmentReason?: string;
-  finalAmount: number;        // auto: MAX(centrix, benchmark) + adjustment
+  finalAmount: number;        // auto: MAX(centrix || declared, benchmark) + adjustment
   benchmarkOverrideAcknowledged?: boolean;
 }
 
@@ -254,6 +515,9 @@ export interface AffordabilityAssessment {
     employmentVerificationMethod?: string;
     visaConfirmed: boolean;
     visaExpiryDate?: string;
+    /** NZ citizens have no visa — the lender confirms the passport instead. */
+    passportConfirmed?: boolean;
+    passportExpiryDate?: string;
   };
 
   // Data
@@ -278,6 +542,10 @@ export interface AffordabilityAssessment {
   redFlagsAcknowledged: Record<string, string>; // flag → lender acknowledgement
   surplusRating: 'affordable' | 'marginal' | 'high_risk' | 'not_affordable';
   recommendation: 'proceed' | 'decline';
+
+  /** AI credit assessment (`creditAssessments/{id}`) the lender ran on this wizard, if any. Advisory only. */
+  creditAssessmentId?: string;
+  creditAssessment?: CreditAssessmentSummary;
 }
 
 // ---------------------------------------------------------------------------
@@ -313,6 +581,11 @@ export interface HouseholdMultiplier {
 // Affordability Assessment Draft (persisted step-by-step)
 // ---------------------------------------------------------------------------
 export interface AffordabilityDraftData {
+  /**
+   * Which step order the draft was saved under. Drafts without it (or with an
+   * older value) pre-date the current wizard layout and resume from the start.
+   */
+  layoutVersion?: number;
   currentStep: number;
   checklist: {
     centrixReportObtained: boolean;
@@ -325,9 +598,12 @@ export interface AffordabilityDraftData {
     employmentVerificationMethod: string;
     visaConfirmed: boolean;
     visaExpiryDate: string;
+    passportConfirmed?: boolean;
+    passportExpiryDate?: string;
   };
   incomeRows: Array<{
     category: string;
+    declaredAmount?: number;
     centrixAmount: number;
     verifiedAmount: number;
     adjustment: number;
@@ -336,6 +612,7 @@ export interface AffordabilityDraftData {
   }>;
   expenseRows: Array<{
     category: string;
+    declaredAmount?: number;
     centrixAmount: number;
     benchmarkAmount: number;
     adjustment: number;
@@ -355,6 +632,8 @@ export interface LoanApplication {
   referenceNumber: string;           // e.g. TP-2026-00001
   applicantId: string;
   assignedLenderId?: string;
+  /** Friendly customer ID (e.g. TERE001) when the application was raised for an offline customer. */
+  offlineCustomerId?: string;
   status: ApplicationStatus;
   submittedAt?: Timestamp;
 
@@ -371,7 +650,18 @@ export interface LoanApplication {
     approvedAmount?: number;
     applicationFee?: number;
     fortnightlyPayment?: number;
+    /** Principal + interest. Excludes `applicationFee`, which is deducted at disbursement. */
     totalRepayment?: number;
+    /** Total interest over the term (totalRepayment − approvedAmount). */
+    totalInterest?: number;
+    /** Annual interest rate the loan was priced at, e.g. 0.49. */
+    interestRate?: number;
+    /**
+     * Pricing model stamp. `'amortised_v1'` = reducing-balance annuity.
+     * Absent on loans written under the legacy flat 4.7% product, which keep
+     * their original figures and settlement basis.
+     */
+    rateModel?: 'amortised_v1';
     disbursementDate?: string;
     disbursedAmount?: number;
   };
@@ -392,11 +682,16 @@ export interface LoanApplication {
   documentRequest?: {
     requestedAt: Timestamp;
     requestedBy: string;
+    /** Human labels — kept for the email and older clients. Derived from `items` when present. */
     requiredDocuments: string[];
+    /** Structured items; each knows the DocumentType(s) that satisfy it. Absent on requests made before this existed. */
+    items?: DocumentRequestItem[];
     message?: string;
   };
 
   internalNotes: InternalNote[];
+  /** Lender-logged calls / messages / emails with the applicant (most recent last). */
+  communicationLog?: CommunicationLogEntry[];
   decision?: LenderDecision;
   applicantRejection?: {
     rejectedAt: Timestamp;
@@ -409,6 +704,8 @@ export interface LoanApplication {
   affordabilityStatus: 'not_started' | 'in_progress' | 'complete';
   /** Persisted step-by-step draft while the lender is filling the assessment */
   affordabilityDraft?: AffordabilityDraftData;
+  /** Latest AI credit assessment queued for this application (full record in `creditAssessments`). */
+  creditAssessment?: CreditAssessmentSummary;
   /** True when the applicant is flagged as an existing customer ($20 fee vs $50 for new) */
   isExistingCustomer?: boolean;
   creditCheck?: {
@@ -443,6 +740,26 @@ export interface LoanApplication {
    * first schedules a payment. Updated by the webhook receiver or the manual poll route.
    */
   scheduledPayments?: ScheduledPayment[];
+
+  /**
+   * Voluntary early-repayment payoff via Qippay PayBy (one-off Hosted payment).
+   * Present once the borrower starts an advance payoff on a live loan.
+   */
+  earlyRepayment?: EarlyRepayment;
+
+
+  /**
+   * Fee-policy version stamped at disbursement. Present only on loans disbursed
+   * under the arrears-fee policy (future loans); the arrears engine assesses
+   * fees + post-default interest only when this is set.
+   */
+  feePolicyVersion?: string;
+  /** Append-only ledger of default fees assessed by the arrears engine. */
+  feeAssessments?: FeeAssessment[];
+  /** Running post-default interest accrual state, recomputed daily. */
+  arrears?: ArrearsState;
+  /** Ledger of dunning reminders already sent (used to dedupe the sequence). */
+  reminders?: SentReminder[];
 
   // TerePay 8-section form data
   personalInfo?: TerePayPersonalInfo;
@@ -490,6 +807,9 @@ export interface TerePayEmployment {
   employmentStatus: 'permanent' | 'fixed_term' | 'casual' | 'part_time';
   timeAtEmployer: string;
   previousEmployer?: string;
+  previousEmployerPeriod?: string;
+  /** Repeat borrowers: whether they changed jobs since their last application (false = details carried over). */
+  changedSinceLastApplication?: boolean;
   income: {
     salaryBeforeTax: number;
     salaryAfterTax: number;
@@ -548,7 +868,9 @@ export interface TerePayBankDetails {
   bankName: string;
   accountHolderName: string;
   accountNumber: string; // store encrypted in production
-  paymentMethod: 'direct_debit' | 'bank_transfer';
+  paymentMethod?: 'direct_debit' | 'bank_transfer';
+  /** Repeat borrowers: whether their bank account changed since their last application (false = carried over). */
+  changedSinceLastApplication?: boolean;
 }
 
 export interface TerePayReferences {

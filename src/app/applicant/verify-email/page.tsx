@@ -2,9 +2,11 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { sendEmailVerification, reload } from 'firebase/auth';
+import { reload } from 'firebase/auth';
 import { clientAuth } from '@/lib/firebase/client';
 import { useAuth } from '@/hooks/useAuth';
+
+const CHANNEL = 'terepay-email-verify';
 
 export default function VerifyEmailPage() {
   const { user } = useAuth();
@@ -20,21 +22,6 @@ export default function VerifyEmailPage() {
     return () => clearTimeout(timer);
   }, [resendCooldown]);
 
-  // Poll every 8 seconds to auto-detect verification
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      const firebaseUser = clientAuth.currentUser;
-      if (!firebaseUser) return;
-      await reload(firebaseUser).catch(() => null);
-      if (firebaseUser.emailVerified) {
-        clearInterval(interval);
-        await refreshSessionAndRedirect();
-      }
-    }, 8000);
-    return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const refreshSessionAndRedirect = useCallback(async () => {
     const firebaseUser = clientAuth.currentUser;
     if (!firebaseUser) return;
@@ -48,11 +35,53 @@ export default function VerifyEmailPage() {
     router.push('/applicant/dashboard');
   }, [router]);
 
-  const handleResend = async () => {
-    const firebaseUser = clientAuth.currentUser;
-    if (!firebaseUser) return;
+  // Poll every 8 seconds to auto-detect verification
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      const firebaseUser = clientAuth.currentUser;
+      if (!firebaseUser) return;
+      await reload(firebaseUser).catch(() => null);
+      if (firebaseUser.emailVerified) {
+        clearInterval(interval);
+        await refreshSessionAndRedirect();
+      }
+    }, 8000);
+    return () => clearInterval(interval);
+  }, [refreshSessionAndRedirect]);
+
+  // Listen for the branded action handler verifying in another tab
+  useEffect(() => {
+    let channel: BroadcastChannel | null = null;
     try {
-      await sendEmailVerification(firebaseUser);
+      channel = new BroadcastChannel(CHANNEL);
+      channel.onmessage = async (e: MessageEvent) => {
+        if (e.data?.type !== 'email-verified') return;
+        channel?.postMessage({ type: 'verify-ack' });
+        const firebaseUser = clientAuth.currentUser;
+        if (firebaseUser) await reload(firebaseUser).catch(() => null);
+        await refreshSessionAndRedirect();
+      };
+    } catch {
+      channel = null;
+    }
+    return () => channel?.close();
+  }, [refreshSessionAndRedirect]);
+
+  const handleResend = async () => {
+    try {
+      const res = await fetch('/api/auth/send-verification-email', { method: 'POST' });
+      if (!res.ok) {
+        setResendStatus('error');
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      if (data?.alreadyVerified) {
+        await refreshSessionAndRedirect();
+        return;
+      }
+      if (data?.devVerificationUrl) {
+        console.log('[dev] Open this verification link:', data.devVerificationUrl);
+      }
       setResendStatus('sent');
       setResendCooldown(60);
     } catch {

@@ -1,6 +1,7 @@
 import { Hero, HeroBalance, Pill, ProgressBar, StatGrid, ButtonLink, Confetti } from '@/components/ui';
 import { fmtDate, fmtNZD, daysUntil } from '@/lib/loan/format';
 import type { LoanDisplayState } from '@/lib/loan/status-display';
+import { withDefaults, type ContentSectionValues } from '@/types/content';
 
 export type DashboardHeroData = {
   state: LoanDisplayState;
@@ -10,8 +11,10 @@ export type DashboardHeroData = {
     totalPaid: number;
     nextPaymentDate: string;
     isDelinquent?: boolean;
+    /** Active loan's application id — links straight to its repayment schedule. */
+    applicationId?: string;
   };
-  // review / approved / rejected
+  // draft / review / approved / rejected
   application?: {
     id: string;
     referenceNumber?: string;
@@ -21,28 +24,39 @@ export type DashboardHeroData = {
   };
 };
 
-export default function LoanHero({ data, firstName }: { data: DashboardHeroData; firstName?: string | null }) {
+/**
+ * Status hero for the borrower dashboard. `content` is the editable
+ * `borrower.status.<state>` section matching `data.state` (defaults applied
+ * if absent), so every heading, subtitle, pill and button here is editable.
+ */
+export default function LoanHero({
+  data,
+  firstName,
+  content,
+}: {
+  data: DashboardHeroData;
+  firstName?: string | null;
+  content?: ContentSectionValues;
+}) {
+  const c = withDefaults(`borrower.status.${data.state}`, content);
+
   if (data.state === 'active' && data.loan) {
-    const { remainingBalance, totalPaid, nextPaymentDate, isDelinquent } = data.loan;
+    const { remainingBalance, totalPaid, nextPaymentDate, isDelinquent, applicationId } = data.loan;
     const total = totalPaid + remainingBalance;
     const repaidPct = total > 0 ? Math.round((totalPaid / total) * 100) : 0;
     const dleft = daysUntil(nextPaymentDate);
     return (
       <Hero
-        eyebrow={isDelinquent ? 'Payment missed' : 'Active loan balance'}
-        subtitle={
-          isDelinquent
-            ? "Your last instalment didn't go through. We'll keep retrying — make sure funds are available in your account."
-            : undefined
-        }
+        eyebrow={isDelinquent ? c.delinquentEyebrow : c.eyebrow}
+        subtitle={isDelinquent ? c.delinquentSubtitle : undefined}
         pill={
           isDelinquent ? (
             <Pill tone="danger" pulse onInk>
-              Late
+              {c.pillLate}
             </Pill>
           ) : (
             <Pill tone="success" pulse onInk>
-              On track
+              {c.pillOnTrack}
             </Pill>
           )
         }
@@ -52,7 +66,7 @@ export default function LoanHero({ data, firstName }: { data: DashboardHeroData;
           <ProgressBar
             value={repaidPct}
             onInk
-            label="Repayment progress"
+            label={c.progressLabel}
             trailing={`${repaidPct}% repaid`}
           />
         </div>
@@ -69,11 +83,13 @@ export default function LoanHero({ data, firstName }: { data: DashboardHeroData;
             Next payment in {dleft === 0 ? 'today' : `${dleft} day${dleft === 1 ? '' : 's'}`}.
           </p>
         )}
-        <div className="mt-5">
-          <ButtonLink href="/applicant/applications" variant="ghost-light" fullWidth>
-            View account balance
-          </ButtonLink>
-        </div>
+        {applicationId && (
+          <div className="mt-5">
+            <ButtonLink href={`/applicant/applications/${applicationId}`} variant="ghost-light" fullWidth>
+              {c.cta}
+            </ButtonLink>
+          </div>
+        )}
       </Hero>
     );
   }
@@ -82,13 +98,12 @@ export default function LoanHero({ data, firstName }: { data: DashboardHeroData;
     return (
       <Hero
         state="paid"
-        eyebrow="Loan complete"
-        emoji="🎉"
-        title={`Loan repaid${firstName ? `, ${firstName}` : ''}`}
-        subtitle="Thanks for repaying on time. You're all set."
+        eyebrow={c.eyebrow}
+        title={`${c.title}${firstName ? `, ${firstName}` : ''}`}
+        subtitle={c.subtitle}
         pill={
           <Pill tone="success" onInk>
-            Repaid
+            {c.pill}
           </Pill>
         }
       >
@@ -96,7 +111,7 @@ export default function LoanHero({ data, firstName }: { data: DashboardHeroData;
           <Confetti />
           <StatGrid
             stats={[
-              { label: 'Total repaid', value: fmtNZD(data.loan.totalPaid + data.loan.remainingBalance) },
+              { label: 'Total repaid', value: fmtNZD(data.loan.totalPaid) },
             ]}
             columns={2}
           />
@@ -105,17 +120,45 @@ export default function LoanHero({ data, firstName }: { data: DashboardHeroData;
     );
   }
 
+  if (data.state === 'draft') {
+    const requested = data.application?.requestedAmount;
+    return (
+      <Hero
+        eyebrow={c.eyebrow}
+        title={c.title}
+        subtitle={c.subtitle}
+        pill={
+          <Pill tone="amber" pulse onInk>
+            {c.pill}
+          </Pill>
+        }
+      >
+        {requested ? (
+          <StatGrid
+            stats={[{ label: 'Requested', value: fmtNZD(requested) }]}
+            columns={2}
+          />
+        ) : null}
+        <div className="mt-5">
+          <ButtonLink href="/applicant/apply" fullWidth>
+            {c.cta}
+          </ButtonLink>
+        </div>
+        <p className="mt-3 text-[12px] text-white/60">{c.disclaimer}</p>
+      </Hero>
+    );
+  }
+
   if (data.state === 'approved' && data.application) {
     return (
       <Hero
         state="approved"
-        eyebrow="Loan approved"
-        emoji="✅"
-        title="Your loan is approved"
-        subtitle="Review your offer and one-tap accept on the loan tracker."
+        eyebrow={c.eyebrow}
+        title={c.title}
+        subtitle={c.subtitle}
         pill={
           <Pill tone="success" pulse onInk>
-            Approved
+            {c.pill}
           </Pill>
         }
       >
@@ -132,7 +175,7 @@ export default function LoanHero({ data, firstName }: { data: DashboardHeroData;
         />
         <div className="mt-5">
           <ButtonLink href={`/applicant/applications/${data.application.id}`} fullWidth>
-            Review offer
+            {c.cta}
           </ButtonLink>
         </div>
       </Hero>
@@ -142,13 +185,12 @@ export default function LoanHero({ data, firstName }: { data: DashboardHeroData;
   if (data.state === 'review' && data.application) {
     return (
       <Hero
-        eyebrow="Application in review"
-        emoji="🔎"
-        title="We're processing your loan"
-        subtitle="A lender is reviewing your application. We'll notify you when there's an update."
+        eyebrow={c.eyebrow}
+        title={c.title}
+        subtitle={c.subtitle}
         pill={
           <Pill tone="amber" pulse onInk>
-            In review
+            {c.pill}
           </Pill>
         }
       >
@@ -160,7 +202,7 @@ export default function LoanHero({ data, firstName }: { data: DashboardHeroData;
         />
         <div className="mt-5">
           <ButtonLink href={`/applicant/applications/${data.application.id}`} variant="ghost-light" fullWidth>
-            Track progress
+            {c.cta}
           </ButtonLink>
         </div>
       </Hero>
@@ -171,36 +213,31 @@ export default function LoanHero({ data, firstName }: { data: DashboardHeroData;
     return (
       <Hero
         state="rejected"
-        eyebrow="Application outcome"
-        emoji="😕"
-        title="We couldn't approve this time"
-        subtitle="Don't worry — you can review the details and try again when you're ready."
+        eyebrow={c.eyebrow}
+        title={c.title}
+        subtitle={c.subtitle}
         pill={
           <Pill tone="danger" onInk>
-            Declined
+            {c.pill}
           </Pill>
         }
       >
         <div className="flex flex-wrap gap-2">
           <ButtonLink href={`/applicant/applications/${data.application.id}`} variant="ghost-light">
-            See details
+            {c.detailsCta}
           </ButtonLink>
-          <ButtonLink href="/applicant/apply">Apply again</ButtonLink>
+          <ButtonLink href="/applicant/apply">{c.applyAgainCta}</ButtonLink>
         </div>
       </Hero>
     );
   }
 
-  // state === 'new'
+  // state === 'new' (also the fallback when a status has no matching data)
+  const n = withDefaults('borrower.status.new', data.state === 'new' ? content : undefined);
   return (
-    <Hero
-      eyebrow="No active loan"
-      emoji="✨"
-      title="Start a TerePay loan"
-      subtitle="Borrow $200 – $2,000 · 8 weeks · 4 fortnightly instalments."
-    >
+    <Hero eyebrow={n.eyebrow} title={n.title} subtitle={n.subtitle}>
       <ButtonLink href="/applicant/apply" fullWidth>
-        Apply for a loan
+        {n.cta}
       </ButtonLink>
     </Hero>
   );

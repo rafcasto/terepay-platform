@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { PaymentConsentStatus } from '@/types/application';
 import { Button, Card, CardHeader, FormField, SelectField, Pill, Icons } from '@/components/ui';
+import { fmtYmd } from '@/lib/loan/format';
 
 export type PaymentConsentCardProps = {
   status: PaymentConsentStatus;
@@ -175,7 +176,7 @@ export default function InitiatePaymentConsentCard({ applicationId, paymentConse
           <ul className="space-y-1.5">
             {installments.map((i) => (
               <li key={i.dueDate} className="flex justify-between text-sm">
-                <span className="text-muted">{i.dueDate}</span>
+                <span className="text-muted">{fmtYmd(i.dueDate)}</span>
                 <span className="font-semibold text-text tabular-nums">{fmtNzd(i.amountCents)}</span>
               </li>
             ))}

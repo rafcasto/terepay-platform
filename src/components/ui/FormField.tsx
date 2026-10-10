@@ -3,7 +3,7 @@
 import { forwardRef, type InputHTMLAttributes, type SelectHTMLAttributes, type TextareaHTMLAttributes, type ReactNode } from 'react';
 
 const inputBase =
-  'w-full h-11 px-3 rounded-xl border bg-surface text-text placeholder:text-muted/70 transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent disabled:bg-surface-2 disabled:cursor-not-allowed';
+  'w-full h-11 px-3.5 rounded-md border bg-surface-card text-[var(--text-body)] placeholder:text-[var(--text-disabled)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)] focus:border-brand disabled:bg-surface-sunken disabled:cursor-not-allowed';
 
 interface FieldLabelProps {
   label?: ReactNode;
@@ -16,18 +16,18 @@ function FieldLabel({ label, required, hint, htmlFor }: FieldLabelProps) {
   if (!label) return null;
   return (
     <div className="flex items-baseline justify-between mb-1.5">
-      <label htmlFor={htmlFor} className="text-sm font-semibold text-text">
+      <label htmlFor={htmlFor} className="text-sm font-semibold text-ink-strong">
         {label}
-        {required && <span className="text-danger ml-0.5">*</span>}
+        {required && <span className="text-danger-text ml-0.5">*</span>}
       </label>
-      {hint && <span className="text-xs text-muted">{hint}</span>}
+      {hint && <span className="text-xs text-[var(--text-muted)]">{hint}</span>}
     </div>
   );
 }
 
 function FieldError({ error }: { error?: ReactNode }) {
   if (!error) return null;
-  return <p className="mt-1.5 text-xs text-danger font-medium">{error}</p>;
+  return <p className="mt-1.5 text-xs text-danger-text font-medium">{error}</p>;
 }
 
 export interface FormFieldProps extends InputHTMLAttributes<HTMLInputElement> {
@@ -46,17 +46,17 @@ export const FormField = forwardRef<HTMLInputElement, FormFieldProps>(function F
 ) {
   const fieldId = id ?? rest.name;
   const borderCls = error
-    ? 'border-danger focus:ring-danger focus:border-danger'
+    ? 'border-[var(--danger-500)] focus:ring-[var(--danger-500)] focus:border-[var(--danger-500)]'
     : prefilled
-      ? 'border-info/40 bg-info-soft/30'
-      : 'border-border';
+      ? 'border-[var(--info-500)]/40 bg-info-soft-ds/40'
+      : 'border-border-default';
 
   return (
     <div className={className}>
       <FieldLabel label={label} required={required} hint={hint} htmlFor={fieldId} />
       <div className="relative flex items-center">
         {leading && (
-          <span className="absolute left-3 text-sm text-muted font-medium pointer-events-none select-none">
+          <span className="absolute left-3 text-sm text-[var(--text-muted)] font-medium pointer-events-none select-none">
             {leading}
           </span>
         )}
@@ -67,7 +67,7 @@ export const FormField = forwardRef<HTMLInputElement, FormFieldProps>(function F
           {...rest}
         />
         {trailing && (
-          <span className="absolute right-3 text-sm text-muted pointer-events-none select-none">{trailing}</span>
+          <span className="absolute right-3 text-sm text-[var(--text-muted)] pointer-events-none select-none">{trailing}</span>
         )}
       </div>
       <FieldError error={error} />
@@ -90,17 +90,17 @@ export const SelectField = forwardRef<HTMLSelectElement, SelectFieldProps>(funct
 ) {
   const fieldId = id ?? rest.name;
   const borderCls = error
-    ? 'border-danger focus:ring-danger focus:border-danger'
+    ? 'border-[var(--danger-500)] focus:ring-[var(--danger-500)] focus:border-[var(--danger-500)]'
     : prefilled
-      ? 'border-info/40 bg-info-soft/30'
-      : 'border-border';
+      ? 'border-[var(--info-500)]/40 bg-info-soft-ds/40'
+      : 'border-border-default';
   return (
     <div className={className}>
       <FieldLabel label={label} required={required} hint={hint} htmlFor={fieldId} />
       <select
         ref={ref}
         id={fieldId}
-        className={`${inputBase} ${borderCls} appearance-none bg-[url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 fill=%22none%22 stroke=%22%236b7280%22 stroke-width=%221.75%22 viewBox=%220 0 24 24%22><path d=%22m6 9 6 6 6-6%22/></svg>')] bg-no-repeat bg-[length:18px_18px] bg-[position:right_12px_center] pr-10`}
+        className={`${inputBase} ${borderCls} appearance-none bg-[url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 fill=%22none%22 stroke=%22%235A6B82%22 stroke-width=%221.75%22 viewBox=%220 0 24 24%22><path d=%22m6 9 6 6 6-6%22/></svg>')] bg-no-repeat bg-[length:18px_18px] bg-[position:right_12px_center] pr-10`}
         {...rest}
       >
         {children}
@@ -124,10 +124,10 @@ export const TextareaField = forwardRef<HTMLTextAreaElement, TextareaFieldProps>
 ) {
   const fieldId = id ?? rest.name;
   const borderCls = error
-    ? 'border-danger focus:ring-danger focus:border-danger'
+    ? 'border-[var(--danger-500)] focus:ring-[var(--danger-500)] focus:border-[var(--danger-500)]'
     : prefilled
-      ? 'border-info/40 bg-info-soft/30'
-      : 'border-border';
+      ? 'border-[var(--info-500)]/40 bg-info-soft-ds/40'
+      : 'border-border-default';
   return (
     <div className={className}>
       <FieldLabel label={label} required={required} hint={hint} htmlFor={fieldId} />
@@ -135,7 +135,7 @@ export const TextareaField = forwardRef<HTMLTextAreaElement, TextareaFieldProps>
         ref={ref}
         id={fieldId}
         rows={rows}
-        className={`w-full px-3 py-2.5 rounded-xl border ${borderCls} bg-surface text-text placeholder:text-muted/70 transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent`}
+        className={`w-full px-3.5 py-2.5 rounded-md border ${borderCls} bg-surface-card text-[var(--text-body)] placeholder:text-[var(--text-disabled)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)] focus:border-brand`}
         {...rest}
       />
       <FieldError error={error} />
@@ -158,10 +158,10 @@ export const CheckboxField = forwardRef<HTMLInputElement, CheckboxFieldProps>(fu
         <input
           ref={ref}
           type="checkbox"
-          className="mt-0.5 h-4 w-4 rounded border-border text-accent focus:ring-accent shrink-0"
+          className="mt-0.5 h-4 w-4 rounded border-border-default accent-[var(--orange-700)] focus:ring-[var(--focus-ring)] shrink-0"
           {...rest}
         />
-        <span className="text-sm text-text">{label}</span>
+        <span className="text-sm text-ink-strong">{label}</span>
       </label>
       <FieldError error={error} />
     </div>

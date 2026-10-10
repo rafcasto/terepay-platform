@@ -12,6 +12,14 @@ import { randomUUID } from 'crypto';
 import { generateAffordabilityPdf } from '@/lib/pdf/affordability-report';
 import { getDriveClient, getOrCreateSubfolder, uploadBufferToDrive } from '@/lib/gdrive/client';
 import type { AffordabilityAssessment, LoanApplication } from '@/types/application';
+import type { CreditAssessmentRecord, CreditAssessmentSummary } from '@/types/credit-assessment';
+import { getAssessmentRecord, summariseRecord } from '@/lib/assessment/persist';
+import { evaluateEvidenceGate, loadPreviousApplications } from '@/lib/loan/evidence-gate';
+import {
+  affordabilityLoanPayment,
+  calcExpenseFinal,
+  calcIncomeFinal,
+} from '@/lib/loan/affordability-calc';
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -98,25 +106,47 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     if (!['under_assessment', 'waiting_for_docs', 'credit_check'].includes(appData.status)) {
       throw new AppError('BAD_REQUEST', 400, `Cannot submit assessment while status is: ${appData.status}`);
     }
+    if (appData.assignedLenderId !== auth.uid) {
+      throw new AppError('FORBIDDEN', 403, 'Only the assigned lender can submit the affordability assessment');
+    }
+
+    // Evidence gate — the same rule the wizard page enforces. Documents must be
+    // reviewed (bank statements + payslips accepted here, or reusable from a
+    // loan paid out within the last 6 months) before an assessment is recorded.
+    const application = { ...(appData as LoanApplication), applicationId: id };
+    const gate = evaluateEvidenceGate(application, await loadPreviousApplications(adminDb, application));
+    if (!gate.ok) {
+      throw new AppError('EVIDENCE_REQUIRED', 409, `Review the applicant's documents first: ${gate.reasons.join('; ')}`, {
+        reasons: gate.reasons,
+      });
+    }
 
     const body = await request.json();
     const parsed = affordabilityAssessmentSchema.parse(body);
 
-    // Calculate income totals
+    // Link the AI credit assessment the lender ran on this wizard, if any.
+    // It must be this application's and complete — a stale or foreign id is refused.
+    let creditAssessment: CreditAssessmentSummary | undefined;
+    let creditAssessmentRecord: CreditAssessmentRecord | null = null;
+    if (parsed.creditAssessmentId) {
+      const record = await getAssessmentRecord(parsed.creditAssessmentId);
+      if (!record || record.applicationId !== id || record.status !== 'done') {
+        throw new AppError('VALIDATION_ERROR', 422, 'The AI assessment is not complete for this application — wait for it to finish or run it again');
+      }
+      creditAssessment = summariseRecord(record);
+      creditAssessmentRecord = record;
+    }
+
+    // Recompute finals server-side with the same shared maths the wizard uses,
+    // so the persisted surplus is exactly what the lender saw on screen.
     const incomeRows = parsed.incomeRows.map((row) => ({
       ...row,
-      finalAmount: Math.min(
-        row.centrixAmount > 0 ? row.centrixAmount : Infinity,
-        row.verifiedAmount > 0 ? row.verifiedAmount : Infinity,
-      ) === Infinity ? 0 : Math.min(
-        row.centrixAmount > 0 ? row.centrixAmount : row.verifiedAmount,
-        row.verifiedAmount > 0 ? row.verifiedAmount : row.centrixAmount,
-      ),
+      finalAmount: calcIncomeFinal(row),
     }));
 
     const expenseRows = parsed.expenseRows.map((row) => ({
       ...row,
-      finalAmount: Math.max(0, Math.max(row.centrixAmount, row.benchmarkAmount) + row.adjustment),
+      finalAmount: calcExpenseFinal(row),
     }));
 
     const totalVerifiedIncome = incomeRows.reduce((sum, r) => sum + r.finalAmount, 0);
@@ -125,7 +155,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const requestedAmount = appData.loanDetails?.requestedAmount ?? 0;
     const assessedAmount = parsed.assessedAmount ?? requestedAmount;
-    const loanFortnightlyPayment = (assessedAmount * 1.047) / 4;
+    // CCCFA affordability must test the instalment the borrower will actually
+    // be charged — identical pricing to the applicant's quote and the approval
+    // schedule (reducing-balance annuity, rate from collections config).
+    const loanFortnightlyPayment = affordabilityLoanPayment(assessedAmount);
     const finalAvailableSurplus = netDisposableIncome - loanFortnightlyPayment;
 
     // Days of transaction data
@@ -137,9 +170,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const loanEndDate = new Date();
     loanEndDate.setDate(loanEndDate.getDate() + 56);
 
+    // NZ citizens have no visa to expire — the checklist records their passport instead.
+    const isCitizen = appData.personalInfo?.visaStatus === 'citizen';
     const hardDeclineTriggers = detectHardDeclines({
       daysOfTransactionData,
-      visaExpiry: appData.personalInfo?.visaExpiryDate,
+      visaExpiry: isCitizen ? undefined : (parsed.checklist.visaExpiryDate || appData.personalInfo?.visaExpiryDate),
       loanEndDate: loanEndDate.toISOString().split('T')[0],
       surplus: finalAvailableSurplus,
       loanPurpose: appData.loanRequest?.purpose ?? appData.loanDetails?.loanPurpose ?? '',
@@ -199,6 +234,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       redFlagsAcknowledged: parsed.redFlagsAcknowledged,
       surplusRating,
       recommendation,
+      ...(creditAssessment ? { creditAssessmentId: creditAssessment.assessmentId, creditAssessment } : {}),
     });
 
     const now = FieldValue.serverTimestamp();
@@ -249,9 +285,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
               redFlagsAcknowledged: parsed.redFlagsAcknowledged,
               surplusRating,
               recommendation,
+              ...(creditAssessment ? { creditAssessmentId: creditAssessment.assessmentId, creditAssessment } : {}),
             };
             const appForPdf = { ...appData, applicationId: id } as LoanApplication;
-            const pdfBuffer = await generateAffordabilityPdf(assessmentForPdf, appForPdf);
+            const pdfBuffer = await generateAffordabilityPdf(assessmentForPdf, appForPdf, {
+              creditAssessment: creditAssessmentRecord,
+            });
             const dateStr = new Date().toISOString().split('T')[0];
             const pdfFileName = `affordability_assessment_v${nextVersion}_${dateStr}.pdf`;
             const drive = getDriveClient();
@@ -276,7 +315,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       targetType: 'application',
       outcome: 'success',
       ipAddress: ip,
-      changes: { assessmentId, version: nextVersion, recommendation, surplus: finalAvailableSurplus },
+      changes: { assessmentId, version: nextVersion, recommendation, surplus: finalAvailableSurplus, creditAssessmentId: creditAssessment?.assessmentId },
     });
 
     return NextResponse.json({
@@ -311,11 +350,12 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const appDoc = await appRef.get();
     if (!appDoc.exists) throw new AppError('NOT_FOUND', 404, 'Application not found');
 
-    const { currentStep, checklist, incomeRows, expenseRows, recommendation, assessedAmount } =
+    const { layoutVersion, currentStep, checklist, incomeRows, expenseRows, recommendation, assessedAmount } =
       await request.json();
 
     await appRef.update({
       affordabilityDraft: {
+        ...(typeof layoutVersion === 'number' ? { layoutVersion } : {}),
         currentStep: currentStep ?? 0,
         checklist: checklist ?? {},
         incomeRows: incomeRows ?? [],

@@ -24,6 +24,7 @@ export default function CustomerEditPanel({ customer, onClose, onSuccess }: Prop
   // Populate form when customer changes
   useEffect(() => {
     if (customer) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- resets the editable form when a different customer is selected
       setFirstName(customer.firstName);
       setLastName(customer.lastName);
       setEmail(customer.email ?? '');

@@ -15,13 +15,15 @@ export const dynamic = 'force-dynamic';
 // GET /api/admin/email-templates — list all templates
 export async function GET(request: NextRequest): Promise<Response> {
   try {
-    const auth = await withAuth(request, ['admin']);
+    const auth = await withAuth(request, ['admin', 'content_editor']);
     await checkRateLimit(defaultLimiter, auth.uid);
 
+    // Order by type only — a secondary orderBy('sequenceOrder') would exclude
+    // any template document that has no sequenceOrder field (e.g. transactional
+    // templates like email_verification). Secondary sort is applied in code.
     const snap = await adminDb
       .collection('emailTemplates')
       .orderBy('type')
-      .orderBy('sequenceOrder')
       .limit(200)
       .get();
 
@@ -45,6 +47,11 @@ export async function GET(request: NextRequest): Promise<Response> {
       };
     });
 
+    templates.sort((a, b) => {
+      if (a.type !== b.type) return 0; // preserve Firestore type ordering
+      return (a.sequenceOrder ?? 0) - (b.sequenceOrder ?? 0);
+    });
+
     return NextResponse.json({ data: templates });
   } catch (err) {
     if (err instanceof AppError) return errorResponse(err);
@@ -63,7 +70,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       return errorResponse(new AppError('RATE_LIMITED', 429, 'Too many requests.'));
     }
 
-    const auth = await withAuth(request, ['admin']);
+    const auth = await withAuth(request, ['admin', 'content_editor']);
     uid = auth.uid;
 
     const body = await request.json();

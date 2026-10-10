@@ -31,7 +31,6 @@ export default function ScreenRejected({ app, status, applicationId }: Props) {
       <Hero
         state="rejected"
         eyebrow={`Application ${refNum}`}
-        emoji={isOfferDeclined ? '👋' : '😕'}
         title={title}
         subtitle={subtitle}
         pill={
@@ -42,9 +41,6 @@ export default function ScreenRejected({ app, status, applicationId }: Props) {
       >
         <div className="flex flex-wrap gap-3">
           <ButtonLink href="/applicant/apply">Apply again</ButtonLink>
-          <ButtonLink href="/applicant/applications" variant="ghost-light">
-            See application history
-          </ButtonLink>
         </div>
       </Hero>
 
@@ -76,8 +72,8 @@ export default function ScreenRejected({ app, status, applicationId }: Props) {
           </li>
           <li>
             <span className="font-semibold">Talk to us.</span> Email{' '}
-            <a className="font-semibold text-accent-2 hover:underline" href="mailto:support@terepay.co.nz">
-              support@terepay.co.nz
+            <a className="font-semibold text-accent-2 hover:underline" href="mailto:support@terepay.com">
+              support@terepay.com
             </a>{' '}
             if you have questions.
           </li>

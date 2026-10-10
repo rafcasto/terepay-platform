@@ -1,10 +1,15 @@
 import { type NextRequest, NextResponse } from 'next/server';
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
 import { auditLog } from '@/lib/utils/audit';
 import { getQippayWebhookConfig } from '@/lib/qippay/webhook-config';
-import { verifyWebhookSignature, WEBHOOK_SIG_HEADER } from '@/lib/qippay/verify-webhook';
+import {
+  verifyWebhookSignature,
+  WEBHOOK_SIG_HEADER,
+  WEBHOOK_TIMESTAMP_HEADER,
+} from '@/lib/qippay/verify-webhook';
 import { getDetailedConsentStatus } from '@/lib/qippay/setpay-client';
+import { syncLoanRecord } from '@/lib/loan/loan-record';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,7 +43,8 @@ export async function POST(request: NextRequest) {
   // 3. Verify signature — return 401 if invalid so Qippay knows something is wrong
   if (config.webhookSecret) {
     const sig = request.headers.get(WEBHOOK_SIG_HEADER);
-    if (!verifyWebhookSignature(rawBody, sig, config.webhookSecret)) {
+    const timestamp = request.headers.get(WEBHOOK_TIMESTAMP_HEADER);
+    if (!verifyWebhookSignature(rawBody, sig, config.webhookSecret, timestamp)) {
       console.warn('[webhooks/qippay] Invalid signature — rejecting request');
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
     }
@@ -159,7 +165,9 @@ async function handlePaymentSuccess(epcId: string): Promise<void> {
       const num = p.installmentNumber as number;
       if (num <= countComplete && p.status !== 'success') {
         changed = true;
-        return { ...p, status: 'success', completedAt: FieldValue.serverTimestamp() };
+        // Timestamp.now(), not FieldValue.serverTimestamp() — sentinels are
+        // rejected inside array elements by Firestore.
+        return { ...p, status: 'success', completedAt: Timestamp.now() };
       }
       return p;
     });
@@ -171,6 +179,9 @@ async function handlePaymentSuccess(epcId: string): Promise<void> {
       'timeline.updatedAt': FieldValue.serverTimestamp(),
     });
   });
+
+  // Keep the canonical loan record (portfolio + statements) in sync.
+  await syncLoanRecord(app.ref.id);
 
   await auditLog({
     userId: 'system:qippay_webhook',
@@ -216,6 +227,8 @@ async function handlePaymentRetry(epcId: string): Promise<void> {
     });
   });
 
+  await syncLoanRecord(app.ref.id);
+
   await auditLog({
     userId: 'system:qippay_webhook',
     action: 'setpay_payment_retry',
@@ -246,7 +259,7 @@ async function handlePaymentFailure(epcId: string): Promise<void> {
         return {
           ...p,
           status: 'failed',
-          failedAt: FieldValue.serverTimestamp(),
+          failedAt: Timestamp.now(),
           failureReason: 'setpay.status.failure — max retries exceeded',
         };
       }
@@ -259,6 +272,8 @@ async function handlePaymentFailure(epcId: string): Promise<void> {
       'timeline.updatedAt': FieldValue.serverTimestamp(),
     });
   });
+
+  await syncLoanRecord(app.ref.id);
 
   await auditLog({
     userId: 'system:qippay_webhook',
@@ -298,6 +313,8 @@ async function handleConsentRevoked(epcId: string): Promise<void> {
       'timeline.updatedAt': now,
     });
   });
+
+  await syncLoanRecord(app.ref.id);
 
   await auditLog({
     userId: 'system:qippay_webhook',

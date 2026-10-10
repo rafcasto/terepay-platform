@@ -3,44 +3,109 @@
 import React from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
 import type { TerepayApplicationInput } from '@/lib/validation/schemas';
+import { useSiteContent } from '@/lib/content/SiteContentContext';
+import { useRepeatBorrower } from './RepeatBorrowerContext';
+import YesNoQuestion from './YesNoQuestion';
 
 const inputCls =
-  'w-full px-3 h-11 border border-border rounded-xl text-sm focus:ring-2 focus:ring-accent focus:border-accent focus:outline-none transition-colors bg-surface text-text placeholder:text-muted/70';
+  'w-full px-3 h-11 border border-border-default rounded-xl text-sm focus:ring-2 focus:ring-[var(--focus-ring)] focus:border-brand focus:outline-none transition-colors bg-surface-card text-ink-strong placeholder:text-[var(--text-disabled)]';
 const selectCls = inputCls + ' appearance-none';
-const labelCls = 'block text-sm font-semibold text-text mb-1.5';
-const errorCls = 'mt-1.5 text-xs text-danger font-medium';
+const labelCls = 'block text-sm font-semibold text-ink-strong mb-1.5';
+const errorCls = 'mt-1.5 text-xs text-danger-text font-medium';
+
+// Duration options, mirroring the "How long at this address?" field. We store the
+// human-readable label (not a code) so the lender view and PDF render it directly.
+const DURATION_OPTIONS = [
+  'Less than 6 months',
+  '6–12 months',
+  '1–2 years',
+  '2–5 years',
+  '5+ years',
+];
 
 const NzdInput = React.forwardRef<
   HTMLInputElement,
   { name: string } & React.InputHTMLAttributes<HTMLInputElement>
 >(({ name, ...props }, ref) => (
   <div className="relative">
-    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted/70 select-none">
+    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[var(--text-disabled)] select-none">
       $
     </span>
     <input
       ref={ref}
       name={name}
       type="number"
+      inputMode="decimal"
       min={0}
       step="0.01"
-      className="w-full pl-6 pr-3 py-2.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-accent focus:border-accent focus:outline-none transition-colors bg-white"
+      onFocus={(ev) => ev.currentTarget.select()}
+      className="w-full pl-6 pr-3 py-2.5 border border-border-default rounded-lg text-sm focus:ring-2 focus:ring-[var(--focus-ring)] focus:border-brand focus:outline-none transition-colors bg-surface-card"
       {...props}
     />
   </div>
 ));
 NzdInput.displayName = 'NzdInput';
 
+const STATUS_LABELS: Record<string, string> = {
+  permanent: 'Permanent',
+  fixed_term: 'Fixed Term',
+  casual: 'Casual',
+  part_time: 'Part-time',
+};
+
+/** Empty employment section, used when a repeat borrower has changed jobs. */
+const BLANK_EMPLOYMENT = {
+  employerName: '',
+  employerAddress: '',
+  occupation: '',
+  hoursPerWeek: undefined,
+  employmentStatus: '',
+  timeAtEmployer: '',
+  previousEmployer: '',
+  previousEmployerPeriod: '',
+  income: { salaryBeforeTax: 0, salaryAfterTax: 0, winz: 0, otherIncome: 0, otherIncomeDescription: '' },
+} as unknown as TerepayApplicationInput['employment'];
+
+const nzd = (n: number | undefined) =>
+  new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(n ?? 0);
+
 export default function Step2Employment() {
   const {
     register,
     control,
+    setValue,
+    clearErrors,
     formState: { errors },
   } = useFormContext<TerepayApplicationInput>();
+  const c = useSiteContent('apply.step2');
+  const { isRepeat, previous } = useRepeatBorrower();
+
+  // Repeat borrowers are asked whether their job has changed. "No" carries the
+  // employment details over from their last application; "Yes" starts the
+  // section again from blank.
+  const askJobChange = isRepeat && Boolean(previous.employment);
+  const jobChanged = useWatch({ control, name: 'employment.changedSinceLastApplication' });
+  const retained = askJobChange && jobChanged === false;
+  const showForm = !askJobChange || jobChanged === true;
+
+  const answerJobChange = (changed: boolean) => {
+    if (changed === jobChanged) return;
+    clearErrors('employment');
+    setValue(
+      'employment',
+      changed
+        ? { ...BLANK_EMPLOYMENT, changedSinceLastApplication: true }
+        : { ...previous.employment!, changedSinceLastApplication: false },
+      { shouldDirty: true },
+    );
+  };
 
   const e = errors.employment;
 
   const income = useWatch({ control, name: 'employment.income' });
+  const timeAtEmployer = useWatch({ control, name: 'employment.timeAtEmployer' });
+  const isNewJob = timeAtEmployer === 'Less than 6 months';
+
   const total =
     (income?.salaryAfterTax ?? 0) +
     (income?.winz ?? 0) +
@@ -49,14 +114,51 @@ export default function Step2Employment() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-text">Employment &amp; Income</h2>
-        <p className="text-sm text-muted mt-1">Tell us about your current employment and fortnightly earnings.</p>
+        <h2 className="text-xl font-bold text-ink-strong">{c.title}</h2>
+        <p className="text-sm text-[var(--text-muted)] mt-1">{c.intro}</p>
       </div>
 
+      {askJobChange && (
+        <YesNoQuestion
+          name="employment-changed"
+          question="Have you changed jobs since your last application?"
+          hint="If nothing has changed, we'll keep the employment and income details from your last application."
+          value={jobChanged}
+          onChange={answerJobChange}
+          error={e?.changedSinceLastApplication?.message}
+        />
+      )}
+
+      {retained && previous.employment && (
+        <div className="rounded-xl border border-border-default bg-surface-card p-4">
+          <h3 className="text-sm font-semibold text-ink-strong">Details kept from your last application</h3>
+          <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+            {[
+              ['Employer', previous.employment.employerName],
+              ['Employer address', previous.employment.employerAddress],
+              ['Occupation', previous.employment.occupation],
+              ['Hours per week', String(previous.employment.hoursPerWeek)],
+              ['Employment status', STATUS_LABELS[previous.employment.employmentStatus] ?? previous.employment.employmentStatus],
+              ['Fortnightly income (after tax)', nzd(total)],
+            ].map(([label, value]) => (
+              <div key={label}>
+                <dt className="text-xs text-[var(--text-muted)]">{label}</dt>
+                <dd className="mt-0.5 font-medium text-ink-strong break-words">{value}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="mt-3 text-xs text-[var(--text-muted)]">
+            If your pay, hours or employer are different now, choose &ldquo;Yes&rdquo; above and enter your current details.
+          </p>
+        </div>
+      )}
+
+      {showForm && (
+      <>
       {/* Employer details */}
       <div>
         <label className={labelCls}>
-          Employer Name <span className="text-danger">*</span>
+          Employer Name <span className="text-danger-text">*</span>
         </label>
         <input
           {...register('employment.employerName')}
@@ -68,7 +170,7 @@ export default function Step2Employment() {
 
       <div>
         <label className={labelCls}>
-          Employer Address <span className="text-danger">*</span>
+          Employer Address <span className="text-danger-text">*</span>
         </label>
         <input
           {...register('employment.employerAddress')}
@@ -82,7 +184,7 @@ export default function Step2Employment() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className={labelCls}>
-            Occupation / Job Title <span className="text-danger">*</span>
+            Occupation / Job Title <span className="text-danger-text">*</span>
           </label>
           <input
             {...register('employment.occupation')}
@@ -93,13 +195,15 @@ export default function Step2Employment() {
         </div>
         <div>
           <label className={labelCls}>
-            Hours per Week <span className="text-danger">*</span>
+            Hours per Week <span className="text-danger-text">*</span>
           </label>
           <input
             type="number"
+            inputMode="numeric"
             min={1}
             max={168}
             {...register('employment.hoursPerWeek', { valueAsNumber: true })}
+            onFocus={(ev) => ev.currentTarget.select()}
             className={inputCls}
             placeholder="40"
           />
@@ -111,7 +215,7 @@ export default function Step2Employment() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className={labelCls}>
-            Employment Status <span className="text-danger">*</span>
+            Employment Status <span className="text-danger-text">*</span>
           </label>
           <select {...register('employment.employmentStatus')} className={selectCls}>
             <option value="">Select…</option>
@@ -124,32 +228,58 @@ export default function Step2Employment() {
         </div>
         <div>
           <label className={labelCls}>
-            Time at Current Employer <span className="text-danger">*</span>
+            Time at Current Employer <span className="text-danger-text">*</span>
           </label>
-          <input
-            {...register('employment.timeAtEmployer')}
-            className={inputCls}
-            placeholder="e.g. 1 year 3 months"
-          />
+          <select {...register('employment.timeAtEmployer')} className={selectCls}>
+            <option value="">Select…</option>
+            {DURATION_OPTIONS.map((d) => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
+          </select>
           {e?.timeAtEmployer && <p className={errorCls}>{e.timeAtEmployer.message}</p>}
         </div>
       </div>
 
-      {/* Previous employer */}
-      <div>
-        <label className={labelCls}>Previous Employer (if less than 6 months)</label>
-        <input
-          {...register('employment.previousEmployer')}
-          className={inputCls}
-          placeholder="Leave blank if not applicable"
-        />
-      </div>
+      {/* Previous employer — only required when under 6 months at current employer */}
+      {isNewJob && (
+        <div className="rounded-xl border border-border-default bg-surface-sunken p-4 space-y-4">
+          <div>
+            <h3 className="text-sm font-semibold text-ink-strong">{c.previousEmployerTitle}</h3>
+            <p className="text-xs text-[var(--text-muted)] mt-0.5">{c.previousEmployerBody}</p>
+          </div>
+          <div>
+            <label className={labelCls}>
+              Previous Employer Name <span className="text-danger-text">*</span>
+            </label>
+            <input
+              {...register('employment.previousEmployer')}
+              className={inputCls}
+              placeholder="Previous Company Ltd"
+            />
+            {e?.previousEmployer && <p className={errorCls}>{e.previousEmployer.message}</p>}
+          </div>
+          <div>
+            <label className={labelCls}>
+              Time at Previous Employer <span className="text-danger-text">*</span>
+            </label>
+            <select {...register('employment.previousEmployerPeriod')} className={selectCls}>
+              <option value="">Select…</option>
+              {DURATION_OPTIONS.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+            {e?.previousEmployerPeriod && <p className={errorCls}>{e.previousEmployerPeriod.message}</p>}
+          </div>
+        </div>
+      )}
 
       {/* Income table */}
-      <div className="bg-surface-2 rounded-xl border border-border p-4 space-y-3">
-        <h3 className="text-sm font-semibold text-gray-800">
-          Fortnightly Income (NZD)
-        </h3>
+      <div className="bg-surface-sunken rounded-xl border border-border-default p-4 space-y-3">
+        <h3 className="text-sm font-semibold text-ink-strong">{c.incomeHeading}</h3>
 
         <div className="space-y-3">
           {[
@@ -172,7 +302,7 @@ export default function Step2Employment() {
           ].map(({ label, field }) => (
             <div key={field} className="flex items-center gap-3">
               <span
-                className="text-sm text-muted flex-1"
+                className="text-sm text-[var(--text-muted)] flex-1"
                 dangerouslySetInnerHTML={{ __html: label }}
               />
               <div className="w-36">
@@ -197,15 +327,15 @@ export default function Step2Employment() {
         </div>
 
         {/* Total */}
-        <div className="flex items-center gap-3 pt-2 border-t border-border">
-          <span className="text-sm font-semibold text-gray-800 flex-1">
-            Total Fortnightly Income
-          </span>
-          <span className="w-36 px-3 py-2 bg-[#FEF7E9] text-accent-2 font-bold text-sm rounded-lg text-right">
+        <div className="flex items-center gap-3 pt-2 border-t border-border-default">
+          <span className="text-sm font-semibold text-ink-strong flex-1">{c.totalLabel}</span>
+          <span className="w-36 px-3 py-2 bg-brand-soft text-brand-text font-bold text-sm rounded-lg text-right">
             ${total.toFixed(2)}
           </span>
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }

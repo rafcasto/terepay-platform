@@ -1,4 +1,5 @@
 import { AppError } from '@/lib/utils/api-error';
+import { qippayFetch } from './http';
 
 // Qippay SetPay (Integrated v1.0, rev 1 May 2026) — open-banking enduring
 // payment consent (NZ direct-debit replacement). This client uses the
@@ -114,41 +115,12 @@ export function getMode(): SetPayMode {
   return readEnv().mode;
 }
 
-function getBaseUrl(): string {
-  const { baseUrl } = readEnv();
-  if (!baseUrl) {
-    throw new AppError(
-      'QIPPAY_NOT_CONFIGURED',
-      500,
-      'QIPPAY_BASE_URL is not configured',
-    );
-  }
-  return baseUrl.replace(/\/$/, '');
-}
-
-function getClientSecret(): string {
-  const { clientSecret } = readEnv();
-  if (!clientSecret) {
-    throw new AppError(
-      'QIPPAY_NOT_CONFIGURED',
-      500,
-      'QIPPAY_CLIENT_SECRET is not configured',
-    );
-  }
-  return clientSecret;
-}
-
 function stubHostedUrl(successUrl: string): string {
   const u = new URL(successUrl);
   u.searchParams.set('stub', 'success');
   return u.toString();
 }
 
-type QippayEnvelope<T> = {
-  success: boolean;
-  data?: T;
-  error?: { code?: string; message?: string } | string;
-};
 
 type EnduringInitiationResponse = {
   id: string;
@@ -164,59 +136,6 @@ type EnduringInitiationResponse = {
   debtor_account_number?: string | null;
   provider_id?: string | null;
 };
-
-async function qippayFetch<T>(
-  path: string,
-  init: { method: 'GET' | 'POST'; body?: unknown },
-): Promise<T> {
-  const baseUrl = getBaseUrl();
-  const secret = getClientSecret();
-
-  let res: Response;
-  try {
-    res = await fetch(`${baseUrl}${path}`, {
-      method: init.method,
-      headers: {
-        Authorization: `Bearer ${secret}`,
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
-      signal: AbortSignal.timeout(8000),
-    });
-  } catch (err) {
-    throw new AppError(
-      'QIPPAY_UPSTREAM',
-      502,
-      'Bank authorization service temporarily unavailable',
-      { cause: err instanceof Error ? err.message : String(err) },
-    );
-  }
-
-  let envelope: QippayEnvelope<T> | undefined;
-  try {
-    envelope = (await res.json()) as QippayEnvelope<T>;
-  } catch {
-    // Non-JSON response — fall through to status-based mapping below.
-  }
-
-  if (!res.ok || !envelope?.success || !envelope.data) {
-    const errMsg =
-      typeof envelope?.error === 'string'
-        ? envelope.error
-        : envelope?.error?.message ?? res.statusText ?? 'Qippay request failed';
-    if (res.status >= 500 || res.status === 0) {
-      throw new AppError('QIPPAY_UPSTREAM', 502, errMsg, {
-        qippayStatus: res.status,
-      });
-    }
-    throw new AppError('QIPPAY_BAD_REQUEST', 502, errMsg, {
-      qippayStatus: res.status,
-    });
-  }
-
-  return envelope.data;
-}
 
 function mapInitiationResponseToMandate(
   data: EnduringInitiationResponse,
@@ -439,6 +358,12 @@ export async function approveEnduring(
 // SetPay requires each individual instalment to be scheduled via POST
 // /v1/setpay (docs rev 1, p.19). The enduring consent only authorises
 // limits — Qippay does not auto-fire payments on its own.
+//
+// Undocumented (confirmed by Qippay support, Sep 2026): `success_url` is now
+// MANDATORY on /v1/setpay. Qippay added a fallback that lets the end-user
+// resolve a failed instalment by paying via a different account/bank on the
+// default Hosted Payment Page, and that page needs somewhere to bounce back
+// to. Omitting it makes the whole call fail with a 500.
 
 export type SetPaySchedulePaymentInput = {
   epcId: string;
@@ -449,6 +374,10 @@ export type SetPaySchedulePaymentInput = {
   statementCode: string;
   statementReference: string;
   maxRetry?: number; // optional Qippay-side retry on failure
+  /** Where Qippay's Hosted fallback page returns the payer after success. Required. */
+  successUrl: string;
+  /** Where the Hosted fallback page returns the payer after failure/cancel. */
+  failureUrl?: string;
 };
 
 export type SetPayScheduledPayment = {
@@ -506,7 +435,9 @@ export async function schedulePayment(
     statement_code: code,
     statement_reference: reference,
     scheduled_for: input.scheduledFor,
+    success_url: input.successUrl,
   };
+  if (input.failureUrl) body.failure_url = input.failureUrl;
   if (input.maxRetry !== undefined) body.max_retry = input.maxRetry;
 
   const data = await qippayFetch<SchedulePaymentResponse>('/v1/setpay', {
@@ -613,12 +544,28 @@ function mapOverallStatus(
   };
 }
 
+export type GetDetailedConsentStatusOptions = {
+  /**
+   * Stub mode only (ignored when live): the instalments we have lodged, so the
+   * stub can simulate the bank collecting each one once its time has passed.
+   * Lets the scheduling → verification loop be exercised without internet,
+   * including the admin test cadence (instalments minutes apart).
+   */
+  stubLodged?: Array<{ scheduledFor: string; amountCents?: number }>;
+};
+
 export async function getDetailedConsentStatus(
   epcId: string,
+  options: GetDetailedConsentStatusOptions = {},
 ): Promise<SetPayDetailedStatus> {
   const env = readEnv();
 
   if (env.mode === 'stub') {
+    const now = Date.now();
+    const lodged = options.stubLodged ?? [];
+    const complete = lodged.filter((l) => Date.parse(l.scheduledFor) <= now);
+    const pending = lodged.filter((l) => Date.parse(l.scheduledFor) > now);
+    const sum = (xs: typeof lodged) => xs.reduce((acc, l) => acc + (l.amountCents ?? 0), 0);
     return {
       epcId,
       status: 'success',
@@ -627,11 +574,11 @@ export async function getDetailedConsentStatus(
         periodIndex: 0,
         periodStart: null,
         periodEnd: null,
-        amountComplete: 0,
-        amountScheduled: 0,
+        amountComplete: sum(complete),
+        amountScheduled: sum(pending),
         amountAvailable: null,
-        countComplete: 0,
-        countScheduled: 0,
+        countComplete: complete.length,
+        countScheduled: pending.length,
         countAvailable: null,
       },
       periodStatus: [],
@@ -656,4 +603,30 @@ export async function getDetailedConsentStatus(
     consentOverallStatus: mapOverallStatus(data.consent_overall_status),
     periodStatus: (data.period_status ?? []).map((p) => mapOverallStatus(p)!),
   };
+}
+
+
+// --- Cancel an enduring consent -------------------------------------------
+// POST /v1/enduring_initiation/cancel (SetPay Integrated, rev 1, p.24).
+// Cancelling a consent ALSO cancels any payments previously scheduled against
+// it — "any payments previously scheduled will not be processed" (p.6). So a
+// single cancel call is enough to stop the recurring direct debit, including
+// instalments already lodged via POST /v1/setpay. Used when a loan is settled
+// early via PayBy so the borrower is not double-charged.
+
+export type SetPayCancelResult = {
+  id: string;
+  status: string; // upstream raw status, expected "cancelled"
+};
+
+export async function cancelEnduring(epcId: string): Promise<SetPayCancelResult> {
+  const env = readEnv();
+  if (env.mode === 'stub') {
+    return { id: epcId, status: 'cancelled' };
+  }
+  const data = await qippayFetch<{ id: string; status: string }>(
+    '/v1/enduring_initiation/cancel',
+    { method: 'POST', body: { epcId } },
+  );
+  return { id: data.id, status: data.status };
 }

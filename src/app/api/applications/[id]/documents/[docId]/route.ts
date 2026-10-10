@@ -8,6 +8,9 @@ import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { auditLog, getClientIp } from '@/lib/utils/audit';
 import { FieldValue } from 'firebase-admin/firestore';
 import { ZodError } from 'zod';
+import { getDriveClient, downloadDriveFile, inlineContentDisposition } from '@/lib/gdrive/client';
+import { checkRateLimit, defaultLimiter } from '@/lib/rate-limit/limiter';
+import { logSystemCommunication } from '@/lib/loan/communication-log';
 
 type RouteParams = { params: Promise<{ id: string; docId: string }> };
 
@@ -59,12 +62,89 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       changes: { docId, action: parsed.action, rejectionReason: parsed.rejectionReason },
     });
 
+    // A rejection is a message to the applicant (reason shown on their
+    // tracker) — record it automatically. Acceptances are silent.
+    if (parsed.action === 'reject') {
+      const d = documents[docIndex] as { type?: string; fileName?: string };
+      const label = (d.type ?? 'document').replace(/_/g, ' ');
+      await logSystemCommunication({
+        applicationId: id,
+        channel: 'system',
+        event: 'document_rejected',
+        summary: `Rejected ${label}${d.fileName ? ` (${d.fileName})` : ''}: ${parsed.rejectionReason}`,
+        outcome: 'Applicant asked to re-upload via their tracker.',
+      });
+    }
+
     return NextResponse.json({ status: 'ok' });
   } catch (err) {
     if (err instanceof ZodError) {
       return errorResponse(new AppError('VALIDATION_ERROR', 422, 'Invalid request', err.flatten().fieldErrors));
     }
     if (err instanceof AppError) return errorResponse(err);
+    return internalError();
+  }
+}
+
+
+/**
+ * GET /api/applications/[id]/documents/[docId]
+ * Streams an applicant-uploaded application document (identity / income
+ * evidence) from Google Drive back to the lender for review/download. The
+ * docId must belong to this application's documents[] — the documentId is the
+ * Drive file id, validated here before serving.
+ */
+export async function GET(request: NextRequest, { params }: RouteParams) {
+  const ip = getClientIp(request);
+  try {
+    const auth = await withAuth(request, ['lender']);
+    const { id, docId } = await params;
+
+    if (!(await checkRateLimit(defaultLimiter, `app-doc-view:${auth.uid}`))) {
+      throw new AppError('RATE_LIMITED', 429, 'Too many requests — please slow down');
+    }
+
+    const appSnap = await adminDb.collection('loanApplications').doc(id).get();
+    if (!appSnap.exists) throw new AppError('NOT_FOUND', 404, 'Application not found');
+
+    const documents = (appSnap.data()!.documents as Array<Record<string, unknown>> | undefined) ?? [];
+    const match = documents.find((d) => (d as { documentId?: string }).documentId === docId);
+    if (!match) throw new AppError('NOT_FOUND', 404, 'Document not found');
+
+    const fileName = ((match.fileName as string) ?? 'document').replace(/[/\\:*?"<>|]/g, '_');
+
+    const drive = getDriveClient();
+    const { buffer: data, mimeType } = await downloadDriveFile(drive, docId);
+
+    await auditLog({
+      userId: auth.uid,
+      action: 'application_document_viewed',
+      targetId: id,
+      targetType: 'application',
+      outcome: 'success',
+      ipAddress: ip,
+      changes: { documentId: docId },
+    });
+
+    return new NextResponse(data, {
+      status: 200,
+      headers: {
+        'Content-Type': mimeType,
+        'Content-Disposition': inlineContentDisposition(fileName),
+        'Cache-Control': 'private, no-store',
+      },
+    });
+  } catch (err) {
+    if (err instanceof AppError) return errorResponse(err);
+    if ((err as { code?: number })?.code === 404) {
+      return errorResponse(new AppError('NOT_FOUND', 404, 'Document is no longer available in storage'));
+    }
+    const detail = err instanceof Error ? err.message : String(err);
+    console.error('[applications/documents] view failed:', detail);
+    // Surface the underlying reason outside production to aid debugging.
+    if (process.env.NEXT_PUBLIC_ENVIRONMENT !== 'production') {
+      return errorResponse(new AppError('DOWNLOAD_FAILED', 502, `Download failed: ${detail}`));
+    }
     return internalError();
   }
 }

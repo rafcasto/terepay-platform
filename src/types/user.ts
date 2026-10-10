@@ -1,6 +1,6 @@
 import type { Timestamp } from 'firebase-admin/firestore';
 
-export type UserRole = 'applicant' | 'lender' | 'admin';
+export type UserRole = 'applicant' | 'lender' | 'admin' | 'content_editor';
 export type UserStatus = 'active' | 'suspended' | 'inactive';
 export type KycStatus = 'not_started' | 'in_progress' | 'submitted' | 'approved' | 'rejected';
 export type ImmigrationStatus = 'student' | 'work_visa' | 'resident' | 'permanent_resident' | 'citizen';
@@ -20,7 +20,14 @@ export interface User {
   email: string;
   firstName: string;
   lastName: string;
+  /** Primary role — drives default portal landing and legacy single-role checks. */
   role: UserRole;
+  /**
+   * Full set of roles granted to this user. A user may hold more than one
+   * (e.g. `['lender', 'content_editor']`). When absent, treat as `[role]`.
+   * Kept in sync with the Firebase custom claim `roles`.
+   */
+  roles?: UserRole[];
   profileComplete: boolean;
   kycStatus: KycStatus;
   status: UserStatus;
@@ -35,6 +42,8 @@ export interface User {
   customerId?: string;
   /** Whether this customer has had at least one loan approved. Controls application fee tier. */
   isExistingCustomer?: boolean;
+  /** Lender may use the Model Training console. Granted by an admin on the Users page. */
+  trainingAccess?: boolean;
 }
 
 export type OfflineCustomerStatus = 'unlinked' | 'linked';
@@ -74,6 +83,15 @@ export interface ApplicantProfile {
   housingStatus?: HousingStatus;
   timeAtAddress?: TimeAtAddress;
   immigrationStatus?: ImmigrationStatus;
+  /** Visa category (e.g. work_visa, resident_visa) — surfaced on the profile page */
+  visaStatus?: string;
+  visaExpiryDate?: string;   // YYYY-MM-DD
+  anniversaryDate?: string;  // YYYY-MM-DD — TerePay customer anniversary
+  householdType?: string;
+  numberOfChildren?: number;
+  numberOfDependents?: number;
+  /** Occupation / job title as entered on the profile page */
+  occupation?: string;
   kycDocuments?: IdentityDocument[];
   profileLastUpdatedAt?: Timestamp;
   employmentStatus: 'employed' | 'self-employed' | 'unemployed' | 'retired';

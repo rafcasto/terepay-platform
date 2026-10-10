@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import type { ReactNode } from 'react';
 import { ArrowLeft, Menu } from './Icons';
 
@@ -20,7 +21,7 @@ export function TopBar({
   right,
 }: TopBarProps) {
   return (
-    <header className="sticky top-0 z-20 bg-ink h-14 px-4 sm:px-6 flex items-center justify-between shrink-0">
+    <header className="sticky top-0 z-20 bg-surface-inverse h-14 px-4 sm:px-6 flex items-center justify-between shrink-0">
       <div className="flex items-center gap-3">
         {showBack && backHref && (
           <Link
@@ -31,8 +32,15 @@ export function TopBar({
             <ArrowLeft size={20} />
           </Link>
         )}
-        <Link href={logoHref} className="text-xl font-extrabold tracking-tight text-accent">
-          TerePay
+        <Link href={logoHref} aria-label="TerePay" className="flex items-center">
+          <Image
+            src="/brand/terepay-wordmark-white.png"
+            alt="TerePay"
+            width={720}
+            height={216}
+            priority
+            className="h-5 w-auto"
+          />
         </Link>
       </div>
 
