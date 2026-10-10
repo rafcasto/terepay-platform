@@ -1,16 +1,16 @@
 import type { Metadata } from 'next';
 import { getSiteSettings } from '@/lib/admin/site-settings';
-import { getContentSection } from '@/lib/content/site-content';
+import { getContentSections } from '@/lib/content/site-content';
 import MaintenancePage from '@/components/shared/MaintenancePage';
 import Navbar from './_landing/Navbar';
 import HeroSection from './_landing/HeroSection';
-import HowItWorksSection from './_landing/HowItWorksSection';
-import FeaturesSection from './_landing/FeaturesSection';
-import LoanSummaryCard from './_landing/LoanSummaryCard';
 import PartnersSection from './_landing/PartnersSection';
+import UsesSection from './_landing/UsesSection';
+import CalculatorSection from './_landing/CalculatorSection';
+import ApplySection from './_landing/ApplySection';
 import TestimonialsSection from './_landing/TestimonialsSection';
-import FAQSection from './_landing/FAQSection';
 import CTABanner from './_landing/CTABanner';
+import FAQSection from './_landing/FAQSection';
 import Footer from './_landing/Footer';
 
 export const metadata: Metadata = {
@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'TerePay — Borrow Now, Pay Later',
     description:
-      'TerePay connects borrowers with responsible, transparent short-term lending. Apply online — decisions within 24 hours.',
+      'TerePay connects borrowers with responsible, transparent short-term lending. Apply online — decisions within 24–48 hours.',
     url: 'https://terepay.com',
     siteName: 'TerePay',
     type: 'website',
@@ -31,32 +31,35 @@ export const metadata: Metadata = {
 // per request — force dynamic rendering so the flag is never frozen at build time.
 export const dynamic = 'force-dynamic';
 
+const SECTION_KEYS = [
+  'landing.hero',
+  'landing.uses',
+  'landing.calculator',
+  'landing.apply',
+  'landing.cta',
+  'landing.faq',
+] as const;
+
 export default async function Home() {
   const settings = await getSiteSettings();
   if (settings.maintenanceMode.public) {
     return <MaintenancePage message={settings.maintenanceMessage} />;
   }
 
-  const [heroContent, faqContent, ctaContent, howItWorksContent, featuresContent] = await Promise.all([
-    getContentSection('landing.hero'),
-    getContentSection('landing.faq'),
-    getContentSection('landing.cta'),
-    getContentSection('landing.howItWorks'),
-    getContentSection('landing.features'),
-  ]);
+  const content = await getContentSections(SECTION_KEYS);
 
   return (
-    <div className="min-h-screen bg-white text-gray-900">
+    <div className="min-h-screen overflow-x-hidden bg-surface-card font-brand text-[var(--ink-800)]">
       <Navbar />
       <main>
-        <HeroSection content={heroContent} />
-        <HowItWorksSection content={howItWorksContent} />
-        <FeaturesSection content={featuresContent} />
-        <LoanSummaryCard />
+        <HeroSection content={content['landing.hero']} />
         <PartnersSection />
+        <UsesSection content={content['landing.uses']} />
+        <CalculatorSection content={content['landing.calculator']} />
+        <ApplySection content={content['landing.apply']} />
         <TestimonialsSection />
-        <FAQSection content={faqContent} />
-        <CTABanner content={ctaContent} />
+        <CTABanner content={content['landing.cta']} />
+        <FAQSection content={content['landing.faq']} />
       </main>
       <Footer />
     </div>
