@@ -199,7 +199,14 @@ export const CONTENT_PAGES: ContentPageDef[] = [
     slug: 'landing',
     title: 'Landing page',
     description: 'Homepage copy shown to everyone.',
-    sectionKeys: ['landing.hero', 'landing.howItWorks', 'landing.features', 'landing.faq', 'landing.cta'],
+    sectionKeys: [
+      'landing.hero',
+      'landing.uses',
+      'landing.calculator',
+      'landing.apply',
+      'landing.cta',
+      'landing.faq',
+    ],
     previewHref: '/',
   },
   {

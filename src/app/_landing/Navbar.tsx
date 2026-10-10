@@ -1,110 +1,90 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { MenuIcon, XIcon } from './icons';
+
+const NAV_LINKS = [
+  { label: "What it's for", href: '#uses' },
+  { label: 'Repayments', href: '#calculator' },
+  { label: 'How to apply', href: '#apply' },
+  { label: 'FAQ', href: '#faq' },
+];
+
+const linkCls =
+  'text-sm font-medium text-[rgba(234,240,247,0.82)] transition-colors duration-[120ms] hover:text-white';
 
 export default function Navbar() {
-  const [scrolled, setScrolled] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-
-  useEffect(() => {
-    const handle = () => setScrolled(window.scrollY > 10);
-    window.addEventListener('scroll', handle, { passive: true });
-    return () => window.removeEventListener('scroll', handle);
-  }, []);
+  const [open, setOpen] = useState(false);
 
   return (
-    <header
-      className={`sticky top-0 z-50 bg-[#0D1B2A] transition-shadow${
-        scrolled ? ' shadow-xl shadow-black/40' : ''
-      }`}
-    >
-      <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-        <Link href="/" className="text-2xl font-bold text-[#F5A523] tracking-tight">
-          TerePay
+    <header className="sticky top-0 z-30 border-b border-white/[0.08] bg-[rgba(11,22,35,0.92)] backdrop-blur-[10px]">
+      <div className="mx-auto flex max-w-[1180px] items-center gap-7 px-6 py-3.5">
+        <Link href="/" aria-label="TerePay home" className="flex items-center gap-2">
+          <Image
+            src="/brand/terepay-mark-white.png"
+            alt=""
+            width={480}
+            height={418}
+            priority
+            className="h-[30px] w-auto"
+          />
+          <Image
+            src="/brand/terepay-wordmark-white.png"
+            alt="TerePay"
+            width={720}
+            height={216}
+            priority
+            className="h-[22px] w-auto"
+          />
         </Link>
 
-        {/* Desktop nav */}
-        <nav className="hidden md:flex items-center gap-8" aria-label="Main navigation">
-          <a href="#how-it-works" className="text-sm text-gray-300 hover:text-white transition-colors">
-            How It Works
-          </a>
-          <a href="#faq" className="text-sm text-gray-300 hover:text-white transition-colors">
-            FAQs
-          </a>
-          <a href="#contact" className="text-sm text-gray-300 hover:text-white transition-colors">
-            Contact
-          </a>
+        <nav aria-label="Main navigation" className="ml-auto hidden items-center gap-6 md:flex">
+          {NAV_LINKS.map((l) => (
+            <a key={l.href} href={l.href} className={linkCls}>
+              {l.label}
+            </a>
+          ))}
+          <Link href="/auth/login" className={linkCls}>
+            Sign in
+          </Link>
+          <Link href="/auth/signup" className="tp-btn tp-btn--accent">
+            Join Now
+          </Link>
         </nav>
 
-        {/* Desktop auth buttons */}
-        <div className="hidden md:flex items-center gap-3">
-          <Link
-            href="/auth/login"
-            className="text-sm font-medium text-gray-300 hover:text-white px-4 py-2 rounded-lg transition-colors"
-          >
-            Sign In
-          </Link>
-          <Link
-            href="/auth/signup"
-            className="text-sm font-semibold px-5 py-2.5 bg-[#F5A523] text-white rounded-lg hover:bg-[#E08B00] transition-colors"
-          >
-            Get Started
-          </Link>
-        </div>
-
-        {/* Mobile hamburger */}
         <button
-          className="md:hidden text-gray-300 hover:text-white"
-          onClick={() => setMenuOpen((o) => !o)}
-          aria-label={menuOpen ? 'Close menu' : 'Open menu'}
-          aria-expanded={menuOpen}
+          type="button"
+          className="ml-auto inline-flex h-10 w-10 items-center justify-center rounded-md text-white/85 transition-colors duration-[120ms] hover:bg-white/10 hover:text-white md:hidden"
+          onClick={() => setOpen((o) => !o)}
+          aria-label={open ? 'Close menu' : 'Open menu'}
+          aria-expanded={open}
+          aria-controls="landing-mobile-nav"
         >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            {menuOpen ? (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            ) : (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            )}
-          </svg>
+          {open ? <XIcon size={22} strokeWidth={2} /> : <MenuIcon size={22} strokeWidth={2} />}
         </button>
       </div>
 
-      {/* Mobile dropdown */}
-      {menuOpen && (
-        <div className="md:hidden border-t border-white/10 px-6 py-5 flex flex-col gap-5 bg-[#0D1B2A]">
-          <a
-            href="#how-it-works"
-            className="text-sm text-gray-300 hover:text-white"
-            onClick={() => setMenuOpen(false)}
-          >
-            How It Works
-          </a>
-          <a
-            href="#faq"
-            className="text-sm text-gray-300 hover:text-white"
-            onClick={() => setMenuOpen(false)}
-          >
-            FAQs
-          </a>
-          <a
-            href="#contact"
-            className="text-sm text-gray-300 hover:text-white"
-            onClick={() => setMenuOpen(false)}
-          >
-            Contact
-          </a>
+      {open && (
+        <nav
+          id="landing-mobile-nav"
+          aria-label="Main navigation"
+          className="flex flex-col gap-4 border-t border-white/10 px-6 py-5 md:hidden"
+        >
+          {NAV_LINKS.map((l) => (
+            <a key={l.href} href={l.href} className={linkCls} onClick={() => setOpen(false)}>
+              {l.label}
+            </a>
+          ))}
           <hr className="border-white/10" />
-          <Link href="/auth/login" className="text-sm font-medium text-gray-300 hover:text-white">
-            Sign In
+          <Link href="/auth/login" className={linkCls}>
+            Sign in
           </Link>
-          <Link
-            href="/auth/signup"
-            className="text-sm font-semibold px-5 py-2.5 bg-[#F5A523] text-white rounded-lg text-center hover:bg-[#E08B00]"
-          >
-            Get Started
+          <Link href="/auth/signup" className="tp-btn tp-btn--accent tp-btn--block">
+            Join Now
           </Link>
-        </div>
+        </nav>
       )}
     </header>
   );

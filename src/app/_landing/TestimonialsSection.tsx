@@ -1,75 +1,105 @@
-const testimonials = [
-  {
-    name: 'Shahara',
-    initials: 'S',
-    avatarBg: 'bg-amber-500',
-    quote: 'Your service is a great help to people.',
-  },
-  {
-    name: 'Walter',
-    initials: 'W',
-    avatarBg: 'bg-slate-700',
-    quote: 'Thank you so much TerePay. A big help — thumbs up!',
-  },
-  {
-    name: 'Eric Arambulo',
-    initials: 'E',
-    avatarBg: 'bg-violet-500',
-    quote: "I want to thank TerePay for helping my friend and me. You're such a blessing to us.",
-  },
+'use client';
+
+import { useEffect, useRef } from 'react';
+import { ChevronLeftIcon, ChevronRightIcon, StarIcon } from './icons';
+
+// Customer quotes are user-generated content and are kept verbatim.
+const TESTIMONIALS = [
+  { name: 'Shahara', quote: 'Thank you for helping during times of need.' },
+  { name: 'Walter', quote: 'Your service is a great help to people.' },
+  { name: 'Eric Arambulo', quote: 'Thank you so much TerePay. A big helped ..Thumbs up' },
   {
     name: 'Lyn',
-    initials: 'L',
-    avatarBg: 'bg-amber-400',
-    quote: 'Thank you for helping during times of need.',
+    quote: "I want to thank TerePay for helping my friend and me. You're such a blessing to Us. God bless you",
   },
 ];
 
-function StarRating() {
-  return (
-    <div className="flex gap-0.5">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <svg key={i} className="w-4 h-4 text-[#F5A523]" fill="currentColor" viewBox="0 0 20 20">
-          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-        </svg>
-      ))}
-    </div>
-  );
+const AUTO_ADVANCE_MS = 4000;
+
+function scrollRail(el: HTMLElement, dir: 1 | -1) {
+  el.scrollBy({ left: dir * Math.min(el.clientWidth * 0.8, 640), behavior: 'smooth' });
 }
 
-export default function TestimonialsSection() {
-  return (
-    <section className="py-20 px-6 bg-[#FEF7E9]/40">
-      <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-14">
-          <span className="text-xs font-semibold tracking-widest uppercase text-[#F5A523]">
-            Testimonials
-          </span>
-          <h2 className="mt-2 text-3xl md:text-4xl font-extrabold text-[#0D1B2A]">
-            What People Say About Us
-          </h2>
-        </div>
+const navBtnCls =
+  'absolute top-1/2 z-[2] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-[var(--ink-900)] text-white shadow-md transition-colors duration-[120ms] hover:bg-[var(--orange-600)]';
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {testimonials.map((t) => (
-            <div
-              key={t.name}
-              className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col gap-4"
-            >
-              <StarRating />
-              <blockquote className="text-sm text-gray-600 leading-relaxed flex-1">
-                &ldquo;{t.quote}&rdquo;
-              </blockquote>
-              <div className="flex items-center gap-3">
-                <div
-                  className={`w-9 h-9 rounded-full ${t.avatarBg} flex items-center justify-center text-white text-sm font-bold flex-shrink-0`}
-                >
-                  {t.initials}
+export default function TestimonialsSection() {
+  const railRef = useRef<HTMLDivElement>(null);
+  const pausedRef = useRef(false);
+
+  useEffect(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const id = window.setInterval(() => {
+      const el = railRef.current;
+      if (!el || pausedRef.current) return;
+      if (el.scrollLeft + el.clientWidth >= el.scrollWidth - 4) {
+        el.scrollTo({ left: 0, behavior: 'smooth' });
+      } else {
+        scrollRail(el, 1);
+      }
+    }, AUTO_ADVANCE_MS);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const pause = () => {
+    pausedRef.current = true;
+  };
+  const resume = () => {
+    pausedRef.current = false;
+  };
+
+  return (
+    <section className="bg-surface-card px-6 py-[clamp(56px,7vw,88px)]" aria-labelledby="testimonials-heading">
+      <div className="mx-auto max-w-[1180px]">
+        <h2
+          id="testimonials-heading"
+          className="mb-8 font-display text-[clamp(28px,3.4vw,40px)] font-bold tracking-[-0.02em] text-ink-strong"
+        >
+          What people say about us...
+        </h2>
+
+        <div className="relative px-[52px]">
+          <button
+            type="button"
+            aria-label="Previous testimonials"
+            onClick={() => railRef.current && scrollRail(railRef.current, -1)}
+            className={`${navBtnCls} left-0`}
+          >
+            <ChevronLeftIcon size={18} strokeWidth={2.2} />
+          </button>
+          <button
+            type="button"
+            aria-label="Next testimonials"
+            onClick={() => railRef.current && scrollRail(railRef.current, 1)}
+            className={`${navBtnCls} right-0`}
+          >
+            <ChevronRightIcon size={18} strokeWidth={2.2} />
+          </button>
+
+          <div
+            ref={railRef}
+            onMouseEnter={pause}
+            onMouseLeave={resume}
+            onTouchStart={pause}
+            onFocus={pause}
+            onBlur={resume}
+            className="flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth px-0.5 pb-3.5 pt-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
+            {TESTIMONIALS.map((t) => (
+              <figure
+                key={t.name}
+                className="flex w-[min(300px,78vw)] flex-none snap-start flex-col rounded-card bg-brand-soft p-6 shadow-md"
+              >
+                <figcaption className="font-display text-base font-bold text-ink-strong">{t.name}</figcaption>
+                <div className="mt-3 flex gap-[3px] text-gold" aria-label="Rated 5 out of 5">
+                  {Array.from({ length: 5 }, (_, i) => (
+                    <StarIcon key={i} />
+                  ))}
                 </div>
-                <p className="font-semibold text-sm text-[#0D1B2A]">{t.name}</p>
-              </div>
-            </div>
-          ))}
+                <blockquote className="mt-3.5 text-base leading-[1.5] text-[var(--ink-800)]">{t.quote}</blockquote>
+              </figure>
+            ))}
+          </div>
         </div>
       </div>
     </section>

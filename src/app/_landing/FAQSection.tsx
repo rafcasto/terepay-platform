@@ -1,11 +1,9 @@
-'use client';
-
-import { useState } from 'react';
+import { renderEmphasis } from '@/lib/content/emphasis';
 import { DEFAULT_CONTENT, type ContentSectionValues } from '@/types/content';
+import { ChevronDownIcon } from './icons';
 
 export default function FAQSection({ content }: { content?: ContentSectionValues }) {
   const c = { ...DEFAULT_CONTENT['landing.faq'], ...(content ?? {}) };
-  const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   const faqs = [
     { q: c.q1, a: c.a1 },
@@ -17,43 +15,30 @@ export default function FAQSection({ content }: { content?: ContentSectionValues
   ].filter((f) => f.q && f.q.trim().length > 0);
 
   return (
-    <section id="faq" className="py-20 px-6 bg-white">
-      <div className="max-w-3xl mx-auto">
-        <div className="text-center mb-14">
-          <span className="text-xs font-semibold tracking-widest uppercase text-[#F5A523]">
-            {c.eyebrow}
-          </span>
-          <h2 className="mt-2 text-3xl md:text-4xl font-extrabold text-[#0D1B2A]">
-            {c.heading}
-          </h2>
-        </div>
+    <section id="faq" className="scroll-mt-20 bg-surface-card px-6 py-[clamp(56px,7vw,88px)]">
+      <div className="mx-auto max-w-[860px]">
+        <span className="tp-eyebrow">{c.eyebrow}</span>
+        <h2 className="mb-8 mt-2.5 font-display text-[clamp(28px,3.4vw,40px)] font-bold tracking-[-0.02em] text-ink-strong">
+          {c.heading}
+        </h2>
 
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2.5">
           {faqs.map((faq, i) => (
-            <div key={i} className="border border-gray-200 rounded-xl overflow-hidden">
-              <button
-                className="w-full flex items-center justify-between px-6 py-5 text-left text-[#0D1B2A] font-semibold hover:bg-gray-50 transition-colors"
-                onClick={() => setOpenIndex(openIndex === i ? null : i)}
-                aria-expanded={openIndex === i}
-              >
-                <span>{faq.q}</span>
-                <svg
-                  className={`w-5 h-5 text-[#F5A523] flex-shrink-0 ml-4 transition-transform duration-200${
-                    openIndex === i ? ' rotate-180' : ''
-                  }`}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-              {openIndex === i && (
-                <div className="px-6 pb-5 border-t border-gray-100">
-                  <p className="pt-4 text-sm text-gray-500 leading-relaxed">{faq.a}</p>
-                </div>
-              )}
-            </div>
+            <details
+              key={faq.q}
+              open={i === 0}
+              className="group rounded-card border border-border-default bg-surface-card p-1"
+            >
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-[18px] font-display text-[17px] font-semibold text-ink-strong [&::-webkit-details-marker]:hidden">
+                {faq.q}
+                <span className="flex-none text-brand-text transition-transform duration-[180ms] group-open:rotate-180">
+                  <ChevronDownIcon strokeWidth={2.2} />
+                </span>
+              </summary>
+              <div className="whitespace-pre-line px-5 pb-5 text-[15px] leading-[1.6] text-[var(--ink-800)]">
+                {renderEmphasis(faq.a)}
+              </div>
+            </details>
           ))}
         </div>
       </div>

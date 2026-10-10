@@ -1,95 +1,93 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import { DEFAULT_CONTENT, type ContentSectionValues } from '@/types/content';
 
 export default function HeroSection({ content }: { content?: ContentSectionValues }) {
   const c = { ...DEFAULT_CONTENT['landing.hero'], ...(content ?? {}) };
 
-  const badges = [
-    {
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="#F5A523" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-        </svg>
-      ),
-      label: c.badge1Label,
-      sub: c.badge1Sub,
-    },
-    {
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="#F5A523" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-          />
-        </svg>
-      ),
-      label: c.badge2Label,
-      sub: c.badge2Sub,
-    },
-    {
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="#F5A523" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-          />
-        </svg>
-      ),
-      label: c.badge3Label,
-      sub: c.badge3Sub,
-    },
-  ];
+  const stats = [
+    { value: c.stat1Value, label: c.stat1Label },
+    { value: c.stat2Value, label: c.stat2Label },
+    { value: c.stat3Value, label: c.stat3Label },
+  ].filter((s) => s.value);
 
   return (
-    <section className="bg-gradient-to-br from-[#FEF7E9] via-white to-white py-20 md:py-32 px-6">
-      <div className="max-w-6xl mx-auto text-center">
-        <span className="inline-block mb-4 px-4 py-1.5 text-xs font-semibold tracking-widest uppercase text-[#F5A523] bg-[#F5A523]/10 rounded-full">
-          {c.badge}
-        </span>
-        <h1 className="text-4xl md:text-6xl font-extrabold text-[#0D1B2A] leading-tight max-w-3xl mx-auto">
-          {c.titleLead}{' '}
-          <span className="text-[#F5A523]">{c.titleHighlight}</span>{' '}
-          {c.titleTail}
-        </h1>
-        <p className="mt-6 text-lg md:text-xl text-gray-500 max-w-2xl mx-auto leading-relaxed">
-          {c.subtitle}
-        </p>
-        <p className="mt-2 text-sm text-gray-400">{c.disclaimer}</p>
+    <section id="top" className="relative overflow-hidden bg-[var(--ink-950)] text-[var(--text-on-inverse)]">
+      {/* Warm radial glow, top-right */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -right-[160px] -top-[220px] h-[620px] w-[620px] rounded-full bg-[radial-gradient(circle,rgba(240,128,0,0.30),rgba(240,128,0,0)_66%)]"
+      />
 
-        <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
-          <Link
-            href="/auth/signup"
-            className="px-8 py-4 bg-[#F5A523] text-white font-bold rounded-xl hover:bg-[#E08B00] transition-colors shadow-lg shadow-[#F5A523]/25 text-base"
-          >
-            {c.primaryCta}
-          </Link>
-          <Link
-            href="/auth/login"
-            className="px-8 py-4 border-2 border-[#0D1B2A] text-[#0D1B2A] font-bold rounded-xl hover:bg-[#0D1B2A] hover:text-white transition-colors text-base"
-          >
-            {c.secondaryCta}
-          </Link>
+      <div className="relative mx-auto flex max-w-[1180px] flex-wrap items-center gap-[clamp(32px,5vw,56px)] px-6 pb-[clamp(88px,10vw,132px)] pt-[clamp(56px,8vw,104px)]">
+        {/* Copy */}
+        <div className="min-w-0 flex-[1_1_320px]">
+          <span className="inline-block rounded-pill border border-[rgba(251,199,141,0.35)] px-3.5 py-[7px] font-display text-xs font-semibold uppercase tracking-[.14em] text-gold-light">
+            {c.badge}
+          </span>
+          <h1 className="mt-[22px] font-display text-[clamp(38px,5.6vw,66px)] font-bold leading-[1.02] tracking-[-0.025em] text-white text-balance">
+            {c.titleLead}{' '}
+            <span className="font-serif font-semibold text-gold-light">{c.titleHighlight}</span>
+            {c.titleTail ? ` ${c.titleTail}` : null}
+          </h1>
+          <p className="mt-5 max-w-[520px] text-[clamp(17px,1.6vw,20px)] leading-[1.55] text-[rgba(234,240,247,0.78)] text-pretty">
+            {c.subtitle}
+          </p>
+          <p className="mt-4 text-sm font-semibold text-gold-light">{c.disclaimer}</p>
+
+          <div className="mt-[30px] flex flex-wrap gap-3">
+            <Link href="/auth/signup" className="tp-btn tp-btn--accent tp-btn--lg">
+              {c.primaryCta}
+            </Link>
+            <a
+              href="#calculator"
+              className="inline-flex h-[52px] items-center rounded-md border border-white/[0.28] px-6 font-display text-[15px] font-semibold text-white transition-colors duration-[120ms] hover:bg-white/[0.08]"
+            >
+              {c.secondaryCta}
+            </a>
+          </div>
+
+          {stats.length > 0 && (
+            <dl className="mt-10 flex flex-wrap gap-7">
+              {stats.map((s) => (
+                <div key={s.label} className="min-w-0">
+                  <dd className="font-tabular text-[26px] font-semibold text-white">{s.value}</dd>
+                  <dt className="mt-0.5 text-[13px] text-[rgba(234,240,247,0.6)]">{s.label}</dt>
+                </div>
+              ))}
+            </dl>
+          )}
         </div>
 
-        {/* Trust badges */}
-        <div className="mt-16 flex flex-col sm:flex-row justify-center gap-8 sm:gap-12">
-          {badges.map((badge) => (
-            <div key={badge.label} className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-[#F5A523]/10 flex items-center justify-center flex-shrink-0">
-                {badge.icon}
-              </div>
-              <div className="text-left">
-                <p className="font-semibold text-[#0D1B2A] text-sm">{badge.label}</p>
-                <p className="text-xs text-gray-500">{badge.sub}</p>
-              </div>
-            </div>
-          ))}
+        {/* Photo grid */}
+        <div className="relative grid min-w-0 flex-[1.45_1_380px] grid-cols-[1.35fr_1fr] grid-rows-[auto_auto] gap-4">
+          <div className="relative row-span-2 aspect-[3/4] overflow-hidden rounded-xl">
+            <Image
+              src="/landing/hero-family.png"
+              alt="A family sitting together at home, smiling"
+              fill
+              priority
+              sizes="(min-width: 1024px) 400px, 55vw"
+              className="object-cover"
+            />
+          </div>
+          <div className="relative aspect-[4/5] overflow-hidden rounded-xl">
+            <Image
+              src="/landing/hero-call.png"
+              alt="A woman smiling while on a phone call"
+              fill
+              sizes="(min-width: 1024px) 300px, 40vw"
+              className="object-cover"
+            />
+          </div>
+          <div className="flex flex-col justify-center rounded-xl bg-brand p-5 text-ink-strong">
+            <div className="font-display text-[15px] font-bold leading-[1.3]">{c.tileTitle}</div>
+            <div className="mt-2 text-[13px] leading-[1.4]">{c.tileBody}</div>
+          </div>
         </div>
       </div>
+
+      <div className="tp-wave absolute -bottom-px left-0 text-surface-card" aria-hidden="true" />
     </section>
   );
 }
