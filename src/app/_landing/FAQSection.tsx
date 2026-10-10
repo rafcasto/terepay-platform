@@ -17,12 +17,12 @@ export default function FAQSection({ content }: { content?: ContentSectionValues
   return (
     <section id="faq" className="scroll-mt-20 bg-surface-card px-6 py-[clamp(56px,7vw,88px)]">
       <div className="mx-auto max-w-[860px]">
-        <span className="tp-eyebrow">{c.eyebrow}</span>
-        <h2 className="mb-8 mt-2.5 font-display text-[clamp(28px,3.4vw,40px)] font-bold tracking-[-0.02em] text-ink-strong">
+        <span className="tp-eyebrow mb-2.5 block">{c.eyebrow}</span>
+        <h2 className="font-display text-[clamp(28px,3.4vw,40px)] font-bold tracking-[-0.02em] text-ink-strong">
           {c.heading}
         </h2>
 
-        <div className="flex flex-col gap-2.5">
+        <div className="mt-8 flex flex-col gap-2.5">
           {faqs.map((faq, i) => (
             <details
               key={faq.q}

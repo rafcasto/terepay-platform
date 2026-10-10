@@ -12,12 +12,16 @@ export default function ApplySection({ content }: { content?: ContentSectionValu
     <section id="apply" className="scroll-mt-20 bg-[var(--surface-page)] px-6 py-[clamp(56px,7vw,88px)]">
       <div className="mx-auto grid max-w-[1180px] grid-cols-[repeat(auto-fit,minmax(300px,1fr))] items-start gap-[clamp(28px,4vw,56px)]">
         <div className="min-w-0">
-          <span className="tp-eyebrow">{c.eyebrow}</span>
-          <h2 className="mt-2.5 font-display text-[clamp(28px,3.4vw,40px)] font-bold tracking-[-0.02em] text-ink-strong">
+          <span className="tp-eyebrow mb-2.5 block">{c.eyebrow}</span>
+          <h2 className="font-display text-[clamp(28px,3.4vw,40px)] font-bold tracking-[-0.02em] text-ink-strong">
             {c.heading}
           </h2>
-          <p className="mt-3.5 text-[17px] leading-[1.55] text-ink-muted">{c.intro}</p>
-          <p className="mt-[18px] text-base leading-[1.6] text-[var(--ink-800)]">{c.body}</p>
+          <div className="mt-3.5">
+            <p className="text-[17px] leading-[1.55] text-ink-muted">{c.intro}</p>
+          </div>
+          <div className="mt-[18px]">
+            <p className="text-base leading-[1.6] text-[var(--ink-800)]">{c.body}</p>
+          </div>
 
           <div className="mt-[26px] flex flex-wrap gap-3">
             <Link href="/auth/signup" className="tp-btn tp-btn--accent tp-btn--lg">
@@ -30,7 +34,7 @@ export default function ApplySection({ content }: { content?: ContentSectionValu
 
           <InterestDisclosure className="mt-[18px] max-w-[460px]">{c.disclosure}</InterestDisclosure>
 
-          <p className="mt-3.5 max-w-[460px] text-[13px] leading-[1.5] text-ink-muted">
+          <p className="block max-w-[460px] pt-3.5 text-[13px] leading-[1.5] text-ink-muted">
             {c.privacyNote}{' '}
             <a
               href="https://terepay.com/privacy-policy/"
@@ -46,7 +50,9 @@ export default function ApplySection({ content }: { content?: ContentSectionValu
 
         <div className="min-w-0 rounded-xl border border-border-default bg-surface-card p-[clamp(24px,3vw,34px)] shadow-md">
           <h3 className="font-display text-xl font-bold text-ink-strong">{c.checklistTitle}</h3>
-          <p className="mb-5 mt-2.5 text-[15px] text-ink-muted">{c.checklistIntro}</p>
+          <div className="mb-5 mt-2.5">
+            <p className="text-[15px] text-ink-muted">{c.checklistIntro}</p>
+          </div>
           <ul className="flex flex-col gap-3.5">
             {items.map((item) => (
               <li key={item} className="flex items-start gap-3">
