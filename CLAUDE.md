@@ -17,7 +17,8 @@ Two user roles: `applicant` and `lender`. Two customer models:
 | `npm run firebase:emulate:clear` | Emulator with fresh state (does not import the snapshot) |
 | `npm run firebase:export` | Persist current emulator state back to `./emulator-data` |
 | `npm run seed:lender` | Seed a lender into the running emulator |
-| `npm run seed:lender:prod` | **Production** seed — handle with care |
+| `npm run seed:lender:prod` | **Production** seed — handle with care. `:prod` scripts read `.env.local.prod` (via `ENV_FILE`) |
+| `npm run seed:admin` / `npm run seed:admin:prod` | Seed an admin (`ADMIN_EMAIL` / `ADMIN_PASSWORD`) into emulator / **production** |
 | `npm run reset:counter:prod` | **Production** customer-ID counter reset — handle with care |
 | `npm run verify:gdrive` | Sanity-check Google Drive integration |
 
