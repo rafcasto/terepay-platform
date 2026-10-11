@@ -10,7 +10,7 @@ import * as admin from 'firebase-admin';
 import * as dotenv from 'dotenv';
 import { resolve } from 'path';
 
-dotenv.config({ path: resolve(process.cwd(), '.env.local') });
+dotenv.config({ path: resolve(process.cwd(), process.env.ENV_FILE ?? '.env.local') });
 
 const {
   FIREBASE_ADMIN_PROJECT_ID,
@@ -37,7 +37,7 @@ if (admin.apps.length === 0) {
   });
 }
 
-console.log('[seed:admin] Auth emulator:', process.env.FIREBASE_AUTH_EMULATOR_HOST ?? 'PRODUCTION');
+console.log('[seed:admin] Project:', FIREBASE_ADMIN_PROJECT_ID, '| Auth emulator:', process.env.FIREBASE_AUTH_EMULATOR_HOST ?? 'PRODUCTION');
 
 const auth = admin.auth();
 const db = admin.firestore();

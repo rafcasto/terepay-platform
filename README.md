@@ -226,7 +226,7 @@ Every pull request also receives an isolated **Preview Deployment** URL automati
 
 The public signup endpoint always creates `applicant` accounts. Lender accounts must be seeded manually.
 
-1. Add the following variables to your local `.env.local` (they are only read by the seed script, never sent to Vercel):
+1. Add the following variables to `.env.local.prod` (the `:prod` scripts read that file via `ENV_FILE`; it must also hold the **production** `FIREBASE_ADMIN_*` credentials). They are only read by the seed script, never sent to Vercel:
 
 ```bash
 LENDER_EMAIL=lender@yourdomain.com
