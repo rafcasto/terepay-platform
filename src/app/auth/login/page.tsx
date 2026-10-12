@@ -11,13 +11,14 @@ import { useRecaptchaToken } from '../recaptcha-provider';
 import { useSiteContent } from '@/lib/content/SiteContentContext';
 import { AuthShell } from '../_components/auth-shell';
 import { AuthIcon } from '../_components/auth-icons';
-import { Field, InputShell, EyeToggle, SubmitButton, ErrorAlert, Divider } from '../_components/auth-ui';
+import { Field, InputShell, EyeToggle, SubmitButton, ErrorAlert, SuccessAlert, Divider } from '../_components/auth-ui';
 
 function LoginFormInner() {
   const { login } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get('redirect');
+  const passwordReset = searchParams.get('reset') === 'success';
   const [showPassword, setShowPassword] = useState(false);
   // Latch that stays true from a successful login until the page unmounts.
   // `isSubmitting` flips back to false the moment router.push() is called, but
@@ -63,6 +64,8 @@ function LoginFormInner() {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-[18px]" noValidate aria-busy={isBusy}>
+      {passwordReset && <SuccessAlert>{c.passwordResetSuccess}</SuccessAlert>}
+
       <Field htmlFor="email" label="Email address" required error={errors.email?.message}>
         <InputShell
           id="email"
