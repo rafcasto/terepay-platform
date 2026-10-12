@@ -11,6 +11,7 @@ import { AuthIcon } from '../_components/auth-icons';
 import { Field, InputShell, EyeToggle, SubmitButton, Checkbox, ErrorAlert } from '../_components/auth-ui';
 import { useRecaptchaToken } from '../recaptcha-provider';
 import { useSiteContent } from '@/lib/content/SiteContentContext';
+import { legalHref } from '@/lib/legal/pages';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -240,7 +241,15 @@ export default function SignupPage() {
 
         <div className="pt-1">
           <Checkbox id="terms" checked={agreedToTerms} onChange={(e) => setAgreedToTerms(e.target.checked)}>
-            I agree to the <a href="/terms">loan agreement terms</a> and <a href="/privacy">privacy policy</a>.{' '}
+            I agree to the{' '}
+            <a href={legalHref('terms-and-conditions')} target="_blank" rel="noopener noreferrer">
+              loan agreement terms
+            </a>{' '}
+            and{' '}
+            <a href={legalHref('privacy-policy')} target="_blank" rel="noopener noreferrer">
+              privacy policy
+            </a>
+            .{' '}
             {c.termsDisclosure}
           </Checkbox>
           {errors.terms && <p className="mt-1.5 text-[12.5px] font-medium text-[var(--text-danger)]">{errors.terms}</p>}
