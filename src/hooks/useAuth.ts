@@ -10,6 +10,30 @@ import {
 import { clientAuth } from '@/lib/firebase/client';
 import type { UserRole } from '@/types/user';
 
+/**
+ * Map Firebase Auth failures to safe, user-facing copy. Raw Firebase messages
+ * (e.g. "Firebase: Error (auth/invalid-credential)") must never reach the UI.
+ * Errors from our own /api routes already carry friendly messages and pass through.
+ */
+function toLoginErrorMessage(err: unknown): string {
+  const code = (err as { code?: unknown })?.code;
+  if (typeof code === 'string' && code.startsWith('auth/')) {
+    switch (code) {
+      case 'auth/too-many-requests':
+        return 'Too many attempts. Please wait a few minutes and try again.';
+      case 'auth/user-disabled':
+        return 'This account has been disabled. Please contact support.';
+      case 'auth/network-request-failed':
+        return 'Network error. Please check your connection and try again.';
+      default:
+        // invalid-credential, wrong-password, user-not-found, invalid-email, ...
+        // Deliberately identical so we never reveal whether an account exists.
+        return 'Invalid email or password';
+    }
+  }
+  return err instanceof Error ? err.message : 'Login failed';
+}
+
 type AppUser = {
   uid: string;
   email: string;
@@ -78,9 +102,9 @@ export function useAuth() {
       setState({ user, loading: false, error: null });
       return user as AppUser;
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Login failed';
+      const message = toLoginErrorMessage(err);
       setState((s) => ({ ...s, loading: false, error: message }));
-      throw err;
+      throw new Error(message);
     }
   }, []);
 

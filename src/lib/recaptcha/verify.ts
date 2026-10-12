@@ -31,7 +31,8 @@ export async function verifyRecaptcha(token: string, action?: string): Promise<b
     return true;
   }
 
-  const secretKey = process.env.RECAPTCHA_SECRET_KEY;
+  // Trimmed: a trailing newline in the env var would make every siteverify call fail.
+  const secretKey = process.env.RECAPTCHA_SECRET_KEY?.trim();
   if (!secretKey) {
     console.warn('[recaptcha] RECAPTCHA_SECRET_KEY is not set — skipping verification');
     return true;
