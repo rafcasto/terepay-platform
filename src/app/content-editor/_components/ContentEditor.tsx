@@ -169,7 +169,9 @@ function SectionForm({
               ) : (
                 <input
                   id={id}
-                  type="text"
+                  type={field.type === 'url' ? 'url' : 'text'}
+                  inputMode={field.type === 'url' ? 'url' : undefined}
+                  placeholder={field.type === 'url' ? 'https://' : undefined}
                   maxLength={field.maxLength}
                   value={value}
                   onChange={(e) => setDraft((p) => ({ ...p, [field.key]: e.target.value }))}

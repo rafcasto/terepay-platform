@@ -217,6 +217,7 @@ export const CONTENT_PAGES: ContentPageDef[] = [
       'landing.apply',
       'landing.cta',
       'landing.faq',
+      'landing.footer',
     ],
     previewHref: '/',
   },

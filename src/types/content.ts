@@ -29,8 +29,10 @@ export type ContentGroup = 'landing' | 'auth' | 'onboarding' | 'borrower' | 'app
  *   (see `src/lib/content/document.tsx`); edited with a formatting toolbar
  *   and live preview
  * - `toggle` — stored as the string `'true'` | `'false'`
+ * - `url` — an absolute `https://` link (validated server-side so an editor can
+ *   never save a `javascript:` or other unsafe scheme)
  */
-export type ContentFieldType = 'text' | 'textarea' | 'document' | 'toggle';
+export type ContentFieldType = 'text' | 'textarea' | 'document' | 'toggle' | 'url';
 
 export interface ContentFieldDef {
   key: string;
@@ -199,6 +201,22 @@ export const CONTENT_SECTIONS: ContentSectionDef[] = [
       ta('subtitle', 'Subtitle'),
       t('primaryCta', 'Button label'),
       t('disclaimer', 'Interest disclaimer', { help: 'Compliance: keep interest/fees visible.' }),
+    ],
+  },
+  {
+    key: 'landing.footer',
+    group: 'landing',
+    label: 'Site footer — Important Links',
+    description: 'The "Important Links" column in the footer shown on every public page.',
+    fields: [
+      t('contractLabel', 'Contract link — label', { maxLength: 80 }),
+      {
+        key: 'contractUrl',
+        label: 'Contract link — URL',
+        type: 'url',
+        maxLength: 500,
+        help: 'Paste the Google Drive share link to the contract document. Must start with https://. Leave blank to hide the link.',
+      },
     ],
   },
 
@@ -802,6 +820,10 @@ export const DEFAULT_CONTENT: Record<string, ContentSectionValues> = {
       'Complete the following questions to get started. Applications are reviewed within 24–48 hours.',
     primaryCta: 'Ready To Borrow?',
     disclaimer: '* All loans are charged interest (see below). Terms and conditions apply.',
+  },
+  'landing.footer': {
+    contractLabel: 'Contract and Agreement',
+    contractUrl: 'https://drive.google.com/file/d/1weraj0jfc1yPtet0bQV-fu332cpVTJG9/view?usp=share_link',
   },
 
   'auth.shared': {
