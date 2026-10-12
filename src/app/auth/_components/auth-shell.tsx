@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 import { useSiteContent } from '@/lib/content/SiteContentContext';
 import { renderEmphasis } from '@/lib/content/emphasis';
 import { AuthIcon } from './auth-icons';
+import { legalHref } from '@/lib/legal/pages';
 
 /* ---------------------------------------------------------------------------
    AuthShell — the split institutional layout from the design system handoff:
@@ -19,7 +20,13 @@ import { AuthIcon } from './auth-icons';
 
 type Mode = 'signin' | 'register';
 
-const POLICIES = ['Disclosure statement', 'Rates & fees', 'Hardship', 'Dispute resolution'];
+/** Policy links in the brand-panel footer — slugs are served by `src/app/(legal)/<slug>`. */
+const POLICIES = [
+  { label: 'Disclosure statement', href: legalHref('disclosure-statement') },
+  { label: 'Rates & fees', href: legalHref('rates-and-fees-policy') },
+  { label: 'Hardship', href: legalHref('unforeseen-financial-hardship-policy') },
+  { label: 'Dispute resolution', href: legalHref('dispute-resolution-policy') },
+];
 
 function Tick({ children }: { children: ReactNode }) {
   return (
@@ -77,9 +84,15 @@ function BrandPanel({ mode }: { mode: Mode }) {
         <p className="text-[12.5px] leading-relaxed text-[#8295ab]">{shared.panelFooter}</p>
         <div className="mt-2 flex flex-wrap gap-x-3.5 gap-y-1.5">
           {POLICIES.map((p) => (
-            <a key={p} href="#" className="whitespace-nowrap text-[12.5px] text-[#aebccd] hover:text-white hover:underline">
-              {p}
-            </a>
+            <Link
+              key={p.href}
+              href={p.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="whitespace-nowrap text-[12.5px] text-[#aebccd] hover:text-white hover:underline"
+            >
+              {p.label}
+            </Link>
           ))}
         </div>
       </div>
