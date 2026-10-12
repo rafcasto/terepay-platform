@@ -143,11 +143,13 @@ function SectionForm({
               {field.type === 'textarea' ? (
                 <textarea
                   id={id}
-                  rows={3}
+                  rows={field.rows ?? 3}
                   maxLength={field.maxLength}
                   value={value}
                   onChange={(e) => setDraft((p) => ({ ...p, [field.key]: e.target.value }))}
-                  className="w-full resize-y rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-[#F5A523] focus:outline-none focus:ring-1 focus:ring-[#F5A523]"
+                  className={`w-full resize-y rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-[#F5A523] focus:outline-none focus:ring-1 focus:ring-[#F5A523] ${
+                    (field.rows ?? 3) > 6 ? 'font-tabular text-[13px] leading-[1.55]' : ''
+                  }`}
                 />
               ) : (
                 <input

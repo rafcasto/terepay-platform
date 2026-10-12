@@ -1,6 +1,10 @@
 import Navbar from '@/app/_landing/Navbar';
 import Footer from '@/app/_landing/Footer';
 
+// Legal documents are editable in the content editor and read from Firestore
+// per request — never freeze them at build time.
+export const dynamic = 'force-dynamic';
+
 /**
  * Shared chrome for the public legal / compliance pages (privacy policy,
  * terms, fees, hardship, complaints, disclosure). Reuses the landing-page

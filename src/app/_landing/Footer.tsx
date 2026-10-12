@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { LEGAL_PAGES, legalHref } from '@/lib/legal/pages';
+import { FacebookIcon, LinkedInIcon } from './icons';
 
 const IMPORTANT_INFORMATION = LEGAL_PAGES.map((p) => ({
   label: p.footerLabel,
@@ -12,8 +13,11 @@ const IMPORTANT_LINKS = [
     label: 'Contract and Agreement',
     href: 'https://drive.google.com/file/d/1weraj0jfc1yPtet0bQV-fu332cpVTJG9/view?usp=share_link',
   },
-  { label: 'Facebook', href: 'https://www.facebook.com/NeophileFinance/' },
-  { label: 'LinkedIn', href: 'https://www.linkedin.com/company/terepay' },
+];
+
+const SOCIAL_LINKS = [
+  { label: 'TerePay on Facebook', href: 'https://www.facebook.com/NeophileFinance/', Icon: FacebookIcon },
+  { label: 'TerePay on LinkedIn', href: 'https://www.linkedin.com/company/terepay', Icon: LinkedInIcon },
 ];
 
 const linkCls =
@@ -48,6 +52,22 @@ export default function Footer() {
               <li key={l.label}>
                 <a href={l.href} target="_blank" rel="noopener noreferrer" className={linkCls}>
                   {l.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+          <ul className="mt-5 flex items-center gap-2" aria-label="Social media">
+            {SOCIAL_LINKS.map(({ label, href, Icon }) => (
+              <li key={href}>
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={label}
+                  title={label}
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-white/[0.14] text-[rgba(234,240,247,0.75)] transition-colors duration-[120ms] hover:border-gold-light hover:text-gold-light"
+                >
+                  <Icon size={20} />
                 </a>
               </li>
             ))}

@@ -1,4 +1,6 @@
 import type { Timestamp } from 'firebase-admin/firestore';
+import { LEGAL_PAGES } from '@/lib/legal/pages';
+import { LEGAL_DOCUMENTS } from '@/lib/legal/documents';
 
 /**
  * Editable site content.
@@ -19,7 +21,7 @@ import type { Timestamp } from 'firebase-admin/firestore';
  *      `SiteContentProvider`.
  */
 
-export type ContentGroup = 'landing' | 'auth' | 'onboarding' | 'borrower' | 'apply';
+export type ContentGroup = 'landing' | 'auth' | 'onboarding' | 'borrower' | 'apply' | 'legal';
 
 export type ContentFieldType = 'text' | 'textarea';
 
@@ -31,6 +33,8 @@ export interface ContentFieldDef {
   help?: string;
   /** Max length enforced client + server side. */
   maxLength: number;
+  /** Textarea height in the editor (defaults to 3). Use for long documents. */
+  rows?: number;
 }
 
 export interface ContentSectionDef {
@@ -64,6 +68,8 @@ const ta = (
 
 const COMPLIANCE = 'Compliance: keep interest/fees and the possibility of decline visible.';
 const BOLD_HELP = 'Wrap words in **double asterisks** to make them bold.';
+const DOCUMENT_HELP =
+  'Formatting: "## Heading" for a section heading, "- item" for bullets, "1. item" for a numbered list, "1.1 text" or "(a) text" for a legal clause (indent two spaces to nest), "| Term | Meaning |" rows for a table, **bold**, and [link text](https://…) for links. Blank lines separate paragraphs.';
 
 // ---------------------------------------------------------------------------
 // Section definitions
@@ -660,6 +666,23 @@ export const CONTENT_SECTIONS: ContentSectionDef[] = [
       ta('privacy2', 'Credit reporting consent'),
     ],
   },
+
+  // ── Legal & compliance (public policy pages) ─────────────────────────────
+  ...LEGAL_PAGES.map<ContentSectionDef>((page) => ({
+    key: `legal.${page.slug}`,
+    group: 'legal',
+    label: page.title,
+    description: `The /${page.slug} page. Edit the full document below — it is published as soon as you save.`,
+    fields: [
+      t('title', 'Page title', { maxLength: 120 }),
+      ta('lead', 'Lead (one sentence under the title)', { maxLength: 400 }),
+      ta('body', 'Document body', {
+        maxLength: 60000,
+        rows: 28,
+        help: DOCUMENT_HELP,
+      }),
+    ],
+  })),
 ];
 
 export const CONTENT_SECTION_KEYS = CONTENT_SECTIONS.map((s) => s.key);
@@ -1069,6 +1092,14 @@ export const DEFAULT_CONTENT: Record<string, ContentSectionValues> = {
     privacy2:
       'I authorise TerePay to collect personal information about me from credit reporting agencies (CRA) in connection with my application, disclose my information to CRAs, and allow CRAs to hold and share my information for credit reporting purposes.',
   },
+
+  // ── Legal & compliance ───────────────────────────────────────────────────
+  ...Object.fromEntries(
+    LEGAL_PAGES.map((page) => {
+      const doc = LEGAL_DOCUMENTS[page.slug];
+      return [`legal.${page.slug}`, { title: doc?.title ?? page.title, lead: doc?.lead ?? '', body: doc?.body ?? '' }];
+    }),
+  ),
 };
 
 /** Merge a saved section's values over its defaults. */
