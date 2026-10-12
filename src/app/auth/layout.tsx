@@ -6,7 +6,7 @@ import { RecaptchaProvider } from './recaptcha-provider';
 export default async function AuthLayout({ children }: { children: React.ReactNode }) {
   const [disabled, content] = await Promise.all([
     recaptchaDisabled(),
-    getContentSections(['auth.shared', 'auth.login', 'auth.signup']),
+    getContentSections(['auth.shared', 'auth.login', 'auth.forgotPassword', 'auth.signup']),
   ]);
 
   return (

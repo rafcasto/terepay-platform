@@ -1,47 +1,97 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import Image from 'next/image';
-import { useSearchParams } from 'next/navigation';
-import { applyActionCode } from 'firebase/auth';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { applyActionCode, confirmPasswordReset, verifyPasswordResetCode } from 'firebase/auth';
 import { clientAuth } from '@/lib/firebase/client';
+import { AuthIcon } from '../_components/auth-icons';
+import { Field, InputShell, EyeToggle, SubmitButton, ErrorAlert } from '../_components/auth-ui';
+import { PASSWORD_HINT, PasswordStrength, meetsPasswordPolicy } from '../_components/password-strength';
 
 /**
  * Branded Firebase email action handler.
  *
- * Replaces Firebase's generic, unbranded hosted action page. Our verification
- * emails point here (`/auth/action?mode=verifyEmail&oobCode=...`) so the whole
- * journey stays in the TerePay brand.
+ * Replaces Firebase's generic, unbranded hosted action page. Our emails point
+ * here so the whole journey stays in the TerePay brand:
  *
- * Cross-tab coordination: when verification succeeds we broadcast on the
- * `terepay-email-verify` channel. If another open TerePay tab (the page that
- * is waiting for verification) acknowledges, this tab steps aside and closes
+ *   - `/auth/action?mode=verifyEmail&oobCode=...`    — email verification
+ *   - `/auth/action?mode=resetPassword&oobCode=...`  — password reset
+ *
+ * Email verification does cross-tab coordination: on success we broadcast on
+ * the `terepay-email-verify` channel. If another open TerePay tab (the page
+ * waiting for verification) acknowledges, this tab steps aside and closes
  * itself, so the user isn't left with two TerePay tabs open.
+ *
+ * Password reset verifies the code first (`verifyPasswordResetCode`), then
+ * collects a new password that must satisfy the same policy as registration,
+ * and finally calls `confirmPasswordReset`. The user is sent to the login
+ * page with a success banner — we deliberately do not sign them in here.
  */
 
 const CHANNEL = 'terepay-email-verify';
+const LOGIN_PATH = '/auth/login';
+const FORGOT_PASSWORD_PATH = '/auth/forgot-password';
+const VERIFY_EMAIL_PATH = '/applicant/onboarding/verify-email';
 
-type Status = 'working' | 'success' | 'error';
-
-function shouldHandoff(continueUrl: string): string {
-  // Default destination if no continueUrl provided.
-  return continueUrl || '/applicant/onboarding/verify-email';
+/** Only ever follow same-origin relative paths from `continueUrl` (no open redirects). */
+function safeContinuePath(value: string | null, fallback: string): string {
+  if (value && value.startsWith('/') && !value.startsWith('//')) return value;
+  return fallback;
 }
+
+const primaryBtn =
+  'inline-flex w-full items-center justify-center rounded-full bg-[#B45600] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#8f4400]';
+
+// ---------------------------------------------------------------------------
+// Dispatcher
+// ---------------------------------------------------------------------------
 
 function ActionInner() {
   const params = useSearchParams();
   const mode = params.get('mode');
   const oobCode = params.get('oobCode');
-  const continueUrl = shouldHandoff(params.get('continueUrl') ?? '');
+  const continueUrl = params.get('continueUrl');
 
-  const [status, setStatus] = useState<Status>('working');
+  if (!oobCode) return <InvalidLink />;
+  if (mode === 'verifyEmail') {
+    return <VerifyEmailAction oobCode={oobCode} continueUrl={safeContinuePath(continueUrl, VERIFY_EMAIL_PATH)} />;
+  }
+  if (mode === 'resetPassword') return <ResetPasswordAction oobCode={oobCode} />;
+  return <InvalidLink />;
+}
+
+function InvalidLink() {
+  return (
+    <Card>
+      <ErrorMark />
+      <h1 className="font-display text-xl font-semibold text-[#16263B] mt-5 mb-2">This link isn&rsquo;t valid</h1>
+      <p className="text-sm text-slate-500 mb-6">
+        The link is incomplete or has expired. Please go back and request a new one.
+      </p>
+      <Link href={LOGIN_PATH} className={primaryBtn}>
+        Back to sign in
+      </Link>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Email verification
+// ---------------------------------------------------------------------------
+
+type VerifyStatus = 'working' | 'success' | 'error';
+
+function VerifyEmailAction({ oobCode, continueUrl }: { oobCode: string; continueUrl: string }) {
+  const [status, setStatus] = useState<VerifyStatus>('working');
   const [message, setMessage] = useState('');
   const [handedOff, setHandedOff] = useState(false);
   const ranRef = useRef(false);
 
   const goContinue = useCallback(() => {
     const u = clientAuth.currentUser;
-    window.location.href = u ? continueUrl : '/auth/login';
+    window.location.href = u ? continueUrl : LOGIN_PATH;
   }, [continueUrl]);
 
   useEffect(() => {
@@ -52,12 +102,6 @@ function ActionInner() {
     let channel: BroadcastChannel | null = null;
 
     (async () => {
-      if (mode !== 'verifyEmail' || !oobCode) {
-        setStatus('error');
-        setMessage('This link is invalid or incomplete. Please request a new verification email.');
-        return;
-      }
-
       try {
         channel = new BroadcastChannel(CHANNEL);
         channel.onmessage = (e: MessageEvent) => {
@@ -114,8 +158,239 @@ function ActionInner() {
     })();
 
     return () => channel?.close();
-  }, [mode, oobCode, goContinue]);
+  }, [oobCode, goContinue]);
 
+  return (
+    <Card>
+      {status === 'working' && (
+        <>
+          <Spinner />
+          <h1 className="font-display text-xl font-semibold text-[#16263B] mt-5 mb-2">Verifying your email</h1>
+          <p className="text-sm text-slate-500">Just a moment while we confirm your address&hellip;</p>
+        </>
+      )}
+
+      {status === 'success' && (
+        <>
+          <SuccessMark />
+          <h1 className="font-display text-xl font-semibold text-[#16263B] mt-5 mb-2">Email verified</h1>
+          <p className="text-sm text-slate-500 mb-6">{message}</p>
+          {handedOff ? (
+            <>
+              <p className="text-sm text-slate-500 mb-4">
+                You&rsquo;ve been signed in on your other TerePay tab. You can safely close this one.
+              </p>
+              <button type="button" onClick={goContinue} className={primaryBtn}>
+                Continue here instead
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-slate-500 mb-4">Taking you to the next step&hellip;</p>
+              <button type="button" onClick={goContinue} className={primaryBtn}>
+                Continue now
+              </button>
+            </>
+          )}
+        </>
+      )}
+
+      {status === 'error' && (
+        <>
+          <ErrorMark />
+          <h1 className="font-display text-xl font-semibold text-[#16263B] mt-5 mb-2">Verification failed</h1>
+          <p className="text-sm text-slate-500 mb-6">{message}</p>
+          <a href={VERIFY_EMAIL_PATH} className={primaryBtn}>
+            Request a new link
+          </a>
+        </>
+      )}
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Password reset
+// ---------------------------------------------------------------------------
+
+type ResetPhase = 'verifying' | 'form' | 'done' | 'error';
+
+/** Map Firebase action-code failures to safe, user-facing copy. */
+function resetLinkErrorMessage(err: unknown): string {
+  const code = (err as { code?: string }).code;
+  switch (code) {
+    case 'auth/expired-action-code':
+      return 'This password reset link has expired. Please request a new one.';
+    case 'auth/invalid-action-code':
+      return 'This password reset link is invalid or has already been used. Please request a new one.';
+    case 'auth/user-disabled':
+      return 'This account has been disabled. Please contact support.';
+    default:
+      return 'We couldn’t verify this password reset link. Please request a new one.';
+  }
+}
+
+function ResetPasswordAction({ oobCode }: { oobCode: string }) {
+  const router = useRouter();
+  const [phase, setPhase] = useState<ResetPhase>('verifying');
+  const [email, setEmail] = useState('');
+  const [linkError, setLinkError] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<{ password?: string; confirm?: string }>({});
+  const [formError, setFormError] = useState('');
+  // Stays true from submit through the redirect so the button can't be fired twice.
+  const [saving, setSaving] = useState(false);
+  const ranRef = useRef(false);
+
+  useEffect(() => {
+    if (ranRef.current) return; // guard against double-invoke in dev/StrictMode
+    ranRef.current = true;
+
+    verifyPasswordResetCode(clientAuth, oobCode)
+      .then((address) => {
+        setEmail(address);
+        setPhase('form');
+      })
+      .catch((err: unknown) => {
+        setLinkError(resetLinkErrorMessage(err));
+        setPhase('error');
+      });
+  }, [oobCode]);
+
+  const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (saving) return;
+
+    const errs: { password?: string; confirm?: string } = {};
+    if (!meetsPasswordPolicy(password)) errs.password = 'Password does not meet all requirements.';
+    if (password !== confirm) errs.confirm = 'Passwords do not match.';
+    setFieldErrors(errs);
+    if (errs.password || errs.confirm) return;
+
+    setFormError('');
+    setSaving(true);
+    try {
+      await confirmPasswordReset(clientAuth, oobCode, password);
+      setPhase('done');
+      window.setTimeout(() => {
+        router.push(`${LOGIN_PATH}?reset=success`);
+      }, 1600);
+    } catch (err) {
+      const code = (err as { code?: string }).code;
+      if (code === 'auth/weak-password') {
+        setFieldErrors({ password: 'Please choose a stronger password.' });
+        setSaving(false);
+        return;
+      }
+      if (code === 'auth/expired-action-code' || code === 'auth/invalid-action-code') {
+        setLinkError(resetLinkErrorMessage(err));
+        setPhase('error');
+        return;
+      }
+      setFormError('We couldn’t update your password. Please try again.');
+      setSaving(false);
+    }
+  };
+
+  if (phase === 'verifying') {
+    return (
+      <Card>
+        <Spinner />
+        <h1 className="font-display text-xl font-semibold text-[#16263B] mt-5 mb-2">Checking your link</h1>
+        <p className="text-sm text-slate-500">Just a moment&hellip;</p>
+      </Card>
+    );
+  }
+
+  if (phase === 'error') {
+    return (
+      <Card>
+        <ErrorMark />
+        <h1 className="font-display text-xl font-semibold text-[#16263B] mt-5 mb-2">Reset link not valid</h1>
+        <p className="text-sm text-slate-500 mb-6">{linkError}</p>
+        <Link href={FORGOT_PASSWORD_PATH} className={primaryBtn}>
+          Request a new link
+        </Link>
+      </Card>
+    );
+  }
+
+  if (phase === 'done') {
+    return (
+      <Card>
+        <SuccessMark />
+        <h1 className="font-display text-xl font-semibold text-[#16263B] mt-5 mb-2">Password updated</h1>
+        <p className="text-sm text-slate-500 mb-6">You can now sign in with your new password.</p>
+        <p className="text-sm text-slate-500 mb-4">Taking you to sign in&hellip;</p>
+        <Link href={`${LOGIN_PATH}?reset=success`} className={primaryBtn}>
+          Sign in now
+        </Link>
+      </Card>
+    );
+  }
+
+  return (
+    <Card centered={false}>
+      <h1 className="font-display text-xl font-semibold text-[#16263B] mb-2">Choose a new password</h1>
+      <p className="text-sm text-slate-500 mb-6">
+        for <span className="font-semibold text-[#16263B] break-all">{email}</span>
+      </p>
+
+      <form onSubmit={onSubmit} className="flex flex-col gap-[18px]" noValidate aria-busy={saving}>
+        <Field htmlFor="new-password" label="New password" required hint={PASSWORD_HINT} error={fieldErrors.password}>
+          <InputShell
+            id="new-password"
+            type={showPassword ? 'text' : 'password'}
+            autoComplete="new-password"
+            placeholder="Create a password"
+            prefix={AuthIcon.lock}
+            suffix={<EyeToggle shown={showPassword} onToggle={() => setShowPassword((v) => !v)} />}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            invalid={!!fieldErrors.password}
+            disabled={saving}
+          />
+          {password && <PasswordStrength password={password} />}
+        </Field>
+
+        <Field htmlFor="confirm-password" label="Confirm new password" required error={fieldErrors.confirm}>
+          <InputShell
+            id="confirm-password"
+            type={showPassword ? 'text' : 'password'}
+            autoComplete="new-password"
+            placeholder="Re-enter your password"
+            prefix={AuthIcon.lock}
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            invalid={!!fieldErrors.confirm}
+            disabled={saving}
+          />
+        </Field>
+
+        {formError && <ErrorAlert>{formError}</ErrorAlert>}
+
+        <div className="mt-2">
+          <SubmitButton type="submit" disabled={saving} aria-busy={saving}>
+            {saving ? 'Updating password…' : 'Update password'}
+            {!saving && AuthIcon.arrow}
+          </SubmitButton>
+        </div>
+
+        <Link href={LOGIN_PATH} className="text-center text-[14px] font-semibold text-[var(--text-link)] hover:underline">
+          Back to sign in
+        </Link>
+      </form>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Shared chrome
+// ---------------------------------------------------------------------------
+
+function Card({ children, centered = true }: { children: ReactNode; centered?: boolean }) {
   return (
     <main className="min-h-screen bg-[var(--slate-50,#F6F8FB)] flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-md">
@@ -123,51 +398,7 @@ function ActionInner() {
           <Image src="/brand/terepay-logo.png" alt="TerePay" width={150} height={36} priority className="h-9 w-auto" />
         </div>
 
-        <div className="tp-card p-8 text-center">
-          {status === 'working' && (
-            <>
-              <Spinner />
-              <h1 className="font-display text-xl font-semibold text-[#16263B] mt-5 mb-2">Verifying your email</h1>
-              <p className="text-sm text-slate-500">Just a moment while we confirm your address&hellip;</p>
-            </>
-          )}
-
-          {status === 'success' && (
-            <>
-              <SuccessMark />
-              <h1 className="font-display text-xl font-semibold text-[#16263B] mt-5 mb-2">Email verified</h1>
-              <p className="text-sm text-slate-500 mb-6">{message}</p>
-              {handedOff ? (
-                <>
-                  <p className="text-sm text-slate-500 mb-4">
-                    You&rsquo;ve been signed in on your other TerePay tab. You can safely close this one.
-                  </p>
-                  <button type="button" onClick={goContinue} className={primaryBtn}>
-                    Continue here instead
-                  </button>
-                </>
-              ) : (
-                <>
-                  <p className="text-sm text-slate-500 mb-4">Taking you to the next step&hellip;</p>
-                  <button type="button" onClick={goContinue} className={primaryBtn}>
-                    Continue now
-                  </button>
-                </>
-              )}
-            </>
-          )}
-
-          {status === 'error' && (
-            <>
-              <ErrorMark />
-              <h1 className="font-display text-xl font-semibold text-[#16263B] mt-5 mb-2">Verification failed</h1>
-              <p className="text-sm text-slate-500 mb-6">{message}</p>
-              <a href="/applicant/onboarding/verify-email" className={primaryBtn}>
-                Request a new link
-              </a>
-            </>
-          )}
-        </div>
+        <div className={`tp-card p-8 ${centered ? 'text-center' : ''}`}>{children}</div>
 
         <p className="mt-6 text-center text-xs text-slate-400">
           All loans are charged interest and an admin fee, shown in full before you sign.
@@ -176,9 +407,6 @@ function ActionInner() {
     </main>
   );
 }
-
-const primaryBtn =
-  'inline-flex w-full items-center justify-center rounded-full bg-[#B45600] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#8f4400]';
 
 function Spinner() {
   return (

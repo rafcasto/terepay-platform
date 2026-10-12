@@ -142,6 +142,17 @@ export function ErrorAlert({ children }: { children: ReactNode }) {
   );
 }
 
+export function SuccessAlert({ children }: { children: ReactNode }) {
+  return (
+    <p
+      role="status"
+      className="rounded-[10px] border border-[#A7F3D0] bg-[#ECFDF5] px-4 py-3 text-[14px] leading-snug text-[var(--success-700,#137a43)]"
+    >
+      {children}
+    </p>
+  );
+}
+
 export function Divider({ children }: { children: ReactNode }) {
   return (
     <div className="my-6 flex items-center gap-3.5 text-[13px] text-[var(--text-muted)] before:h-px before:flex-1 before:bg-[var(--border-default)] before:content-[''] after:h-px after:flex-1 after:bg-[var(--border-default)] after:content-['']">

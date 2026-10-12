@@ -109,10 +109,28 @@ function toggleCls(active: boolean) {
   ].join(' ');
 }
 
-export function AuthShell({ mode, children }: { mode: Mode; children: ReactNode }) {
+export interface AuthShellHeading {
+  eyebrow: string;
+  title: string;
+  subtitle: string;
+}
+
+export function AuthShell({
+  mode,
+  heading,
+  children,
+}: {
+  mode: Mode;
+  /** Override the form-column heading (defaults to the login/signup copy for `mode`). */
+  heading?: AuthShellHeading;
+  children: ReactNode;
+}) {
   const isReg = mode === 'register';
   const shared = useSiteContent('auth.shared');
   const page = useSiteContent(isReg ? 'auth.signup' : 'auth.login');
+  const eyebrow = heading?.eyebrow ?? page.eyebrow;
+  const title = heading?.title ?? page.title;
+  const subtitle = heading?.subtitle ?? page.subtitle;
   return (
     <div className="grid min-h-screen bg-[var(--surface-page)] lg:grid-cols-[1.05fr_0.95fr]">
       <BrandPanel mode={mode} />
@@ -139,10 +157,10 @@ export function AuthShell({ mode, children }: { mode: Mode; children: ReactNode 
           </div>
 
           <span className="font-display text-[13px] font-semibold uppercase tracking-wide text-[var(--text-accent)]">
-            {page.eyebrow}
+            {eyebrow}
           </span>
-          <h1 className="mt-1.5 font-display text-[28px] font-bold tracking-tight text-[var(--text-strong)]">{page.title}</h1>
-          <p className="mt-2 text-[15px] leading-normal text-[var(--text-muted)]">{page.subtitle}</p>
+          <h1 className="mt-1.5 font-display text-[28px] font-bold tracking-tight text-[var(--text-strong)]">{title}</h1>
+          <p className="mt-2 text-[15px] leading-normal text-[var(--text-muted)]">{subtitle}</p>
 
           <div
             className="my-7 flex gap-1 rounded-full border border-[var(--border-default)] bg-[var(--slate-100)] p-1"
