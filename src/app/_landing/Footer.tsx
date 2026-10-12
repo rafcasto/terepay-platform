@@ -1,30 +1,37 @@
 import Image from 'next/image';
+import Link from 'next/link';
+import { getContentSections } from '@/lib/content/site-content';
+import { isLegalPublished, LEGAL_PAGES, legalHref, legalSectionKey } from '@/lib/legal/pages';
+import { FacebookIcon, LinkedInIcon } from './icons';
 
-const IMPORTANT_INFORMATION = [
-  { label: 'Annual Interest Rate', href: 'https://terepay.com/disclosure-statement/' },
-  { label: 'Fees & Charges', href: 'https://terepay.com/rates-and-fees-policy/' },
-  { label: 'Unforeseen Financial Hardship & Financial Difficulty', href: 'https://terepay.com/unforeseen-financial-hardship-policy/' },
-  { label: 'Complaints & Dispute Resolution', href: 'https://terepay.com/dispute-resolution-policy/' },
-  { label: 'Loan Agreement Terms and Conditions', href: 'https://terepay.com/terms-and-conditions/' },
-  { label: 'Privacy Policy', href: 'https://terepay.com/privacy-policy/' },
-  { label: 'Website Terms of Use', href: 'https://terepay.com/website-terms-of-use/' },
-  { label: 'Disclosure Statement', href: 'https://terepay.com/disclosure-statement/' },
-];
+/** Footer links for the legal pages an editor has published (fail-open: all). */
+async function getImportantInformation() {
+  const sections = await getContentSections(LEGAL_PAGES.map((p) => legalSectionKey(p.slug)));
+  return LEGAL_PAGES.filter((p) => isLegalPublished(sections[legalSectionKey(p.slug)])).map((p) => ({
+    label: p.footerLabel,
+    href: legalHref(p.slug),
+  }));
+}
 
 const IMPORTANT_LINKS = [
   {
     label: 'Contract and Agreement',
     href: 'https://drive.google.com/file/d/1weraj0jfc1yPtet0bQV-fu332cpVTJG9/view?usp=share_link',
   },
-  { label: 'Facebook', href: 'https://www.facebook.com/NeophileFinance/' },
-  { label: 'LinkedIn', href: 'https://www.linkedin.com/company/terepay' },
+];
+
+const SOCIAL_LINKS = [
+  { label: 'TerePay on Facebook', href: 'https://www.facebook.com/NeophileFinance/', Icon: FacebookIcon },
+  { label: 'TerePay on LinkedIn', href: 'https://www.linkedin.com/company/terepay', Icon: LinkedInIcon },
 ];
 
 const linkCls =
   'text-sm text-[rgba(234,240,247,0.75)] transition-colors duration-[120ms] hover:text-gold-light';
 const headingCls = 'mb-4 font-display text-[13px] font-semibold uppercase tracking-[.1em] text-white';
 
-export default function Footer() {
+export default async function Footer() {
+  const importantInformation = await getImportantInformation();
+
   return (
     <footer id="contact" className="bg-[var(--ink-900)] px-6 pb-8 pt-[clamp(48px,6vw,72px)] text-[var(--text-on-inverse)]">
       <div className="mx-auto grid max-w-[1180px] grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-10">
@@ -35,11 +42,11 @@ export default function Footer() {
         <div className="min-w-0">
           <h3 className={headingCls}>Important Information</h3>
           <ul className="flex flex-col gap-2.5">
-            {IMPORTANT_INFORMATION.map((l) => (
-              <li key={l.label}>
-                <a href={l.href} target="_blank" rel="noopener noreferrer" className={linkCls}>
+            {importantInformation.map((l) => (
+              <li key={l.href}>
+                <Link href={l.href} className={linkCls}>
                   {l.label}
-                </a>
+                </Link>
               </li>
             ))}
           </ul>
@@ -69,6 +76,22 @@ export default function Footer() {
               +64 9 886 7158
             </a>
           </address>
+          <ul className="mt-5 flex items-center gap-2" aria-label="Social media">
+            {SOCIAL_LINKS.map(({ label, href, Icon }) => (
+              <li key={href}>
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={label}
+                  title={label}
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-white/[0.14] text-[rgba(234,240,247,0.75)] transition-colors duration-[120ms] hover:border-gold-light hover:text-gold-light"
+                >
+                  <Icon size={20} />
+                </a>
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
 

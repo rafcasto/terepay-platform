@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import type { ContentSectionDef, ContentSectionValues } from '@/types/content';
+import { Toggle } from '@/components/ui/Toggle';
+import DocumentEditor from './DocumentEditor';
 
 type ApiResponse = {
   sections: ContentSectionDef[];
@@ -135,19 +137,34 @@ function SectionForm({
         {section.fields.map((field) => {
           const value = draft[field.key] ?? '';
           const id = `${section.key}-${field.key}`;
+          const set = (next: string) => setDraft((p) => ({ ...p, [field.key]: next }));
+
+          if (field.type === 'toggle') {
+            return (
+              <div key={field.key} className="md:col-span-2 rounded-lg border border-gray-200 px-3 py-2.5">
+                <Toggle checked={value === 'true'} onChange={(v) => set(v ? 'true' : 'false')} label={field.label} description={field.help} />
+              </div>
+            );
+          }
+
+          const wide = field.type === 'textarea' || field.type === 'document';
           return (
-            <div key={field.key} className={field.type === 'textarea' ? 'md:col-span-2' : ''}>
+            <div key={field.key} className={wide ? 'md:col-span-2' : ''}>
               <label htmlFor={id} className="mb-1 block text-xs font-medium text-slate-700">
                 {field.label}
               </label>
-              {field.type === 'textarea' ? (
+              {field.type === 'document' ? (
+                <DocumentEditor id={id} value={value} onChange={set} maxLength={field.maxLength} rows={field.rows} />
+              ) : field.type === 'textarea' ? (
                 <textarea
                   id={id}
-                  rows={3}
+                  rows={field.rows ?? 3}
                   maxLength={field.maxLength}
                   value={value}
                   onChange={(e) => setDraft((p) => ({ ...p, [field.key]: e.target.value }))}
-                  className="w-full resize-y rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-[#F5A523] focus:outline-none focus:ring-1 focus:ring-[#F5A523]"
+                  className={`w-full resize-y rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-[#F5A523] focus:outline-none focus:ring-1 focus:ring-[#F5A523] ${
+                    (field.rows ?? 3) > 6 ? 'font-tabular text-[13px] leading-[1.55]' : ''
+                  }`}
                 />
               ) : (
                 <input

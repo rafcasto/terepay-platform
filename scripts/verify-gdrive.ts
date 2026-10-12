@@ -12,7 +12,7 @@ import { resolve } from 'path';
 import { Readable } from 'stream';
 
 // Load .env.local
-dotenv.config({ path: resolve(process.cwd(), '.env.local') });
+dotenv.config({ path: resolve(process.cwd(), process.env.ENV_FILE ?? '.env.local') });
 
 const PASS = '✓';
 const FAIL = '✗';

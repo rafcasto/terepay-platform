@@ -16,7 +16,7 @@ import { resolve } from 'path';
 import * as readline from 'readline';
 
 // Load .env.local
-dotenv.config({ path: resolve(process.cwd(), '.env.local') });
+dotenv.config({ path: resolve(process.cwd(), process.env.ENV_FILE ?? '.env.local') });
 
 const {
   FIREBASE_ADMIN_PROJECT_ID,

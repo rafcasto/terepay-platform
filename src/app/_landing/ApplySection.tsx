@@ -36,14 +36,12 @@ export default function ApplySection({ content }: { content?: ContentSectionValu
 
           <p className="block max-w-[460px] pt-3.5 text-[13px] leading-[1.5] text-ink-muted">
             {c.privacyNote}{' '}
-            <a
-              href="https://terepay.com/privacy-policy/"
-              target="_blank"
-              rel="noopener noreferrer"
+            <Link
+              href="/privacy-policy"
               className="text-[var(--text-link)] underline-offset-2 hover:text-[var(--text-link-hover)] hover:underline"
             >
               Privacy Policy
-            </a>
+            </Link>
             .
           </p>
         </div>

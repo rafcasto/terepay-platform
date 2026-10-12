@@ -1,4 +1,6 @@
 import type { Timestamp } from 'firebase-admin/firestore';
+import { LEGAL_PAGES } from '@/lib/legal/pages';
+import { LEGAL_DOCUMENTS } from '@/lib/legal/documents';
 
 /**
  * Editable site content.
@@ -19,9 +21,16 @@ import type { Timestamp } from 'firebase-admin/firestore';
  *      `SiteContentProvider`.
  */
 
-export type ContentGroup = 'landing' | 'auth' | 'onboarding' | 'borrower' | 'apply';
+export type ContentGroup = 'landing' | 'auth' | 'onboarding' | 'borrower' | 'apply' | 'legal';
 
-export type ContentFieldType = 'text' | 'textarea';
+/**
+ * - `text` / `textarea` — plain copy (supports `**bold**`)
+ * - `document` — long-form rich text in the plain-text document format
+ *   (see `src/lib/content/document.tsx`); edited with a formatting toolbar
+ *   and live preview
+ * - `toggle` — stored as the string `'true'` | `'false'`
+ */
+export type ContentFieldType = 'text' | 'textarea' | 'document' | 'toggle';
 
 export interface ContentFieldDef {
   key: string;
@@ -31,6 +40,8 @@ export interface ContentFieldDef {
   help?: string;
   /** Max length enforced client + server side. */
   maxLength: number;
+  /** Textarea height in the editor (defaults to 3). Use for long documents. */
+  rows?: number;
 }
 
 export interface ContentSectionDef {
@@ -64,6 +75,8 @@ const ta = (
 
 const COMPLIANCE = 'Compliance: keep interest/fees and the possibility of decline visible.';
 const BOLD_HELP = 'Wrap words in **double asterisks** to make them bold.';
+const DOCUMENT_HELP =
+  'Use the toolbar to format. Behind the scenes: "## Heading", "- bullet", "1. numbered", "1.1 text" or "(a) text" for legal clauses (indent two spaces to nest), "| Term | Meaning |" table rows, **bold**, and [link text](https://…). Blank lines separate paragraphs.';
 
 // ---------------------------------------------------------------------------
 // Section definitions
@@ -660,6 +673,33 @@ export const CONTENT_SECTIONS: ContentSectionDef[] = [
       ta('privacy2', 'Credit reporting consent'),
     ],
   },
+
+  // ── Legal & compliance (public policy pages) ─────────────────────────────
+  ...LEGAL_PAGES.map<ContentSectionDef>((page) => ({
+    key: `legal.${page.slug}`,
+    group: 'legal',
+    label: page.title,
+    description: `The /${page.slug} page. Edit the full document below — it is published as soon as you save.`,
+    fields: [
+      {
+        key: 'published',
+        label: 'Published',
+        type: 'toggle',
+        maxLength: 5,
+        help: 'When off, the page is hidden from the site footer and visitors get "page not found".',
+      },
+      t('title', 'Page title', { maxLength: 120 }),
+      ta('lead', 'Lead (one sentence under the title)', { maxLength: 400 }),
+      {
+        key: 'body',
+        label: 'Document body',
+        type: 'document',
+        maxLength: 60000,
+        rows: 28,
+        help: DOCUMENT_HELP,
+      },
+    ],
+  })),
 ];
 
 export const CONTENT_SECTION_KEYS = CONTENT_SECTIONS.map((s) => s.key);
@@ -1069,6 +1109,22 @@ export const DEFAULT_CONTENT: Record<string, ContentSectionValues> = {
     privacy2:
       'I authorise TerePay to collect personal information about me from credit reporting agencies (CRA) in connection with my application, disclose my information to CRAs, and allow CRAs to hold and share my information for credit reporting purposes.',
   },
+
+  // ── Legal & compliance ───────────────────────────────────────────────────
+  ...Object.fromEntries(
+    LEGAL_PAGES.map((page) => {
+      const doc = LEGAL_DOCUMENTS[page.slug];
+      return [
+        `legal.${page.slug}`,
+        {
+          published: doc?.published === false ? 'false' : 'true',
+          title: doc?.title ?? page.title,
+          lead: doc?.lead ?? '',
+          body: doc?.body ?? '',
+        },
+      ];
+    }),
+  ),
 };
 
 /** Merge a saved section's values over its defaults. */

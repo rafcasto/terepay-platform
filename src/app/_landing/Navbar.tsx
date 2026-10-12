@@ -5,11 +5,13 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { MenuIcon, XIcon } from './icons';
 
+// Section anchors are rooted at "/" so they work from any page that shows
+// this navbar (e.g. the legal pages), not just the homepage.
 const NAV_LINKS = [
-  { label: "What it's for", href: '#uses' },
-  { label: 'Repayments', href: '#calculator' },
-  { label: 'How to apply', href: '#apply' },
-  { label: 'FAQ', href: '#faq' },
+  { label: "What it's for", href: '/#uses' },
+  { label: 'Repayments', href: '/#calculator' },
+  { label: 'How to apply', href: '/#apply' },
+  { label: 'FAQ', href: '/#faq' },
 ];
 
 const linkCls =
