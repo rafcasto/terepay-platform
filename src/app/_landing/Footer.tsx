@@ -63,6 +63,19 @@ export default async function Footer() {
               </li>
             ))}
           </ul>
+        </div>
+
+        <div className="min-w-0">
+          <h3 className={headingCls}>Contact Us</h3>
+          <address className="flex flex-col gap-2.5 text-sm not-italic leading-[1.5] text-[rgba(234,240,247,0.75)]">
+            <span>27 Henry Partington Place, Greenhithe, Auckland</span>
+            <a href="mailto:info@terepay.com" className={linkCls}>
+              info@terepay.com
+            </a>
+            <a href="tel:+6498867158" className={linkCls}>
+              +64 9 886 7158
+            </a>
+          </address>
           <ul className="mt-5 flex items-center gap-2" aria-label="Social media">
             {SOCIAL_LINKS.map(({ label, href, Icon }) => (
               <li key={href}>
@@ -79,19 +92,6 @@ export default async function Footer() {
               </li>
             ))}
           </ul>
-        </div>
-
-        <div className="min-w-0">
-          <h3 className={headingCls}>Contact Us</h3>
-          <address className="flex flex-col gap-2.5 text-sm not-italic leading-[1.5] text-[rgba(234,240,247,0.75)]">
-            <span>27 Henry Partington Place, Greenhithe, Auckland</span>
-            <a href="mailto:info@terepay.com" className={linkCls}>
-              info@terepay.com
-            </a>
-            <a href="tel:+6498867158" className={linkCls}>
-              +64 9 886 7158
-            </a>
-          </address>
         </div>
       </div>
 
