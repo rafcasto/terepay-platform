@@ -11,6 +11,12 @@ export const loginSchema = z.object({
   password: z.string().min(6, 'Password must be at least 6 characters'),
 });
 
+export const forgotPasswordSchema = z.object({
+  email: z.string().trim().toLowerCase().email('Invalid email address').max(254),
+  recaptchaToken: z.string().max(4096).optional(),
+});
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
+
 export const signupSchema = z.object({
   firstName: z.string().min(1, 'First name is required').max(50),
   lastName: z.string().min(1, 'Last name is required').max(50),
@@ -657,10 +663,12 @@ export const adminEmailTemplateSchema = z.object({
   name: z.string().min(1, 'Template name is required').max(100),
   type: z.enum([
     'email_verification',
+    'password_reset',
     'onboarding_followup',
     'welcome_sequence',
     'loan_submitted',
     'loan_under_review',
+    'documents_requested',
     'loan_approved',
     'loan_declined',
     'loan_disbursed',

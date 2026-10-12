@@ -76,6 +76,7 @@ export const ADMIN_CONFIG_KEYS: { key: AdminConfigKey; label: string; envVar: st
 
 export type EmailTemplateType =
   | 'email_verification'
+  | 'password_reset'
   | 'onboarding_followup'
   | 'welcome_sequence'
   | 'loan_submitted'
@@ -91,6 +92,7 @@ export type EmailTemplateCategory = 'account' | 'onboarding' | 'welcome' | 'loan
 
 export const EMAIL_TEMPLATE_TYPE_LABELS: Record<EmailTemplateType, string> = {
   email_verification: 'Email Verification',
+  password_reset: 'Password Reset',
   onboarding_followup: 'Onboarding Follow-up',
   welcome_sequence: 'Welcome Sequence',
   loan_submitted: 'Loan Submitted',
@@ -113,6 +115,7 @@ export const EMAIL_TEMPLATE_CATEGORY_LABELS: Record<EmailTemplateCategory, strin
 
 export const EMAIL_TEMPLATE_TYPE_CATEGORY: Record<EmailTemplateType, EmailTemplateCategory> = {
   email_verification: 'account',
+  password_reset: 'account',
   onboarding_followup: 'onboarding',
   welcome_sequence: 'welcome',
   loan_submitted: 'loan_events',

@@ -229,6 +229,13 @@ export const CONTENT_PAGES: ContentPageDef[] = [
     previewHref: '/auth/login',
   },
   {
+    slug: 'forgot-password',
+    title: 'Forgot password page',
+    description: 'Copy on the password-reset request screen. Shares the brand panel with the login page.',
+    sectionKeys: ['auth.forgotPassword', 'auth.shared'],
+    previewHref: '/auth/forgot-password',
+  },
+  {
     slug: 'registration',
     title: 'Registration page',
     description: 'Copy on the create-account screen and its brand panel.',
@@ -259,6 +266,7 @@ export const CONTENT_NAV: ContentNavGroup[] = [
     items: [
       { label: 'Landing CMS', slug: 'landing' },
       { label: 'Login', slug: 'login' },
+      { label: 'Forgot password', slug: 'forgot-password' },
       { label: 'Registration', slug: 'registration' },
       {
         label: 'Onboarding',

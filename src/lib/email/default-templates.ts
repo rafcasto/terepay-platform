@@ -102,6 +102,27 @@ If you didn't create a TerePay account, you can safely ignore this email.
 TerePay - 27 Henry Partington Place, Greenhithe, Auckland.
 All loans are charged interest and an admin fee, shown in full before you sign. Applications can be declined.`;
 
+const PASSWORD_RESET_HTML = shell(
+  `<h1 style="margin:0 0 8px;font-family:'Poppins',Arial,Helvetica,sans-serif;font-size:22px;font-weight:600;color:${BRAND_INK};">Reset your password</h1>
+   <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Hi {{firstName}},</p>
+   <p style="margin:0 0 8px;font-size:15px;line-height:1.6;">We received a request to reset the password for your TerePay account. Choose a new password using the button below. This link expires in one hour and can only be used once.</p>
+   ${button('{{resetUrl}}', 'Reset my password')}
+   <p style="margin:0 0 8px;font-size:13px;line-height:1.6;color:${TEXT_MUTED};">If the button doesn&rsquo;t work, copy and paste this link into your browser:</p>
+   <p style="margin:0 0 16px;font-size:13px;line-height:1.6;word-break:break-all;"><a href="{{resetUrl}}" style="color:${BRAND_ORANGE_TEXT};">{{resetUrl}}</a></p>
+   <p style="margin:0;font-size:13px;line-height:1.6;color:${TEXT_MUTED};">If you didn&rsquo;t ask to reset your password, you can safely ignore this email &mdash; your password won&rsquo;t change. If you&rsquo;re concerned about the security of your account, please contact us.</p>`,
+);
+
+const PASSWORD_RESET_TEXT = `Hi {{firstName}},
+
+We received a request to reset the password for your TerePay account. Choose a new password by opening the link below. It expires in one hour and can only be used once:
+
+{{resetUrl}}
+
+If you didn't ask to reset your password, you can safely ignore this email - your password won't change. If you're concerned about the security of your account, please contact us.
+
+TerePay - 27 Henry Partington Place, Greenhithe, Auckland.
+All loans are charged interest and an admin fee, shown in full before you sign. Applications can be declined.`;
+
 const DOCUMENTS_REQUESTED_HTML = shell(
   `<h1 style="margin:0 0 8px;font-family:'Poppins',Arial,Helvetica,sans-serif;font-size:22px;font-weight:600;color:${BRAND_INK};">We need a few more documents</h1>
    <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Hi {{firstName}},</p>
@@ -136,6 +157,12 @@ export const EMAIL_DEFAULT_TEMPLATES: Partial<Record<EmailTemplateType, EmailDef
     htmlBody: EMAIL_VERIFICATION_HTML,
     textBody: EMAIL_VERIFICATION_TEXT,
     availableVariables: ['firstName', 'verificationUrl'],
+  },
+  password_reset: {
+    subject: 'Reset your TerePay password',
+    htmlBody: PASSWORD_RESET_HTML,
+    textBody: PASSWORD_RESET_TEXT,
+    availableVariables: ['firstName', 'resetUrl'],
   },
   documents_requested: {
     subject: 'Action needed: documents for your TerePay application {{referenceNumber}}',
