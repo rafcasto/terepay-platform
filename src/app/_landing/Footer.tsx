@@ -1,15 +1,11 @@
 import Image from 'next/image';
+import Link from 'next/link';
+import { LEGAL_PAGES, legalHref } from '@/lib/legal/pages';
 
-const IMPORTANT_INFORMATION = [
-  { label: 'Annual Interest Rate', href: 'https://terepay.com/disclosure-statement/' },
-  { label: 'Fees & Charges', href: 'https://terepay.com/rates-and-fees-policy/' },
-  { label: 'Unforeseen Financial Hardship & Financial Difficulty', href: 'https://terepay.com/unforeseen-financial-hardship-policy/' },
-  { label: 'Complaints & Dispute Resolution', href: 'https://terepay.com/dispute-resolution-policy/' },
-  { label: 'Loan Agreement Terms and Conditions', href: 'https://terepay.com/terms-and-conditions/' },
-  { label: 'Privacy Policy', href: 'https://terepay.com/privacy-policy/' },
-  { label: 'Website Terms of Use', href: 'https://terepay.com/website-terms-of-use/' },
-  { label: 'Disclosure Statement', href: 'https://terepay.com/disclosure-statement/' },
-];
+const IMPORTANT_INFORMATION = LEGAL_PAGES.map((p) => ({
+  label: p.footerLabel,
+  href: legalHref(p.slug),
+}));
 
 const IMPORTANT_LINKS = [
   {
@@ -36,10 +32,10 @@ export default function Footer() {
           <h3 className={headingCls}>Important Information</h3>
           <ul className="flex flex-col gap-2.5">
             {IMPORTANT_INFORMATION.map((l) => (
-              <li key={l.label}>
-                <a href={l.href} target="_blank" rel="noopener noreferrer" className={linkCls}>
+              <li key={l.href}>
+                <Link href={l.href} className={linkCls}>
                   {l.label}
-                </a>
+                </Link>
               </li>
             ))}
           </ul>
