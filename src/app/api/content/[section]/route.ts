@@ -8,6 +8,16 @@ import { defaultLimiter, checkRateLimit } from '@/lib/rate-limit/limiter';
 
 export const dynamic = 'force-dynamic';
 
+function isSafeHttpsUrl(value: string): boolean {
+  if (/[\s<>"']/.test(value)) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && url.hostname.length > 0;
+  } catch {
+    return false;
+  }
+}
+
 // GET /api/content/[section] — current values for one section.
 export async function GET(
   request: NextRequest,
@@ -72,6 +82,16 @@ export async function PATCH(
       }
       if (field.type === 'toggle' && value !== 'true' && value !== 'false') {
         throw new AppError('VALIDATION_ERROR', 422, `Field "${field.label}" must be on or off`);
+      }
+      if (field.type === 'url') {
+        // Rendered as an href — only allow absolute https URLs so an editor can
+        // never save `javascript:` / `data:` or a scheme-relative link.
+        const trimmed = value.trim();
+        if (trimmed !== '' && !isSafeHttpsUrl(trimmed)) {
+          throw new AppError('VALIDATION_ERROR', 422, `Field "${field.label}" must be a full https:// link`);
+        }
+        clean[field.key] = trimmed;
+        continue;
       }
       clean[field.key] = value;
     }

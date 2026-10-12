@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { getContentSections } from '@/lib/content/site-content';
+import { getContentSection, getContentSections } from '@/lib/content/site-content';
 import { isLegalPublished, LEGAL_PAGES, legalHref, legalSectionKey } from '@/lib/legal/pages';
 import { FacebookIcon, LinkedInIcon } from './icons';
 
@@ -13,12 +13,18 @@ async function getImportantInformation() {
   }));
 }
 
-const IMPORTANT_LINKS = [
-  {
-    label: 'Contract and Agreement',
-    href: 'https://drive.google.com/file/d/1weraj0jfc1yPtet0bQV-fu332cpVTJG9/view?usp=share_link',
-  },
-];
+/**
+ * "Important Links" column — editable in the content editor (Landing CMS →
+ * Site footer). The URL is validated as https-only when saved; a blank URL
+ * hides the link.
+ */
+async function getImportantLinks() {
+  const footer = await getContentSection('landing.footer');
+  const href = (footer.contractUrl ?? '').trim();
+  const label = (footer.contractLabel ?? '').trim() || 'Contract and Agreement';
+  if (!/^https:\/\//i.test(href)) return [];
+  return [{ label, href }];
+}
 
 const SOCIAL_LINKS = [
   { label: 'TerePay on Facebook', href: 'https://www.facebook.com/NeophileFinance/', Icon: FacebookIcon },
@@ -30,7 +36,10 @@ const linkCls =
 const headingCls = 'mb-4 font-display text-[13px] font-semibold uppercase tracking-[.1em] text-white';
 
 export default async function Footer() {
-  const importantInformation = await getImportantInformation();
+  const [importantInformation, importantLinks] = await Promise.all([
+    getImportantInformation(),
+    getImportantLinks(),
+  ]);
 
   return (
     <footer id="contact" className="bg-[var(--ink-900)] px-6 pb-8 pt-[clamp(48px,6vw,72px)] text-[var(--text-on-inverse)]">
@@ -52,18 +61,20 @@ export default async function Footer() {
           </ul>
         </div>
 
-        <div className="min-w-0">
-          <h3 className={headingCls}>Important Links</h3>
-          <ul className="flex flex-col gap-2.5">
-            {IMPORTANT_LINKS.map((l) => (
-              <li key={l.label}>
-                <a href={l.href} target="_blank" rel="noopener noreferrer" className={linkCls}>
-                  {l.label}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </div>
+        {importantLinks.length > 0 && (
+          <div className="min-w-0">
+            <h3 className={headingCls}>Important Links</h3>
+            <ul className="flex flex-col gap-2.5">
+              {importantLinks.map((l) => (
+                <li key={l.label}>
+                  <a href={l.href} target="_blank" rel="noopener noreferrer" className={linkCls}>
+                    {l.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <div className="min-w-0">
           <h3 className={headingCls}>Contact Us</h3>
