@@ -24,9 +24,19 @@ export interface LegalDocumentDefaults {
   title: string;
   lead: string;
   body: string;
+  /** Defaults to published. Set `false` for pages that start as a blank draft. */
+  published?: boolean;
 }
 
 export const LEGAL_DOCUMENTS: Record<string, LegalDocumentDefaults> = {
+  // Blank draft — the content editor fills this in and publishes it.
+  'annual-interest-rate': {
+    title: 'Annual Interest Rate',
+    lead: '',
+    body: '',
+    published: false,
+  },
+
   'disclosure-statement': {
     title: 'Disclosure Statement',
     lead: 'Advice about your credit contract is not regulated financial advice.',
