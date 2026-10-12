@@ -70,6 +70,9 @@ export async function PATCH(
       if (value.length > field.maxLength) {
         throw new AppError('VALIDATION_ERROR', 422, `Field "${field.label}" exceeds ${field.maxLength} characters`);
       }
+      if (field.type === 'toggle' && value !== 'true' && value !== 'false') {
+        throw new AppError('VALIDATION_ERROR', 422, `Field "${field.label}" must be on or off`);
+      }
       clean[field.key] = value;
     }
 
