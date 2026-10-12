@@ -1,30 +1,15 @@
-import type { Metadata } from 'next';
 import Link from 'next/link';
-import { findLegalPage, LEGAL_PAGES, legalHref } from '@/lib/legal/pages';
 
-/** Build page metadata for a registered legal slug. */
-export function legalMetadata(slug: string): Metadata {
-  const page = findLegalPage(slug);
-  if (!page) return {};
-  const url = `https://terepay.com${legalHref(page.slug)}`;
-  return {
-    title: `${page.title} — TerePay`,
-    description: page.description,
-    alternates: { canonical: url },
-    openGraph: {
-      title: `${page.title} — TerePay`,
-      description: page.description,
-      url,
-      siteName: 'TerePay',
-      type: 'article',
-    },
-  };
+export interface RelatedDoc {
+  href: string;
+  title: string;
 }
 
 interface LegalArticleProps {
-  slug: string;
+  title: string;
   /** Optional one-line lead shown under the heading. */
   lead?: string;
+  related: RelatedDoc[];
   children: React.ReactNode;
 }
 
@@ -33,11 +18,7 @@ interface LegalArticleProps {
  * card, and a "related documents" list so every policy is one click from the
  * others (hardship + dispute-resolution must stay reachable — see CLAUDE.md).
  */
-export default function LegalArticle({ slug, lead, children }: LegalArticleProps) {
-  const page = findLegalPage(slug);
-  const title = page?.title ?? slug;
-  const related = LEGAL_PAGES.filter((p) => p.slug !== slug);
-
+export default function LegalArticle({ title, lead, related, children }: LegalArticleProps) {
   return (
     <>
       <section className="bg-[var(--ink-900)] px-6 pb-[clamp(40px,6vw,64px)] pt-[clamp(40px,6vw,64px)] text-[var(--text-on-inverse)]">
@@ -57,23 +38,25 @@ export default function LegalArticle({ slug, lead, children }: LegalArticleProps
         <div className="mx-auto max-w-[860px]">
           <article className="tp-card tp-prose px-[clamp(20px,4vw,48px)] py-[clamp(28px,4vw,44px)]">{children}</article>
 
-          <nav aria-label="Related documents" className="mt-10">
-            <h2 className="font-display text-sm font-semibold uppercase tracking-[.1em] text-ink-muted">
-              Related documents
-            </h2>
-            <ul className="mt-3 flex flex-wrap gap-x-6 gap-y-2">
-              {related.map((p) => (
-                <li key={p.slug}>
-                  <Link
-                    href={legalHref(p.slug)}
-                    className="text-sm font-medium text-[var(--text-link)] underline-offset-2 hover:text-[var(--text-link-hover)] hover:underline"
-                  >
-                    {p.title}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </nav>
+          {related.length > 0 && (
+            <nav aria-label="Related documents" className="mt-10">
+              <h2 className="font-display text-sm font-semibold uppercase tracking-[.1em] text-ink-muted">
+                Related documents
+              </h2>
+              <ul className="mt-3 flex flex-wrap gap-x-6 gap-y-2">
+                {related.map((p) => (
+                  <li key={p.href}>
+                    <Link
+                      href={p.href}
+                      className="text-sm font-medium text-[var(--text-link)] underline-offset-2 hover:text-[var(--text-link-hover)] hover:underline"
+                    >
+                      {p.title}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          )}
         </div>
       </section>
     </>

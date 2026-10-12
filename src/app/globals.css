@@ -666,23 +666,37 @@ img { max-width: 100%; display: block; }
   color: var(--text-muted);
 }
 
-/* Numbered legal clauses: "1.", "1.1", "(a)" are supplied in markup so that
-   cross-references (e.g. "clause 8.2a") stay stable. */
-.tp-clauses { list-style: none; padding-left: 0; margin: 0; }
-.tp-clauses > li { margin: 0 0 var(--space-6); padding-left: 0; }
-.tp-clause__title {
-  display: flex; gap: var(--space-3);
-  font-family: var(--font-poppins), 'Public Sans', system-ui, sans-serif;
-  font-size: var(--text-h4, 1.125rem);
-  font-weight: var(--weight-semibold);
-  color: var(--text-strong);
+/* Editable long-form documents (`renderDocument()`): numbered legal clauses
+   carry their own number in markup so cross-references like "clause 8.2a"
+   stay stable; `data-level` is the indent depth (0–3). */
+.tp-doc__clause {
+  display: grid;
+  grid-template-columns: 3.25rem 1fr;
+  gap: 0 var(--space-2);
   margin: 0 0 var(--space-3);
 }
-.tp-clause__list { list-style: none; padding-left: 0; margin: 0; }
-.tp-clause__list > li { display: grid; grid-template-columns: 3.25rem 1fr; gap: 0 var(--space-2); margin: 0 0 var(--space-3); padding-left: 0; }
-.tp-clause__list > li > .tp-clause__num { font-variant-numeric: tabular-nums; color: var(--text-muted); }
-.tp-clause__sub { list-style: none; padding-left: 0; margin: var(--space-2) 0 0; grid-column: 2; }
-.tp-clause__sub > li { display: grid; grid-template-columns: 2rem 1fr; gap: 0 var(--space-2); margin: 0 0 var(--space-2); padding-left: 0; }
-.tp-clause__sub .tp-clause__sub > li { grid-template-columns: 2.25rem 1fr; }
-.tp-clause__list p, .tp-clause__sub p { margin: 0 0 var(--space-2); }
-.tp-clause__list p:last-child, .tp-clause__sub p:last-child { margin-bottom: 0; }
+.tp-doc__clause > p { margin: 0; }
+.tp-doc__num {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+.tp-doc__clause[data-level="1"] { margin-left: 3.75rem; grid-template-columns: 2rem 1fr; }
+.tp-doc__clause[data-level="2"] { margin-left: 6.25rem; grid-template-columns: 2.25rem 1fr; }
+.tp-doc__clause[data-level="3"] { margin-left: 9rem; grid-template-columns: 2.25rem 1fr; }
+.tp-doc__p[data-level="1"] { margin-left: 3.75rem; }
+.tp-doc__p[data-level="2"] { margin-left: 6.25rem; }
+.tp-doc__p[data-level="3"] { margin-left: 9rem; }
+.tp-prose .tp-doc__term {
+  white-space: nowrap;
+  font-weight: var(--weight-semibold);
+  color: var(--text-strong);
+}
+@media (max-width: 480px) {
+  .tp-doc__clause[data-level="1"],
+  .tp-doc__p[data-level="1"] { margin-left: 1.5rem; }
+  .tp-doc__clause[data-level="2"],
+  .tp-doc__p[data-level="2"] { margin-left: 3rem; }
+  .tp-doc__clause[data-level="3"],
+  .tp-doc__p[data-level="3"] { margin-left: 4.5rem; }
+  .tp-prose .tp-doc__term { white-space: normal; }
+}

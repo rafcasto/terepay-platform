@@ -8,6 +8,8 @@
  * Pure data — safe to import from both server and client components.
  */
 
+import { LEGAL_PAGES, legalHref } from '@/lib/legal/pages';
+
 export interface ContentPageDef {
   /** URL path under /content-editor/, e.g. `onboarding/verify-email`. */
   slug: string;
@@ -194,6 +196,15 @@ const LOAN_REQUEST_STEPS: Array<ContentPageDef & { navLabel: string }> = [
   },
 ];
 
+const LEGAL_CONTENT_PAGES: Array<ContentPageDef & { navLabel: string }> = LEGAL_PAGES.map((page) => ({
+  slug: `legal/${page.slug}`,
+  navLabel: page.title,
+  title: `Legal — ${page.title}`,
+  description: `The public /${page.slug} page linked from the site footer.`,
+  sectionKeys: [`legal.${page.slug}`],
+  previewHref: legalHref(page.slug),
+}));
+
 export const CONTENT_PAGES: ContentPageDef[] = [
   {
     slug: 'landing',
@@ -234,6 +245,7 @@ export const CONTENT_PAGES: ContentPageDef[] = [
   },
   ...BORROWER_STATUS_PAGES,
   ...LOAN_REQUEST_STEPS,
+  ...LEGAL_CONTENT_PAGES,
 ];
 
 export function findContentPage(slug: string): ContentPageDef | undefined {
@@ -272,6 +284,15 @@ export const CONTENT_NAV: ContentNavGroup[] = [
       {
         label: 'Loan request',
         children: LOAN_REQUEST_STEPS.map((p) => ({ label: p.navLabel, slug: p.slug })),
+      },
+    ],
+  },
+  {
+    label: 'Legal & compliance',
+    items: [
+      {
+        label: 'Policy pages',
+        children: LEGAL_CONTENT_PAGES.map((p) => ({ label: p.navLabel, slug: p.slug })),
       },
     ],
   },
