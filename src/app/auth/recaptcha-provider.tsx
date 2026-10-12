@@ -9,6 +9,15 @@ import { GoogleReCaptchaProvider, useGoogleReCaptcha } from 'react-google-recapt
  */
 const RecaptchaEnabledContext = createContext(false);
 
+/**
+ * Site key, trimmed. A stray trailing newline/space in the env var (easy to
+ * introduce when piping values into `vercel env add`) is invisible in the
+ * dashboard but fatal at runtime: the browser strips it from the `api.js?render=`
+ * URL so the badge renders, yet `grecaptcha.execute("KEY\n")` throws
+ * "Invalid site key or not loaded in api.js".
+ */
+const SITE_KEY = (process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY ?? '').trim();
+
 export function RecaptchaProvider({
   enabled,
   children,
@@ -24,7 +33,7 @@ export function RecaptchaProvider({
   return (
     <RecaptchaEnabledContext value={true}>
       <GoogleReCaptchaProvider
-        reCaptchaKey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY ?? ''}
+        reCaptchaKey={SITE_KEY}
         scriptProps={{ async: true, defer: true }}
       >
         {children}
