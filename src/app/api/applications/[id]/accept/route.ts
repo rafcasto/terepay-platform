@@ -5,6 +5,7 @@ import { withAuth } from '@/lib/auth/middleware';
 import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { checkRateLimit, defaultLimiter } from '@/lib/rate-limit/limiter';
 import { auditLog, getClientIp } from '@/lib/utils/audit';
+import { isQippayEnabled } from '@/lib/qippay/feature';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,7 +14,8 @@ type RouteParams = { params: Promise<{ id: string }> };
 /**
  * POST /api/applications/[id]/accept
  * Applicant accepts a lender-approved loan offer.
- * - Transitions status from 'approved' → 'loan_accepted'
+ * - Qippay ON:  'approved' → 'awaiting_payment_consent' (SetPay mandate gates disbursement)
+ * - Qippay OFF: 'approved' → 'loan_accepted' (lender disburses and records repayments manually)
  * - If the applicant does not yet have a customerId, assigns the next TERE ID
  *   and marks isExistingCustomer: true on the user document.
  */
@@ -47,6 +49,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const userRef = adminDb.collection('users').doc(auth.uid);
     const counterRef = adminDb.doc('settings/customerIdCounter');
 
+    // Behind the Qippay feature flag: with it on, the applicant must set up a
+    // SetPay mandate before funds are released; with it off, the offer is
+    // simply accepted and the lender takes it from there.
+    const qippayOn = await isQippayEnabled();
+    const nextStatus = qippayOn ? 'awaiting_payment_consent' : 'loan_accepted';
+
     let assignedCustomerId: string | null = null;
 
     await adminDb.runTransaction(async (tx) => {
@@ -58,11 +66,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
       const now = FieldValue.serverTimestamp();
 
-      // Update application status. We skip the legacy `loan_accepted` stop
-      // and go straight to `awaiting_payment_consent` so the applicant is
-      // prompted to set up the Qippay SetPay mandate before disbursement.
       tx.update(appRef, {
-        status: 'awaiting_payment_consent',
+        status: nextStatus,
         'timeline.acceptedAt': now,
         'timeline.updatedAt': now,
       });
@@ -96,13 +101,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       targetType: 'application',
       outcome: 'success',
       ipAddress: ip,
-      changes: { assignedCustomerId },
+      changes: { assignedCustomerId, status: nextStatus },
     });
 
     return NextResponse.json(
       {
         data: {
-          status: 'awaiting_payment_consent',
+          status: nextStatus,
           ...(assignedCustomerId ? { customerId: assignedCustomerId } : {}),
         },
       },

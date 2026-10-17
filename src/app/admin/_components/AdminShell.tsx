@@ -99,7 +99,22 @@ const NAV_ITEMS = [
   },
 ];
 
-export default function AdminShell({ children, showEnvReset }: { children: ReactNode; showEnvReset: boolean }) {
+/** Admin pages that only make sense while the Qippay feature flag is on. */
+const QIPPAY_ONLY_HREFS = new Set(['/admin/setpay-testing']);
+
+export default function AdminShell({
+  children,
+  showEnvReset,
+  showQippayTools = true,
+}: {
+  children: ReactNode;
+  showEnvReset: boolean;
+  /** Qippay feature flag — hides SetPay-only tooling while off. */
+  showQippayTools?: boolean;
+}) {
+  const navItems = showQippayTools
+    ? NAV_ITEMS
+    : NAV_ITEMS.filter((item) => !QIPPAY_ONLY_HREFS.has(item.href));
   const pathname = usePathname();
 
   return (
@@ -134,7 +149,7 @@ export default function AdminShell({ children, showEnvReset }: { children: React
           </div>
 
           <nav className="flex-1 px-3 py-4 space-y-0.5">
-            {NAV_ITEMS.map((item) => {
+            {navItems.map((item) => {
               const isActive = pathname?.startsWith(item.href);
               return (
                 <Link

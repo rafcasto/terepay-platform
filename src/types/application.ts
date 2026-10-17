@@ -119,6 +119,27 @@ export interface ScheduledPayment {
   /** How many times we have attempted to schedule this instalment with Qippay. */
   scheduleAttempts?: number;
   retryCount: number;               // incremented on each setpay.status.retry event
+  /**
+   * Present when the lender recorded this instalment by hand (Qippay feature
+   * flag off — see `qippayEnabled`). Absent on instalments Qippay collected.
+   */
+  manualRecord?: ManualPaymentRecord;
+}
+
+/**
+ * A repayment the lender recorded manually while Qippay is disabled. The
+ * borrower pays TerePay directly (bank transfer etc.) and the lender marks the
+ * instalment as received from the application page.
+ */
+export interface ManualPaymentRecord {
+  /** NZ calendar date the money was received (YYYY-MM-DD). */
+  paidOn: string;
+  /** Free-text reference — bank transfer reference, receipt number, etc. */
+  reference?: string;
+  recordedBy: string;              // lender uid
+  recordedByName?: string;
+  /** Omitted when the array is serialised for a Client Component. */
+  recordedAt?: Timestamp;
 }
 
 // ---------------------------------------------------------------------------

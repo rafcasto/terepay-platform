@@ -583,6 +583,26 @@ export const disburseSchema = z.object({
   disbursedAmount: z.number().positive().optional(),
 });
 
+/**
+ * Lender records (or reverses) a repayment by hand — only while the Qippay
+ * feature flag is off. `paidOn` is an NZ calendar date; it may not be in the
+ * future.
+ */
+export const recordManualPaymentSchema = z
+  .object({
+    installmentNumber: z.number().int().min(1).max(60),
+    action: z.enum(['mark_paid', 'mark_unpaid']),
+    paidOn: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD')
+      .optional(),
+    reference: z.string().trim().max(120).optional(),
+  })
+  .refine((v) => v.action !== 'mark_paid' || Boolean(v.paidOn), {
+    message: 'paidOn is required when marking an instalment paid',
+    path: ['paidOn'],
+  });
+
 export const benchmarkEntrySchema = z.object({
   categoryName: z.string().min(1, 'Category name is required'),
   householdType: z.string().min(1, 'Household type is required'),

@@ -187,6 +187,15 @@ export type ReviewData = {
   applicantRejection?: { rejectedAt: string; reason: string };
   payments: {
     show: boolean;
+    /**
+     * `qippay` — instalments are lodged/collected by Qippay (SetPay panel).
+     * `manual` — Qippay feature flag off; the lender records repayments by hand.
+     */
+    mode: 'qippay' | 'manual';
+    /** Whether the sweep assesses arrears on its own; off → lender runs it by hand. */
+    arrearsAutoEnabled: boolean;
+    /** Assigned lender on a live (disbursed/active) loan may run the arrears engine. */
+    canAssessArrears: boolean;
     scheduled: ScheduledPayment[];
     /** Late fees, default fee and accrued interest charged by the arrears engine. */
     charges: ArrearsChargesSummary;

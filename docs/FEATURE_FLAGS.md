@@ -143,6 +143,8 @@ export function PaymentClient({ useV2 }: { useV2: boolean }) {
 | `disable-sms-otp` | Skip SMS OTP step | `true` | All |
 | `env_reset_enabled` | Full environment data reset from admin console | `false` (`ENV_RESET_ENABLED=true`) | Dev/staging only |
 | `recaptcha_disabled` | Skip reCAPTCHA v3 (client script + server verify) | `false` (`DISABLE_RECAPTCHA=true`) | Any env except Vercel production |
+| `qippay_enabled` | Qippay SetPay/PayBy payment flows; off = lender records repayments manually | `false` (`QIPPAY_ENABLED=true`) | Off until the Qippay authorisation flow goes live |
+| `arrears_auto_enabled` | Payment-refresh sweep runs the arrears engine on every live loan; off = lender triggers it per loan | `false` (`ARREARS_AUTO_ENABLED=true`) | Off while repayments are recorded manually |
 
 ### 5.1 `recaptcha_disabled`
 
@@ -177,6 +179,73 @@ closed — if the flag throws, verification stays on.
 Client code must use `useRecaptchaToken()` from `src/app/auth/recaptcha-provider.tsx`
 rather than `useGoogleReCaptcha()` directly — the raw hook throws when the provider
 is absent, which is exactly what happens with the flag on.
+
+### 5.2 `qippay_enabled`
+
+The Qippay payment-authorisation integration is **not live yet**, so the whole
+Qippay surface sits behind this flag. Default is **off**.
+
+| | Flag **off** — manual repayment mode (default) | Flag **on** — Qippay mode |
+|---|---|---|
+| Applicant accepts offer | `approved` → `loan_accepted` | `approved` → `awaiting_payment_consent` |
+| Bank authorisation step | Not shown | SetPay mandate via `InitiatePaymentConsentCard`; lender's disburse button is locked until the mandate is `active` |
+| Disbursement | Lender disburses directly; `initialiseManualSchedule()` writes `scheduledPayments` from the approved figures | `scheduleInstallments()` lodges instalments with Qippay |
+| Recording repayments | Lender marks each instalment paid/unpaid on the application page (`ManualPaymentsPanel` → `POST /api/applications/[id]/payments/record`) | Qippay webhook + payment-status polling (`ScheduledPaymentsPanel`) |
+| Loan closes | Automatically when the last instalment is marked paid (`closed_repaid`) | Early repayment via PayBy; otherwise stays `active` |
+| Early repayment (PayBy) | Not offered | `EarlyRepaymentCard` |
+| Payment-refresh sweep | Walks every `disbursed`/`active` loan; arrears only if `arrears_auto_enabled` (§5.3) | Reconciles against Qippay, then arrears if `arrears_auto_enabled` |
+| Qippay-only routes (`consent/*`, `early-repayment/*`, `payment-status`, `schedule-payments`, `admin/setpay-testing*`) | `404 FEATURE_DISABLED` | Normal |
+| Webhook `/api/webhooks/qippay` | `200 { received: false, reason: 'qippay_disabled' }` | Normal |
+| Cron `/api/cron/schedule-payments` | No-op (`skipped: true`) | Normal |
+| Admin nav | "SetPay Testing" hidden | Shown |
+
+Turn it on with a runtime env var (no rebuild) or from the Vercel dashboard:
+
+```bash
+QIPPAY_ENABLED=true
+```
+
+Flag evaluation **fails closed** (`isQippayEnabled()` in `src/lib/qippay/feature.ts`
+returns `false` if the flag throws), so a flag outage can never start lodging real
+bank mandates. The manual-record route refuses with `409` while the flag is on so a
+lender can never overwrite what the bank reported.
+
+Both modes share the same data: `scheduledPayments` on the application is the
+source of truth for balances, the arrears engine, statements and the borrower's
+tracker, so flipping the flag does not require a data migration. Manually recorded
+instalments carry a `manualRecord` (date received, reference, who recorded it) and
+are the only ones the "Undo" action can reverse. Applications caught in
+`awaiting_payment_consent` when the flag is turned off can still be disbursed —
+the consent gate only applies while the flag is on.
+
+### 5.3 `arrears_auto_enabled`
+
+Controls whether the arrears engine ([src/lib/loan/assess-arrears.ts](../src/lib/loan/assess-arrears.ts)
+— late payment fees, the payment default fee, post-default interest, dunning reminder
+emails) runs **automatically** inside the payment-refresh sweep. Default is **off**.
+
+| | Flag **off** (default) | Flag **on** |
+|---|---|---|
+| Payment-refresh sweep (cron / admin "Verify now") | Skips the arrears step for every loan | Assesses every live loan after reconciliation |
+| Lender's application page | **Arrears assessment** card, badge "Manual only"; "Assess arrears now" runs the engine on that loan (`POST /api/applications/[id]/arrears/assess`) | Same card, badge "Automatic"; the button brings the loan up to date ahead of the next sweep |
+| Borrower impact | Nothing is charged or emailed until a lender runs it | Charged/emailed on the sweep's schedule |
+
+The manual trigger is available in both modes, is restricted to the assigned lender on a
+`disbursed`/`active` loan, and is idempotent (the engine re-checks fee ids and reminder
+keys in a transaction, so pressing it twice never double-charges). Each run is audited as
+`arrears_assessment_requested`, plus the engine's own `arrears_fee_assessed` /
+`arrears_assessed` entries.
+
+Why it exists: while `qippay_enabled` is off the lender records repayments by hand, and
+an automatic sweep would charge a late fee the moment the lender was slower to record a
+payment than the borrower was to make it. Keeping arrears manual makes every fee and
+reminder a deliberate decision on a loan the lender has just looked at.
+
+```bash
+ARREARS_AUTO_ENABLED=true
+```
+
+Evaluation fails closed (`isArrearsAutoEnabled()` in `src/lib/loan/arrears-feature.ts`).
 
 ---
 

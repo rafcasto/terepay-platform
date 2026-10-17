@@ -17,6 +17,7 @@ import {
   buildTestCadenceTimes,
   getSetPayTestSettings,
 } from '@/lib/admin/setpay-test-settings';
+import { assertQippayEnabled } from '@/lib/qippay/feature';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,6 +41,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const userAgent = request.headers.get('user-agent') ?? '';
 
   try {
+    // Qippay is behind a feature flag — 404 while it is off.
+    await assertQippayEnabled();
     const auth = await withAuth(request, ['applicant']);
 
     const allowed = await checkRateLimit(paymentLimiter, auth.uid);

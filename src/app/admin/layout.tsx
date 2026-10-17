@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { verifySessionOrIdToken } from '@/lib/firebase/admin';
 import { envResetEnabled } from '@/lib/flags/flags';
+import { isQippayEnabled } from '@/lib/qippay/feature';
 import AdminShell from './_components/AdminShell';
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
@@ -13,7 +14,11 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   const decoded = await verifySessionOrIdToken(session).catch(() => null);
   if (!decoded || decoded.role !== 'admin') redirect('/auth/login');
 
-  const showEnvReset = await envResetEnabled();
+  const [showEnvReset, showQippayTools] = await Promise.all([envResetEnabled(), isQippayEnabled()]);
 
-  return <AdminShell showEnvReset={showEnvReset}>{children}</AdminShell>;
+  return (
+    <AdminShell showEnvReset={showEnvReset} showQippayTools={showQippayTools}>
+      {children}
+    </AdminShell>
+  );
 }

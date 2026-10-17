@@ -10,6 +10,7 @@ import {
   setSetPayTestSettings,
 } from '@/lib/admin/setpay-test-settings';
 import { getMode } from '@/lib/qippay/setpay-client';
+import { assertQippayEnabled } from '@/lib/qippay/feature';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,6 +40,8 @@ function serialise(settings: Awaited<ReturnType<typeof getSetPayTestSettings>>) 
 // GET /api/admin/setpay-testing — read the SetPay test cadence config
 export async function GET(request: NextRequest): Promise<Response> {
   try {
+    // Qippay is behind a feature flag — 404 while it is off.
+    await assertQippayEnabled();
     const auth = await withAuth(request, ['admin']);
     await checkRateLimit(defaultLimiter, auth.uid);
 
@@ -56,6 +59,8 @@ export async function PATCH(request: NextRequest): Promise<Response> {
   let uid = 'unknown';
 
   try {
+    // Qippay is behind a feature flag — 404 while it is off.
+    await assertQippayEnabled();
     const allowed = await checkRateLimit(defaultLimiter, ip);
     if (!allowed) {
       return errorResponse(new AppError('RATE_LIMITED', 429, 'Too many requests.'));

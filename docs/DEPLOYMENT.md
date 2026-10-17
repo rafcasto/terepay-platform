@@ -43,6 +43,8 @@ NEXT_PUBLIC_ENABLE_MOCK_DATA=true
 FIREBASE_EMULATOR_HOST=localhost:8080
 
 # Qippay SetPay (pre-disbursement payment consent gate)
+QIPPAY_ENABLED=false                          # feature flag — leave off until the Qippay authorisation flow is live; off = lender records repayments manually (see docs/FEATURE_FLAGS.md §5.2)
+ARREARS_AUTO_ENABLED=false                    # feature flag — off = the sweep never assesses arrears; lender runs "Assess arrears now" per loan (see docs/FEATURE_FLAGS.md §5.3)
 QIPPAY_BASE_URL=https://api.uat.qippay.com
 QIPPAY_CLIENT_SECRET=<server-only bearer>
 QIPPAY_BENEFICIARY_ID=<TerePay beneficiary>
@@ -82,6 +84,8 @@ SECURE_AUTH_COOKIE=true
 AUTH_COOKIE_SECURE=true
 
 # Qippay SetPay
+QIPPAY_ENABLED=false                          # feature flag — flip to true only once Qippay payment authorisation is live
+ARREARS_AUTO_ENABLED=false                    # feature flag — flip to true to let the daily sweep charge arrears fees / send reminders automatically
 QIPPAY_BASE_URL=https://api.qippay.com
 QIPPAY_CLIENT_SECRET=<server-only bearer>
 QIPPAY_BENEFICIARY_ID=<TerePay beneficiary>
@@ -90,6 +94,7 @@ QIPPAY_RETURN_BASE_URL=https://terepay.com
 ```
 
 **Qippay SetPay notes:**
+- **The whole Qippay surface is behind the `qippay_enabled` feature flag (`QIPPAY_ENABLED`), default off.** With it off the platform runs in manual repayment mode — the lender disburses without a mandate and records each instalment by hand — and none of the `QIPPAY_*` variables below are read. See [FEATURE_FLAGS.md §5.2](./FEATURE_FLAGS.md#52-qippay_enabled).
 - `QIPPAY_MODE=stub` is hard-blocked when `NEXT_PUBLIC_ENVIRONMENT=production`. Setting `stub` in production raises an error at first call from `src/lib/qippay/setpay-client.ts`.
 - The success/failure URLs registered with Qippay must match `${QIPPAY_RETURN_BASE_URL}/applicant/applications/<id>/consent/return`. This same URL is also sent as `success_url` on every `POST /v1/setpay` instalment call — Qippay made it mandatory there (undocumented, confirmed by their support) for the Hosted fallback page; without it the call 500s and instalments stay `pending`. Vercel preview deploys use ephemeral hostnames — only test against live Qippay UAT from a stable host; preview QA should use `stub`.
 - `QIPPAY_BENEFICIARY_ID` resolves to TerePay's platform-wide Qippay merchant account (single beneficiary across all lenders).

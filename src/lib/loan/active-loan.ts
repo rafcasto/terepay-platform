@@ -157,7 +157,8 @@ const SETTLED_STATUSES: ReadonlySet<DerivedInstallmentStatus> = new Set([
  * from a loan application.
  *
  * The canonical source of repayment data, in priority order:
- *   1. `scheduledPayments` — created at disbursement, carries live per-instalment status.
+ *   1. `scheduledPayments` — created at disbursement, carries live per-instalment status
+ *      (Qippay-reported, or lender-recorded while the Qippay flag is off).
  *   2. `paymentConsent.scheduleSummary.installments` — the schedule the applicant
  *      authorised when they linked their bank (pre-disbursement).
  *   3. `repaymentSchedule.installments` — legacy field.
@@ -456,6 +457,18 @@ export function toPlainScheduledPayments(payments: ScheduledPayment[]): Schedule
     ...(p.qippayPaymentId ? { qippayPaymentId: p.qippayPaymentId } : {}),
     ...(p.failureReason ? { failureReason: p.failureReason } : {}),
     ...(p.scheduleAttempts !== undefined ? { scheduleAttempts: p.scheduleAttempts } : {}),
+    ...(p.manualRecord
+      ? {
+          manualRecord: {
+            paidOn: p.manualRecord.paidOn,
+            recordedBy: p.manualRecord.recordedBy,
+            ...(p.manualRecord.reference ? { reference: p.manualRecord.reference } : {}),
+            ...(p.manualRecord.recordedByName
+              ? { recordedByName: p.manualRecord.recordedByName }
+              : {}),
+          },
+        }
+      : {}),
   }));
 }
 
