@@ -7,6 +7,8 @@ import { auditLog, getClientIp } from '@/lib/utils/audit';
 import { FieldValue } from 'firebase-admin/firestore';
 import { ZodError } from 'zod';
 import { scheduleInstallments } from '@/lib/qippay/schedule-installments';
+import { isQippayEnabled } from '@/lib/qippay/feature';
+import { initialiseManualSchedule } from '@/lib/loan/manual-payments';
 import { createLoanRecord } from '@/lib/loan/loan-record';
 import { FEE_POLICY_VERSION } from '@/lib/constants/fees';
 import type { PaymentConsent } from '@/types/application';
@@ -22,12 +24,15 @@ type RouteParams = { params: Promise<{ id: string }> };
  * application. Idempotent: re-running on an already-disbursed application
  * returns the existing values.
  *
- * After a successful disbursement we attempt to schedule the fortnightly
- * instalments with Qippay (see `scheduleInstallments`). SetPay only accepts
- * instalments whose period is currently open, so any it can't lodge yet stay
- * `pending` and are retried by the daily cron / the lender's manual trigger —
- * the disbursement itself is never rolled back. Finally a canonical `loans`
- * record is created for the portfolio + statement surfaces.
+ * After a successful disbursement the instalment schedule is written:
+ * - Qippay ON:  instalments are lodged with Qippay (see `scheduleInstallments`).
+ *   SetPay only accepts instalments whose period is currently open, so any it
+ *   can't lodge yet stay `pending` and are retried by the daily cron / the
+ *   lender's manual trigger — the disbursement itself is never rolled back.
+ * - Qippay OFF: the schedule is written from the approved loan figures
+ *   (`initialiseManualSchedule`) and the lender records repayments by hand.
+ * Finally a canonical `loans` record is created for the portfolio + statement
+ * surfaces.
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   const ip = getClientIp(request);
@@ -40,6 +45,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const rawBody = await request.json().catch(() => ({}));
     const parsed = disburseSchema.parse(rawBody);
+    const qippayOn = await isQippayEnabled();
 
     const appRef = adminDb.collection('loanApplications').doc(id);
 
@@ -74,11 +80,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         );
       }
 
-      // Consent gate: new flow requires an active Qippay SetPay mandate
-      // before disbursement. Legacy `loan_accepted` applications (created
-      // before this feature) are exempt — their `paymentConsent` will be
-      // absent, not stale.
+      // Consent gate: with Qippay on, an active SetPay mandate is required
+      // before disbursement. `loan_accepted` applications (manual mode, or
+      // legacy ones that pre-date the gate) are exempt — their
+      // `paymentConsent` will be absent, not stale. With Qippay off the gate
+      // is skipped entirely: a mandate can no longer be completed, so an
+      // application caught mid-consent when the flag flipped must not be
+      // stranded.
       if (
+        qippayOn &&
         appData.status === 'awaiting_payment_consent' &&
         appData.paymentConsent?.status !== 'active'
       ) {
@@ -168,15 +178,25 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         ipAddress: ip,
       });
 
-      // ── Schedule instalments with Qippay ───────────────────────────────────
-      // Lodges what SetPay will accept now; anything it won't yet (future
-      // rolling periods) stays `pending` and is picked up by the daily cron or
-      // the lender's manual "Schedule pending" action. Best-effort — never
-      // rolls back the committed disbursement.
-      try {
-        await scheduleInstallments({ applicationId: id, actor: auth.uid, ip });
-      } catch (err) {
-        console.error('[disburse] Initial instalment scheduling failed', err);
+      // ── Write the instalment schedule ──────────────────────────────────────
+      // Best-effort either way — never rolls back the committed disbursement.
+      if (qippayOn) {
+        // Lodges what SetPay will accept now; anything it won't yet (future
+        // rolling periods) stays `pending` and is picked up by the daily cron
+        // or the lender's manual "Schedule pending" action.
+        try {
+          await scheduleInstallments({ applicationId: id, actor: auth.uid, ip });
+        } catch (err) {
+          console.error('[disburse] Initial instalment scheduling failed', err);
+        }
+      } else {
+        // Manual repayment mode: schedule from the approved figures so the
+        // lender has instalments to record against.
+        try {
+          await initialiseManualSchedule({ applicationId: id, actor: auth.uid, ip });
+        } catch (err) {
+          console.error('[disburse] Manual schedule initialisation failed', err);
+        }
       }
 
       // ── Create the canonical loan record (portfolio + statements) ──────────

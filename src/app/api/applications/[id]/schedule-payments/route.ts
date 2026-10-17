@@ -5,6 +5,7 @@ import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { checkRateLimit, defaultLimiter } from '@/lib/rate-limit/limiter';
 import { auditLog, getClientIp } from '@/lib/utils/audit';
 import { scheduleInstallments } from '@/lib/qippay/schedule-installments';
+import { assertQippayEnabled } from '@/lib/qippay/feature';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,6 +23,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const ip = getClientIp(request);
 
   try {
+    // Qippay is behind a feature flag — 404 while it is off.
+    await assertQippayEnabled();
     const auth = await withAuth(request, ['lender']);
 
     const allowed = await checkRateLimit(defaultLimiter, auth.uid);

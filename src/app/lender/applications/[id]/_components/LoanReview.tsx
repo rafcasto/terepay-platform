@@ -8,6 +8,8 @@ import ConsolePill, { type PillTone } from '@/components/lender/ConsolePill';
 import DisburseForm from '../DisburseForm';
 import ExistingCustomerToggle from '../ExistingCustomerToggle';
 import ScheduledPaymentsPanel from '../ScheduledPaymentsPanel';
+import ManualPaymentsPanel from '../ManualPaymentsPanel';
+import AssessArrearsCard from '../AssessArrearsCard';
 import { Card, Field, SECTION_LABEL } from './Card';
 import CommunicationTab from './CommunicationTab';
 import CreditSummary from './CreditSummary';
@@ -395,11 +397,28 @@ function OverviewTab({ data, onSelect }: { data: ReviewData; onSelect: (tab: Tab
         <EarlySettlementCard settlement={data.payments.settlement} ledger={data.payments.ledger} />
       )}
 
-      {data.payments.show && (
+      {data.payments.show && data.payments.mode === 'qippay' && (
         <ScheduledPaymentsPanel
           applicationId={data.applicationId}
           scheduledPayments={data.payments.scheduled}
           settledEarlyInstalments={data.payments.settlement?.instalmentsCleared ?? []}
+        />
+      )}
+
+      {data.payments.show && data.payments.mode === 'manual' && (
+        <ManualPaymentsPanel
+          applicationId={data.applicationId}
+          scheduledPayments={data.payments.scheduled}
+          canRecord={data.isAssigned}
+        />
+      )}
+
+      {data.payments.show && data.payments.canAssessArrears && (
+        <AssessArrearsCard
+          applicationId={data.applicationId}
+          autoEnabled={data.payments.arrearsAutoEnabled}
+          isOverdue={data.payments.charges.isOverdue}
+          policyApplies={data.payments.charges.policyApplies}
         />
       )}
 

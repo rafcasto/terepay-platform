@@ -15,6 +15,11 @@ interface Props {
   applicationId: string;
   /** Live Qippay payment status per instalment (post-disbursement source of truth). */
   scheduledPayments?: ScheduledPayment[];
+  /**
+   * Qippay feature flag. Off → instalments are paid to TerePay directly and
+   * recorded by the lender; no auto-debit copy and no PayBy early payoff.
+   */
+  qippayEnabled?: boolean;
 }
 
 type RowStatus = 'paid' | 'next' | 'upcoming' | 'overdue';
@@ -26,7 +31,13 @@ function rowStatusFor(status: DerivedInstallmentStatus, isNext: boolean): RowSta
   return 'upcoming';
 }
 
-export default function ScreenActive({ app, status, applicationId, scheduledPayments = [] }: Props) {
+export default function ScreenActive({
+  app,
+  status,
+  applicationId,
+  scheduledPayments = [],
+  qippayEnabled = true,
+}: Props) {
   const ld = app.loanDetails;
   const refNum = (app.referenceNumber as string | undefined) ?? `#${applicationId.slice(0, 8)}`;
   const isDisbursed = status === 'disbursed';
@@ -42,8 +53,9 @@ export default function ScreenActive({ app, status, applicationId, scheduledPaym
   const remaining = summary.remainingBalance;
   const repaidPct = total > 0 ? Math.round((summary.totalPaid / total) * 100) : 0;
 
-  // Voluntary early-payoff (Qippay PayBy): only offered while a balance remains.
-  const payoff = computeEarlyPayoff({ ...app, scheduledPayments });
+  // Voluntary early-payoff (Qippay PayBy): only offered while a balance remains
+  // and the Qippay integration is switched on.
+  const payoff = qippayEnabled ? computeEarlyPayoff({ ...app, scheduledPayments }) : null;
   const earlyRepaymentStatus = (app.earlyRepayment as EarlyRepayment | undefined)?.status;
 
   // The next instalment still owing drives the "Next payment" stat.
@@ -188,7 +200,9 @@ export default function ScreenActive({ app, status, applicationId, scheduledPaym
       {installments.length > 0 && (
         <SectionCard eyebrow="Schedule" title="Repayments">
           <p className="text-xs text-muted mb-3">
-            Each instalment is auto-debited from your bank on its due date — no action needed.
+            {qippayEnabled
+              ? 'Each instalment is auto-debited from your bank on its due date — no action needed.'
+              : 'Pay each instalment to TerePay by its due date. Your lender records it here once it arrives.'}
           </p>
           <div className="divide-y divide-border-2">
             {installments.map((i) => (

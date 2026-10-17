@@ -9,6 +9,7 @@ import type {
   ScheduledPayment,
 } from '@/types/application';
 import { reconcileConsent } from '@/lib/qippay/reconcile-consent';
+import { isQippayEnabled } from '@/lib/qippay/feature';
 import { toDisplayState } from '@/lib/loan/status-display';
 import { Card, Icons } from '@/components/ui';
 import ScreenDraft from '@/components/applicant/screens/ScreenDraft';
@@ -57,10 +58,14 @@ export default async function ApplicationDetailPage({
       (app as Record<string, unknown>).offlineCustomerId === userCustomerId);
   if (!isOwner) notFound();
 
+  // Qippay feature flag: off → the borrower pays TerePay directly and the
+  // lender records repayments, so no consent step or early-payoff offer.
+  const qippayOn = await isQippayEnabled();
+
   // If a SetPay mandate is in flight, reconcile against Qippay before rendering —
   // the user may have approved at their bank in another tab. The reconciler is
   // internally rate-limited (one upstream call / 10s) so this is cheap.
-  if (status === 'awaiting_payment_consent') {
+  if (qippayOn && status === 'awaiting_payment_consent') {
     const pc = app.paymentConsent as PaymentConsent | undefined;
     const nonTerminal =
       pc &&
@@ -99,6 +104,7 @@ export default async function ApplicationDetailPage({
           status={status}
           applicationId={id}
           isExistingCustomer={isExistingCustomer}
+          qippayEnabled={qippayOn}
         />
       );
       break;
@@ -112,6 +118,7 @@ export default async function ApplicationDetailPage({
           status={status}
           applicationId={id}
           scheduledPayments={scheduledPayments}
+          qippayEnabled={qippayOn}
         />
       );
       break;

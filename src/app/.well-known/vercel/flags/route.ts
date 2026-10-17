@@ -8,6 +8,8 @@ import {
   disableSmsOtp,
   envResetEnabled,
   recaptchaDisabled,
+  qippayEnabled,
+  arrearsAutoEnabled,
 } from '../../../../lib/flags/flags';
 
 export async function GET(request: NextRequest) {
@@ -22,6 +24,8 @@ export async function GET(request: NextRequest) {
     disableSmsOtp,
     envResetEnabled,
     recaptchaDisabled,
+    qippayEnabled,
+    arrearsAutoEnabled,
   });
   return NextResponse.json(data);
 }

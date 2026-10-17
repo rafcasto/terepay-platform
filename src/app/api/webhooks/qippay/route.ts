@@ -10,6 +10,7 @@ import {
 } from '@/lib/qippay/verify-webhook';
 import { getDetailedConsentStatus } from '@/lib/qippay/setpay-client';
 import { syncLoanRecord } from '@/lib/loan/loan-record';
+import { isQippayEnabled } from '@/lib/qippay/feature';
 
 export const dynamic = 'force-dynamic';
 
@@ -53,6 +54,10 @@ export async function POST(request: NextRequest) {
   // 4. If webhook receiver is disabled, acknowledge but do not process
   if (!config.webhookEnabled) {
     return NextResponse.json({ received: false, reason: 'webhook_disabled' });
+  }
+  // 4b. Qippay feature flag off → same soft-skip (200 so Qippay stops retrying).
+  if (!(await isQippayEnabled())) {
+    return NextResponse.json({ received: false, reason: 'qippay_disabled' });
   }
 
   // 5. Parse body

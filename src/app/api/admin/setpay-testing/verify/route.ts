@@ -5,6 +5,7 @@ import { auditLog, getClientIp } from '@/lib/utils/audit';
 import { defaultLimiter, checkRateLimit } from '@/lib/rate-limit/limiter';
 import { runPaymentRefreshSweep } from '@/lib/qippay/refresh-sweep';
 import { markSetPayTestVerifyRun } from '@/lib/admin/setpay-test-settings';
+import { assertQippayEnabled } from '@/lib/qippay/feature';
 
 export const dynamic = 'force-dynamic';
 // Same headroom as the cron — the sweep may touch many applications.
@@ -24,6 +25,8 @@ export async function POST(request: NextRequest): Promise<Response> {
   let uid = 'unknown';
 
   try {
+    // Qippay is behind a feature flag — 404 while it is off.
+    await assertQippayEnabled();
     const allowed = await checkRateLimit(defaultLimiter, ip);
     if (!allowed) {
       return errorResponse(new AppError('RATE_LIMITED', 429, 'Too many requests.'));
