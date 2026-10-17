@@ -14,16 +14,27 @@ async function getImportantInformation() {
 }
 
 /**
- * "Important Links" column — editable in the content editor (Landing CMS →
- * Site footer). The URL is validated as https-only when saved; a blank URL
- * hides the link.
+ * Fixed external links that always appear in the "Important Links" column.
+ * Compliance: the FMA's lender responsibility principles must stay reachable
+ * from every public page.
+ */
+const STATIC_IMPORTANT_LINKS = [
+  {
+    label: 'Responsible lending',
+    href: 'https://www.fma.govt.nz/business/services/consumer-credit/lender-responsibility-principles/',
+  },
+];
+
+/**
+ * "Important Links" column — the editable contract link (Landing CMS → Site
+ * footer; https-only, blank hides it) followed by the fixed links above.
  */
 async function getImportantLinks() {
   const footer = await getContentSection('landing.footer');
   const href = (footer.contractUrl ?? '').trim();
   const label = (footer.contractLabel ?? '').trim() || 'Contract and Agreement';
-  if (!/^https:\/\//i.test(href)) return [];
-  return [{ label, href }];
+  const contract = /^https:\/\//i.test(href) ? [{ label, href }] : [];
+  return [...contract, ...STATIC_IMPORTANT_LINKS];
 }
 
 const SOCIAL_LINKS = [
