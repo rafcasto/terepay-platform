@@ -2,6 +2,7 @@ import { adminDb } from '@/lib/firebase/admin';
 import { reconcilePaymentStatus } from '@/lib/qippay/reconcile-payments';
 import { assessArrearsForApplication } from '@/lib/loan/assess-arrears';
 import { isQippayEnabled } from '@/lib/qippay/feature';
+import { isArrearsAutoEnabled } from '@/lib/loan/arrears-feature';
 import type { PaymentConsent, ScheduledPayment } from '@/types/application';
 
 const DEFAULT_MAX_APPLICATIONS = 500;
@@ -18,8 +19,10 @@ export type RefreshSweepApplication = {
 };
 
 export type RefreshSweepResult = {
-  /** `qippay` reconciles against the provider first; `manual` runs arrears only. */
+  /** `qippay` reconciles against the provider first; `manual` skips reconciliation. */
   mode: 'qippay' | 'manual';
+  /** `auto` ran the arrears engine on every loan; `manual` left it to the lender. */
+  arrearsMode: 'auto' | 'manual';
   total: number;
   processed: number;
   changed: number;
@@ -38,8 +41,11 @@ export type RefreshSweepResult = {
  *
  * While the Qippay feature flag is OFF there is nothing to reconcile — the
  * lender records repayments by hand — so the sweep instead walks every live
- * loan and runs only the arrears engine, keeping late-fee / reminder policy
- * identical across both modes.
+ * loan and only counts their state.
+ *
+ * The arrears step runs only while the `arrears_auto_enabled` flag is ON.
+ * With it off, late fees, overdue interest and reminders are applied solely
+ * when a lender runs "Assess arrears now" on the application page.
  */
 export async function runPaymentRefreshSweep(opts: {
   actor: string;
@@ -50,7 +56,7 @@ export async function runPaymentRefreshSweep(opts: {
 }): Promise<RefreshSweepResult> {
   const { actor, ip, auditAction, maxApplications = DEFAULT_MAX_APPLICATIONS } = opts;
 
-  const qippayOn = await isQippayEnabled();
+  const [qippayOn, arrearsAuto] = await Promise.all([isQippayEnabled(), isArrearsAutoEnabled()]);
 
   const snap = qippayOn
     ? await adminDb
@@ -66,6 +72,7 @@ export async function runPaymentRefreshSweep(opts: {
 
   const result: RefreshSweepResult = {
     mode: qippayOn ? 'qippay' : 'manual',
+    arrearsMode: arrearsAuto ? 'auto' : 'manual',
     total: snap.size,
     processed: 0,
     changed: 0,
@@ -118,19 +125,23 @@ export async function runPaymentRefreshSweep(opts: {
     // Arrears assessment runs after reconciliation so fees/interest reflect
     // the freshest payment state. Independent try/catch — an arrears failure
     // never aborts the sweep. No-op for loans without a fee-policy stamp.
-    try {
-      const arrears = await assessArrearsForApplication({
-        applicationId: doc.id,
-        actor,
-        ip,
-      });
-      result.feesAssessed += arrears.newFeeCount;
-      result.remindersSent += arrears.remindersSent;
-      if (arrears.isInArrears) result.inArrears += 1;
-    } catch (err) {
-      result.errored += 1;
-      entry.error = entry.error ?? 'arrears_failed';
-      console.error('[payment-refresh] failed to assess arrears', doc.id, err);
+    // Skipped entirely while automatic arrears is behind its flag — the
+    // lender triggers it per loan instead.
+    if (arrearsAuto) {
+      try {
+        const arrears = await assessArrearsForApplication({
+          applicationId: doc.id,
+          actor,
+          ip,
+        });
+        result.feesAssessed += arrears.newFeeCount;
+        result.remindersSent += arrears.remindersSent;
+        if (arrears.isInArrears) result.inArrears += 1;
+      } catch (err) {
+        result.errored += 1;
+        entry.error = entry.error ?? 'arrears_failed';
+        console.error('[payment-refresh] failed to assess arrears', doc.id, err);
+      }
     }
 
     result.applications.push(entry);

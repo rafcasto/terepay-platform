@@ -99,6 +99,29 @@ export const qippayEnabled = flag<boolean>({
   decide: () => process.env.QIPPAY_ENABLED === 'true',
 });
 
+/**
+ * Automatic arrears assessment.
+ *
+ * When ON the payment-refresh sweep (hourly cron, gated to once a day by the
+ * admin Payment Refresh settings) runs every live loan through the arrears
+ * engine — late payment fees, the payment default fee, post-default interest
+ * and dunning reminder emails are applied without anyone touching the loan.
+ *
+ * When OFF (the default) the sweep never assesses arrears. A lender runs the
+ * assessment by hand from the application page ("Assess arrears now"), so
+ * every fee and reminder is a deliberate decision on a loan they have looked
+ * at. The engine itself is unchanged and stays idempotent either way.
+ *
+ * DEFAULT OFF. Opt in with ARREARS_AUTO_ENABLED=true (runtime env var) or
+ * toggle `arrears_auto_enabled` in the Vercel dashboard.
+ */
+export const arrearsAutoEnabled = flag<boolean>({
+  key: 'arrears_auto_enabled',
+  description:
+    'Run the arrears engine automatically in the payment-refresh sweep. Off = lender triggers it per loan.',
+  decide: () => process.env.ARREARS_AUTO_ENABLED === 'true',
+});
+
 // Keep lazy-getter aliases for backward compatibility
 export const getNewApplicantDashboard = () => newApplicantDashboard;
 export const getPaymentTrackingV2 = () => paymentTrackingV2;
@@ -106,3 +129,4 @@ export const getAutoUnderwriting = () => autoUnderwriting;
 export const getDisableSmsOtp = () => disableSmsOtp;
 export const getRecaptchaDisabled = () => recaptchaDisabled;
 export const getQippayEnabled = () => qippayEnabled;
+export const getArrearsAutoEnabled = () => arrearsAutoEnabled;

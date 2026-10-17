@@ -9,6 +9,7 @@ import DisburseForm from '../DisburseForm';
 import ExistingCustomerToggle from '../ExistingCustomerToggle';
 import ScheduledPaymentsPanel from '../ScheduledPaymentsPanel';
 import ManualPaymentsPanel from '../ManualPaymentsPanel';
+import AssessArrearsCard from '../AssessArrearsCard';
 import { Card, Field, SECTION_LABEL } from './Card';
 import CommunicationTab from './CommunicationTab';
 import CreditSummary from './CreditSummary';
@@ -409,6 +410,15 @@ function OverviewTab({ data, onSelect }: { data: ReviewData; onSelect: (tab: Tab
           applicationId={data.applicationId}
           scheduledPayments={data.payments.scheduled}
           canRecord={data.isAssigned}
+        />
+      )}
+
+      {data.payments.show && data.payments.canAssessArrears && (
+        <AssessArrearsCard
+          applicationId={data.applicationId}
+          autoEnabled={data.payments.arrearsAutoEnabled}
+          isOverdue={data.payments.charges.isOverdue}
+          policyApplies={data.payments.charges.policyApplies}
         />
       )}
 

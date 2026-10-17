@@ -1,6 +1,9 @@
 import type { ReactNode } from 'react';
 import { isQippayEnabled } from '@/lib/qippay/feature';
 
+// Flag is read per request — never bake its value into a static page.
+export const dynamic = 'force-dynamic';
+
 /**
  * SetPay test cadence only exists while the Qippay feature flag is on. With it
  * off the API behind this page 404s, so show why instead of a broken screen.

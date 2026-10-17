@@ -12,6 +12,9 @@ export async function isQippayEnabled(): Promise<boolean> {
   try {
     return await qippayEnabled();
   } catch (err) {
+    // Next.js signals "render this dynamically" by throwing from `headers()`
+    // during prerender — that is not a flag outage, so let it propagate.
+    if (isDynamicServerUsage(err)) throw err;
     console.warn('[qippay] flag evaluation failed — treating Qippay as disabled', err);
     return false;
   }
@@ -41,4 +44,13 @@ export async function assertManualRepaymentsMode(): Promise<void> {
       'Repayments are collected by Qippay on this environment and cannot be recorded manually',
     );
   }
+}
+
+function isDynamicServerUsage(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const e = err as { digest?: unknown; message?: unknown };
+  return (
+    e.digest === 'DYNAMIC_SERVER_USAGE' ||
+    (typeof e.message === 'string' && e.message.includes('Dynamic server usage'))
+  );
 }

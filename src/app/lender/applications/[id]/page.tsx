@@ -14,6 +14,7 @@ import { loanPurposeLabel } from '@/lib/constants/loan-purposes';
 import { computeApplicationFee } from '@/lib/constants/fees';
 import { reconcileConsent } from '@/lib/qippay/reconcile-consent';
 import { isQippayEnabled } from '@/lib/qippay/feature';
+import { isArrearsAutoEnabled } from '@/lib/loan/arrears-feature';
 import { deriveLoanSummary, toPlainScheduledPayments } from '@/lib/loan/active-loan';
 import { summariseArrearsCharges } from '@/lib/loan/arrears-charges';
 import { DOCUMENT_TYPE_LABELS, fulfilRequest, catalogueItem } from '@/lib/loan/document-requests';
@@ -202,7 +203,7 @@ export default async function LenderApplicationDetailPage({
 
   // Qippay feature flag: off → manual repayment mode (no consent gate, lender
   // records instalments by hand).
-  const qippayOn = await isQippayEnabled();
+  const [qippayOn, arrearsAuto] = await Promise.all([isQippayEnabled(), isArrearsAutoEnabled()]);
 
   // Reconcile a SetPay mandate that is still in flight before rendering.
   if (qippayOn && app.status === 'awaiting_payment_consent') {
@@ -722,6 +723,8 @@ export default async function LenderApplicationDetailPage({
     payments: {
       show: PAYMENT_STATUSES.has(status),
       mode: qippayOn ? 'qippay' : 'manual',
+      arrearsAutoEnabled: arrearsAuto,
+      canAssessArrears: isAssigned && (status === 'disbursed' || status === 'active'),
       scheduled: toPlainScheduledPayments((app.scheduledPayments ?? []) as ScheduledPayment[]),
       charges: summariseArrearsCharges({
         installments: loanSummary.installments,

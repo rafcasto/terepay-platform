@@ -44,6 +44,7 @@ FIREBASE_EMULATOR_HOST=localhost:8080
 
 # Qippay SetPay (pre-disbursement payment consent gate)
 QIPPAY_ENABLED=false                          # feature flag — leave off until the Qippay authorisation flow is live; off = lender records repayments manually (see docs/FEATURE_FLAGS.md §5.2)
+ARREARS_AUTO_ENABLED=false                    # feature flag — off = the sweep never assesses arrears; lender runs "Assess arrears now" per loan (see docs/FEATURE_FLAGS.md §5.3)
 QIPPAY_BASE_URL=https://api.uat.qippay.com
 QIPPAY_CLIENT_SECRET=<server-only bearer>
 QIPPAY_BENEFICIARY_ID=<TerePay beneficiary>
@@ -84,6 +85,7 @@ AUTH_COOKIE_SECURE=true
 
 # Qippay SetPay
 QIPPAY_ENABLED=false                          # feature flag — flip to true only once Qippay payment authorisation is live
+ARREARS_AUTO_ENABLED=false                    # feature flag — flip to true to let the daily sweep charge arrears fees / send reminders automatically
 QIPPAY_BASE_URL=https://api.qippay.com
 QIPPAY_CLIENT_SECRET=<server-only bearer>
 QIPPAY_BENEFICIARY_ID=<TerePay beneficiary>
