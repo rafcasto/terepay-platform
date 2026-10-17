@@ -1,6 +1,7 @@
 import { adminDb } from '@/lib/firebase/admin';
 import { reconcilePaymentStatus } from '@/lib/qippay/reconcile-payments';
 import { assessArrearsForApplication } from '@/lib/loan/assess-arrears';
+import { isQippayEnabled } from '@/lib/qippay/feature';
 import type { PaymentConsent, ScheduledPayment } from '@/types/application';
 
 const DEFAULT_MAX_APPLICATIONS = 500;
@@ -17,6 +18,8 @@ export type RefreshSweepApplication = {
 };
 
 export type RefreshSweepResult = {
+  /** `qippay` reconciles against the provider first; `manual` runs arrears only. */
+  mode: 'qippay' | 'manual';
   total: number;
   processed: number;
   changed: number;
@@ -32,6 +35,11 @@ export type RefreshSweepResult = {
  * the arrears engine. Shared by the hourly cron (gated to once a day by the
  * admin Payment Refresh settings) and the admin "Verify now" action on the
  * SetPay Testing page, so both paths behave identically.
+ *
+ * While the Qippay feature flag is OFF there is nothing to reconcile — the
+ * lender records repayments by hand — so the sweep instead walks every live
+ * loan and runs only the arrears engine, keeping late-fee / reminder policy
+ * identical across both modes.
  */
 export async function runPaymentRefreshSweep(opts: {
   actor: string;
@@ -42,13 +50,22 @@ export async function runPaymentRefreshSweep(opts: {
 }): Promise<RefreshSweepResult> {
   const { actor, ip, auditAction, maxApplications = DEFAULT_MAX_APPLICATIONS } = opts;
 
-  const snap = await adminDb
-    .collection('loanApplications')
-    .where('paymentConsent.status', '==', 'active')
-    .limit(maxApplications)
-    .get();
+  const qippayOn = await isQippayEnabled();
+
+  const snap = qippayOn
+    ? await adminDb
+        .collection('loanApplications')
+        .where('paymentConsent.status', '==', 'active')
+        .limit(maxApplications)
+        .get()
+    : await adminDb
+        .collection('loanApplications')
+        .where('status', 'in', ['disbursed', 'active'])
+        .limit(maxApplications)
+        .get();
 
   const result: RefreshSweepResult = {
+    mode: qippayOn ? 'qippay' : 'manual',
     total: snap.size,
     processed: 0,
     changed: 0,
@@ -70,24 +87,32 @@ export async function runPaymentRefreshSweep(opts: {
       testCadenceMinutes: consent?.testCadence?.intervalMinutes ?? null,
     };
 
-    try {
-      const r = await reconcilePaymentStatus({
-        applicationId: doc.id,
-        callerUid: actor,
-        ipAddress: ip,
-        auditAction,
-      });
-      result.processed += 1;
-      if (r.changed) result.changed += 1;
-      const payments = r.scheduledPayments as ScheduledPayment[];
-      entry.changed = r.changed;
-      entry.consentStatus = r.consentStatus;
+    if (!qippayOn) {
+      // Manual mode: the lender-recorded instalments are already the truth.
+      const payments = (doc.data().scheduledPayments as ScheduledPayment[] | undefined) ?? [];
       entry.totalCount = payments.length;
       entry.paidCount = payments.filter((p) => p.status === 'success').length;
-    } catch (err) {
-      result.errored += 1;
-      entry.error = 'reconcile_failed';
-      console.error('[payment-refresh] failed to reconcile', doc.id, err);
+      result.processed += 1;
+    } else {
+      try {
+        const r = await reconcilePaymentStatus({
+          applicationId: doc.id,
+          callerUid: actor,
+          ipAddress: ip,
+          auditAction,
+        });
+        result.processed += 1;
+        if (r.changed) result.changed += 1;
+        const payments = r.scheduledPayments as ScheduledPayment[];
+        entry.changed = r.changed;
+        entry.consentStatus = r.consentStatus;
+        entry.totalCount = payments.length;
+        entry.paidCount = payments.filter((p) => p.status === 'success').length;
+      } catch (err) {
+        result.errored += 1;
+        entry.error = 'reconcile_failed';
+        console.error('[payment-refresh] failed to reconcile', doc.id, err);
+      }
     }
 
     // Arrears assessment runs after reconciliation so fees/interest reflect

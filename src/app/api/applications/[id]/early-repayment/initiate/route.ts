@@ -12,6 +12,7 @@ import { computeEarlyPayoff } from '@/lib/loan/early-payoff';
 import { isLiveLoanStatus } from '@/lib/loan/active-loan';
 import { EARLY_REPAYMENT_DISCLAIMER_VERSION } from '@/lib/constants/fees';
 import type { EarlyRepayment, LoanApplication } from '@/types/application';
+import { assertQippayEnabled } from '@/lib/qippay/feature';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,6 +41,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const userAgent = request.headers.get('user-agent') ?? '';
 
   try {
+    // Qippay is behind a feature flag — 404 while it is off.
+    await assertQippayEnabled();
     const auth = await withAuth(request, ['applicant']);
 
     const allowed = await checkRateLimit(paymentLimiter, auth.uid);

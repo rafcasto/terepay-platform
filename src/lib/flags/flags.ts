@@ -73,9 +73,36 @@ export const recaptchaDisabled = flag<boolean>({
   },
 });
 
+/**
+ * Qippay payments (SetPay repayment mandates + PayBy early repayment).
+ *
+ * When ON the full Qippay flow runs: accepting an offer moves the application
+ * to `awaiting_payment_consent`, the applicant authorises a SetPay mandate,
+ * disbursement is gated on that mandate, instalments are lodged with Qippay and
+ * reconciled by webhook / cron, and PayBy early repayment is offered.
+ *
+ * When OFF (the default) the platform runs in **manual repayment mode**:
+ * accepting an offer moves straight to `loan_accepted`, the lender disburses
+ * without a mandate, the instalment schedule is written from the approved loan
+ * figures, and the lender records each repayment by hand from the application
+ * page. Every Qippay-facing route (consent, early repayment, payment polling,
+ * webhook, SetPay cron) is disabled.
+ *
+ * DEFAULT OFF. Opt in with QIPPAY_ENABLED=true (runtime env var — no rebuild
+ * needed) or toggle `qippay_enabled` in the Vercel dashboard. The Qippay
+ * authorisation flow has not gone live yet; flip this on once it has.
+ */
+export const qippayEnabled = flag<boolean>({
+  key: 'qippay_enabled',
+  description:
+    'Enable Qippay SetPay/PayBy payment flows. Off = lender records repayments manually.',
+  decide: () => process.env.QIPPAY_ENABLED === 'true',
+});
+
 // Keep lazy-getter aliases for backward compatibility
 export const getNewApplicantDashboard = () => newApplicantDashboard;
 export const getPaymentTrackingV2 = () => paymentTrackingV2;
 export const getAutoUnderwriting = () => autoUnderwriting;
 export const getDisableSmsOtp = () => disableSmsOtp;
 export const getRecaptchaDisabled = () => recaptchaDisabled;
+export const getQippayEnabled = () => qippayEnabled;

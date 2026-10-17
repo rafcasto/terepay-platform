@@ -13,6 +13,7 @@ import type { PillTone } from '@/components/lender/ConsolePill';
 import { loanPurposeLabel } from '@/lib/constants/loan-purposes';
 import { computeApplicationFee } from '@/lib/constants/fees';
 import { reconcileConsent } from '@/lib/qippay/reconcile-consent';
+import { isQippayEnabled } from '@/lib/qippay/feature';
 import { deriveLoanSummary, toPlainScheduledPayments } from '@/lib/loan/active-loan';
 import { summariseArrearsCharges } from '@/lib/loan/arrears-charges';
 import { DOCUMENT_TYPE_LABELS, fulfilRequest, catalogueItem } from '@/lib/loan/document-requests';
@@ -199,8 +200,12 @@ export default async function LenderApplicationDetailPage({
 
   let app = { applicationId: snap.id, ...snap.data() } as LoanApplication;
 
+  // Qippay feature flag: off → manual repayment mode (no consent gate, lender
+  // records instalments by hand).
+  const qippayOn = await isQippayEnabled();
+
   // Reconcile a SetPay mandate that is still in flight before rendering.
-  if (app.status === 'awaiting_payment_consent') {
+  if (qippayOn && app.status === 'awaiting_payment_consent') {
     const pc = app.paymentConsent;
     const nonTerminal =
       pc && pc.status !== 'active' && pc.status !== 'failed' &&
@@ -579,8 +584,11 @@ export default async function LenderApplicationDetailPage({
                 paymentMethod: app.bankDetails.paymentMethod,
               }
             : undefined,
+          // Only gate on the mandate while Qippay is on; with it off a
+          // `loan_accepted` (or stranded `awaiting_payment_consent`) loan is
+          // disbursed directly.
           consentStatus:
-            status === 'awaiting_payment_consent'
+            qippayOn && status === 'awaiting_payment_consent'
               ? (app.paymentConsent?.status ?? 'not_started')
               : undefined,
           consentActivatedAt: fmtTs(app.paymentConsent?.activatedAt as TS),
@@ -713,6 +721,7 @@ export default async function LenderApplicationDetailPage({
     applicantRejection,
     payments: {
       show: PAYMENT_STATUSES.has(status),
+      mode: qippayOn ? 'qippay' : 'manual',
       scheduled: toPlainScheduledPayments((app.scheduledPayments ?? []) as ScheduledPayment[]),
       charges: summariseArrearsCharges({
         installments: loanSummary.installments,

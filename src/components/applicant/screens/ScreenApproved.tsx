@@ -13,9 +13,20 @@ interface Props {
   status: AnyApplicationStatus;
   applicationId: string;
   isExistingCustomer: boolean;
+  /**
+   * Qippay feature flag. Off → no bank-authorisation step: accepting the offer
+   * is the last thing the borrower does before the lender releases funds.
+   */
+  qippayEnabled?: boolean;
 }
 
-export default function ScreenApproved({ app, status, applicationId, isExistingCustomer }: Props) {
+export default function ScreenApproved({
+  app,
+  status,
+  applicationId,
+  isExistingCustomer,
+  qippayEnabled = true,
+}: Props) {
   const ld = app.loanDetails;
   const approvedAmount = ld?.approvedAmount ?? ld?.requestedAmount ?? 0;
   const refNum = (app.referenceNumber as string | undefined) ?? `#${applicationId.slice(0, 8)}`;
@@ -39,9 +50,11 @@ export default function ScreenApproved({ app, status, applicationId, isExistingC
     </Pill>
   );
 
-  if (isAccepted) {
+  if (isAccepted || (isAwaitingConsent && !qippayEnabled)) {
     title = 'Offer accepted';
-    subtitle = "We're preparing the bank authorisation step.";
+    subtitle = qippayEnabled
+      ? "We're preparing the bank authorisation step."
+      : 'Your lender is arranging the transfer. Funds will be paid to your nominated account shortly.';
     pill = (
       <Pill tone="info" onInk>
         Accepted
@@ -82,8 +95,10 @@ export default function ScreenApproved({ app, status, applicationId, isExistingC
       {isApproved && (
         <SectionCard eyebrow="Your offer" title="Accept or decline">
           <p className="text-sm text-muted mb-4">
-            Accept to lock in your approved amount and continue to bank authorisation. You can decline if you&apos;ve
-            changed your mind.
+            {qippayEnabled
+              ? 'Accept to lock in your approved amount and continue to bank authorisation. '
+              : 'Accept to lock in your approved amount — your lender will then release the funds. '}
+            You can decline if you&apos;ve changed your mind.
           </p>
           <div className="flex flex-wrap gap-3">
             <AcceptOfferButton applicationId={applicationId} />
@@ -92,7 +107,7 @@ export default function ScreenApproved({ app, status, applicationId, isExistingC
         </SectionCard>
       )}
 
-      {isAwaitingConsent && (
+      {isAwaitingConsent && qippayEnabled && (
         <InitiatePaymentConsentCard
           applicationId={applicationId}
           paymentConsent={
@@ -154,6 +169,8 @@ export default function ScreenApproved({ app, status, applicationId, isExistingC
             <p className="mt-4 text-xs text-muted">
               All loans are charged interest. The application fee is deducted from your loan amount at
               disbursement, so you receive {fmtNZD(payout)}.
+              {!qippayEnabled &&
+                ' Repayments are made directly to TerePay by each due date — your lender will confirm the account details.'}
             </p>
           </SectionCard>
         );

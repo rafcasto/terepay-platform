@@ -3,6 +3,7 @@ import { adminDb } from '@/lib/firebase/admin';
 import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { auditLog } from '@/lib/utils/audit';
 import { scheduleInstallments, nzToday } from '@/lib/qippay/schedule-installments';
+import { isQippayEnabled } from '@/lib/qippay/feature';
 import type { LoanApplication, ScheduledPayment } from '@/types/application';
 
 export const dynamic = 'force-dynamic';
@@ -43,6 +44,12 @@ export async function GET(request: NextRequest) {
     const authHeader = request.headers.get('authorization');
     if (authHeader !== `Bearer ${secret}`) {
       throw new AppError('UNAUTHORIZED', 401, 'Invalid cron credentials');
+    }
+
+    // Nothing to lodge while Qippay is behind the flag — manual mode writes
+    // the schedule at disbursement and the lender records payments by hand.
+    if (!(await isQippayEnabled())) {
+      return NextResponse.json({ data: { skipped: true, reason: 'qippay_disabled' } });
     }
 
     const today = nzToday();

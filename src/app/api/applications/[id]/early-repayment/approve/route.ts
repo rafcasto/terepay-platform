@@ -10,6 +10,7 @@ import { approvePayment } from '@/lib/qippay/payby-client';
 import { normaliseNzPhoneForQippay, getReturnBaseUrl } from '@/lib/qippay/setpay-client';
 import { isLiveLoanStatus } from '@/lib/loan/active-loan';
 import type { EarlyRepayment, LoanApplication } from '@/types/application';
+import { assertQippayEnabled } from '@/lib/qippay/feature';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,6 +34,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const ip = getClientIp(request);
 
   try {
+    // Qippay is behind a feature flag — 404 while it is off.
+    await assertQippayEnabled();
     const auth = await withAuth(request, ['applicant']);
 
     const allowed = await checkRateLimit(paymentLimiter, auth.uid);
