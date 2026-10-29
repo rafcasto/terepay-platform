@@ -176,6 +176,14 @@
   --accent-hover:      var(--orange-600);
   --accent-press:      var(--orange-700);
 
+  /* ---- Partner: Qippay (Merchant Brand Guidelines §5) --------------- */
+  /* Qippay's own brand values for the dedicated "Pay by bank with Qippay"
+     button and lockup. Not part of the TerePay orange scale — never reuse
+     them for TerePay UI. See src/lib/qippay/brand.ts. */
+  --qippay-orange: #F47820;   /* button background / logo colour */
+  --qippay-text:   #F4F4F4;   /* text on the orange button */
+  --qippay-hover:  #000000;   /* hover / secondary style */
+
   /* ---- Typography (DS) ---------------------------------------------- */
   --font-serif:   'Lora', Georgia, 'Times New Roman', serif;
   --font-display: 'Poppins', 'Public Sans', system-ui, sans-serif;

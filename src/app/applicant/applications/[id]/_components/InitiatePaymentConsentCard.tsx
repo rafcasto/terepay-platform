@@ -3,7 +3,16 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { PaymentConsentStatus } from '@/types/application';
-import { Button, Card, CardHeader, FormField, SelectField, Pill, Icons } from '@/components/ui';
+import { Button, Card, CardHeader, Pill, Icons } from '@/components/ui';
+import {
+  QippayBankPicker,
+  QippayCheckoutIntro,
+  QippayFaq,
+  QippayLockup,
+  QippayPayButton,
+  type QippayBank,
+} from '@/components/qippay';
+import { MERCHANT_NAME, QIPPAY_BANK_SELECTION, QIPPAY_DESCRIPTOR } from '@/lib/qippay/brand';
 import { fmtYmd } from '@/lib/loan/format';
 
 export type PaymentConsentCardProps = {
@@ -17,12 +26,10 @@ type Props = {
   paymentConsent?: PaymentConsentCardProps;
 };
 
-type Provider = { id: string; name: string; logoUrl?: string };
-
 type InitiateResponse = {
   data: {
     mandateId: string;
-    providers: Provider[];
+    providers: QippayBank[];
     phoneHint?: string;
     scheduleSummary: {
       currency: 'NZD';
@@ -39,21 +46,33 @@ const fmtNzd = (cents?: number) =>
     ? new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(cents / 100)
     : '—';
 
+/**
+ * Applicant-side SetPay consent step, presented per the Qippay Merchant Brand
+ * Guidelines (Embedded): the product descriptor "Pay by bank with Qippay"
+ * everywhere (never "SetPay"), the dedicated Qippay button, the checkout
+ * instructions before the customer starts, then the vertical bank picker with
+ * the mobile-number field and a "Continue to [Bank]" confirm.
+ */
 export default function InitiatePaymentConsentCard({ applicationId, paymentConsent }: Props) {
   const router = useRouter();
   const [stage, setStage] = useState<'idle' | 'picking' | 'approving' | 'waiting_ciba'>('idle');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [providers, setProviders] = useState<Provider[]>([]);
+  const [providers, setProviders] = useState<QippayBank[]>([]);
+  // No bank is pre-selected — guideline §6 ("no bank looks preferred").
   const [providerId, setProviderId] = useState<string>('');
   const [phone, setPhone] = useState<string>('');
   const [installments, setInstallments] = useState<Array<{ dueDate: string; amountCents: number }>>(
     paymentConsent?.installments ?? [],
   );
+  const [totalCents, setTotalCents] = useState<number | undefined>(
+    paymentConsent?.installments?.reduce((acc, i) => acc + i.amountCents, 0),
+  );
 
   const status = paymentConsent?.status;
   const isRetry = status === 'failed' || status === 'expired' || status === 'cancelled';
   const isActive = status === 'active';
+  const selectedBank = providers.find((p) => p.id === providerId);
 
   useEffect(() => {
     if (stage !== 'waiting_ciba') return;
@@ -88,7 +107,8 @@ export default function InitiatePaymentConsentCard({ applicationId, paymentConse
       const data = (body as InitiateResponse).data;
       setProviders(data.providers ?? []);
       setInstallments(data.scheduleSummary?.installments ?? []);
-      setProviderId(data.providers?.[0]?.id ?? '');
+      setTotalCents(data.scheduleSummary?.totalAmountCents);
+      setProviderId('');
       setPhone(data.phoneHint ?? '');
       setStage('picking');
     } catch {
@@ -100,7 +120,7 @@ export default function InitiatePaymentConsentCard({ applicationId, paymentConse
 
   const handleApprove = async () => {
     if (!providerId || !phone.trim()) {
-      setError('Please choose a bank and confirm your phone number.');
+      setError('Please choose your bank and enter your mobile number.');
       return;
     }
     setLoading(true);
@@ -145,12 +165,17 @@ export default function InitiatePaymentConsentCard({ applicationId, paymentConse
           </div>
           <div>
             <p className="text-sm font-semibold text-success">Bank authorisation complete</p>
-            <p className="text-xs text-muted">Your lender will release the funds shortly.</p>
+            <p className="text-xs text-muted">
+              Your repayments are set up with {QIPPAY_DESCRIPTOR}. Your lender will release the funds
+              shortly.
+            </p>
           </div>
         </div>
       </Card>
     );
   }
+
+  const picking = stage === 'picking' || stage === 'approving';
 
   return (
     <Card className="border-accent/40">
@@ -164,9 +189,15 @@ export default function InitiatePaymentConsentCard({ applicationId, paymentConse
         }
       />
       <p className="mt-3 text-sm text-muted">
-        Before funds can be released, your bank needs to authorise the fortnightly repayments.
-        You&apos;ll be sent to your bank&apos;s secure page — no money moves at this step.
+        Before funds can be released, your bank needs to authorise the fortnightly repayments using{' '}
+        {QIPPAY_DESCRIPTOR} (Open Banking Payments). You approve it in your own banking app and no money
+        moves at this step.
       </p>
+      {isRetry && stage === 'idle' && (
+        <p className="mt-2 text-sm font-medium text-warning-text">
+          Your previous authorisation wasn&apos;t completed. You can try again below.
+        </p>
+      )}
 
       {installments.length > 0 && stage !== 'waiting_ciba' && (
         <div className="mt-4 rounded-xl bg-surface-2 p-3.5">
@@ -184,48 +215,68 @@ export default function InitiatePaymentConsentCard({ applicationId, paymentConse
         </div>
       )}
 
-      {error && <p className="mt-3 text-sm text-danger font-medium">{error}</p>}
-
       {stage === 'idle' && (
-        <div className="mt-5">
-          <Button onClick={handleStart} disabled={loading} fullWidth>
-            {loading ? 'Starting…' : isRetry ? 'Retry bank authorisation' : 'Start bank authorisation'}
-          </Button>
+        <div className="mt-4 space-y-4">
+          <QippayCheckoutIntro
+            note={
+              <>
+                This sets up your fortnightly repayments to {MERCHANT_NAME}. Nothing is collected until
+                each instalment is due. All loans are charged interest.
+              </>
+            }
+          />
+          {error && <p className="text-sm text-danger font-medium">{error}</p>}
+          <QippayPayButton onClick={handleStart} disabled={loading} fullWidth>
+            {loading ? 'Starting…' : QIPPAY_DESCRIPTOR}
+          </QippayPayButton>
+          <QippayLockup logoHeight={28} className="pt-1" />
+          <QippayFaq className="pt-2" />
         </div>
       )}
 
-      {stage === 'picking' && (
-        <div className="mt-5 space-y-4">
-          <SelectField
-            label="Your bank"
-            value={providerId}
-            onChange={(e) => setProviderId(e.target.value)}
-            disabled={loading}
-          >
-            {providers.length === 0 && <option value="">(no banks available)</option>}
-            {providers.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </SelectField>
-          <FormField
-            type="tel"
-            label="Phone registered with your bank"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            disabled={loading}
-            placeholder="+64 21 123 4567"
-            hint="May be used for a push notification"
-          />
-          <div className="flex gap-2">
-            <Button onClick={handleApprove} disabled={loading || !providerId || !phone.trim()} fullWidth>
-              {loading ? 'Contacting bank…' : 'Continue to my bank'}
-            </Button>
-            <Button variant="secondary" onClick={() => setStage('idle')} disabled={loading}>
+      {picking && (
+        <div className="mt-4 space-y-4">
+          {typeof totalCents === 'number' && (
+            <p className="text-sm text-[var(--text-body)]">
+              Authorising <span className="font-semibold tabular-nums">{fmtNzd(totalCents)}</span> in
+              repayments to {MERCHANT_NAME}.
+            </p>
+          )}
+          {providers.length === 0 ? (
+            <p className="text-sm text-muted">No banks are available right now. Please try again shortly.</p>
+          ) : (
+            <QippayBankPicker
+              idPrefix="consent"
+              banks={providers}
+              selectedId={providerId}
+              onSelect={setProviderId}
+              phone={phone}
+              onPhoneChange={setPhone}
+              disabled={loading}
+            />
+          )}
+          {error && <p className="text-sm text-danger font-medium">{error}</p>}
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <QippayPayButton
+              onClick={handleApprove}
+              disabled={loading || !providerId || !phone.trim()}
+              fullWidth
+            >
+              {loading
+                ? 'Contacting your bank…'
+                : selectedBank
+                  ? QIPPAY_BANK_SELECTION.continueTo(selectedBank.name)
+                  : 'Choose your bank to continue'}
+            </QippayPayButton>
+            <Button variant="secondary" size="lg" onClick={() => setStage('idle')} disabled={loading}>
               Cancel
             </Button>
           </div>
+          <p className="text-xs text-muted">
+            You approve the authorisation securely in your own bank&apos;s app or online banking.
+            Applications can be declined and terms apply.
+          </p>
+          <QippayLockup logoHeight={28} className="pt-1" />
         </div>
       )}
 
@@ -234,7 +285,8 @@ export default function InitiatePaymentConsentCard({ applicationId, paymentConse
           <div className="flex items-center gap-3 rounded-xl border border-info/40 bg-info-soft p-3.5">
             <span className="h-5 w-5 shrink-0 rounded-full border-2 border-info border-t-transparent animate-spin" />
             <p className="text-sm text-[#1e40af]">
-              We&apos;ve sent an approval request to your bank&apos;s app. Approve it there to continue — this page will refresh automatically.
+              We&apos;ve sent the request to {selectedBank?.name ?? 'your bank'}. Approve it in your banking
+              app to continue — this page will refresh automatically.
             </p>
           </div>
           <button
@@ -243,6 +295,7 @@ export default function InitiatePaymentConsentCard({ applicationId, paymentConse
           >
             I&apos;ve approved — check now
           </button>
+          <QippayLockup logoHeight={28} className="pt-1" />
         </div>
       )}
     </Card>
