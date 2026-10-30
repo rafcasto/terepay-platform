@@ -270,6 +270,14 @@ type PaymentProviderResponseItem = {
   website?: string;
 };
 
+/**
+ * Qippay Merchant Brand Guidelines §6: bank logos, names and instructions
+ * should be refreshed daily or weekly, not on every transaction. The provider
+ * list is cached per warm instance for a day; a cold start simply refetches.
+ */
+const PROVIDERS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+let providersCache: { fetchedAt: number; providers: SetPayProvider[] } | null = null;
+
 export async function listProviders(): Promise<SetPayProvider[]> {
   const env = readEnv();
 
@@ -281,16 +289,22 @@ export async function listProviders(): Promise<SetPayProvider[]> {
     ];
   }
 
+  if (providersCache && Date.now() - providersCache.fetchedAt < PROVIDERS_CACHE_TTL_MS) {
+    return providersCache.providers;
+  }
+
   const data = await qippayFetch<PaymentProviderResponseItem[]>(
     '/v1/payment_providers',
     { method: 'GET' },
   );
-  return data.map((d) => ({
+  const providers = data.map((d) => ({
     id: d.id,
     name: d.name,
     logoUrl: d.logo_url,
     website: d.website,
   }));
+  providersCache = { fetchedAt: Date.now(), providers };
+  return providers;
 }
 
 export type SetPayApproveMethod = 'redirect' | 'phone' | 'login_hint_token' | 'username';

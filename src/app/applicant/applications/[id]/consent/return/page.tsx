@@ -5,6 +5,8 @@ import { getAdminDb, verifySessionOrIdToken } from '@/lib/firebase/admin';
 import { auditLog } from '@/lib/utils/audit';
 import { reconcileConsent } from '@/lib/qippay/reconcile-consent';
 import type { PaymentConsent } from '@/types/application';
+import { QippayLockup } from '@/components/qippay';
+import { QIPPAY_DESCRIPTOR } from '@/lib/qippay/brand';
 import PendingPoller from './PendingPoller';
 
 export const dynamic = 'force-dynamic';
@@ -74,9 +76,10 @@ export default async function ConsentReturnPage({ params, searchParams }: PagePr
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
             </svg>
           </div>
-          <h1 className="text-xl font-bold text-gray-900 mb-1">Bank authorization complete</h1>
+          <h1 className="text-xl font-bold text-gray-900 mb-1">Bank authorisation complete</h1>
           <p className="text-sm text-gray-500 mb-6">
-            Your repayment mandate is now active. Your lender can release the loan funds.
+            Thanks. Your fortnightly repayments are set up with {QIPPAY_DESCRIPTOR}. Your lender can now
+            release the loan funds.
           </p>
           <Link
             href={detailHref}
@@ -85,6 +88,7 @@ export default async function ConsentReturnPage({ params, searchParams }: PagePr
             Back to your application
           </Link>
         </div>
+        <QippayLockup logoHeight={28} className="mt-6" />
       </div>
     );
   }
@@ -102,7 +106,7 @@ export default async function ConsentReturnPage({ params, searchParams }: PagePr
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
             </svg>
           </div>
-          <h1 className="text-xl font-bold text-gray-900 mb-1">Bank authorization not completed</h1>
+          <h1 className="text-xl font-bold text-gray-900 mb-1">Bank authorisation not completed</h1>
           <p className="text-sm text-gray-500 mb-6">
             {reconciled.status === 'expired'
               ? 'The verification window expired before your bank confirmed the authorization.'
@@ -117,6 +121,7 @@ export default async function ConsentReturnPage({ params, searchParams }: PagePr
             Return to your application
           </Link>
         </div>
+        <QippayLockup logoHeight={28} className="mt-6" />
       </div>
     );
   }
@@ -130,10 +135,11 @@ export default async function ConsentReturnPage({ params, searchParams }: PagePr
         </div>
         <h1 className="text-xl font-bold text-gray-900 mb-1">Waiting for your bank…</h1>
         <p className="text-sm text-gray-500 mb-6">
-          We&apos;re confirming the authorization with your bank. This usually takes only a few seconds.
+          We&apos;re confirming the authorisation with your bank. This usually takes only a few seconds.
         </p>
         <PendingPoller applicationId={id} detailHref={detailHref} />
       </div>
+      <QippayLockup logoHeight={28} className="mt-6" />
     </div>
   );
 }
