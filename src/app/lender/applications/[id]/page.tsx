@@ -16,6 +16,7 @@ import { reconcileConsent } from '@/lib/qippay/reconcile-consent';
 import { isQippayEnabled } from '@/lib/qippay/feature';
 import { isArrearsAutoEnabled } from '@/lib/loan/arrears-feature';
 import { deriveLoanSummary, toPlainScheduledPayments } from '@/lib/loan/active-loan';
+import { buildManualSchedule, nzToday } from '@/lib/loan/manual-payments';
 import { summariseArrearsCharges } from '@/lib/loan/arrears-charges';
 import { DOCUMENT_TYPE_LABELS, fulfilRequest, catalogueItem } from '@/lib/loan/document-requests';
 import {
@@ -36,6 +37,7 @@ import type {
   EvidenceGateView,
   PreviousApplication,
   ReferenceContact,
+  RepaymentPlanView,
   ReportItem,
   ReuseItem,
   ReviewData,
@@ -121,6 +123,8 @@ const VISA_LABEL: Record<string, string> = {
 const ASSESSMENT_STATUSES = ['under_assessment', 'waiting_for_docs', 'credit_check'];
 const REQUEST_DOCS_STATUSES = ['under_assessment', 'waiting_for_docs'];
 const PAYMENT_STATUSES = new Set(['disbursed', 'active', 'closed_repaid']);
+/** Approved but not yet disbursed — the window in which the repayment breakdown is previewed. */
+const PRE_DISBURSEMENT_STATUSES = new Set(['approved', 'loan_accepted', 'awaiting_payment_consent']);
 /** Statuses that count as a real previous loan (money went out). */
 const LOAN_STATUSES = new Set(['disbursed', 'active', 'closed_repaid']);
 
@@ -596,6 +600,44 @@ export default async function LenderApplicationDetailPage({
         }
       : undefined;
 
+  // ---- Repayment breakdown (approved, not yet disbursed, manual mode) -----
+  // Read-only preview of the instalments `initialiseManualSchedule` will
+  // write at disbursement. Dates are indicative — the real schedule is
+  // anchored on the day the money leaves. Not shown while Qippay is on: the
+  // SetPay mandate owns the schedule there.
+  const fmtCents = (c: number) => fmt(c / 100);
+  let repaymentPlan: RepaymentPlanView | undefined;
+  if (
+    !qippayOn &&
+    PRE_DISBURSEMENT_STATUSES.has(status) &&
+    typeof ld?.approvedAmount === 'number' &&
+    ld.approvedAmount > 0
+  ) {
+    const anchor = nzToday();
+    const plan = buildManualSchedule({
+      principal: ld.approvedAmount,
+      startDate: anchor,
+      totalRepayment: ld.totalRepayment,
+    });
+    repaymentPlan = {
+      rows: plan.rows.map((r) => ({
+        installmentNumber: r.installmentNumber,
+        dueDate: fmtYmd(r.dueDate),
+        amount: fmtCents(r.amountCents),
+        interest: fmtCents(r.interestCents),
+        principal: fmtCents(r.principalCents),
+        closingBalance: fmtCents(r.closingBalanceCents),
+      })),
+      principal: fmt(ld.approvedAmount),
+      fortnightlyPayment: fmt(plan.schedule.fortnightlyPayment),
+      totalInterest: fmtCents(plan.totalInterestCents),
+      totalRepayable: fmtCents(plan.totalCents),
+      annualRate: `${(plan.schedule.annualRate * 100).toFixed(2)}%`,
+      anchoredOn: fmtYmd(anchor),
+      instalments: plan.rows.length,
+    };
+  }
+
   let documentRequest: ReviewData['documentRequest'];
   if (app.documentRequest) {
     const requestedAtMs = toDate(app.documentRequest.requestedAt as TS)?.getTime();
@@ -720,6 +762,7 @@ export default async function LenderApplicationDetailPage({
     timeline,
     decision,
     applicantRejection,
+    repaymentPlan,
     payments: {
       show: PAYMENT_STATUSES.has(status),
       mode: qippayOn ? 'qippay' : 'manual',

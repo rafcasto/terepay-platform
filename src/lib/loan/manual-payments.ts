@@ -2,7 +2,7 @@ import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
 import { AppError } from '@/lib/utils/api-error';
 import { auditLog } from '@/lib/utils/audit';
-import { buildSchedule } from '@/lib/loan/repayment';
+import { buildSchedule, type AmortisedSchedule } from '@/lib/loan/repayment';
 import { deriveLoanSummary } from '@/lib/loan/active-loan';
 import { syncLoanRecord } from '@/lib/loan/loan-record';
 import type {
@@ -28,6 +28,87 @@ export function nzToday(): string {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' });
 }
 
+export interface ManualScheduleRow {
+  installmentNumber: number;
+  /** YYYY-MM-DD (NZ calendar date). */
+  dueDate: string;
+  amountCents: number;
+  interestCents: number;
+  principalCents: number;
+  closingBalanceCents: number;
+}
+
+export interface ManualSchedule {
+  /** Underlying amortisation the instalments were derived from. */
+  schedule: AmortisedSchedule;
+  rows: ManualScheduleRow[];
+  payments: ScheduledPayment[];
+  totalCents: number;
+  totalInterestCents: number;
+  /** Cents added to the final instalment so the total matches the figure agreed at approval. */
+  driftCents: number;
+}
+
+/**
+ * Pure builder for the manual-mode instalment schedule. Used both for the
+ * read-only breakdown the lender sees after approval and by
+ * `initialiseManualSchedule` at disbursement, so the preview and the stored
+ * schedule can never disagree for the same anchor date.
+ *
+ * Mirrors the consent flow's maths — a real reducing-balance amortisation
+ * anchored on `startDate`, so the final instalment trues up to the cent rather
+ * than splitting a total four ways. If a `totalRepayment` was agreed at
+ * approval and differs by a few cents (older rate config, rounding), the final
+ * instalment is adjusted so the borrower owes exactly what they signed for.
+ */
+export function buildManualSchedule(opts: {
+  principal: number;
+  startDate: string;
+  totalRepayment?: number;
+}): ManualSchedule {
+  const schedule = buildSchedule({ principal: opts.principal, startDate: opts.startDate });
+
+  const rows: ManualScheduleRow[] = schedule.rows.map((row) => ({
+    installmentNumber: row.installmentNumber,
+    dueDate: row.dueDate,
+    amountCents: Math.round(row.amount * 100),
+    interestCents: Math.round(row.interest * 100),
+    principalCents: Math.round(row.principal * 100),
+    closingBalanceCents: Math.round(row.closingBalance * 100),
+  }));
+
+  let driftCents = 0;
+  if (typeof opts.totalRepayment === 'number' && rows.length > 0) {
+    const agreedCents = Math.round(opts.totalRepayment * 100);
+    const scheduledCents = rows.reduce((acc, r) => acc + r.amountCents, 0);
+    const drift = agreedCents - scheduledCents;
+    const last = rows[rows.length - 1];
+    if (drift !== 0 && last.amountCents + drift > 0) {
+      last.amountCents += drift;
+      // Principal is fixed by the approved amount, so any true-up is interest.
+      last.interestCents += drift;
+      driftCents = drift;
+    }
+  }
+
+  const payments: ScheduledPayment[] = rows.map((r) => ({
+    installmentNumber: r.installmentNumber,
+    dueDate: r.dueDate,
+    amountCents: r.amountCents,
+    status: 'pending',
+    retryCount: 0,
+  }));
+
+  return {
+    schedule,
+    rows,
+    payments,
+    totalCents: rows.reduce((acc, r) => acc + r.amountCents, 0),
+    totalInterestCents: rows.reduce((acc, r) => acc + r.interestCents, 0),
+    driftCents,
+  };
+}
+
 export type InitialiseManualScheduleResult = {
   created: boolean;
   payments: ScheduledPayment[];
@@ -37,11 +118,8 @@ export type InitialiseManualScheduleResult = {
 /**
  * Write the instalment schedule for a freshly disbursed loan when Qippay is
  * not collecting it. Idempotent: an application that already has instalments
- * (Qippay-lodged or manual) is left untouched.
- *
- * Mirrors the consent flow's maths — a real reducing-balance amortisation
- * anchored on the disbursement date, so the final instalment trues up to the
- * cent rather than splitting a total four ways.
+ * (Qippay-lodged or manual) is left untouched. The maths live in
+ * `buildManualSchedule`, anchored on the disbursement date.
  */
 export async function initialiseManualSchedule(opts: {
   applicationId: string;
@@ -67,29 +145,11 @@ export async function initialiseManualSchedule(opts: {
   }
 
   const startDate = app.loanDetails?.disbursementDate ?? nzToday();
-  const schedule = buildSchedule({ principal: approvedAmount, startDate });
-
-  const payments: ScheduledPayment[] = schedule.rows.map((row) => ({
-    installmentNumber: row.installmentNumber,
-    dueDate: row.dueDate,
-    amountCents: Math.round(row.amount * 100),
-    status: 'pending',
-    retryCount: 0,
-  }));
-
-  // Prefer the total agreed at approval: if it differs from the fresh
-  // amortisation by a few cents (older rate config, rounding), true up the
-  // final instalment so the borrower owes exactly what they signed for.
-  const agreedTotal = app.loanDetails?.totalRepayment;
-  if (typeof agreedTotal === 'number' && payments.length > 0) {
-    const agreedCents = Math.round(agreedTotal * 100);
-    const scheduledCents = payments.reduce((acc, p) => acc + p.amountCents, 0);
-    const drift = agreedCents - scheduledCents;
-    const last = payments[payments.length - 1];
-    if (drift !== 0 && last.amountCents + drift > 0) {
-      last.amountCents += drift;
-    }
-  }
+  const { payments } = buildManualSchedule({
+    principal: approvedAmount,
+    startDate,
+    totalRepayment: app.loanDetails?.totalRepayment,
+  });
 
   await appRef.update({
     scheduledPayments: payments,

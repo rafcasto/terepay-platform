@@ -16,6 +16,7 @@ import CreditSummary from './CreditSummary';
 import DecisionModal, { type DecisionMode } from './DecisionModal';
 import DocumentReviewList from './DocumentReviewList';
 import DocumentsTab from './DocumentsTab';
+import RepaymentPlanCard from './RepaymentPlanCard';
 import ReviewProgress from './ReviewProgress';
 import type { ReportItem, ReviewData, TabKey } from './review-types';
 import { ARREARS_POLICY } from '@/lib/loan/arrears-charges';
@@ -378,6 +379,9 @@ function OverviewTab({ data, onSelect }: { data: ReviewData; onSelect: (tab: Tab
       {!data.decision && ASSESSMENT_STATUSES.concat('pending_review').includes(data.status) && (
         <ReviewProgress data={data} onSelect={onSelect} />
       )}
+
+      {/* Fortnightly breakdown — approved, not yet disbursed, manual repayment mode only */}
+      {data.repaymentPlan && <RepaymentPlanCard plan={data.repaymentPlan} />}
 
       {/* Disburse */}
       {data.disburse && (
