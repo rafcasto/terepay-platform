@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Card, CardHeader, RangeSlider, QuickAmounts, StatGrid, ButtonLink } from '@/components/ui';
 import { computeRepayment, LOAN_MIN, LOAN_MAX, LOAN_INSTALMENTS } from '@/lib/loan/status-display';
 import { fmtNZD, fmtNZDCompact } from '@/lib/loan/format';
+import { APPLICATION_FEE_NEW, APPLICATION_FEE_EXISTING, TERM_INTEREST_RATE_PCT } from '@/lib/constants/fees';
 import { DEFAULT_CONTENT, type ContentSectionValues } from '@/types/content';
 
 const QUICK = [300, 500, 1000, 1500, 2000];
@@ -49,8 +50,10 @@ export default function LoanCalculatorCard({ content }: { content?: ContentSecti
       </div>
 
       <p className="mt-4 text-[12.5px] text-[var(--text-muted)] leading-relaxed">
-        {LOAN_INSTALMENTS} fortnightly payments over 8 weeks. All loans are charged interest;
-        includes an establishment fee of {fmtNZD(r.fee)}. {c.calculatorDisclaimer}
+        {LOAN_INSTALMENTS} fortnightly payments over 8 weeks. {TERM_INTEREST_RATE_PCT}% interest. All
+        loans are charged interest; an establishment fee of {fmtNZD(APPLICATION_FEE_NEW)} applies to new
+        customers, and an application fee of {fmtNZD(APPLICATION_FEE_EXISTING, { cents: false })} applies to
+        repeat customers. {c.calculatorDisclaimer}
       </p>
 
       <div className="mt-5">

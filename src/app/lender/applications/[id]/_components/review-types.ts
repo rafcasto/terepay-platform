@@ -185,6 +185,13 @@ export type ReviewData = {
     declineReasons?: string[];
   };
   applicantRejection?: { rejectedAt: string; reason: string };
+  /**
+   * Indicative fortnightly repayment breakdown, shown after approval and
+   * before disbursement. Present only in manual repayment mode (Qippay flag
+   * off) — with Qippay on the SetPay mandate fixes the schedule at
+   * disbursement, so there is nothing for the lender to preview here.
+   */
+  repaymentPlan?: RepaymentPlanView;
   payments: {
     show: boolean;
     /**
@@ -245,3 +252,26 @@ export type ReviewData = {
 };
 
 export type TabKey = 'overview' | 'documents' | 'affordability' | 'kyc' | 'credit' | 'communication';
+
+/** One instalment of the pre-disbursement repayment breakdown (all figures pre-formatted). */
+export type RepaymentPlanRow = {
+  installmentNumber: number;
+  dueDate: string;
+  amount: string;
+  interest: string;
+  principal: string;
+  closingBalance: string;
+};
+
+export type RepaymentPlanView = {
+  rows: RepaymentPlanRow[];
+  principal: string;
+  fortnightlyPayment: string;
+  totalInterest: string;
+  totalRepayable: string;
+  /** e.g. "49.00%" */
+  annualRate: string;
+  /** Date the indicative dates are anchored on (dd/mm/yyyy). */
+  anchoredOn: string;
+  instalments: number;
+};

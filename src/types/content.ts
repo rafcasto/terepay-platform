@@ -991,8 +991,7 @@ export const DEFAULT_CONTENT: Record<string, ContentSectionValues> = {
     greetingSuffix: '👋',
     welcomeTitle: 'Welcome back',
     calculatorEyebrow: 'Quick estimate',
-    calculatorDisclaimer:
-      'Applications are subject to approval and affordability checks — final terms confirmed after assessment.',
+    calculatorDisclaimer: 'Applications are subject to approval and affordability checks. Terms and conditions apply.',
     calculatorCta: 'Continue to application',
     quickActionsHeading: 'Quick actions',
     helpText: 'Need help? Email',
