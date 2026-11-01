@@ -50,6 +50,13 @@ export const PAYMENT_DEFAULT_GRACE_DAYS = 7;
  * The same rate drives post-default daily accrual on the outstanding balance.
  */
 export const ANNUAL_INTEREST_RATE = 0.49;
+/**
+ * Headline interest figure shown to borrowers: total interest over an on-time
+ * 8-week term as a percentage of the amount borrowed (matches the
+ * `onTimeInterestFraction` the collections engine asserts). Display only —
+ * never use it for calculations, which go through the amortised schedule.
+ */
+export const TERM_INTEREST_RATE_PCT = 4.74;
 /** Daily interest rate = annual / 365 (CCCFA daily-balance method). */
 export const DAILY_INTEREST_RATE = ANNUAL_INTEREST_RATE / 365;
 
