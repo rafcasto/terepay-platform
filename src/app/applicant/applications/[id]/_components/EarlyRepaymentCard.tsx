@@ -2,7 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button, CheckboxField, FormField, SelectField, Pill, Icons } from '@/components/ui';
+import { Button, CheckboxField, Pill, Icons } from '@/components/ui';
+import {
+  QippayBankPicker,
+  QippayCheckoutIntro,
+  QippayLockup,
+  QippayPayButton,
+  type QippayBank,
+} from '@/components/qippay';
+import { MERCHANT_NAME, QIPPAY_BANK_SELECTION, QIPPAY_DESCRIPTOR } from '@/lib/qippay/brand';
 import { fmtNZD } from '@/lib/loan/format';
 import type { EarlyRepaymentStatus } from '@/types/application';
 import { SectionCard } from '@/components/applicant/screens/shared';
@@ -17,8 +25,6 @@ export type EarlyRepaymentQuoteView = {
   totalPayoff: number;
 };
 
-type Provider = { id: string; name: string; logoUrl?: string };
-
 type Props = {
   applicationId: string;
   quote: EarlyRepaymentQuoteView;
@@ -31,7 +37,7 @@ type InitiateResponse = {
     paymentId: string;
     hostedUrl?: string;
     embedded?: boolean;
-    providers?: Provider[];
+    providers?: QippayBank[];
     phoneHint?: string;
   };
 };
@@ -46,12 +52,14 @@ export default function EarlyRepaymentCard({ applicationId, quote, status }: Pro
   const [accepted, setAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [providers, setProviders] = useState<Provider[]>([]);
+  const [providers, setProviders] = useState<QippayBank[]>([]);
+  // No bank is pre-selected — Qippay guideline §6 ("no bank looks preferred").
   const [providerId, setProviderId] = useState('');
   const [phone, setPhone] = useState('');
   const [hostedUrl, setHostedUrl] = useState('');
 
   const inFlight = status === 'initiated' || status === 'pending';
+  const selectedBank = providers.find((p) => p.id === providerId);
 
   // Poll payment status while waiting for a CIBA bank-app approval.
   useEffect(() => {
@@ -97,7 +105,7 @@ export default function EarlyRepaymentCard({ applicationId, quote, status }: Pro
       // page. The Hosted round-trip returns to our early-repayment return page.
       if (data.embedded && (data.providers?.length ?? 0) > 0) {
         setProviders(data.providers ?? []);
-        setProviderId(data.providers?.[0]?.id ?? '');
+        setProviderId('');
         setPhone(data.phoneHint ?? '');
         setHostedUrl(data.hostedUrl ?? '');
         setStage('picking');
@@ -118,7 +126,7 @@ export default function EarlyRepaymentCard({ applicationId, quote, status }: Pro
   // Approve at the selected bank — CIBA push (poll) or redirect straight to bank.
   const handleApprove = async () => {
     if (!providerId || !phone.trim()) {
-      setError('Please choose a bank and confirm your phone number.');
+      setError('Please choose your bank and enter your mobile number.');
       return;
     }
     setLoading(true);
@@ -254,16 +262,26 @@ export default function EarlyRepaymentCard({ applicationId, quote, status }: Pro
             disabled={loading}
           />
 
+          <QippayCheckoutIntro
+            note={
+              <>
+                You pay {fmtNZD(quote.totalPayoff)} to {MERCHANT_NAME} today, including the prepayment fee
+                shown above. All loans are charged interest.
+              </>
+            }
+          />
+
           {error && <p className="text-sm text-danger font-medium">{error}</p>}
 
-          <div className="flex gap-2">
-            <Button onClick={handleStart} disabled={loading || !accepted} fullWidth>
-              {loading ? 'Starting…' : 'Continue'}
-            </Button>
-            <Button variant="secondary" onClick={() => setStage('summary')} disabled={loading}>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <QippayPayButton onClick={handleStart} disabled={loading || !accepted} fullWidth>
+              {loading ? 'Starting…' : QIPPAY_DESCRIPTOR}
+            </QippayPayButton>
+            <Button variant="secondary" size="lg" onClick={() => setStage('summary')} disabled={loading}>
               Cancel
             </Button>
           </div>
+          <QippayLockup logoHeight={28} className="pt-1" />
         </div>
       )}
 
@@ -277,62 +295,62 @@ export default function EarlyRepaymentCard({ applicationId, quote, status }: Pro
 
           {error && <p className="text-sm text-danger font-medium">{error}</p>}
 
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             {hostedUrl ? (
-              <Button onClick={goToHosted} disabled={loading} fullWidth>
-                <Icons.ArrowRight size={16} />
-                {`Pay ${fmtNZD(quote.totalPayoff)} on the secure payment page`}
-              </Button>
+              <QippayPayButton onClick={goToHosted} disabled={loading} fullWidth>
+                <Icons.ArrowRight size={18} />
+                {QIPPAY_DESCRIPTOR}
+              </QippayPayButton>
             ) : (
               <Button onClick={handleStart} disabled={loading} fullWidth>
                 {loading ? 'Retrying…' : 'Try again'}
               </Button>
             )}
-            <Button variant="secondary" onClick={() => setStage('review')} disabled={loading}>
+            <Button variant="secondary" size="lg" onClick={() => setStage('review')} disabled={loading}>
               Back
             </Button>
           </div>
+          <QippayLockup logoHeight={28} className="pt-1" />
         </div>
       )}
 
       {(stage === 'picking' || stage === 'approving') && providers.length > 0 && (
         <div className="mt-4 space-y-4">
-          <SelectField
-            label="Your bank"
-            value={providerId}
-            onChange={(e) => setProviderId(e.target.value)}
+          <p className="text-sm text-[var(--text-body)]">
+            Paying <span className="font-semibold tabular-nums">{fmtNZD(quote.totalPayoff)}</span> to{' '}
+            {MERCHANT_NAME}.
+          </p>
+          <QippayBankPicker
+            idPrefix="payoff"
+            banks={providers}
+            selectedId={providerId}
+            onSelect={setProviderId}
+            phone={phone}
+            onPhoneChange={setPhone}
             disabled={loading}
-          >
-            {providers.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </SelectField>
-          <FormField
-            type="tel"
-            label="Phone registered with your bank"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            disabled={loading}
-            placeholder="+64 21 123 4567"
-            hint="May be used for a secure push notification from your bank"
           />
 
           {error && <p className="text-sm text-danger font-medium">{error}</p>}
 
-          <div className="flex gap-2">
-            <Button onClick={handleApprove} disabled={loading || !providerId || !phone.trim()} fullWidth>
-              <Icons.ArrowRight size={16} />
-              {loading ? 'Contacting your bank…' : `Pay ${fmtNZD(quote.totalPayoff)} at my bank`}
-            </Button>
-            <Button variant="secondary" onClick={() => setStage('review')} disabled={loading}>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <QippayPayButton
+              onClick={handleApprove}
+              disabled={loading || !providerId || !phone.trim()}
+              fullWidth
+            >
+              {loading
+                ? 'Contacting your bank…'
+                : selectedBank
+                  ? QIPPAY_BANK_SELECTION.continueTo(selectedBank.name)
+                  : 'Choose your bank to continue'}
+            </QippayPayButton>
+            <Button variant="secondary" size="lg" onClick={() => setStage('review')} disabled={loading}>
               Back
             </Button>
           </div>
           <p className="text-xs text-muted">
-            You approve the payment securely with your own bank. Applications can be declined and terms
-            apply.
+            You approve the payment securely in your own bank&apos;s app or online banking. Applications can
+            be declined and terms apply.
           </p>
           {hostedUrl && (
             <button
@@ -344,6 +362,7 @@ export default function EarlyRepaymentCard({ applicationId, quote, status }: Pro
               Having trouble? Pay on the secure payment page instead
             </button>
           )}
+          <QippayLockup logoHeight={28} className="pt-1" />
         </div>
       )}
 
@@ -352,9 +371,9 @@ export default function EarlyRepaymentCard({ applicationId, quote, status }: Pro
           <div className="flex items-center gap-3 rounded-xl border border-info/40 bg-info-soft p-3.5">
             <span className="h-5 w-5 shrink-0 rounded-full border-2 border-info border-t-transparent animate-spin" />
             <p className="text-sm text-[#1e40af]">
-              We&apos;ve sent an approval request to your bank&apos;s app. Approve the{' '}
-              {fmtNZD(quote.totalPayoff)} payment there to settle your loan — this page will refresh
-              automatically.
+              We&apos;ve sent the payment request to {selectedBank?.name ?? 'your bank'}. Approve the{' '}
+              {fmtNZD(quote.totalPayoff)} payment in your banking app to settle your loan — this page will
+              refresh automatically.
             </p>
           </div>
           <button
@@ -363,6 +382,7 @@ export default function EarlyRepaymentCard({ applicationId, quote, status }: Pro
           >
             I&apos;ve approved — check now
           </button>
+          <QippayLockup logoHeight={28} className="pt-1" />
         </div>
       )}
     </SectionCard>

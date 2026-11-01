@@ -5,6 +5,8 @@ import { getAdminDb, verifySessionOrIdToken } from '@/lib/firebase/admin';
 import { auditLog } from '@/lib/utils/audit';
 import { reconcileEarlyRepayment } from '@/lib/qippay/reconcile-early-repayment';
 import type { EarlyRepayment } from '@/types/application';
+import { QippayLockup } from '@/components/qippay';
+import { QIPPAY_DESCRIPTOR } from '@/lib/qippay/brand';
 import PendingPoller from './PendingPoller';
 
 export const dynamic = 'force-dynamic';
@@ -74,8 +76,8 @@ export default async function EarlyRepaymentReturnPage({ params, searchParams }:
           </div>
           <h1 className="text-xl font-bold text-gray-900 mb-1">Loan repaid in full</h1>
           <p className="text-sm text-gray-500 mb-6">
-            Thanks — your payment was approved and your loan is now settled. No further instalments
-            will be collected.
+            Thanks — your payment was approved with {QIPPAY_DESCRIPTOR} and your loan is now settled. No
+            further instalments will be collected.
           </p>
           <Link
             href={detailHref}
@@ -84,6 +86,7 @@ export default async function EarlyRepaymentReturnPage({ params, searchParams }:
             Back to your loan
           </Link>
         </div>
+        <QippayLockup logoHeight={28} className="mt-6" />
       </div>
     );
   }
@@ -116,6 +119,7 @@ export default async function EarlyRepaymentReturnPage({ params, searchParams }:
             Return to your loan
           </Link>
         </div>
+        <QippayLockup logoHeight={28} className="mt-6" />
       </div>
     );
   }
@@ -133,6 +137,7 @@ export default async function EarlyRepaymentReturnPage({ params, searchParams }:
         </p>
         <PendingPoller applicationId={id} detailHref={detailHref} />
       </div>
+      <QippayLockup logoHeight={28} className="mt-6" />
     </div>
   );
 }

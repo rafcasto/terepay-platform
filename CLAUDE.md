@@ -113,6 +113,7 @@ Don't duplicate these — point at them.
 - [docs/MODEL_TRAINING.md](docs/MODEL_TRAINING.md) — admin Model Training page → Upstash Redis queue → Pi worker (key contract, job types)
 - [docs/AI_CREDIT_ASSESSMENT.md](docs/AI_CREDIT_ASSESSMENT.md) — lender's Results & Decision step → Upstash Redis `assessment:queue` → Pi worker; every input is sent, missing input = 422, result is advisory
 - [docs/SECURITY_AUDIT.md](docs/SECURITY_AUDIT.md) — **security checklist — NZ Privacy Act, CCCFA, AML/CFT**
+- [docs/QIPPAY_BRANDING.md](docs/QIPPAY_BRANDING.md) — Qippay Merchant Brand Guidelines applied to the payment flows: descriptor, button, bank picker, FAQ. Copy/colours live in `src/lib/qippay/brand.ts`, components in `src/components/qippay/`
 
 `.env.local` is gitignored. See QUICK_START / DEPLOYMENT for the variable list (`NEXT_PUBLIC_FIREBASE_*`, `FIREBASE_ADMIN_*`, `ENCRYPTION_KEY`, `NEXT_PUBLIC_ENVIRONMENT`, Twilio/Resend/Upstash/reCAPTCHA secrets).
 

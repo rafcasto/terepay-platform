@@ -8,6 +8,7 @@ import type { ArrearsState, FeeAssessment } from '@/types/application';
 import type { EarlyRepayment } from '@/types/application';
 import EarlyRepaymentCard from '@/app/applicant/applications/[id]/_components/EarlyRepaymentCard';
 import { SectionCard, Field } from './shared';
+import { QIPPAY_DESCRIPTOR } from '@/lib/qippay/brand';
 
 interface Props {
   app: LoanApplication & Record<string, unknown>;
@@ -201,7 +202,7 @@ export default function ScreenActive({
         <SectionCard eyebrow="Schedule" title="Repayments">
           <p className="text-xs text-muted mb-3">
             {qippayEnabled
-              ? 'Each instalment is auto-debited from your bank on its due date — no action needed.'
+              ? `Each instalment is collected from your bank account on its due date through ${QIPPAY_DESCRIPTOR} — no action needed.`
               : 'Pay each instalment to TerePay by its due date. Your lender records it here once it arrives.'}
           </p>
           <div className="divide-y divide-border-2">
