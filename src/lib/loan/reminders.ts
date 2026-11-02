@@ -32,6 +32,12 @@ const SUPPORT_EMAIL = 'support@terepay.com';
 export interface ReminderContext {
   applicantName: string;
   applicationRef: string;
+  /**
+   * How instalments are collected, so the copy is truthful:
+   *  - `auto`   — an active Qippay SetPay authority collects each instalment
+   *  - `manual` — the borrower pays TerePay directly by each due date
+   */
+  collectionMode: 'auto' | 'manual';
 }
 
 export interface PlannedReminder {
@@ -98,6 +104,7 @@ export function planReminders(input: {
 
   const greeting = ctx.applicantName ? `Hi ${ctx.applicantName},` : 'Hi,';
   const ref = ctx.applicationRef;
+  const auto = ctx.collectionMode === 'auto';
 
   for (const inst of installments) {
     if (inst.status === 'paid' || inst.status === 'cancelled') continue;
@@ -109,14 +116,20 @@ export function planReminders(input: {
 
     // Upcoming payment (1–3 days out).
     if (daysUntilDue >= 1 && daysUntilDue <= 3) {
-      const body = `<p>${greeting}</p><p>This is a reminder that your instalment ${n} of <strong>${amount}</strong> for loan ${ref} is due on <strong>${inst.dueDate}</strong>. It will be collected automatically from your linked bank account.</p><p>Please make sure the funds are available. Interest continues to accrue on your balance, and a ${money(LATE_PAYMENT_FEE * 100)} late fee applies if a payment is not made within ${LATE_PAYMENT_GRACE_DAYS} days of the due date.</p>`;
+      const how = auto
+        ? 'It will be collected automatically from your linked bank account under the repayment authority you approved — you do not need to do anything except make sure the funds are available.'
+        : 'Please pay this amount to TerePay by the due date using the account details your lender gave you, and quote your loan reference.';
+      const howText = auto
+        ? 'It will be collected automatically from your linked bank account under the repayment authority you approved. Please ensure funds are available.'
+        : 'Please pay it to TerePay by the due date using the account details your lender gave you, quoting your loan reference.';
+      const body = `<p>${greeting}</p><p>This is a reminder that your instalment ${n} of <strong>${amount}</strong> for loan ${ref} is due on <strong>${inst.dueDate}</strong>. ${how}</p><p>Interest continues to accrue on your balance, and a ${money(LATE_PAYMENT_FEE * 100)} late fee applies if a payment is not made within ${LATE_PAYMENT_GRACE_DAYS} days of the due date.</p>`;
       push({
         key: `upcoming_payment:${n}`,
         type: 'upcoming_payment',
         installmentNumber: n,
         subject: `Payment of ${amount} due ${inst.dueDate} — loan ${ref}`,
         html: wrap(body),
-        text: wrapText(`${greeting}\n\nReminder: instalment ${n} of ${amount} for loan ${ref} is due on ${inst.dueDate} and will be collected from your linked bank account. Please ensure funds are available. A ${money(LATE_PAYMENT_FEE * 100)} late fee applies if not paid within ${LATE_PAYMENT_GRACE_DAYS} days of the due date.`),
+        text: wrapText(`${greeting}\n\nReminder: instalment ${n} of ${amount} for loan ${ref} is due on ${inst.dueDate}. ${howText} A ${money(LATE_PAYMENT_FEE * 100)} late fee applies if not paid within ${LATE_PAYMENT_GRACE_DAYS} days of the due date.`),
       });
       continue;
     }
@@ -125,14 +138,19 @@ export function planReminders(input: {
 
     // Payment missed — interest is now accruing.
     if (daysPastDue >= 1) {
-      const body = `<p>${greeting}</p><p>We were unable to collect instalment ${n} of <strong>${amount}</strong> for loan ${ref}, which was due on ${inst.dueDate}. This can happen when there are insufficient funds in your account.</p><p>We will keep trying to collect this payment over the next few days. Interest is now accruing daily on your outstanding balance until it is paid. You have until ${LATE_PAYMENT_GRACE_DAYS} days after the due date to pay before a ${money(LATE_PAYMENT_FEE * 100)} late fee applies.</p><p>Please make sure funds are available, or reply to arrange another way to pay.</p>`;
+      const body = auto
+        ? `<p>${greeting}</p><p>We were unable to collect instalment ${n} of <strong>${amount}</strong> for loan ${ref}, which was due on ${inst.dueDate}. This can happen when there are insufficient funds in your account.</p><p>We will keep trying to collect this payment over the next few days. Interest is now accruing daily on your outstanding balance until it is paid. You have until ${LATE_PAYMENT_GRACE_DAYS} days after the due date to pay before a ${money(LATE_PAYMENT_FEE * 100)} late fee applies.</p><p>Please make sure funds are available, or reply to arrange another way to pay.</p>`
+        : `<p>${greeting}</p><p>We have not received instalment ${n} of <strong>${amount}</strong> for loan ${ref}, which was due on ${inst.dueDate}.</p><p>Interest is now accruing daily on your outstanding balance until it is paid. You have until ${LATE_PAYMENT_GRACE_DAYS} days after the due date to pay before a ${money(LATE_PAYMENT_FEE * 100)} late fee applies.</p><p>Please pay it to TerePay using the account details your lender gave you, or reply if you have already paid or need to arrange another way to pay.</p>`;
+      const text = auto
+        ? `${greeting}\n\nWe could not collect instalment ${n} of ${amount} for loan ${ref} (due ${inst.dueDate}) — often due to insufficient funds. We will keep trying over the next few days. Interest is now accruing daily on your outstanding balance. A ${money(LATE_PAYMENT_FEE * 100)} late fee applies if unpaid ${LATE_PAYMENT_GRACE_DAYS} days after the due date. Please ensure funds are available or reply to arrange payment.`
+        : `${greeting}\n\nWe have not received instalment ${n} of ${amount} for loan ${ref} (due ${inst.dueDate}). Interest is now accruing daily on your outstanding balance. A ${money(LATE_PAYMENT_FEE * 100)} late fee applies if unpaid ${LATE_PAYMENT_GRACE_DAYS} days after the due date. Please pay TerePay using the account details your lender gave you, or reply if you have already paid.`;
       push({
         key: `payment_missed:${n}`,
         type: 'payment_missed',
         installmentNumber: n,
         subject: `Action needed: payment missed for loan ${ref}`,
         html: wrap(body),
-        text: wrapText(`${greeting}\n\nWe could not collect instalment ${n} of ${amount} for loan ${ref} (due ${inst.dueDate}) — often due to insufficient funds. We will keep trying over the next few days. Interest is now accruing daily on your outstanding balance. A ${money(LATE_PAYMENT_FEE * 100)} late fee applies if unpaid ${LATE_PAYMENT_GRACE_DAYS} days after the due date. Please ensure funds are available or reply to arrange payment.`),
+        text: wrapText(text),
       });
     }
 

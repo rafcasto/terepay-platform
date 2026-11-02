@@ -5,6 +5,7 @@ import { sendEmail } from '@/lib/email/resend';
 import { deriveLoanSummary, isLiveLoanStatus } from './active-loan';
 import { assessArrears } from './arrears';
 import { planReminders } from './reminders';
+import { collectionModeOf, loadReminderRecipient } from './upcoming-reminders';
 import type {
   ArrearsState,
   FeeAssessment,
@@ -92,23 +93,18 @@ export async function assessArrearsForApplication(opts: {
   const sentKeys = new Set(existingReminders.map((r) => r.key));
 
   // Resolve recipient (email + first name are plaintext top-level user fields).
-  let recipientEmail = '';
-  let firstName = '';
-  try {
-    const userSnap = await adminDb.collection('users').doc(app.applicantId).get();
-    const user = userSnap.data() as { email?: string; firstName?: string } | undefined;
-    recipientEmail = user?.email ?? '';
-    firstName = user?.firstName ?? '';
-  } catch (err) {
-    console.error('[assess-arrears] failed to load applicant for reminders', applicationId, err);
-  }
+  const { email: recipientEmail, firstName } = await loadReminderRecipient(app.applicantId);
 
   if (recipientEmail) {
     const planned = planReminders({
       installments: summary.installments,
       today,
       sentKeys,
-      ctx: { applicantName: firstName, applicationRef: app.referenceNumber },
+      ctx: {
+        applicantName: firstName,
+        applicationRef: app.referenceNumber,
+        collectionMode: collectionModeOf(app),
+      },
     });
 
     for (const reminder of planned) {

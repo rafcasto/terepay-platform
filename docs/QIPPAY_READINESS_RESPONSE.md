@@ -122,14 +122,14 @@ All reconcilers are idempotent: terminal states are never overwritten, transitio
 
 | Stage | When | Content |
 |---|---|---|
-| Upcoming payment | 1–3 days before due | Amount, date, "will be collected from your linked account — please ensure funds" |
+| Upcoming payment | 1–3 days before due (every instalment) | Amount, date, "will be collected automatically from your linked bank account under the repayment authority you approved — please ensure funds" |
 | Payment missed | day 1 overdue | "We were unable to collect… we'll keep trying over the next few days; interest accruing" |
 | Late-fee warning | end of 3-day grace | "$10 late fee applies if not paid" |
 | Late fee charged | day 4 | "$10 late fee applied; $25 default fee if more than 7 days overdue" |
 | Default warning | day 6 | "Avoid the $25 default fee; hardship help available" |
 | Authority cancelled | on revocation | "No further instalments can be collected; loan unchanged; here's how to keep paying" |
 
-Reminders and fees are produced by the arrears engine. It runs automatically inside the daily sweep when automatic arrears is enabled; the assigned lender can also run it per loan at any time (*Assess arrears now*). Both paths are idempotent.
+The **upcoming-payment reminder is sent for every instalment**, 1–3 days before it is collected, by the daily sweep — this does not depend on any configuration. The wording reflects how the loan is collected: with an active repayment authority it says the instalment *"will be collected automatically from your linked bank account under the repayment authority you approved"*; a loan being repaid directly to TerePay is told to pay by the due date instead. The overdue sequence and fees come from the arrears engine, which runs automatically in the sweep when automatic arrears is enabled and can also be run per loan by the assigned lender (*Assess arrears now*). Every reminder is de-duplicated per instalment and stage, so a customer never receives the same notice twice.
 
 ### Playbook — changed, cancelled and failed payments
 
