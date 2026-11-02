@@ -86,8 +86,8 @@ export default function ScreenApproved({
         <div className="mt-4">
           <StatGrid
             stats={[
-              { label: 'You receive', value: fmtNZD(payout) },
-              { label: 'Application fee', value: fmtNZD(fee) },
+              { label: 'Paid to your account', value: fmtNZD(payout) },
+              { label: 'Application fee (deducted)', value: fmtNZD(fee) },
             ]}
           />
         </div>
@@ -144,15 +144,33 @@ export default function ScreenApproved({
             ? `${round2((ld?.interestRate ?? quote.annualRate) * 100)}% p.a.`
             : `${Math.round((interest / approvedAmount) * 1000) / 10}%`;
 
-        const rows: Array<{ label: string; value: string; strong?: boolean }> = [
-          { label: 'Approved loan amount', value: fmtNZD(approvedAmount) },
-          { label: `Total interest charges (${rateLabel})`, value: fmtNZD(interest) },
-          { label: 'Application fee', value: fmtNZD(fee) },
-          { label: 'Total amount', value: fmtNZD(totalAmount), strong: true },
-          { label: 'Loan disbursed', value: fmtNZD(payout) },
-          { label: 'Total amount to pay', value: fmtNZD(totalToPay), strong: true },
-          { label: 'Fortnightly payment', value: fmtNZD(fortnightly) },
-          { label: 'Term', value: '8 weeks · 4 fortnightly payments' },
+        const installmentCount = quote.rows.length || 4;
+        // Two groups so the two "totals" can't be confused: what is paid out
+        // (loan − fee) and what is repaid (loan + interest, collected in
+        // instalments). The fee is deducted up front and is never collected
+        // via an instalment; the overall cost line adds it back for CCCFA
+        // total-cost disclosure.
+        const rows: Array<{ label: string; value: string; strong?: boolean; sub?: string }> = [
+          { label: 'Loan amount', value: fmtNZD(approvedAmount) },
+          {
+            label: 'Application fee',
+            value: `− ${fmtNZD(fee)}`,
+            sub: 'Deducted from the loan before payout — not part of your repayments',
+          },
+          { label: 'Paid to your account', value: fmtNZD(payout), strong: true },
+          { label: `Interest (${rateLabel})`, value: fmtNZD(interest) },
+          {
+            label: 'You repay',
+            value: fmtNZD(totalToPay),
+            strong: true,
+            sub: `${installmentCount} fortnightly instalments of ${fmtNZD(fortnightly)} — loan amount plus interest`,
+          },
+          {
+            label: 'Total cost of borrowing',
+            value: fmtNZD(totalAmount),
+            sub: 'Repayments plus the application fee',
+          },
+          { label: 'Term', value: `${installmentCount * 2} weeks · ${installmentCount} fortnightly payments` },
         ];
 
         return (
@@ -160,7 +178,10 @@ export default function ScreenApproved({
             <dl className="divide-y divide-border-2">
               {rows.map((r) => (
                 <div key={r.label} className="flex items-baseline justify-between gap-4 py-2.5 first:pt-0 last:pb-0">
-                  <dt className="text-sm text-muted">{r.label}</dt>
+                  <dt className="text-sm text-muted">
+                    {r.label}
+                    {r.sub && <span className="block text-xs text-muted/80">{r.sub}</span>}
+                  </dt>
                   <dd className={`text-sm tabular-nums text-text ${r.strong ? 'font-bold' : 'font-semibold'}`}>
                     {r.value}
                   </dd>
@@ -168,8 +189,9 @@ export default function ScreenApproved({
               ))}
             </dl>
             <p className="mt-4 text-xs text-muted">
-              All loans are charged interest. The application fee is deducted from your loan amount at
-              disbursement, so you receive {fmtNZD(payout)}.
+              All loans are charged interest. The {fmtNZD(fee)} application fee is deducted from your loan
+              amount at disbursement, so {fmtNZD(payout)} is paid to your account and your instalments
+              repay the {fmtNZD(approvedAmount)} loan plus interest ({fmtNZD(totalToPay)} in total).
               {!qippayEnabled &&
                 ' Repayments are made directly to TerePay by each due date — your lender will confirm the account details.'}
             </p>

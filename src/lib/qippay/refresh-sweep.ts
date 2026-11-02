@@ -1,6 +1,7 @@
 import { adminDb } from '@/lib/firebase/admin';
 import { reconcilePaymentStatus } from '@/lib/qippay/reconcile-payments';
 import { assessArrearsForApplication } from '@/lib/loan/assess-arrears';
+import { sendUpcomingReminders } from '@/lib/loan/upcoming-reminders';
 import { isQippayEnabled } from '@/lib/qippay/feature';
 import { isArrearsAutoEnabled } from '@/lib/loan/arrears-feature';
 import type { PaymentConsent, ScheduledPayment } from '@/types/application';
@@ -44,8 +45,11 @@ export type RefreshSweepResult = {
  * loan and only counts their state.
  *
  * The arrears step runs only while the `arrears_auto_enabled` flag is ON.
- * With it off, late fees, overdue interest and reminders are applied solely
- * when a lender runs "Assess arrears now" on the application page.
+ * With it off, late fees, overdue interest and the overdue reminder sequence
+ * are applied solely when a lender runs "Assess arrears now" on the
+ * application page — but the **upcoming-payment reminder** (1–3 days before
+ * each instalment) is still sent by this sweep in both modes, so every
+ * borrower is told before each collection / due date.
  */
 export async function runPaymentRefreshSweep(opts: {
   actor: string;
@@ -141,6 +145,16 @@ export async function runPaymentRefreshSweep(opts: {
         result.errored += 1;
         entry.error = entry.error ?? 'arrears_failed';
         console.error('[payment-refresh] failed to assess arrears', doc.id, err);
+      }
+    } else {
+      // Fees stay a lender decision, but the pre-due reminder always goes out.
+      try {
+        const upcoming = await sendUpcomingReminders({ applicationId: doc.id, actor, ip });
+        result.remindersSent += upcoming.remindersSent;
+      } catch (err) {
+        result.errored += 1;
+        entry.error = entry.error ?? 'reminders_failed';
+        console.error('[payment-refresh] failed to send upcoming reminders', doc.id, err);
       }
     }
 

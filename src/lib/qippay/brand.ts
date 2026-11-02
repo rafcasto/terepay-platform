@@ -111,6 +111,43 @@ export const QIPPAY_FAQ: ReadonlyArray<{ q: string; a: string }> = [
   },
 ];
 
+/**
+ * SetPay (enduring consent) variants of the §5 steps and §7 FAQ, used on the
+ * repayment-authorisation step. The §5/§7 copy above is written for a one-off
+ * payment ("approve the payment", "you approve every payment") and would
+ * misdescribe a recurring authority, so the consent card uses these instead.
+ * Still uses the product descriptor — never "SetPay" — per §2.
+ */
+export const QIPPAY_CONSENT_STEPS: readonly string[] = [
+  'Enter your mobile number.',
+  'Choose your bank.',
+  'Approve the repayment authority once in your banking app or online banking (Open Banking).',
+  `Come back to ${MERCHANT_NAME} — your lender can then release the funds.`,
+];
+
+export const QIPPAY_CONSENT_FAQ: ReadonlyArray<{ q: string; a: string }> = [
+  {
+    q: `What is ${QIPPAY_DESCRIPTOR}?`,
+    a: 'A way to pay straight from your bank account, without entering card details. You enter your mobile number, choose your bank and approve a repayment authority in your banking app.',
+  },
+  {
+    q: 'Do I approve every repayment?',
+    a: `No. You approve the authority once. Your bank then lets ${MERCHANT_NAME} collect each scheduled instalment on its due date, up to the limits you see on the bank's screen (the payee, the amount per fortnight, the number of payments and the end date). You are not asked to approve each instalment.`,
+  },
+  {
+    q: 'Is it secure?',
+    a: "Yes. You approve the authority in your own bank's app and never share your banking login or card details. Qippay is accredited by MBIE under New Zealand's Consumer Data Right and certified to ISO 27001:2022.",
+  },
+  {
+    q: 'Can I cancel the authority?',
+    a: `Yes, at any time — in your banking app (under payment consents or authorised payments) or by contacting ${MERCHANT_NAME}. Once cancelled no further instalments can be collected under it. Your loan and its repayment dates still stand, so we will contact you to arrange another way to pay. Interest and fees continue to apply to any unpaid amount.`,
+  },
+  {
+    q: 'Want to know more?',
+    a: 'Visit qippay.com/consumers for answers to common questions about paying with Qippay.',
+  },
+];
+
 /** §8 Support — Qippay merchant support, for internal/admin surfaces. */
 export const QIPPAY_SUPPORT = {
   phone: '09 300 1424',

@@ -266,17 +266,22 @@ export interface ArrearsState {
   lastAssessedDate: string;
 }
 
-/** Dunning-reminder stages sent to the borrower via email (Resend). */
+/**
+ * Borrower notifications sent via email (Resend): the dunning-reminder stages,
+ * plus `consent_revoked` — sent once when the bank reports the SetPay
+ * repayment authority was cancelled by the customer.
+ */
 export type ReminderType =
   | 'upcoming_payment'
   | 'payment_missed'
   | 'late_fee_warning'
   | 'late_fee_charged'
-  | 'default_warning';
+  | 'default_warning'
+  | 'consent_revoked';
 
 /** Record of a reminder already sent, used to dedupe the sequence. */
 export interface SentReminder {
-  /** Dedup key: `<type>:<installmentNumber>`. */
+  /** Dedup key: `<type>:<installmentNumber>` (or `consent_revoked:<mandateId>`). */
   key: string;
   type: ReminderType;
   installmentNumber?: number;

@@ -2,6 +2,7 @@ import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
 import { auditLog } from '@/lib/utils/audit';
 import { getDetailedConsentStatus } from './setpay-client';
+import { sendConsentRevokedNotice } from '@/lib/loan/consent-revoked-notice';
 import type { PaymentConsent, ScheduledPayment } from '@/types/application';
 
 type OverallStatus = Awaited<
@@ -116,6 +117,17 @@ export async function reconcilePaymentStatus(params: {
 
   if (changed) {
     await appRef.update(updates);
+  }
+
+  // Revocation seen by the poll rather than the webhook: notify the borrower
+  // once (same de-dupe key as the webhook path).
+  if (providerRevoked && consent.status === 'active') {
+    await sendConsentRevokedNotice({
+      applicationId,
+      mandateId: consent.mandateId,
+      actor: callerUid,
+      ip: ipAddress,
+    });
   }
 
   const finalSnap = await appRef.get();
