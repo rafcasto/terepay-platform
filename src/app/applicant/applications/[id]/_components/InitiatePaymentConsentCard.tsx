@@ -12,7 +12,13 @@ import {
   QippayPayButton,
   type QippayBank,
 } from '@/components/qippay';
-import { MERCHANT_NAME, QIPPAY_BANK_SELECTION, QIPPAY_DESCRIPTOR } from '@/lib/qippay/brand';
+import {
+  MERCHANT_NAME,
+  QIPPAY_BANK_SELECTION,
+  QIPPAY_CONSENT_FAQ,
+  QIPPAY_CONSENT_STEPS,
+  QIPPAY_DESCRIPTOR,
+} from '@/lib/qippay/brand';
 import { fmtYmd } from '@/lib/loan/format';
 
 export type PaymentConsentCardProps = {
@@ -166,8 +172,9 @@ export default function InitiatePaymentConsentCard({ applicationId, paymentConse
           <div>
             <p className="text-sm font-semibold text-success">Bank authorisation complete</p>
             <p className="text-xs text-muted">
-              Your repayments are set up with {QIPPAY_DESCRIPTOR}. Your lender will release the funds
-              shortly.
+              Your repayments are set up with {QIPPAY_DESCRIPTOR} and will be collected on each due
+              date. You can cancel the authority at any time in your banking app or by contacting us.
+              Your lender will release the funds shortly.
             </p>
           </div>
         </div>
@@ -190,8 +197,10 @@ export default function InitiatePaymentConsentCard({ applicationId, paymentConse
       />
       <p className="mt-3 text-sm text-muted">
         Before funds can be released, your bank needs to authorise the fortnightly repayments using{' '}
-        {QIPPAY_DESCRIPTOR} (Open Banking Payments). You approve it in your own banking app and no money
-        moves at this step.
+        {QIPPAY_DESCRIPTOR} (Open Banking Payments). <strong className="font-semibold text-text">You
+        approve this once</strong> in your own banking app — it lets {MERCHANT_NAME} collect each of the{' '}
+        {installments.length > 0 ? installments.length : ''} instalments below on its due date, and you
+        won&apos;t be asked to approve them one by one. No money moves at this step.
       </p>
       {isRetry && stage === 'idle' && (
         <p className="mt-2 text-sm font-medium text-warning-text">
@@ -218,10 +227,14 @@ export default function InitiatePaymentConsentCard({ applicationId, paymentConse
       {stage === 'idle' && (
         <div className="mt-4 space-y-4">
           <QippayCheckoutIntro
+            steps={QIPPAY_CONSENT_STEPS}
             note={
               <>
                 This sets up your fortnightly repayments to {MERCHANT_NAME}. Nothing is collected until
-                each instalment is due. All loans are charged interest.
+                each instalment is due. Your bank will show you the payee, the amount per fortnight, the
+                number of payments and the end date before you approve. You can cancel the authority at
+                any time in your banking app or by contacting us — your loan and its repayment dates still
+                stand, so we would then arrange another way to pay. All loans are charged interest.
               </>
             }
           />
@@ -230,7 +243,7 @@ export default function InitiatePaymentConsentCard({ applicationId, paymentConse
             {loading ? 'Starting…' : QIPPAY_DESCRIPTOR}
           </QippayPayButton>
           <QippayLockup logoHeight={28} className="pt-1" />
-          <QippayFaq className="pt-2" />
+          <QippayFaq className="pt-2" items={QIPPAY_CONSENT_FAQ} />
         </div>
       )}
 
@@ -273,8 +286,9 @@ export default function InitiatePaymentConsentCard({ applicationId, paymentConse
             </Button>
           </div>
           <p className="text-xs text-muted">
-            You approve the authorisation securely in your own bank&apos;s app or online banking.
-            Applications can be declined and terms apply.
+            You approve the authority once, securely in your own bank&apos;s app or online banking — it
+            covers every instalment listed above and can be cancelled there at any time. Applications
+            can be declined and terms apply.
           </p>
           <QippayLockup logoHeight={28} className="pt-1" />
         </div>
