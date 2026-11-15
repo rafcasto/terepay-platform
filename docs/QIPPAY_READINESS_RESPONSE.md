@@ -27,6 +27,8 @@ Loan instalments are never PayBy payments and customers never initiate instalmen
 
 **If the customer doesn't complete it?** Nothing adverse happens. The PayBy payment expires after 24 h, the loan stays open, and the SetPay schedule continues unchanged; they can start another payoff later. On `success` we mark every remaining instalment paid, close the loan, and call `POST /v1/enduring_initiation/cancel` so no further SetPay instalments are collected.
 
+**If the customer approves at their bank but never returns to our page?** We still find out. Every hourly cron tick (`/api/cron/payment-refresh`) runs an ungated PayBy sweep over every application whose early repayment is still `initiated` / `pending`, checking `GET /v1/payment_status/{id}` with the same idempotent reconciler the return page uses. A `success` found this way settles the loan and cancels the SetPay consent exactly as if the customer had landed on the return page — within the hour, with no customer action. The same sweep is run by the admin *Verify now* action, and the customer's own return page / early-repayment screen remain the fast path.
+
 ### 1.2 SetPay — complete payer journey
 
 | # | Where | Customer sees / what happens |
@@ -77,6 +79,7 @@ Loan instalments are never PayBy payments and customers never initiate instalmen
 **Delayed or missed webhooks — reconciliation**
 
 1. **Daily reconciliation sweep** (`/api/cron/payment-refresh`, Vercel cron, once per day at an admin-set NZT hour): every loan with an active consent is checked against `GET …/status`; instalments advance to `success` by `count_complete`, `revoked` is detected, then the arrears engine runs. Admin can run the same sweep on demand ("Verify now").
+   **Hourly PayBy sweep** (same cron, every tick, not behind the once-a-day gate): every in-flight early payoff is checked against `GET /v1/payment_status/{id}`; a `success` closes the loan and cancels the consent, a terminal failure is recorded. Covers the customer who approved at the bank and never came back.
 2. **Lender on-demand** *Check Status* on the loan page runs the same reconciler.
 3. **Customer return pages** reconcile consent / PayBy status on landing and poll while pending.
 4. **Daily backfill** (`/api/cron/schedule-payments`) lodges pending instalments whose period has opened and retries earlier lodgement errors.

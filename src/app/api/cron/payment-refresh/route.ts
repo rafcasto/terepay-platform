@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { auditLog, getClientIp } from '@/lib/utils/audit';
 import { runPaymentRefreshSweep } from '@/lib/qippay/refresh-sweep';
+import { runEarlyRepaymentSweep } from '@/lib/qippay/early-repayment-sweep';
 import {
   getPaymentRefreshSettings,
   markPaymentRefreshRun,
@@ -29,6 +30,12 @@ const CRON_ACTOR = 'system:payment_refresh_cron';
  *
  * Each active loan is (1) reconciled against Qippay, then (2) run through the
  * arrears engine — see runPaymentRefreshSweep().
+ *
+ * Independently of those gates, EVERY hourly tick reconciles in-flight PayBy
+ * early payoffs (`earlyRepayment.status` in initiated/pending) — see
+ * runEarlyRepaymentSweep(). A borrower who approves the payoff at their bank
+ * but never returns to our page is therefore settled within the hour, and the
+ * SetPay consent is cancelled so no further instalments are collected.
  *
  * Auth: Vercel Cron sends `Authorization: Bearer ${CRON_SECRET}`. We require
  * CRON_SECRET to be set and to match (fail-closed).
@@ -58,17 +65,60 @@ export async function GET(request: NextRequest): Promise<Response> {
     // Test cadence is locked off in production, so this never bypasses gates there.
     const bypassGates = force || testSettings.enabled;
 
+    // --- Hourly, ungated: pick up PayBy early payoffs approved at the bank
+    // but never confirmed via our return page. Idempotent; no-op when the
+    // Qippay flag is off or nothing is in flight.
+    const earlyRepayment = await runEarlyRepaymentSweep({ actor: CRON_ACTOR, ip });
+    if (earlyRepayment.total > 0) {
+      await auditLog({
+        userId: CRON_ACTOR,
+        action: 'early_repayment_cron_sweep_completed',
+        targetId: 'paymentRefresh',
+        targetType: 'systemConfig',
+        outcome: earlyRepayment.errored > 0 ? 'failure' : 'success',
+        ipAddress: ip,
+        changes: {
+          dateNzt,
+          hour,
+          total: earlyRepayment.total,
+          processed: earlyRepayment.processed,
+          settled: earlyRepayment.settled,
+          ended: earlyRepayment.ended,
+          stillPending: earlyRepayment.stillPending,
+          errored: earlyRepayment.errored,
+        },
+      });
+    }
+    const earlyRepaymentSummary = {
+      total: earlyRepayment.total,
+      settled: earlyRepayment.settled,
+      ended: earlyRepayment.ended,
+      stillPending: earlyRepayment.stillPending,
+      errored: earlyRepayment.errored,
+    };
+
     // --- Gating: enabled, right hour, not already run today ---
     if (!settings.enabled && !bypassGates) {
-      return NextResponse.json({ data: { ran: false, reason: 'disabled', hour, dateNzt } });
+      return NextResponse.json({
+        data: { ran: false, reason: 'disabled', hour, dateNzt, earlyRepayment: earlyRepaymentSummary },
+      });
     }
     if (hour !== settings.refreshHourNzt && !bypassGates) {
       return NextResponse.json({
-        data: { ran: false, reason: 'not_scheduled_hour', hour, scheduledHour: settings.refreshHourNzt, dateNzt },
+        data: {
+          ran: false,
+          reason: 'not_scheduled_hour',
+          hour,
+          scheduledHour: settings.refreshHourNzt,
+          dateNzt,
+          earlyRepayment: earlyRepaymentSummary,
+        },
       });
     }
     if (settings.lastRunDateNzt === dateNzt && !bypassGates) {
-      return NextResponse.json({ data: { ran: false, reason: 'already_ran_today', dateNzt } });
+      return NextResponse.json({
+        data: { ran: false, reason: 'already_ran_today', dateNzt, earlyRepayment: earlyRepaymentSummary },
+      });
     }
 
     const sweep = await runPaymentRefreshSweep({
@@ -90,6 +140,7 @@ export async function GET(request: NextRequest): Promise<Response> {
       feesAssessed: sweep.feesAssessed,
       remindersSent: sweep.remindersSent,
       inArrears: sweep.inArrears,
+      earlyRepayment: earlyRepaymentSummary,
     };
 
     await auditLog({
