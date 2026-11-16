@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { getAdminDb, verifySessionOrIdToken } from '@/lib/firebase/admin';
 import { auditLog } from '@/lib/utils/audit';
 import { reconcileEarlyRepayment } from '@/lib/qippay/reconcile-early-repayment';
@@ -27,10 +27,33 @@ export default async function EarlyRepaymentReturnPage({ params, searchParams }:
 
   const cookieStore = await cookies();
   const session = cookieStore.get('__session')?.value;
-  if (!session) notFound();
+  const decoded = session ? await verifySessionOrIdToken(session).catch(() => null) : null;
 
-  const decoded = await verifySessionOrIdToken(session).catch(() => null);
-  if (!decoded) notFound();
+  // The bank → Qippay → TerePay round trip can land here without a usable
+  // session: the bank's app opened a different browser, the session expired
+  // while the borrower was at the bank, or the return host differs from the
+  // one they signed in on (host-only cookie). Previously this was a silent
+  // 404 that left no trace and never reconciled the payment. Record the
+  // landing, then send them to sign in and straight back here — the page
+  // reconciles on the way back in, and the loan page itself now re-checks an
+  // in-flight payoff too.
+  if (!decoded) {
+    await auditLog({
+      userId: 'unknown',
+      action: 'early_repayment_returned_unauthenticated',
+      targetId: id,
+      targetType: 'application',
+      outcome: 'failure',
+      errorDetail: session ? 'session_invalid' : 'session_missing',
+      changes: { hintedStatus: sp.outcome },
+    });
+    const params = new URLSearchParams();
+    if (sp.outcome) params.set('outcome', sp.outcome);
+    if (sp.stub) params.set('stub', sp.stub);
+    const query = params.toString();
+    const returnPath = `/applicant/applications/${id}/early-repayment/return${query ? `?${query}` : ''}`;
+    redirect(`/auth/login?redirect=${encodeURIComponent(returnPath)}`);
+  }
 
   const db = getAdminDb();
   const snap = await db.collection('loanApplications').doc(id).get();

@@ -61,24 +61,54 @@ export default function EarlyRepaymentCard({ applicationId, quote, status }: Pro
   const inFlight = status === 'initiated' || status === 'pending';
   const selectedBank = providers.find((p) => p.id === providerId);
 
-  // Poll payment status while waiting for a CIBA bank-app approval.
+  // Poll payment status while waiting for a CIBA bank-app approval, and when
+  // the page is opened with a payoff still in flight. The borrower may have
+  // approved at their bank and never reached our return page (closed tab,
+  // bank app opened a different browser, session cookie missing on return) —
+  // every /status call runs the server-side reconciler, so simply revisiting
+  // the loan settles it the moment Qippay reports success. The on-mount case
+  // is bounded so a payoff that stays pending doesn't poll forever.
   useEffect(() => {
-    if (stage !== 'waiting_ciba') return;
-    const interval = window.setInterval(async () => {
+    const waitingCiba = stage === 'waiting_ciba';
+    const resumingInFlight = inFlight && stage === 'summary';
+    if (!waitingCiba && !resumingInFlight) return;
+
+    const MAX_RESUME_ATTEMPTS = 10;
+    let attempts = 0;
+    let cancelled = false;
+
+    const check = async () => {
       try {
         const res = await fetch(`/api/applications/${applicationId}/early-repayment/status`);
-        if (!res.ok) return;
+        if (!res.ok || cancelled) return;
         const body = await res.json();
         const s = body.data?.status;
         if (s === 'paid' || s === 'failed' || s === 'expired' || s === 'cancelled') {
+          window.clearInterval(interval);
           router.refresh();
         }
       } catch {
         // retry next tick
       }
+    };
+
+    const interval = window.setInterval(() => {
+      attempts += 1;
+      if (resumingInFlight && attempts > MAX_RESUME_ATTEMPTS) {
+        window.clearInterval(interval);
+        return;
+      }
+      void check();
     }, 3000);
-    return () => window.clearInterval(interval);
-  }, [stage, applicationId, router]);
+    // Check immediately on mount for the resume case — the reconciler is what
+    // actually settles the loan, so don't wait a tick for the first attempt.
+    if (resumingInFlight) void check();
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [stage, inFlight, applicationId, router]);
 
   // Create the PayBy payment, then show the in-app bank picker.
   const handleStart = async () => {
