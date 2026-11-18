@@ -117,10 +117,10 @@ export function planReminders(input: {
     // Upcoming payment (1–3 days out).
     if (daysUntilDue >= 1 && daysUntilDue <= 3) {
       const how = auto
-        ? 'It will be collected automatically from your linked bank account under the repayment authority you approved — you do not need to do anything except make sure the funds are available.'
+        ? 'It will be collected automatically from your linked bank account under the repayment authority (the "ongoing payment") you approved — you do not need to do anything except make sure the funds are available.'
         : 'Please pay this amount to TerePay by the due date using the account details your lender gave you, and quote your loan reference.';
       const howText = auto
-        ? 'It will be collected automatically from your linked bank account under the repayment authority you approved. Please ensure funds are available.'
+        ? 'It will be collected automatically from your linked bank account under the repayment authority (the &ldquo;ongoing payment&rdquo;) you approved. Please ensure funds are available.'
         : 'Please pay it to TerePay by the due date using the account details your lender gave you, quoting your loan reference.';
       const body = `<p>${greeting}</p><p>This is a reminder that your instalment ${n} of <strong>${amount}</strong> for loan ${ref} is due on <strong>${inst.dueDate}</strong>. ${how}</p><p>Interest continues to accrue on your balance, and a ${money(LATE_PAYMENT_FEE * 100)} late fee applies if a payment is not made within ${LATE_PAYMENT_GRACE_DAYS} days of the due date.</p>`;
       push({

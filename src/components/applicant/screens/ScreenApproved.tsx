@@ -7,7 +7,7 @@ import AcceptOfferButton from '@/app/applicant/applications/[id]/_components/Acc
 import RejectOfferButton from '@/app/applicant/applications/[id]/_components/RejectOfferButton';
 import InitiatePaymentConsentCard from '@/app/applicant/applications/[id]/_components/InitiatePaymentConsentCard';
 import { SectionCard } from './shared';
-import { QIPPAY_DESCRIPTOR } from '@/lib/qippay/brand';
+import { QIPPAY_DESCRIPTOR, QIPPAY_ONGOING_PAYMENT_TERM } from '@/lib/qippay/brand';
 
 interface Props {
   app: LoanApplication & Record<string, unknown>;
@@ -54,7 +54,7 @@ export default function ScreenApproved({
   if (isAccepted || (isAwaitingConsent && !qippayEnabled)) {
     title = 'Offer accepted';
     subtitle = qippayEnabled
-      ? `We're preparing your bank authorisation with ${QIPPAY_DESCRIPTOR}.`
+      ? `We're preparing your bank authorisation with ${QIPPAY_DESCRIPTOR} — an "${QIPPAY_ONGOING_PAYMENT_TERM}" you approve once in your banking app.`
       : 'Your lender is arranging the transfer. Funds will be paid to your nominated account shortly.';
     pill = (
       <Pill tone="info" onInk>
@@ -63,7 +63,7 @@ export default function ScreenApproved({
     );
   } else if (isAwaitingConsent && !consentActive) {
     title = 'Authorise your repayments';
-    subtitle = `One last step before funds are released — ${QIPPAY_DESCRIPTOR}.`;
+    subtitle = `One last step before funds are released — approve the "${QIPPAY_ONGOING_PAYMENT_TERM}" with ${QIPPAY_DESCRIPTOR}.`;
     pill = (
       <Pill tone="amber" pulse onInk>
         Action needed
@@ -71,7 +71,7 @@ export default function ScreenApproved({
     );
   } else if (isAwaitingConsent && consentActive) {
     title = 'All set — awaiting disbursement';
-    subtitle = `Your repayments are set up with ${QIPPAY_DESCRIPTOR}. Funds will be released shortly.`;
+    subtitle = `Your repayments are set up as an "${QIPPAY_ONGOING_PAYMENT_TERM}" with ${QIPPAY_DESCRIPTOR}. Funds will be released shortly.`;
     pill = (
       <Pill tone="success" onInk>
         Ready
@@ -97,7 +97,7 @@ export default function ScreenApproved({
         <SectionCard eyebrow="Your offer" title="Accept or decline">
           <p className="text-sm text-muted mb-4">
             {qippayEnabled
-              ? `Accept to lock in your approved amount and continue to bank authorisation with ${QIPPAY_DESCRIPTOR}. `
+              ? `Accept to lock in your approved amount and continue to bank authorisation with ${QIPPAY_DESCRIPTOR} — an "${QIPPAY_ONGOING_PAYMENT_TERM}" you approve once in your banking app. `
               : 'Accept to lock in your approved amount — your lender will then release the funds. '}
             You can decline if you&apos;ve changed your mind.
           </p>

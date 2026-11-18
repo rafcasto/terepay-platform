@@ -17,6 +17,7 @@ import {
   QIPPAY_BANK_SELECTION,
   QIPPAY_CONSENT_FAQ,
   QIPPAY_CONSENT_STEPS,
+  QIPPAY_ONGOING_PAYMENT_TERM,
   QIPPAY_DESCRIPTOR,
 } from '@/lib/qippay/brand';
 import { fmtYmd } from '@/lib/loan/format';
@@ -197,8 +198,11 @@ export default function InitiatePaymentConsentCard({ applicationId, paymentConse
       />
       <p className="mt-3 text-sm text-muted">
         Before funds can be released, your bank needs to authorise the fortnightly repayments using{' '}
-        {QIPPAY_DESCRIPTOR} (Open Banking Payments). <strong className="font-semibold text-text">You
-        approve this once</strong> in your own banking app — it lets {MERCHANT_NAME} collect each of the{' '}
+        {QIPPAY_DESCRIPTOR} (Open Banking Payments).{' '}
+        <strong className="font-semibold text-text">
+          You&apos;ll approve this once in your banking app as an &ldquo;{QIPPAY_ONGOING_PAYMENT_TERM}&rdquo;
+        </strong>{' '}
+        limited to your scheduled instalments — it lets {MERCHANT_NAME} collect each of the{' '}
         {installments.length > 0 ? installments.length : ''} instalments below on its due date, and you
         won&apos;t be asked to approve them one by one. No money moves at this step.
       </p>
@@ -230,9 +234,10 @@ export default function InitiatePaymentConsentCard({ applicationId, paymentConse
             steps={QIPPAY_CONSENT_STEPS}
             note={
               <>
-                This sets up your fortnightly repayments to {MERCHANT_NAME}. Nothing is collected until
-                each instalment is due. Your bank will show you the payee, the amount per fortnight, the
-                number of payments and the end date before you approve. You can cancel the authority at
+                This sets up your fortnightly repayments to {MERCHANT_NAME} as an &ldquo;
+                {QIPPAY_ONGOING_PAYMENT_TERM}&rdquo;. Nothing is collected until each instalment is due.
+                Your bank will show the &ldquo;{QIPPAY_ONGOING_PAYMENT_TERM}&rdquo; request with the payee,
+                the amount per fortnight, the number of payments and the end date before you approve. You can cancel the authority at
                 any time in your banking app or by contacting us — your loan and its repayment dates still
                 stand, so we would then arrange another way to pay. All loans are charged interest.
               </>
@@ -286,8 +291,9 @@ export default function InitiatePaymentConsentCard({ applicationId, paymentConse
             </Button>
           </div>
           <p className="text-xs text-muted">
-            You approve the authority once, securely in your own bank&apos;s app or online banking — it
-            covers every instalment listed above and can be cancelled there at any time. Applications
+            You approve the &ldquo;{QIPPAY_ONGOING_PAYMENT_TERM}&rdquo; once, securely in your own
+            bank&apos;s app or online banking — it is limited to the instalments listed above and can be
+            cancelled there at any time. Applications
             can be declined and terms apply.
           </p>
           <QippayLockup logoHeight={28} className="pt-1" />
@@ -299,8 +305,9 @@ export default function InitiatePaymentConsentCard({ applicationId, paymentConse
           <div className="flex items-center gap-3 rounded-xl border border-info/40 bg-info-soft p-3.5">
             <span className="h-5 w-5 shrink-0 rounded-full border-2 border-info border-t-transparent animate-spin" />
             <p className="text-sm text-[#1e40af]">
-              We&apos;ve sent the request to {selectedBank?.name ?? 'your bank'}. Approve it in your banking
-              app to continue — this page will refresh automatically.
+              We&apos;ve sent the request to {selectedBank?.name ?? 'your bank'}. Approve the &ldquo;
+              {QIPPAY_ONGOING_PAYMENT_TERM}&rdquo; in your banking app to continue — this page will refresh
+              automatically.
             </p>
           </div>
           <button

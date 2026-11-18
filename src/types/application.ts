@@ -108,7 +108,12 @@ export interface ScheduledPayment {
   /** ISO datetime sent as scheduled_for — only set for test-cadence schedules. */
   dueAt?: string;
   amountCents: number;
-  qippayPaymentId?: string;         // pmU_... returned by POST /v1/setpay
+  /**
+   * pmU_... returned by POST /v1/setpay. Absent on a `scheduled` instalment the
+   * scheduler adopted from GET /v1/enduring_initiation/{epcId}/status after an
+   * earlier lodgement attempt failed on our side but was accepted by Qippay.
+   */
+  qippayPaymentId?: string;
   status: ScheduledPaymentStatus;
   scheduledAt?: Timestamp;          // when we called POST /v1/setpay
   completedAt?: Timestamp;          // when payment.status.success confirmed
