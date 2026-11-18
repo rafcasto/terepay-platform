@@ -21,6 +21,15 @@ export const QIPPAY_DESCRIPTOR = 'Pay by bank with Qippay';
 /** §4 "give context in first mentions". */
 export const QIPPAY_CONTEXT = 'Open Banking Payments';
 
+/**
+ * What the customer sees a SetPay enduring consent called in their banking
+ * app — the request appears there as an "ongoing payment" showing the payee,
+ * the amounts and the end date. Qippay asks that this term is mentioned
+ * alongside the descriptor wherever SetPay is used, so the customer recognises
+ * what they are being asked to approve. Keep the quotes: it is the bank's label.
+ */
+export const QIPPAY_ONGOING_PAYMENT_TERM = 'ongoing payment';
+
 /** §4 "pair the name with a benefit where it fits". */
 export const QIPPAY_DESCRIPTOR_WITH_BENEFIT = `${QIPPAY_DESCRIPTOR}. Secure and affordable.`;
 
@@ -116,23 +125,24 @@ export const QIPPAY_FAQ: ReadonlyArray<{ q: string; a: string }> = [
  * repayment-authorisation step. The §5/§7 copy above is written for a one-off
  * payment ("approve the payment", "you approve every payment") and would
  * misdescribe a recurring authority, so the consent card uses these instead.
- * Still uses the product descriptor — never "SetPay" — per §2.
+ * Still uses the product descriptor — never "SetPay" — per §2, and names the
+ * "ongoing payment" the customer will see in their banking app.
  */
 export const QIPPAY_CONSENT_STEPS: readonly string[] = [
   'Enter your mobile number.',
   'Choose your bank.',
-  'Approve the repayment authority once in your banking app or online banking (Open Banking).',
+  `Approve the "${QIPPAY_ONGOING_PAYMENT_TERM}" once in your banking app or online banking (Open Banking).`,
   `Come back to ${MERCHANT_NAME} — your lender can then release the funds.`,
 ];
 
 export const QIPPAY_CONSENT_FAQ: ReadonlyArray<{ q: string; a: string }> = [
   {
     q: `What is ${QIPPAY_DESCRIPTOR}?`,
-    a: 'A way to pay straight from your bank account, without entering card details. You enter your mobile number, choose your bank and approve a repayment authority in your banking app.',
+    a: `A way to pay straight from your bank account, without entering card details. You enter your mobile number, choose your bank and approve an "${QIPPAY_ONGOING_PAYMENT_TERM}" (your repayment authority) in your banking app.`,
   },
   {
     q: 'Do I approve every repayment?',
-    a: `No. You approve the authority once. Your bank then lets ${MERCHANT_NAME} collect each scheduled instalment on its due date, up to the limits you see on the bank's screen (the payee, the amount per fortnight, the number of payments and the end date). You are not asked to approve each instalment.`,
+    a: `No. You approve the "${QIPPAY_ONGOING_PAYMENT_TERM}" once. Your bank then lets ${MERCHANT_NAME} collect each scheduled instalment on its due date, up to the limits you see on the bank's screen (the payee, the amount per fortnight, the number of payments and the end date). You are not asked to approve each instalment.`,
   },
   {
     q: 'Is it secure?',
@@ -140,7 +150,7 @@ export const QIPPAY_CONSENT_FAQ: ReadonlyArray<{ q: string; a: string }> = [
   },
   {
     q: 'Can I cancel the authority?',
-    a: `Yes, at any time — in your banking app (under payment consents or authorised payments) or by contacting ${MERCHANT_NAME}. Once cancelled no further instalments can be collected under it. Your loan and its repayment dates still stand, so we will contact you to arrange another way to pay. Interest and fees continue to apply to any unpaid amount.`,
+    a: `Yes, at any time — in your banking app (look for the "${QIPPAY_ONGOING_PAYMENT_TERM}" under payment consents or authorised payments) or by contacting ${MERCHANT_NAME}. Once cancelled no further instalments can be collected under it. Your loan and its repayment dates still stand, so we will contact you to arrange another way to pay. Interest and fees continue to apply to any unpaid amount.`,
   },
   {
     q: 'Want to know more?',

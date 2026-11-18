@@ -51,7 +51,7 @@ export async function sendConsentRevokedNotice(opts: {
 
     const text = `${greeting}
 
-Your bank has told us that the repayment authority for loan ${ref} (Pay by bank with Qippay) has been cancelled. No further instalments can be collected under it.
+Your bank has told us that the repayment authority for loan ${ref} (the "ongoing payment" for Pay by bank with Qippay) has been cancelled. No further instalments can be collected under it.
 
 Your loan is still open and your repayment dates have not changed. Please reply to this email or contact us at ${SUPPORT_EMAIL} within the next few days so we can set up another way to pay — for example a new bank authorisation from your application page, or a bank transfer by each due date.
 
@@ -61,7 +61,7 @@ TerePay — Borrowing power in your hands.`;
 
     const html = `<div style="font-family:Arial,Helvetica,sans-serif;color:#1C2A3A;max-width:560px;margin:0 auto">
 <p>${greeting}</p>
-<p>Your bank has told us that the repayment authority for loan <strong>${ref}</strong> (Pay by bank with Qippay) has been <strong>cancelled</strong>. No further instalments can be collected under it.</p>
+<p>Your bank has told us that the repayment authority for loan <strong>${ref}</strong> (the &ldquo;ongoing payment&rdquo; for Pay by bank with Qippay) has been <strong>cancelled</strong>. No further instalments can be collected under it.</p>
 <p>Your loan is still open and your repayment dates have not changed. Please reply to this email or contact us at <a href="mailto:${SUPPORT_EMAIL}" style="color:#B45600">${SUPPORT_EMAIL}</a> within the next few days so we can set up another way to pay — for example a new bank authorisation from your application page, or a bank transfer by each due date.</p>
 <hr style="border:none;border-top:1px solid #E2E8F0;margin:24px 0" />
 <p style="color:#475569;font-size:13px;line-height:1.5">Interest continues to accrue on your outstanding balance, and a ${money(LATE_PAYMENT_FEE)} late fee applies if an instalment is not paid within ${LATE_PAYMENT_GRACE_DAYS} days of its due date. If you are having trouble making payments, you can <a href="${HARDSHIP_URL}" style="color:#B45600">apply for hardship support</a>. For disputes, contact <a href="mailto:${SUPPORT_EMAIL}" style="color:#B45600">${SUPPORT_EMAIL}</a>.</p>

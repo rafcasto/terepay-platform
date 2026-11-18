@@ -105,8 +105,8 @@ export default function DisburseForm({
           <div className="rounded-[var(--radius-md)] border border-[var(--warning-700)]/30 bg-[var(--warning-50)] p-4 text-sm text-[var(--warning-700)]">
             <p className="mb-1 font-semibold">Bank authorisation required</p>
             <p>
-              The applicant has not completed their Qippay SetPay mandate.
-              Disbursement is locked until the mandate is active.
+              The applicant has not completed their Qippay SetPay mandate — the &ldquo;ongoing payment&rdquo;
+              they approve once in their banking app. Disbursement is locked until the mandate is active.
             </p>
             <p className="mt-2 text-xs">
               Mandate status: <span className="font-mono">{consentStatus ?? 'not_started'}</span>

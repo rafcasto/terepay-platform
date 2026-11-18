@@ -47,6 +47,7 @@ Do not hard-code Qippay wording or colours anywhere else.
 | 6 | Select-and-confirm: "Continue to [Bank]" | Button label from `QIPPAY_BANK_SELECTION.continueTo`. |
 | 6 | Bank logos exactly as supplied by the API; refresh daily/weekly, not per transaction | `logo_url` is rendered untouched; `listProviders()` caches the list for 24h per instance. |
 | 7 | Payments FAQ with the three recommended questions | `QippayFaq`, shown on the authorisation card. |
+| Review | Wherever SetPay is used, mention the **"ongoing payment"** alongside Pay by bank — it is the label the customer sees in their banking app (payee, amounts, end date). Suggested line: *You'll approve this once in your banking app as an "ongoing payment" limited to your scheduled instalments.* | `QIPPAY_ONGOING_PAYMENT_TERM`; used in the consent card (header, intro note, confirm step, waiting state), `QIPPAY_CONSENT_STEPS` / `QIPPAY_CONSENT_FAQ`, the approved-screen hero, the consent return page, the lender's disburse gate and the reminder / revocation emails. |
 
 ## TerePay-side obligations that still apply
 
