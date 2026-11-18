@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { getSiteSettings } from '@/lib/admin/site-settings';
 import { getContentSections } from '@/lib/content/site-content';
+import { getViewerSession } from '@/lib/auth/session';
 import MaintenancePage from '@/components/shared/MaintenancePage';
 import Navbar from './_landing/Navbar';
 import HeroSection from './_landing/HeroSection';
@@ -46,11 +47,13 @@ export default async function Home() {
     return <MaintenancePage message={settings.maintenanceMessage} />;
   }
 
-  const content = await getContentSections(SECTION_KEYS);
+  // Resolved per request so a signed-in visitor sees their dashboard link
+  // rather than being offered sign-in / registration again.
+  const [content, viewer] = await Promise.all([getContentSections(SECTION_KEYS), getViewerSession()]);
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-surface-card font-brand text-[var(--ink-800)]">
-      <Navbar />
+      <Navbar viewer={viewer} />
       <main>
         <HeroSection content={content['landing.hero']} />
         <PartnersSection />

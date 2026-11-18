@@ -1,131 +1,23 @@
-'use client';
+import { redirect } from 'next/navigation';
+import { getViewerSession } from '@/lib/auth/session';
+import { safeRedirectPath } from '@/lib/auth/redirect';
+import LoginForm from './LoginForm';
 
-import { useState, useCallback, Suspense } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useRouter, useSearchParams } from 'next/navigation';
-import Link from 'next/link';
-import { useAuth } from '@/hooks/useAuth';
-import { loginSchema, type LoginInput } from '@/lib/validation/schemas';
-import { useRecaptchaToken } from '../recaptcha-provider';
-import { useSiteContent } from '@/lib/content/SiteContentContext';
-import { AuthShell } from '../_components/auth-shell';
-import { AuthIcon } from '../_components/auth-icons';
-import { Field, InputShell, EyeToggle, SubmitButton, ErrorAlert, SuccessAlert, Divider } from '../_components/auth-ui';
+// Reads the session cookie on every request — never prerender.
+export const dynamic = 'force-dynamic';
 
-function LoginFormInner() {
-  const { login } = useAuth();
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const redirectTo = searchParams.get('redirect');
-  const passwordReset = searchParams.get('reset') === 'success';
-  const [showPassword, setShowPassword] = useState(false);
-  // Latch that stays true from a successful login until the page unmounts.
-  // `isSubmitting` flips back to false the moment router.push() is called, but
-  // the client-side navigation + redirect takes a couple of seconds. Without
-  // this latch the button briefly re-enables in that gap and the user can fire
-  // duplicate login requests.
-  const [isRedirecting, setIsRedirecting] = useState(false);
-  const getRecaptchaToken = useRecaptchaToken();
-  const c = useSiteContent('auth.login');
+type Props = { searchParams: Promise<{ redirect?: string }> };
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-    setError,
-  } = useForm<LoginInput>({ resolver: zodResolver(loginSchema) });
-
-  const onSubmit = useCallback(
-    async (data: LoginInput) => {
-      try {
-        const recaptchaToken = await getRecaptchaToken('login');
-        const user = await login(data.email, data.password, recaptchaToken);
-        // Keep the button disabled through navigation — never reset on success.
-        setIsRedirecting(true);
-        const dest =
-          redirectTo ??
-          (user?.role === 'admin'
-            ? '/admin/dashboard'
-            : user?.role === 'lender'
-              ? '/lender/dashboard'
-              : '/applicant/dashboard');
-        router.push(dest);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Invalid email or password';
-        setError('root', { message: msg });
-      }
-    },
-    [getRecaptchaToken, login, redirectTo, router, setError],
-  );
-
-  // Busy whenever the form is submitting OR a successful login is mid-redirect.
-  const isBusy = isSubmitting || isRedirecting;
-
-  return (
-    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-[18px]" noValidate aria-busy={isBusy}>
-      {passwordReset && <SuccessAlert>{c.passwordResetSuccess}</SuccessAlert>}
-
-      <Field htmlFor="email" label="Email address" required error={errors.email?.message}>
-        <InputShell
-          id="email"
-          type="email"
-          autoComplete="email"
-          placeholder="you@example.com"
-          prefix={AuthIcon.mail}
-          invalid={!!errors.email}
-          disabled={isBusy}
-          {...register('email')}
-        />
-      </Field>
-
-      <Field htmlFor="password" label="Password" required error={errors.password?.message}>
-        <InputShell
-          id="password"
-          type={showPassword ? 'text' : 'password'}
-          autoComplete="current-password"
-          placeholder="Enter your password"
-          prefix={AuthIcon.lock}
-          suffix={<EyeToggle shown={showPassword} onToggle={() => setShowPassword((v) => !v)} />}
-          invalid={!!errors.password}
-          disabled={isBusy}
-          {...register('password')}
-        />
-      </Field>
-
-      <div className="flex items-center justify-end">
-        <Link href="/auth/forgot-password" className="text-[14px] font-semibold text-[var(--text-link)] hover:underline">
-          {c.forgotPassword}
-        </Link>
-      </div>
-
-      {errors.root && <ErrorAlert>{errors.root.message}</ErrorAlert>}
-
-      <div className="mt-2">
-        <SubmitButton type="submit" disabled={isBusy} aria-busy={isBusy}>
-          {isBusy ? c.submittingCta : c.submitCta}
-          {!isBusy && AuthIcon.arrow}
-        </SubmitButton>
-      </div>
-
-      <Divider>{c.divider}</Divider>
-
-      <Link
-        href="/auth/signup"
-        className="inline-flex h-[52px] w-full items-center justify-center gap-2 rounded-[10px] border border-[var(--slate-300)] bg-white font-display text-[15px] font-semibold text-[var(--text-strong)] transition-colors hover:bg-[var(--slate-50)] active:bg-[var(--slate-100)]"
-      >
-        {c.createAccountCta}
-      </Link>
-    </form>
-  );
-}
-
-export default function LoginPage() {
-  return (
-    <AuthShell mode="signin">
-      <Suspense>
-        <LoginFormInner />
-      </Suspense>
-    </AuthShell>
-  );
+/**
+ * A user who already holds a valid session has nothing to do here: send them
+ * to where they were going (`?redirect=`), or to their dashboard. Only
+ * unauthenticated visitors see the form.
+ */
+export default async function LoginPage({ searchParams }: Props) {
+  const viewer = await getViewerSession();
+  if (viewer) {
+    const { redirect: to } = await searchParams;
+    redirect(safeRedirectPath(to) ?? viewer.dashboardHref);
+  }
+  return <LoginForm />;
 }
