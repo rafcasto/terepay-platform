@@ -4,6 +4,7 @@ import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { auditLog, getClientIp } from '@/lib/utils/audit';
 import { defaultLimiter, checkRateLimit } from '@/lib/rate-limit/limiter';
 import { runPaymentRefreshSweep } from '@/lib/qippay/refresh-sweep';
+import { runEarlyRepaymentSweep } from '@/lib/qippay/early-repayment-sweep';
 import { markSetPayTestVerifyRun } from '@/lib/admin/setpay-test-settings';
 import { assertQippayEnabled } from '@/lib/qippay/feature';
 
@@ -18,7 +19,8 @@ export const maxDuration = 300;
  * right now (the same sweep the payment-refresh cron runs once a day) and
  * returns a per-application summary. Lets an admin confirm test-cadence
  * instalments were collected minutes after disbursement instead of waiting
- * for the daily sweep. No request body.
+ * for the daily sweep. Also reconciles any in-flight PayBy early payoffs, as
+ * the hourly cron does. No request body.
  */
 export async function POST(request: NextRequest): Promise<Response> {
   const ip = getClientIp(request);
@@ -35,11 +37,14 @@ export async function POST(request: NextRequest): Promise<Response> {
     const auth = await withAuth(request, ['admin']);
     uid = auth.uid;
 
-    const sweep = await runPaymentRefreshSweep({
-      actor: uid,
-      ip,
-      auditAction: 'setpay_payment_status_admin_verify',
-    });
+    const [sweep, earlyRepayment] = await Promise.all([
+      runPaymentRefreshSweep({
+        actor: uid,
+        ip,
+        auditAction: 'setpay_payment_status_admin_verify',
+      }),
+      runEarlyRepaymentSweep({ actor: uid, ip }),
+    ]);
 
     await markSetPayTestVerifyRun(sweep.processed);
 
@@ -48,7 +53,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       action: 'admin_setpay_test_verify',
       targetId: 'setpayTesting',
       targetType: 'systemConfig',
-      outcome: sweep.errored > 0 ? 'failure' : 'success',
+      outcome: sweep.errored + earlyRepayment.errored > 0 ? 'failure' : 'success',
       ipAddress: ip,
       userAgent: request.headers.get('user-agent') ?? '',
       changes: {
@@ -59,6 +64,13 @@ export async function POST(request: NextRequest): Promise<Response> {
         feesAssessed: sweep.feesAssessed,
         remindersSent: sweep.remindersSent,
         inArrears: sweep.inArrears,
+        earlyRepayment: {
+          total: earlyRepayment.total,
+          settled: earlyRepayment.settled,
+          ended: earlyRepayment.ended,
+          stillPending: earlyRepayment.stillPending,
+          errored: earlyRepayment.errored,
+        },
       },
     });
 
@@ -73,6 +85,15 @@ export async function POST(request: NextRequest): Promise<Response> {
         remindersSent: sweep.remindersSent,
         inArrears: sweep.inArrears,
         applications: sweep.applications,
+        earlyRepayment: {
+          total: earlyRepayment.total,
+          processed: earlyRepayment.processed,
+          settled: earlyRepayment.settled,
+          ended: earlyRepayment.ended,
+          stillPending: earlyRepayment.stillPending,
+          errored: earlyRepayment.errored,
+          applications: earlyRepayment.applications,
+        },
       },
     });
   } catch (err) {

@@ -226,9 +226,9 @@ emails) runs **automatically** inside the payment-refresh sweep. Default is **of
 
 | | Flag **off** (default) | Flag **on** |
 |---|---|---|
-| Payment-refresh sweep (cron / admin "Verify now") | Skips the arrears step for every loan | Assesses every live loan after reconciliation |
+| Payment-refresh sweep (cron / admin "Verify now") | Skips fees/overdue sequence; still sends the **upcoming-payment reminder** (1–3 days before each instalment) via `sendUpcomingReminders()` | Assesses every live loan after reconciliation (fees + full reminder sequence) |
 | Lender's application page | **Arrears assessment** card, badge "Manual only"; "Assess arrears now" runs the engine on that loan (`POST /api/applications/[id]/arrears/assess`) | Same card, badge "Automatic"; the button brings the loan up to date ahead of the next sweep |
-| Borrower impact | Nothing is charged or emailed until a lender runs it | Charged/emailed on the sweep's schedule |
+| Borrower impact | Reminded before every due date; nothing is **charged** and no overdue email is sent until a lender runs it | Reminded, charged and sent the overdue sequence on the sweep's schedule |
 
 The manual trigger is available in both modes, is restricted to the assigned lender on a
 `disbursed`/`active` loan, and is idempotent (the engine re-checks fee ids and reminder

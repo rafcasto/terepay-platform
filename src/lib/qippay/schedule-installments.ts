@@ -2,7 +2,13 @@ import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
 import { AppError } from '@/lib/utils/api-error';
 import { auditLog } from '@/lib/utils/audit';
-import { schedulePayment, getBeneficiaryId, getReturnBaseUrl } from './setpay-client';
+import {
+  schedulePayment,
+  getBeneficiaryId,
+  getReturnBaseUrl,
+  getDetailedConsentStatus,
+} from './setpay-client';
+import type { SetPayConsentOverallStatus, SetPayDetailedStatus } from './setpay-client';
 import { syncLoanRecord } from '@/lib/loan/loan-record';
 import { buildTestCadenceTimes } from '@/lib/admin/setpay-test-settings';
 import type { LoanApplication, PaymentConsent, ScheduledPayment } from '@/types/application';
@@ -15,6 +21,69 @@ function scheduledForOf(p: Pick<ScheduledPayment, 'dueDate' | 'dueAt'>): string 
 /** Today's calendar date in NZ (Pacific/Auckland) as YYYY-MM-DD. */
 export function nzToday(): string {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' });
+}
+
+/** Instalment statuses that mean Qippay already holds a payment for it. */
+const LODGED_STATUSES: ReadonlyArray<ScheduledPayment['status']> = ['scheduled', 'retrying', 'success'];
+
+/** True when `iso` falls inside the consent period (inclusive bounds). */
+function inPeriod(iso: string, period: SetPayConsentOverallStatus): boolean {
+  if (!period.periodStart || !period.periodEnd) return false;
+  const t = Date.parse(iso);
+  return t >= Date.parse(period.periodStart) && t <= Date.parse(period.periodEnd);
+}
+
+type UpstreamCheck =
+  /** Qippay already holds a payment for this instalment's period that we have no record of. */
+  | { outcome: 'already_scheduled'; periodIndex: number }
+  /** Nothing unaccounted for in the period — safe to (re-)send. */
+  | { outcome: 'not_found' }
+  /** Qippay does not report the instalment's period, so nothing can have been lodged in it yet. */
+  | { outcome: 'period_not_open' };
+
+/**
+ * Duplicate-payment guard for re-sends (Qippay integration review, point 2).
+ *
+ * A `POST /v1/setpay` that failed on our side — the 8s fetch timeout, a 5xx, a
+ * dropped connection — may still have been accepted by Qippay. Re-sending the
+ * instalment blindly would then collect it twice. So before any instalment
+ * that has already been attempted is sent again, the scheduler reads the
+ * consent's detailed status (`GET /v1/enduring_initiation/{epcId}/status`) and
+ * checks whether a payment is already scheduled for that instalment's period.
+ *
+ * The endpoint reports per-period totals rather than per-payment IDs, so the
+ * check compares the upstream `count_scheduled + count_complete` for the period
+ * against the instalments we already know are lodged in that same period (the
+ * admin test cadence can place several in one Daily period). An upstream count
+ * higher than ours is the lost lodgement, and the instalment is adopted as
+ * `scheduled` instead of being sent again.
+ */
+function checkAlreadyScheduledUpstream(
+  p: ScheduledPayment,
+  all: ScheduledPayment[],
+  detailed: SetPayDetailedStatus,
+): UpstreamCheck {
+  const when = scheduledForOf(p);
+  const periods: SetPayConsentOverallStatus[] =
+    detailed.periodStatus.length > 0
+      ? detailed.periodStatus
+      : detailed.consentOverallStatus
+        ? [detailed.consentOverallStatus]
+        : [];
+  const period = periods.find((per) => inPeriod(when, per));
+  if (!period) return { outcome: 'period_not_open' };
+
+  const knownInPeriod = all.filter(
+    (q) =>
+      q.installmentNumber !== p.installmentNumber &&
+      LODGED_STATUSES.includes(q.status) &&
+      inPeriod(scheduledForOf(q), period),
+  ).length;
+  const upstreamInPeriod = period.countScheduled + period.countComplete;
+
+  return upstreamInPeriod > knownInPeriod
+    ? { outcome: 'already_scheduled', periodIndex: period.periodIndex }
+    : { outcome: 'not_found' };
 }
 
 export type ScheduleInstallmentsResult = {
@@ -138,6 +207,12 @@ export async function scheduleInstallments(opts: {
   const shortRef = applicationId.slice(0, 12);
   let attempted = 0;
   const failures: { installmentNumber: number; code: string; reason: string }[] = [];
+  // Instalments found already scheduled at Qippay and adopted without a re-send.
+  const adopted: number[] = [];
+  // Detailed consent status, fetched lazily the first time a re-send is
+  // considered and invalidated after every POST so the per-period counts
+  // always include what this run has already lodged.
+  let detailed: SetPayDetailedStatus | null = null;
 
   // Schedule sequentially (lowest instalment first) so the consent's per-period
   // availability is consumed near-term-first and we don't race Qippay's checks.
@@ -160,6 +235,51 @@ export async function scheduleInstallments(opts: {
         scheduleAttempts: (p.scheduleAttempts ?? 0) + 1,
       };
       continue;
+    }
+
+    // Re-send guard: this instalment has been attempted before, so confirm
+    // Qippay is not already holding it before sending it again.
+    if ((p.scheduleAttempts ?? 0) > 0) {
+      if (!detailed) {
+        try {
+          detailed = await getDetailedConsentStatus(consent.mandateId);
+        } catch (err) {
+          // Fail closed: without the status we cannot rule out a duplicate, so
+          // leave the instalment pending for the next run rather than collect twice.
+          const reason = err instanceof Error ? err.message : String(err);
+          console.error('[setpay] status check before re-send failed', {
+            applicationId,
+            installmentNumber: p.installmentNumber,
+            reason,
+          });
+          payments[i] = {
+            ...p,
+            failureReason:
+              'Could not confirm with Qippay whether this instalment is already scheduled — not re-sent, will retry',
+            lastAttemptAt: Timestamp.now(),
+          };
+          continue;
+        }
+      }
+      const check = checkAlreadyScheduledUpstream(p, payments, detailed);
+      if (check.outcome === 'already_scheduled') {
+        console.warn('[setpay] instalment already scheduled at Qippay — not re-sent', {
+          applicationId,
+          installmentNumber: p.installmentNumber,
+          periodIndex: check.periodIndex,
+          previousFailure: p.failureReason,
+        });
+        const { failureReason: _drop, ...rest } = p;
+        void _drop;
+        payments[i] = {
+          ...rest,
+          status: 'scheduled',
+          scheduledAt: Timestamp.now(),
+          lastAttemptAt: Timestamp.now(),
+        };
+        adopted.push(p.installmentNumber);
+        continue;
+      }
     }
 
     if (!beneficiaryId) {
@@ -208,7 +328,9 @@ export async function scheduleInstallments(opts: {
         lastAttemptAt: Timestamp.now(),
         scheduleAttempts: (p.scheduleAttempts ?? 0) + 1,
       };
+      detailed = null; // upstream counts changed
     } catch (err) {
+      detailed = null; // the request may have landed — never reuse stale counts
       const reason =
         err instanceof AppError
           ? err.message
@@ -248,7 +370,7 @@ export async function scheduleInstallments(opts: {
   const scheduledCount = payments.filter((p) => lodgedStatuses.includes(p.status)).length;
   const pendingCount = payments.filter((p) => p.status === 'pending').length;
 
-  if (attempted > 0) {
+  if (attempted > 0 || adopted.length > 0) {
     await auditLog({
       userId: actor,
       action: 'setpay_payments_scheduled',
@@ -268,6 +390,7 @@ export async function scheduleInstallments(opts: {
         pendingCount,
         failedCount: failures.length,
         ...(failures.length > 0 ? { failures } : {}),
+        ...(adopted.length > 0 ? { adoptedFromStatus: adopted } : {}),
       },
     });
   }

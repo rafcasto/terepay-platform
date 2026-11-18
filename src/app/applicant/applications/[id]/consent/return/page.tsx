@@ -6,7 +6,7 @@ import { auditLog } from '@/lib/utils/audit';
 import { reconcileConsent } from '@/lib/qippay/reconcile-consent';
 import type { PaymentConsent } from '@/types/application';
 import { QippayLockup } from '@/components/qippay';
-import { QIPPAY_DESCRIPTOR } from '@/lib/qippay/brand';
+import { QIPPAY_DESCRIPTOR, QIPPAY_ONGOING_PAYMENT_TERM } from '@/lib/qippay/brand';
 import PendingPoller from './PendingPoller';
 
 export const dynamic = 'force-dynamic';
@@ -78,8 +78,8 @@ export default async function ConsentReturnPage({ params, searchParams }: PagePr
           </div>
           <h1 className="text-xl font-bold text-gray-900 mb-1">Bank authorisation complete</h1>
           <p className="text-sm text-gray-500 mb-6">
-            Thanks. Your fortnightly repayments are set up with {QIPPAY_DESCRIPTOR}. Your lender can now
-            release the loan funds.
+            Thanks. Your fortnightly repayments are set up as an &ldquo;{QIPPAY_ONGOING_PAYMENT_TERM}&rdquo;
+            with {QIPPAY_DESCRIPTOR}. Your lender can now release the loan funds.
           </p>
           <Link
             href={detailHref}
@@ -109,10 +109,10 @@ export default async function ConsentReturnPage({ params, searchParams }: PagePr
           <h1 className="text-xl font-bold text-gray-900 mb-1">Bank authorisation not completed</h1>
           <p className="text-sm text-gray-500 mb-6">
             {reconciled.status === 'expired'
-              ? 'The verification window expired before your bank confirmed the authorization.'
+              ? 'The verification window expired before your bank confirmed the "ongoing payment" authorisation.'
               : reconciled.status === 'cancelled'
-                ? 'The authorization was cancelled before completion.'
-                : 'Your bank did not confirm the authorization. You can try again from your application.'}
+                ? 'The "ongoing payment" authorisation was cancelled before completion.'
+                : 'Your bank did not confirm the "ongoing payment" authorisation. You can try again from your application.'}
           </p>
           <Link
             href={detailHref}
@@ -135,7 +135,8 @@ export default async function ConsentReturnPage({ params, searchParams }: PagePr
         </div>
         <h1 className="text-xl font-bold text-gray-900 mb-1">Waiting for your bank…</h1>
         <p className="text-sm text-gray-500 mb-6">
-          We&apos;re confirming the authorisation with your bank. This usually takes only a few seconds.
+          We&apos;re confirming the &ldquo;{QIPPAY_ONGOING_PAYMENT_TERM}&rdquo; authorisation with your bank.
+          This usually takes only a few seconds.
         </p>
         <PendingPoller applicationId={id} detailHref={detailHref} />
       </div>

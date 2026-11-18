@@ -11,6 +11,7 @@ import {
 import { getDetailedConsentStatus } from '@/lib/qippay/setpay-client';
 import { syncLoanRecord } from '@/lib/loan/loan-record';
 import { isQippayEnabled } from '@/lib/qippay/feature';
+import { sendConsentRevokedNotice } from '@/lib/loan/consent-revoked-notice';
 
 export const dynamic = 'force-dynamic';
 
@@ -320,6 +321,14 @@ async function handleConsentRevoked(epcId: string): Promise<void> {
   });
 
   await syncLoanRecord(app.ref.id);
+
+  // Tell the borrower once (de-duped on the mandate id) and point them at the
+  // ways to keep repaying — the loan and its due dates are unchanged.
+  await sendConsentRevokedNotice({
+    applicationId: app.ref.id,
+    mandateId: epcId,
+    actor: 'system:qippay_webhook',
+  });
 
   await auditLog({
     userId: 'system:qippay_webhook',
