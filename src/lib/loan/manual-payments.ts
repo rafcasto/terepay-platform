@@ -5,6 +5,7 @@ import { auditLog } from '@/lib/utils/audit';
 import { buildSchedule, type AmortisedSchedule } from '@/lib/loan/repayment';
 import { deriveLoanSummary } from '@/lib/loan/active-loan';
 import { syncLoanRecord } from '@/lib/loan/loan-record';
+import { isQippayManagedLoan } from '@/lib/loan/collection-mode';
 import type {
   LoanApplication,
   ManualPaymentRecord,
@@ -12,8 +13,10 @@ import type {
 } from '@/types/application';
 
 /**
- * Manual repayment mode — the path the platform runs on while the Qippay
- * feature flag (`qippayEnabled`) is OFF.
+ * Manual repayment mode — the path a loan runs on when Qippay is not
+ * collecting it: either the `qippayEnabled` flag is OFF, or the loan was
+ * written without a SetPay mandate (e.g. disbursed before Qippay went live).
+ * Decided per loan by `loanCollectionMode()`, never by the global flag alone.
  *
  * Without a SetPay mandate nothing populates `scheduledPayments`, so at
  * disbursement we write the instalment schedule ourselves from the figures
@@ -226,6 +229,17 @@ export async function recordManualPayment(
         'BAD_REQUEST',
         400,
         `Repayments can only be recorded on a disbursed loan (status: ${app.status})`,
+      );
+    }
+
+    // Qippay owns the instalment state on loans it collects — the bank's word
+    // is final there. Loans written without a mandate stay editable by hand
+    // even after the Qippay flag is switched on.
+    if (isQippayManagedLoan(app)) {
+      throw new AppError(
+        'CONFLICT',
+        409,
+        'Repayments on this loan are collected by Qippay and cannot be recorded manually',
       );
     }
 

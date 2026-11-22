@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { z, ZodError } from 'zod';
 import { adminDb } from '@/lib/firebase/admin';
+import { resolveCustomerStatementReference } from '@/lib/loan/customer-ref';
 import { withAuth } from '@/lib/auth/middleware';
 import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { checkRateLimit, paymentLimiter } from '@/lib/rate-limit/limiter';
@@ -103,7 +104,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         customerIp: ip,
         customerUserAgent: userAgent,
         merchantCustomerIdentification: auth.uid,
-        statementReference: app.referenceNumber ?? id.slice(0, 12),
+        statementReference: await resolveCustomerStatementReference({ ...app, applicationId: id }),
         statementParticulars: 'TerePay',
         statementCode: 'PAYOFF',
         expiresAt,

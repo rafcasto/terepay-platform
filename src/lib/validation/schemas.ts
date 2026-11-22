@@ -588,6 +588,23 @@ export const disburseSchema = z.object({
  * feature flag is off. `paidOn` is an NZ calendar date; it may not be in the
  * future.
  */
+/** Body for POST /api/admin/cleanup — selected borrowers / applications to delete. */
+export const adminCleanupSchema = z
+  .object({
+    userIds: z.array(z.string().trim().min(1).max(128)).max(100).optional(),
+    applicationIds: z.array(z.string().trim().min(1).max(128)).max(200).optional(),
+    includeLiveLoans: z.boolean().optional(),
+  })
+  .refine((v) => (v.userIds?.length ?? 0) + (v.applicationIds?.length ?? 0) > 0, {
+    message: 'Select at least one borrower or application',
+    path: ['userIds'],
+  });
+
+/** Body for POST /api/applications/[id]/arrears/revert. */
+export const revertArrearsSchema = z.object({
+  reason: z.string().trim().min(3, 'Give a short reason').max(300),
+});
+
 export const recordManualPaymentSchema = z
   .object({
     installmentNumber: z.number().int().min(1).max(60),

@@ -276,6 +276,24 @@ export interface ArrearsState {
  * plus `consent_revoked` — sent once when the bank reports the SetPay
  * repayment authority was cancelled by the customer.
  */
+/**
+ * Snapshot of arrears charges a lender reverted (e.g. an assessment run by
+ * mistake). Appended to `arrearsReversals` so the audit trail on the loan
+ * survives the charges being removed.
+ */
+export interface ArrearsReversal {
+  revertedAt: Timestamp;
+  revertedBy: string;
+  revertedByName?: string;
+  reason: string;
+  /** Fee assessments removed by this reversal. */
+  feeAssessments: FeeAssessment[];
+  /** Interest accrual state removed by this reversal, if any. */
+  arrears?: ArrearsState;
+  /** Late fees + default fee + accrued interest removed (cents). */
+  totalCents: number;
+}
+
 export type ReminderType =
   | 'upcoming_payment'
   | 'payment_missed'
@@ -791,6 +809,8 @@ export interface LoanApplication {
   arrears?: ArrearsState;
   /** Ledger of dunning reminders already sent (used to dedupe the sequence). */
   reminders?: SentReminder[];
+  /** Arrears charges a lender reverted, newest last. */
+  arrearsReversals?: ArrearsReversal[];
 
   // TerePay 8-section form data
   personalInfo?: TerePayPersonalInfo;

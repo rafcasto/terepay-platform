@@ -423,6 +423,8 @@ function OverviewTab({ data, onSelect }: { data: ReviewData; onSelect: (tab: Tab
           autoEnabled={data.payments.arrearsAutoEnabled}
           isOverdue={data.payments.charges.isOverdue}
           policyApplies={data.payments.charges.policyApplies}
+          hasCharges={data.payments.charges.hasCharges}
+          chargesCents={data.payments.charges.totalChargesCents}
         />
       )}
 
