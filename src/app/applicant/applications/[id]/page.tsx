@@ -10,6 +10,7 @@ import type {
 } from '@/types/application';
 import { reconcileConsent } from '@/lib/qippay/reconcile-consent';
 import { isQippayEnabled } from '@/lib/qippay/feature';
+import { loanCollectionMode } from '@/lib/loan/collection-mode';
 import { toDisplayState } from '@/lib/loan/status-display';
 import { Card, Icons } from '@/components/ui';
 import ScreenDraft from '@/components/applicant/screens/ScreenDraft';
@@ -60,7 +61,10 @@ export default async function ApplicationDetailPage({
 
   // Qippay feature flag: off → the borrower pays TerePay directly and the
   // lender records repayments, so no consent step or early-payoff offer.
+  // A live loan follows its own collection mode: one written without a SetPay
+  // mandate (before the flag went on) is still paid to TerePay directly.
   const qippayOn = await isQippayEnabled();
+  const qippayCollectsThisLoan = qippayOn && loanCollectionMode(app) === 'qippay';
 
   // If a SetPay mandate is in flight, reconcile against Qippay before rendering —
   // the user may have approved at their bank in another tab. The reconciler is
@@ -118,7 +122,7 @@ export default async function ApplicationDetailPage({
           status={status}
           applicationId={id}
           scheduledPayments={scheduledPayments}
-          qippayEnabled={qippayOn}
+          qippayEnabled={qippayCollectsThisLoan}
         />
       );
       break;

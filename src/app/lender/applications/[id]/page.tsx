@@ -17,6 +17,7 @@ import { isQippayEnabled } from '@/lib/qippay/feature';
 import { isArrearsAutoEnabled } from '@/lib/loan/arrears-feature';
 import { deriveLoanSummary, toPlainScheduledPayments } from '@/lib/loan/active-loan';
 import { buildManualSchedule, nzToday } from '@/lib/loan/manual-payments';
+import { loanCollectionMode } from '@/lib/loan/collection-mode';
 import { summariseArrearsCharges } from '@/lib/loan/arrears-charges';
 import { DOCUMENT_TYPE_LABELS, fulfilRequest, catalogueItem } from '@/lib/loan/document-requests';
 import {
@@ -206,7 +207,9 @@ export default async function LenderApplicationDetailPage({
   let app = { applicationId: snap.id, ...snap.data() } as LoanApplication;
 
   // Qippay feature flag: off → manual repayment mode (no consent gate, lender
-  // records instalments by hand).
+  // records instalments by hand). Once a loan is live its collection mode is
+  // decided per loan (`loanCollectionMode`), so loans written by hand before
+  // the flag was switched on stay manageable by hand.
   const [qippayOn, arrearsAuto] = await Promise.all([isQippayEnabled(), isArrearsAutoEnabled()]);
 
   // Reconcile a SetPay mandate that is still in flight before rendering.
@@ -603,12 +606,13 @@ export default async function LenderApplicationDetailPage({
   // ---- Repayment breakdown (approved, not yet disbursed, manual mode) -----
   // Read-only preview of the instalments `initialiseManualSchedule` will
   // write at disbursement. Dates are indicative — the real schedule is
-  // anchored on the day the money leaves. Not shown while Qippay is on: the
-  // SetPay mandate owns the schedule there.
+  // anchored on the day the money leaves. Not shown while Qippay is on (the
+  // SetPay mandate owns the schedule there) except for a legacy
+  // `loan_accepted` application, which is disbursed without a mandate.
   const fmtCents = (c: number) => fmt(c / 100);
   let repaymentPlan: RepaymentPlanView | undefined;
   if (
-    !qippayOn &&
+    (!qippayOn || status === 'loan_accepted') &&
     PRE_DISBURSEMENT_STATUSES.has(status) &&
     typeof ld?.approvedAmount === 'number' &&
     ld.approvedAmount > 0
@@ -765,7 +769,7 @@ export default async function LenderApplicationDetailPage({
     repaymentPlan,
     payments: {
       show: PAYMENT_STATUSES.has(status),
-      mode: qippayOn ? 'qippay' : 'manual',
+      mode: qippayOn ? loanCollectionMode(app) : 'manual',
       arrearsAutoEnabled: arrearsAuto,
       canAssessArrears: isAssigned && (status === 'disbursed' || status === 'active'),
       scheduled: toPlainScheduledPayments((app.scheduledPayments ?? []) as ScheduledPayment[]),

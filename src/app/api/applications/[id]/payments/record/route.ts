@@ -6,7 +6,6 @@ import { recordManualPaymentSchema } from '@/lib/validation/schemas';
 import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { checkRateLimit, defaultLimiter } from '@/lib/rate-limit/limiter';
 import { auditLog, getClientIp } from '@/lib/utils/audit';
-import { assertManualRepaymentsMode } from '@/lib/qippay/feature';
 import { recordManualPayment } from '@/lib/loan/manual-payments';
 import { toPlainScheduledPayments } from '@/lib/loan/active-loan';
 
@@ -19,8 +18,9 @@ type RouteParams = { params: Promise<{ id: string }> };
  *
  * Lender records a repayment received outside Qippay (bank transfer, cash at
  * the counter) against one instalment, or reverses a mistaken entry.
- * Available only while the Qippay feature flag is OFF — once Qippay collects
- * instalments the bank's word is final and this route returns 409.
+ * Available on any loan Qippay is not collecting (`loanCollectionMode` ===
+ * 'manual') — including loans written before the Qippay flag was switched
+ * on. On a Qippay-collected loan the bank's word is final and this returns 409.
  *
  * Body: { installmentNumber, action: 'mark_paid' | 'mark_unpaid', paidOn?, reference? }
  */
@@ -29,8 +29,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   let applicationId = '';
 
   try {
-    await assertManualRepaymentsMode();
-
     const auth = await withAuth(request, ['lender']);
 
     const allowed = await checkRateLimit(defaultLimiter, auth.uid);

@@ -58,9 +58,10 @@ function describe(p: ScheduledPayment, today: string): RowView {
 type RecordForm = { installmentNumber: number; paidOn: string; reference: string };
 
 /**
- * Manual repayment mode (Qippay feature flag off). The borrower pays TerePay
- * directly and the lender marks each instalment received here. Writes go
- * through POST /api/applications/[id]/payments/record, which refreshes the
+ * Manual repayment mode — shown for any loan Qippay is not collecting (flag
+ * off, or the loan was written without a SetPay mandate). The borrower pays
+ * TerePay directly and the lender marks each instalment received here. Writes
+ * go through POST /api/applications/[id]/payments/record, which refreshes the
  * loan record and closes the loan once the last instalment is in.
  */
 export default function ManualPaymentsPanel({
@@ -171,7 +172,7 @@ export default function ManualPaymentsPanel({
       </div>
 
       <p className="mb-4 rounded-[var(--radius-md)] border border-[var(--info-700)]/20 bg-[var(--info-50)] px-3 py-2 text-xs text-[var(--info-700)]">
-        Automatic bank collection is not switched on. Mark each instalment as paid once the
+        This loan is not collected through Qippay. Mark each instalment as paid once the
         borrower&apos;s payment has arrived in the TerePay account.
       </p>
 

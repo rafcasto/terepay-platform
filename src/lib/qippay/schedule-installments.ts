@@ -1,5 +1,6 @@
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
+import { resolveCustomerStatementReference } from '@/lib/loan/customer-ref';
 import { AppError } from '@/lib/utils/api-error';
 import { auditLog } from '@/lib/utils/audit';
 import {
@@ -204,7 +205,9 @@ export async function scheduleInstallments(opts: {
   }
 
   const today = nzToday();
-  const shortRef = applicationId.slice(0, 12);
+  // Printed on both bank statements (statement_reference, 12 chars max) — the
+  // customer's TERE ID so the lender can match the deposit to the customer.
+  const shortRef = await resolveCustomerStatementReference({ ...app, applicationId });
   let attempted = 0;
   const failures: { installmentNumber: number; code: string; reason: string }[] = [];
   // Instalments found already scheduled at Qippay and adopted without a re-send.
