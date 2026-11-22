@@ -4,6 +4,7 @@ import { assessArrearsForApplication } from '@/lib/loan/assess-arrears';
 import { sendUpcomingReminders } from '@/lib/loan/upcoming-reminders';
 import { isQippayEnabled } from '@/lib/qippay/feature';
 import { isArrearsAutoEnabled } from '@/lib/loan/arrears-feature';
+import { isQippayManagedLoan } from '@/lib/loan/collection-mode';
 import type { PaymentConsent, ScheduledPayment } from '@/types/application';
 
 const DEFAULT_MAX_APPLICATIONS = 500;
@@ -42,7 +43,9 @@ export type RefreshSweepResult = {
  *
  * While the Qippay feature flag is OFF there is nothing to reconcile — the
  * lender records repayments by hand — so the sweep instead walks every live
- * loan and only counts their state.
+ * loan and only counts their state. With the flag ON, live loans that Qippay
+ * is not collecting (written by hand before the flag went on) are still
+ * walked the same way, so their reminders and arrears are never skipped.
  *
  * The arrears step runs only while the `arrears_auto_enabled` flag is ON.
  * With it off, late fees, overdue interest and the overdue reminder sequence
@@ -62,22 +65,34 @@ export async function runPaymentRefreshSweep(opts: {
 
   const [qippayOn, arrearsAuto] = await Promise.all([isQippayEnabled(), isArrearsAutoEnabled()]);
 
-  const snap = qippayOn
-    ? await adminDb
-        .collection('loanApplications')
-        .where('paymentConsent.status', '==', 'active')
-        .limit(maxApplications)
-        .get()
-    : await adminDb
-        .collection('loanApplications')
-        .where('status', 'in', ['disbursed', 'active'])
-        .limit(maxApplications)
-        .get();
+  const liveSnap = await adminDb
+    .collection('loanApplications')
+    .where('status', 'in', ['disbursed', 'active'])
+    .limit(maxApplications)
+    .get();
+
+  // Qippay mode: every active-consent loan is reconciled (as before), and any
+  // live loan Qippay is not collecting is walked as a manual loan.
+  const docs = [...liveSnap.docs];
+  if (qippayOn) {
+    const consentSnap = await adminDb
+      .collection('loanApplications')
+      .where('paymentConsent.status', '==', 'active')
+      .limit(maxApplications)
+      .get();
+    const seen = new Set(docs.map((d) => d.id));
+    for (const d of consentSnap.docs) {
+      if (!seen.has(d.id)) {
+        docs.push(d);
+        seen.add(d.id);
+      }
+    }
+  }
 
   const result: RefreshSweepResult = {
     mode: qippayOn ? 'qippay' : 'manual',
     arrearsMode: arrearsAuto ? 'auto' : 'manual',
-    total: snap.size,
+    total: docs.length,
     processed: 0,
     changed: 0,
     errored: 0,
@@ -87,8 +102,10 @@ export async function runPaymentRefreshSweep(opts: {
     applications: [],
   };
 
-  for (const doc of snap.docs) {
-    const consent = doc.data().paymentConsent as PaymentConsent | undefined;
+  for (const doc of docs) {
+    const data = doc.data();
+    const consent = data.paymentConsent as PaymentConsent | undefined;
+    const reconcileWithQippay = qippayOn && isQippayManagedLoan(data);
     const entry: RefreshSweepApplication = {
       applicationId: doc.id,
       consentStatus: consent?.status ?? 'not_started',
@@ -98,9 +115,9 @@ export async function runPaymentRefreshSweep(opts: {
       testCadenceMinutes: consent?.testCadence?.intervalMinutes ?? null,
     };
 
-    if (!qippayOn) {
-      // Manual mode: the lender-recorded instalments are already the truth.
-      const payments = (doc.data().scheduledPayments as ScheduledPayment[] | undefined) ?? [];
+    if (!reconcileWithQippay) {
+      // Manual loan: the lender-recorded instalments are already the truth.
+      const payments = (data.scheduledPayments as ScheduledPayment[] | undefined) ?? [];
       entry.totalCount = payments.length;
       entry.paidCount = payments.filter((p) => p.status === 'success').length;
       result.processed += 1;

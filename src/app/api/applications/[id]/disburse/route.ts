@@ -180,7 +180,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
       // ── Write the instalment schedule ──────────────────────────────────────
       // Best-effort either way — never rolls back the committed disbursement.
-      if (qippayOn) {
+      // Decided per loan: only an active SetPay mandate is lodged with Qippay.
+      // A legacy `loan_accepted` application (or an override) disbursed while
+      // the flag is on has no mandate, so it gets the manual schedule and is
+      // managed by hand from then on.
+      if (qippayOn && result.paymentConsent?.status === 'active') {
         // Lodges what SetPay will accept now; anything it won't yet (future
         // rolling periods) stays `pending` and is picked up by the daily cron
         // or the lender's manual "Schedule pending" action.

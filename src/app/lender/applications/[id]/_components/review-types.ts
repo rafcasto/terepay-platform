@@ -196,7 +196,8 @@ export type ReviewData = {
     show: boolean;
     /**
      * `qippay` — instalments are lodged/collected by Qippay (SetPay panel).
-     * `manual` — Qippay feature flag off; the lender records repayments by hand.
+     * `manual` — Qippay is not collecting this loan (flag off, or the loan was
+     * written without a SetPay mandate); the lender records repayments by hand.
      */
     mode: 'qippay' | 'manual';
     /** Whether the sweep assesses arrears on its own; off → lender runs it by hand. */

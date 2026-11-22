@@ -31,21 +31,6 @@ export async function assertQippayEnabled(): Promise<void> {
   }
 }
 
-/**
- * Guard for routes that only make sense while Qippay is OFF (manual repayment
- * recording). While Qippay owns the instalment state a lender must not
- * overwrite what the bank reported.
- */
-export async function assertManualRepaymentsMode(): Promise<void> {
-  if (await isQippayEnabled()) {
-    throw new AppError(
-      'FEATURE_DISABLED',
-      409,
-      'Repayments are collected by Qippay on this environment and cannot be recorded manually',
-    );
-  }
-}
-
 function isDynamicServerUsage(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false;
   const e = err as { digest?: unknown; message?: unknown };
