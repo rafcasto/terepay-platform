@@ -3,6 +3,7 @@ import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { auditLog, getClientIp } from '@/lib/utils/audit';
 import { runPaymentRefreshSweep } from '@/lib/qippay/refresh-sweep';
 import { runEarlyRepaymentSweep } from '@/lib/qippay/early-repayment-sweep';
+import { runConsentSweep } from '@/lib/qippay/consent-sweep';
 import {
   getPaymentRefreshSettings,
   markPaymentRefreshRun,
@@ -31,11 +32,17 @@ const CRON_ACTOR = 'system:payment_refresh_cron';
  * Each active loan is (1) reconciled against Qippay, then (2) run through the
  * arrears engine — see runPaymentRefreshSweep().
  *
- * Independently of those gates, EVERY hourly tick reconciles in-flight PayBy
- * early payoffs (`earlyRepayment.status` in initiated/pending) — see
- * runEarlyRepaymentSweep(). A borrower who approves the payoff at their bank
- * but never returns to our page is therefore settled within the hour, and the
- * SetPay consent is cancelled so no further instalments are collected.
+ * Independently of those gates, EVERY hourly tick also:
+ *  - reconciles in-flight SetPay consents (`status` awaiting_payment_consent
+ *    with the mandate still initiated/redirected) — see runConsentSweep(). An
+ *    applicant who authorised the mandate at their bank but never returned to
+ *    our page is therefore marked active within the hour and the lender can
+ *    disburse;
+ *  - reconciles in-flight PayBy early payoffs (`earlyRepayment.status` in
+ *    initiated/pending) — see runEarlyRepaymentSweep(). A borrower who
+ *    approves the payoff at their bank but never returns to our page is
+ *    settled within the hour, and the SetPay consent is cancelled so no
+ *    further instalments are collected.
  *
  * Auth: Vercel Cron sends `Authorization: Bearer ${CRON_SECRET}`. We require
  * CRON_SECRET to be set and to match (fail-closed).
@@ -64,6 +71,39 @@ export async function GET(request: NextRequest): Promise<Response> {
       request.nextUrl.searchParams.get('force') === '1';
     // Test cadence is locked off in production, so this never bypasses gates there.
     const bypassGates = force || testSettings.enabled;
+
+    // --- Hourly, ungated: pick up SetPay mandates the applicant authorised
+    // at the bank but never confirmed via our return page / poller.
+    // Idempotent; no-op when the Qippay flag is off or nothing is in flight.
+    const consents = await runConsentSweep({ actor: CRON_ACTOR, ip });
+    if (consents.total > 0) {
+      await auditLog({
+        userId: CRON_ACTOR,
+        action: 'payment_consent_cron_sweep_completed',
+        targetId: 'paymentRefresh',
+        targetType: 'systemConfig',
+        outcome: consents.errored > 0 ? 'failure' : 'success',
+        ipAddress: ip,
+        changes: {
+          dateNzt,
+          hour,
+          total: consents.total,
+          processed: consents.processed,
+          activated: consents.activated,
+          ended: consents.ended,
+          stillPending: consents.stillPending,
+          errored: consents.errored,
+          applications: consents.applications,
+        },
+      });
+    }
+    const consentSummary = {
+      total: consents.total,
+      activated: consents.activated,
+      ended: consents.ended,
+      stillPending: consents.stillPending,
+      errored: consents.errored,
+    };
 
     // --- Hourly, ungated: pick up PayBy early payoffs approved at the bank
     // but never confirmed via our return page. Idempotent; no-op when the
@@ -100,7 +140,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     // --- Gating: enabled, right hour, not already run today ---
     if (!settings.enabled && !bypassGates) {
       return NextResponse.json({
-        data: { ran: false, reason: 'disabled', hour, dateNzt, earlyRepayment: earlyRepaymentSummary },
+        data: { ran: false, reason: 'disabled', hour, dateNzt, consents: consentSummary, earlyRepayment: earlyRepaymentSummary },
       });
     }
     if (hour !== settings.refreshHourNzt && !bypassGates) {
@@ -111,13 +151,14 @@ export async function GET(request: NextRequest): Promise<Response> {
           hour,
           scheduledHour: settings.refreshHourNzt,
           dateNzt,
+          consents: consentSummary,
           earlyRepayment: earlyRepaymentSummary,
         },
       });
     }
     if (settings.lastRunDateNzt === dateNzt && !bypassGates) {
       return NextResponse.json({
-        data: { ran: false, reason: 'already_ran_today', dateNzt, earlyRepayment: earlyRepaymentSummary },
+        data: { ran: false, reason: 'already_ran_today', dateNzt, consents: consentSummary, earlyRepayment: earlyRepaymentSummary },
       });
     }
 
@@ -140,6 +181,7 @@ export async function GET(request: NextRequest): Promise<Response> {
       feesAssessed: sweep.feesAssessed,
       remindersSent: sweep.remindersSent,
       inArrears: sweep.inArrears,
+      consents: consentSummary,
       earlyRepayment: earlyRepaymentSummary,
     };
 

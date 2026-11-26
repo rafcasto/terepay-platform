@@ -287,6 +287,15 @@ export default async function LenderDashboardPage() {
             {myApps.map((app) => {
               const ld = app.loanDetails as { requestedAmount?: number } | undefined;
               const status = app.status as string;
+              // An authorised mandate must not read as "Awaiting" — that is
+              // exactly the state the lender needs to act on.
+              const consentActive =
+                status === 'awaiting_payment_consent' &&
+                (app.paymentConsent as { status?: string } | undefined)?.status === 'active';
+              const pillTone: PillTone = consentActive ? 'success' : (STATUS_TONE[status] ?? 'neutral');
+              const pillLabel = consentActive
+                ? 'Bank Authorised — Ready to Disburse'
+                : (STATUS_LABELS[status] ?? status);
               return (
                 <li
                   key={app.id as string}
@@ -299,7 +308,7 @@ export default async function LenderDashboardPage() {
                     <p className="mt-0.5 text-xs text-[var(--text-muted)]">{fmt(ld?.requestedAmount ?? 0)}</p>
                   </div>
                   <div className="flex shrink-0 items-center gap-3">
-                    <ConsolePill tone={STATUS_TONE[status] ?? 'neutral'} dot>{STATUS_LABELS[status] ?? status}</ConsolePill>
+                    <ConsolePill tone={pillTone} dot>{pillLabel}</ConsolePill>
                     <Link
                       href={`/lender/applications/${app.id as string}`}
                       className="text-xs font-semibold text-[var(--orange-700)] hover:underline"

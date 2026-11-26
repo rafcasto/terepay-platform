@@ -69,7 +69,7 @@ Loan instalments are never PayBy payments and customers never initiate instalmen
 | `setpay.status.retry` | Next outstanding instalment → `retrying`, `retryCount++` | lender sees *Retrying ×N* |
 | `setpay.status.failure` | Next outstanding instalment → `failed`, reason recorded | arrears flow (§3) |
 | `enduring.status.revoked` | Consent → `cancelled`; unpaid instalments → `cancelled`; customer emailed once | no further lodging possible |
-| `enduring.status.success` / `.cancelled` | Audit-logged (consent state is owned by the redirect/return flow) | — |
+| `enduring.status.success` / `.cancelled` | Reconciled immediately against `GET /v1/enduring_initiation/{epcId}` (the event is a hint, the GET is truth): consent → `active` / `cancelled`, audited. The applicant's return page / poller does the same when they come back, and an hourly sweep (`runConsentSweep`) covers a missed webhook — so a mandate the customer authorised is visible to the lender within the hour even if they never return to our page | consent → **active** (lender can disburse) |
 | Unknown event | Audit-logged, `200 { received:false, reason }` | — |
 
 - **Signature:** HMAC-SHA256 over `${x-timestamp}.${rawBody}`, constant-time compared with `x-signature`. Invalid → **401** (the only non-2xx we return). Secret and on/off toggle live in admin integration settings.

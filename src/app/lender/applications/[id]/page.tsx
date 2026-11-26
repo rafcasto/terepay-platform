@@ -212,21 +212,34 @@ export default async function LenderApplicationDetailPage({
   // the flag was switched on stay manageable by hand.
   const [qippayOn, arrearsAuto] = await Promise.all([isQippayEnabled(), isArrearsAutoEnabled()]);
 
-  // Reconcile a SetPay mandate that is still in flight before rendering.
+  // Reconcile a SetPay mandate that is still in flight before rendering, so
+  // the lender sees what Qippay knows — not what the applicant's browser last
+  // told us. A failed check is surfaced on the disbursement card rather than
+  // swallowed: "could not reach Qippay" must never look like "not authorised".
+  let consentReconcileError: string | undefined;
   if (qippayOn && app.status === 'awaiting_payment_consent') {
     const pc = app.paymentConsent;
     const nonTerminal =
       pc && pc.status !== 'active' && pc.status !== 'failed' &&
       pc.status !== 'expired' && pc.status !== 'cancelled';
     if (nonTerminal) {
-      const reconciled = await reconcileConsent({
-        applicationId: id,
-        caller: 'lender',
-        callerUid: decoded.uid,
-      }).catch(() => null);
-      if (reconciled?.status === 'active') {
-        snap = await db.collection('loanApplications').doc(id).get();
-        app = { applicationId: snap.id, ...snap.data() } as LoanApplication;
+      try {
+        const reconciled = await reconcileConsent({
+          applicationId: id,
+          caller: 'lender',
+          callerUid: decoded.uid,
+        });
+        if (reconciled.status !== pc.status) {
+          snap = await db.collection('loanApplications').doc(id).get();
+          app = { applicationId: snap.id, ...snap.data() } as LoanApplication;
+        }
+      } catch (err) {
+        console.error('[lender/application] consent reconcile failed', {
+          applicationId: id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        consentReconcileError =
+          'We could not confirm the mandate status with Qippay just now. The status shown is the last one we recorded — use "Refresh status" to try again.';
       }
     }
   }
@@ -600,6 +613,11 @@ export default async function LenderApplicationDetailPage({
               ? (app.paymentConsent?.status ?? 'not_started')
               : undefined,
           consentActivatedAt: fmtTs(app.paymentConsent?.activatedAt as TS),
+          consentProviderStatus: app.paymentConsent?.lastStatusFromProvider,
+          consentLastCheckedAt: app.paymentConsent?.lastStatusCheckedAt
+            ? fmtTs(app.paymentConsent.lastStatusCheckedAt as TS)
+            : undefined,
+          consentReconcileError,
         }
       : undefined;
 

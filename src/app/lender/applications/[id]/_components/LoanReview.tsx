@@ -393,6 +393,9 @@ function OverviewTab({ data, onSelect }: { data: ReviewData; onSelect: (tab: Tab
             bankDetails={data.disburse.bankDetails}
             consentStatus={data.disburse.consentStatus}
             consentActivatedAt={data.disburse.consentActivatedAt}
+            consentProviderStatus={data.disburse.consentProviderStatus}
+            consentLastCheckedAt={data.disburse.consentLastCheckedAt}
+            consentReconcileError={data.disburse.consentReconcileError}
           />
         </Card>
       )}

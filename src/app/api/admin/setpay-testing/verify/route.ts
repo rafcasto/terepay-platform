@@ -5,6 +5,7 @@ import { auditLog, getClientIp } from '@/lib/utils/audit';
 import { defaultLimiter, checkRateLimit } from '@/lib/rate-limit/limiter';
 import { runPaymentRefreshSweep } from '@/lib/qippay/refresh-sweep';
 import { runEarlyRepaymentSweep } from '@/lib/qippay/early-repayment-sweep';
+import { runConsentSweep } from '@/lib/qippay/consent-sweep';
 import { markSetPayTestVerifyRun } from '@/lib/admin/setpay-test-settings';
 import { assertQippayEnabled } from '@/lib/qippay/feature';
 
@@ -37,13 +38,14 @@ export async function POST(request: NextRequest): Promise<Response> {
     const auth = await withAuth(request, ['admin']);
     uid = auth.uid;
 
-    const [sweep, earlyRepayment] = await Promise.all([
+    const [sweep, earlyRepayment, consents] = await Promise.all([
       runPaymentRefreshSweep({
         actor: uid,
         ip,
         auditAction: 'setpay_payment_status_admin_verify',
       }),
       runEarlyRepaymentSweep({ actor: uid, ip }),
+      runConsentSweep({ actor: uid, ip }),
     ]);
 
     await markSetPayTestVerifyRun(sweep.processed);
@@ -53,7 +55,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       action: 'admin_setpay_test_verify',
       targetId: 'setpayTesting',
       targetType: 'systemConfig',
-      outcome: sweep.errored + earlyRepayment.errored > 0 ? 'failure' : 'success',
+      outcome: sweep.errored + earlyRepayment.errored + consents.errored > 0 ? 'failure' : 'success',
       ipAddress: ip,
       userAgent: request.headers.get('user-agent') ?? '',
       changes: {
@@ -70,6 +72,13 @@ export async function POST(request: NextRequest): Promise<Response> {
           ended: earlyRepayment.ended,
           stillPending: earlyRepayment.stillPending,
           errored: earlyRepayment.errored,
+        },
+        consents: {
+          total: consents.total,
+          activated: consents.activated,
+          ended: consents.ended,
+          stillPending: consents.stillPending,
+          errored: consents.errored,
         },
       },
     });
