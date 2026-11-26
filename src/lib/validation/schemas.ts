@@ -550,6 +550,12 @@ export const affordabilityAssessmentSchema = z.object({
   catalogVersionId: z.string(),
   redFlagsAcknowledged: z.record(z.string(), z.string()).optional().default({}),
   recommendation: z.enum(['proceed', 'decline']),
+  /** Why the assessor is proceeding or declining — recorded with the assessment and printed on the report. */
+  recommendationRationale: z
+    .string()
+    .trim()
+    .min(10, 'Recommendation rationale must be at least 10 characters')
+    .max(2000, 'Recommendation rationale must be 2000 characters or fewer'),
   assessedAmount: z.number().min(200).max(2000).optional(),
   /** Completed AI credit assessment job to attach to this assessment (see creditAssessmentRequestSchema). */
   creditAssessmentId: z.string().regex(/^[0-9]{14}-[0-9a-f]{8}$/, 'Invalid assessment id').optional(),

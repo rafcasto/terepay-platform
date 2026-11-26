@@ -591,6 +591,12 @@ export interface AffordabilityAssessment {
   redFlagsAcknowledged: Record<string, string>; // flag → lender acknowledgement
   surplusRating: 'affordable' | 'marginal' | 'high_risk' | 'not_affordable';
   recommendation: 'proceed' | 'decline';
+  /**
+   * The assessor's written reasons for the recommendation (why it is
+   * affordable / why it is being declined). Required on new assessments;
+   * absent on assessments recorded before it was introduced.
+   */
+  recommendationRationale?: string;
 
   /** AI credit assessment (`creditAssessments/{id}`) the lender ran on this wizard, if any. Advisory only. */
   creditAssessmentId?: string;
@@ -669,6 +675,7 @@ export interface AffordabilityDraftData {
     finalAmount: number;
   }>;
   recommendation: 'proceed' | 'decline';
+  recommendationRationale?: string;
   assessedAmount?: number;
   savedAt: string;
 }
@@ -678,7 +685,7 @@ export interface AffordabilityDraftData {
 // ---------------------------------------------------------------------------
 export interface LoanApplication {
   applicationId: string;
-  referenceNumber: string;           // e.g. TP-2026-00001
+  referenceNumber: string;           // e.g. TPN202600001 (see src/lib/loan/reference.ts; legacy TP-2026-00001)
   applicantId: string;
   assignedLenderId?: string;
   /** Friendly customer ID (e.g. TERE001) when the application was raised for an offline customer. */

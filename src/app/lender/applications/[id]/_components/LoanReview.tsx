@@ -580,7 +580,44 @@ function AffordabilityTab({ data, onSelect }: { data: ReviewData; onSelect: (tab
             <p className={SECTION_LABEL}>Assessments</p>
             <p className="mt-0.5 font-semibold text-[var(--text-strong)]">{a.assessmentCount}</p>
           </div>
+          {a.latest && (
+            <div
+              className={`rounded-[var(--radius-md)] p-3 ${
+                a.latest.recommendation === 'proceed'
+                  ? 'bg-[var(--success-50)] text-[var(--success-700)]'
+                  : 'bg-[var(--danger-50)] text-[var(--danger-700)]'
+              }`}
+            >
+              <p className="text-[11px] font-semibold uppercase tracking-[0.04em] opacity-80">Recommendation</p>
+              <p className="mt-0.5 font-semibold">{a.latest.recommendationLabel}</p>
+            </div>
+          )}
         </div>
+
+        {a.latest && (
+          <div className="mt-4 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-white p-4">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+              <p className={SECTION_LABEL}>Why — assessor&apos;s rationale (v{a.latest.version})</p>
+              <p className="text-xs text-[var(--text-muted)]">
+                {a.latest.assessedBy} · {a.latest.assessedAt} · surplus {a.latest.surplus} ({a.latest.surplusRatingLabel})
+              </p>
+            </div>
+            {a.latest.rationale ? (
+              <p className="mt-2 whitespace-pre-wrap text-sm text-[var(--text-body)]">{a.latest.rationale}</p>
+            ) : (
+              <p className="mt-2 text-sm italic text-[var(--text-muted)]">
+                No rationale was recorded with this assessment — it predates the rationale field. Re-assess to record one.
+              </p>
+            )}
+            {a.latest.hardDeclineTriggers.length > 0 && (
+              <ul className="mt-2 list-inside list-disc space-y-0.5 text-xs text-[var(--danger-700)]">
+                {a.latest.hardDeclineTriggers.map((t) => (
+                  <li key={t}>Hard decline: {t}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
         {data.docsPending > 0 && (
           <p className="mt-3 text-xs text-[var(--warning-700)]">
             {data.docsPending} document{data.docsPending === 1 ? '' : 's'} still need review — check them before relying on declared figures.

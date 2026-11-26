@@ -18,6 +18,10 @@ interface Props {
   hardDeclines: string[];
   recommendation: 'proceed' | 'decline';
   onRecommendationChange: (r: 'proceed' | 'decline') => void;
+  /** The assessor's written reasons for the recommendation — recorded with the assessment. */
+  rationale: string;
+  onRationaleChange: (v: string) => void;
+  validationErrors?: string[];
   onNext: () => void;
   onBack: () => void;
   /** AI credit assessment panel (rendered between the calculation and the recommendation). */
@@ -44,10 +48,18 @@ export default function StepResultsDecision({
   hardDeclines,
   recommendation,
   onRecommendationChange,
+  rationale,
+  onRationaleChange,
+  validationErrors,
   onNext,
   onBack,
   aiPanel,
 }: Props) {
+  const effectiveRecommendation: 'proceed' | 'decline' = hardDeclines.length > 0 ? 'decline' : recommendation;
+  const rationalePrompt =
+    effectiveRecommendation === 'decline'
+      ? 'Why is this application being declined? Reference the figures above (surplus, income verification, hard-decline triggers, credit history).'
+      : 'Why is this loan affordable for the applicant? Reference the figures above (verified income, expenses, surplus) and anything you weighed up.';
   const isAdjusted = assessedAmount !== requestedAmount;
   const outOfRange = assessedAmount < 200 || assessedAmount > 2000;
   const forced = hardDeclines.length > 0;
@@ -195,7 +207,43 @@ export default function StepResultsDecision({
             />
           </div>
         )}
+
+        {/* Rationale — why approve / why decline */}
+        <div className="mt-5">
+          <label htmlFor="recommendation-rationale" className="mb-1.5 block text-sm font-semibold text-[var(--text-strong)]">
+            Rationale for this recommendation <span className="text-[var(--danger-700)]">*</span>
+          </label>
+          <p className="mb-2 text-xs text-[var(--text-muted)]">{rationalePrompt}</p>
+          <textarea
+            id="recommendation-rationale"
+            rows={5}
+            value={rationale}
+            onChange={(e) => onRationaleChange(e.target.value)}
+            maxLength={2000}
+            placeholder={
+              effectiveRecommendation === 'decline'
+                ? 'e.g. Verified income is $1,480/fn against $1,520/fn of expenses; surplus is negative after the TerePay instalment and the Centrix report shows two recent defaults.'
+                : 'e.g. Verified salary of $2,100/fn confirmed against payslips and Centrix; expenses sit at benchmark; $320/fn surplus after the TerePay instalment comfortably covers the loan.'
+            }
+            className="w-full resize-y rounded-[var(--radius-md)] border border-[var(--border-default)] bg-white px-3 py-2 text-sm text-[var(--text-body)] placeholder:text-[var(--text-muted)]/60 focus:border-[var(--orange-400)] focus:outline-none focus:ring-2 focus:ring-[var(--orange-400)]"
+          />
+          <div className="mt-1 flex items-center justify-between text-xs text-[var(--text-muted)]">
+            <span>Recorded with the assessment and printed on the affordability report.</span>
+            <span className="tabular-nums">{rationale.trim().length}/2000</span>
+          </div>
+        </div>
       </div>
+
+      {validationErrors && validationErrors.length > 0 && (
+        <div className="rounded-[var(--radius-lg)] border-2 border-[var(--danger-700)]/30 bg-[var(--danger-50)] p-4">
+          <p className="mb-1 font-semibold text-[var(--danger-700)]">Before you continue</p>
+          <ul className="list-inside list-disc space-y-1 text-sm text-[var(--danger-700)]">
+            {validationErrors.map((e) => (
+              <li key={e}>{e}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Navigation */}
       <div className="flex items-center justify-between pt-2">

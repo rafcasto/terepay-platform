@@ -8,6 +8,7 @@ import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { auditLog, getClientIp } from '@/lib/utils/audit';
 import { defaultLimiter, checkRateLimit } from '@/lib/rate-limit/limiter';
 import { hasOutstandingLoan } from '@/lib/loan/outstanding-loan';
+import { generateLoanReference } from '@/lib/loan/reference';
 import { FieldValue } from 'firebase-admin/firestore';
 import { ZodError, z } from 'zod';
 import { randomUUID } from 'crypto';
@@ -66,10 +67,14 @@ async function handleLenderApplication(
   }
 
   const applicationId = randomUUID();
+  // Lender-raised applications skip the applicant's submit step, so the loan
+  // reference is issued here.
+  const referenceNumber = await generateLoanReference(adminDb);
   const now = FieldValue.serverTimestamp();
 
   const applicationData: Record<string, unknown> = {
     applicationId,
+    referenceNumber,
     status: 'pending_review',
     isExistingCustomer: inheritedIsExistingCustomer,
     createdByLenderId: lenderUid,
@@ -129,7 +134,7 @@ async function handleLenderApplication(
     userAgent: request.headers.get('user-agent') ?? '',
   });
 
-  return NextResponse.json({ data: { applicationId } }, { status: 201 });
+  return NextResponse.json({ data: { applicationId, referenceNumber } }, { status: 201 });
 }
 
 

@@ -169,6 +169,19 @@ export type ReviewData = {
     assessUrl: string;
     /** Evidence gate — documents must be reviewed before the credit assessment can start. */
     gate: EvidenceGateView;
+    /** Most recent recorded assessment (all figures pre-formatted); undefined until one is submitted. */
+    latest?: {
+      version: number;
+      recommendation: 'proceed' | 'decline';
+      recommendationLabel: string;
+      /** Written reasons for the recommendation; null on assessments recorded before the field existed. */
+      rationale: string | null;
+      surplus: string;
+      surplusRatingLabel: string;
+      hardDeclineTriggers: string[];
+      assessedBy: string;
+      assessedAt: string;
+    };
   };
   estimatedFee: string;
   feeIsEstimated: boolean;

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Badge from '@/components/shared/Badge';
+import { CUSTOMER_ID_RE } from '@/lib/customers/customer-id-format';
 import type { MergedCustomer } from '../page';
 
 type Props = {
@@ -11,6 +12,7 @@ type Props = {
 };
 
 export default function CustomerEditPanel({ customer, onClose, onSuccess }: Props) {
+  const [customerId, setCustomerId] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -25,6 +27,7 @@ export default function CustomerEditPanel({ customer, onClose, onSuccess }: Prop
   useEffect(() => {
     if (customer) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- resets the editable form when a different customer is selected
+      setCustomerId(customer.customerId ?? '');
       setFirstName(customer.firstName);
       setLastName(customer.lastName);
       setEmail(customer.email ?? '');
@@ -47,10 +50,19 @@ export default function CustomerEditPanel({ customer, onClose, onSuccess }: Prop
   }, [onClose]);
 
   const isOffline = customer?.type === 'offline';
+  /** Online applicants only get a TERE ID once their first loan is accepted. */
+  const hasCustomerId = Boolean(customer?.customerId);
+  const normalisedCustomerId = customerId.trim().toUpperCase();
+  const customerIdChanged = hasCustomerId && normalisedCustomerId !== customer?.customerId;
+  const customerIdInvalid = customerIdChanged && !CUSTOMER_ID_RE.test(normalisedCustomerId);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!customer) return;
+    if (customerIdInvalid) {
+      setError('Customer ID must look like TERE001 (TERE followed by at least three digits).');
+      return;
+    }
     setLoading(true);
     setError(null);
 
@@ -76,6 +88,25 @@ export default function CustomerEditPanel({ customer, onClose, onSuccess }: Prop
       const updated: Partial<MergedCustomer> = { firstName, lastName };
       if (phone.trim()) updated.email = customer.email; // preserve email; phone stored server-side
       if (isOffline && email.trim()) updated.email = email.trim();
+
+      // The ID change goes last: for offline customers it moves the record, so
+      // the field update above has to land on the old document first.
+      if (customerIdChanged) {
+        const idRes = await fetch(`/api/customers/${customer.id}/change-id`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ newCustomerId: normalisedCustomerId }),
+        });
+        if (!idRes.ok) {
+          const data = await idRes.json().catch(() => ({}));
+          throw new Error(
+            `Details saved, but the customer ID was not changed: ${data.error?.message ?? 'Failed to change customer ID'}`,
+          );
+        }
+        updated.customerId = normalisedCustomerId;
+        // Offline records are keyed by the ID, so the row's key moves with it.
+        if (isOffline) updated.id = normalisedCustomerId;
+      }
 
       onSuccess(customer.id, updated);
     } catch (err) {
@@ -131,10 +162,32 @@ export default function CustomerEditPanel({ customer, onClose, onSuccess }: Prop
         {/* Form */}
         <form onSubmit={handleSubmit} className="flex flex-1 flex-col overflow-y-auto">
           <div className="flex-1 space-y-5 px-6 py-6">
-            {customer?.customerId && (
+            {hasCustomerId ? (
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700">Customer ID</label>
+                <input
+                  type="text"
+                  value={customerId}
+                  onChange={(e) => setCustomerId(e.target.value)}
+                  pattern="[Tt][Ee][Rr][Ee][0-9]{3,}"
+                  spellCheck={false}
+                  autoCapitalize="characters"
+                  aria-invalid={customerIdInvalid || undefined}
+                  className={`w-full rounded-lg border px-3 py-2 font-mono text-sm font-semibold uppercase text-[#B45600] focus:outline-none focus:ring-1 ${
+                    customerIdInvalid
+                      ? 'border-red-300 focus:border-red-400 focus:ring-red-400'
+                      : 'border-gray-200 focus:border-[#F5A523] focus:ring-[#F5A523]'
+                  }`}
+                />
+                <p className="mt-1 text-xs text-gray-400">
+                  {customerIdChanged
+                    ? `Changing from ${customer?.customerId}. Every application and linked account that uses this ID is updated.`
+                    : 'TERE followed by at least three digits. Must not already be in use.'}
+                </p>
+              </div>
+            ) : (
               <p className="text-xs text-gray-400">
-                Customer ID:{' '}
-                <span className="font-mono font-semibold text-[#E08B00]">{customer.customerId}</span>
+                No customer ID yet — one is assigned when the customer accepts their first loan.
               </p>
             )}
 

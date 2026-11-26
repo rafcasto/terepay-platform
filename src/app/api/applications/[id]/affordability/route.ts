@@ -182,6 +182,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const surplusRating = calcSurplusRating(finalAvailableSurplus);
     const recommendation = hardDeclineTriggers.length > 0 ? 'decline' : parsed.recommendation;
+    const recommendationRationale = parsed.recommendationRationale;
 
     // Get current version number
     const existingSnap = await adminDb
@@ -234,6 +235,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       redFlagsAcknowledged: parsed.redFlagsAcknowledged,
       surplusRating,
       recommendation,
+      recommendationRationale,
       ...(creditAssessment ? { creditAssessmentId: creditAssessment.assessmentId, creditAssessment } : {}),
     });
 
@@ -285,6 +287,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
               redFlagsAcknowledged: parsed.redFlagsAcknowledged,
               surplusRating,
               recommendation,
+              recommendationRationale,
               ...(creditAssessment ? { creditAssessmentId: creditAssessment.assessmentId, creditAssessment } : {}),
             };
             const appForPdf = { ...appData, applicationId: id } as LoanApplication;
@@ -350,8 +353,16 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const appDoc = await appRef.get();
     if (!appDoc.exists) throw new AppError('NOT_FOUND', 404, 'Application not found');
 
-    const { layoutVersion, currentStep, checklist, incomeRows, expenseRows, recommendation, assessedAmount } =
-      await request.json();
+    const {
+      layoutVersion,
+      currentStep,
+      checklist,
+      incomeRows,
+      expenseRows,
+      recommendation,
+      recommendationRationale,
+      assessedAmount,
+    } = await request.json();
 
     await appRef.update({
       affordabilityDraft: {
@@ -361,6 +372,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         incomeRows: incomeRows ?? [],
         expenseRows: expenseRows ?? [],
         recommendation: recommendation ?? 'proceed',
+        ...(typeof recommendationRationale === 'string'
+          ? { recommendationRationale: recommendationRationale.slice(0, 2000) }
+          : {}),
         ...(typeof assessedAmount === 'number' ? { assessedAmount } : {}),
         savedAt: FieldValue.serverTimestamp(),
       },
