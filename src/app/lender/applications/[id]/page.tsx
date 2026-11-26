@@ -31,6 +31,7 @@ import {
 } from '@/lib/loan/evidence-reuse';
 import { evaluateEvidenceGate, loadPreviousApplications } from '@/lib/loan/evidence-gate';
 import { loadCreditSummary } from '@/lib/loan/credit-summary';
+import { resolveCustomerId } from '@/lib/loan/customer-ref';
 import { fmtDate, fmtDateTime, fmtYmd } from '@/lib/loan/format';
 import LoanReview from './_components/LoanReview';
 import type {
@@ -741,7 +742,10 @@ export default async function LenderApplicationDetailPage({
   };
   // Latest recorded affordability assessment — surfaces the assessor's
   // recommendation and written rationale on the application page.
-  const latestAssessment = await loadLatestAssessmentView(db, id);
+  const [latestAssessment, customerId] = await Promise.all([
+    loadLatestAssessmentView(db, id),
+    resolveCustomerId(app),
+  ]);
 
   // Lender-entered Centrix summary, stored encrypted on the customer profile.
   const storedSummary = app.applicantId
@@ -787,6 +791,7 @@ export default async function LenderApplicationDetailPage({
       submittedLabel: fmtDate(app.timeline?.submittedAt as TS),
     },
     snapshot: {
+      customerId: customerId ?? 'Not yet assigned',
       name: name || '—',
       email: pi?.email || '—',
       phone: pi?.phone || '—',

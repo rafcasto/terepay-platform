@@ -16,6 +16,22 @@ import type { LoanApplication } from '@/types/application';
 export async function resolveCustomerStatementReference(
   app: Pick<LoanApplication, 'applicationId' | 'applicantId' | 'offlineCustomerId' | 'referenceNumber'>,
 ): Promise<string> {
+  const customerId = await resolveCustomerId(app);
+  if (customerId) return customerId;
+
+  if (app.referenceNumber) return app.referenceNumber;
+  return app.applicationId.slice(0, 12);
+}
+
+/**
+ * The friendly TerePay customer ID (`TERE001`) behind an application, or null
+ * when the applicant has not been assigned one yet (online applicants get it
+ * when they accept their first offer). Offline applications carry it on the
+ * document; online ones keep it on `users/{uid}.customerId`.
+ */
+export async function resolveCustomerId(
+  app: Pick<LoanApplication, 'applicationId' | 'applicantId' | 'offlineCustomerId'>,
+): Promise<string | null> {
   if (app.offlineCustomerId) return app.offlineCustomerId;
 
   if (app.applicantId) {
@@ -28,6 +44,5 @@ export async function resolveCustomerStatementReference(
     }
   }
 
-  if (app.referenceNumber) return app.referenceNumber;
-  return app.applicationId.slice(0, 12);
+  return null;
 }

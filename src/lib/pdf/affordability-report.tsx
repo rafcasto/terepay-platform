@@ -287,9 +287,15 @@ interface Props {
   application: LoanApplication;
   /** Full AI credit assessment record linked to this version (advisory), when one was run. */
   creditAssessment?: CreditAssessmentRecord | null;
+  /** Friendly TerePay customer ID (`TERE001`); null when the applicant has none yet. */
+  customerId?: string | null;
 }
 
-const AffordabilityReportDocument = ({ assessment, application, creditAssessment }: Props) => {
+const AffordabilityReportDocument = ({ assessment, application, creditAssessment, customerId }: Props) => {
+  const customerIdLabel = customerId?.trim() || 'Not yet assigned';
+  const applicationRef = application.referenceNumber?.trim() || '-';
+  // Printed in every page header so a loose page can be traced back.
+  const headerLine = `Date: ${todayFmt()} | Ref: ${refFromAssessment(assessment)} | Customer: ${customerIdLabel} | Loan: ${applicationRef}`;
   const pi = application.personalInfo;
   const emp = application.employment;
   const expenses = application.livingExpenses;
@@ -425,7 +431,7 @@ const AffordabilityReportDocument = ({ assessment, application, creditAssessment
           <View>
             <Text style={styles.headerTitle}>AFFORDABILITY ASSESSMENT</Text>
             <Text style={[styles.headerTitle, { fontSize: 13 }]}>REPORT</Text>
-            <Text style={styles.headerSub}>Date: {todayFmt()} | Ref: {refFromAssessment(assessment)}</Text>
+            <Text style={styles.headerSub}>{headerLine}</Text>
           </View>
         </View>
         <Text style={styles.fspLine}>FSP1007414 | NZBN: 9429052055232</Text>
@@ -440,6 +446,9 @@ const AffordabilityReportDocument = ({ assessment, application, creditAssessment
         {/* Section 1 – Client Overview */}
         <SectionTitle title="1. CLIENT OVERVIEW" />
         <View style={styles.overviewTable}>
+          <OverviewRow label="Customer ID" value={customerIdLabel} />
+          <OverviewRow label="Loan Reference" value={applicationRef} />
+          <OverviewRow label="Application ID" value={application.applicationId} />
           <OverviewRow label="Full Name" value={pi ? `${pi.firstName} ${pi.lastName}` : '-'} />
           <OverviewRow label="Date of Birth" value={fmtYmd(pi?.dateOfBirth)} />
           <OverviewRow label="Residential Address" value={pi ? [pi.address, [pi.city, pi.postCode].filter(Boolean).join(' ')].filter(Boolean).join(', ') : '-'} />
@@ -487,7 +496,7 @@ const AffordabilityReportDocument = ({ assessment, application, creditAssessment
           <TerePayLogo />
           <View>
             <Text style={styles.headerTitle}>AFFORDABILITY ASSESSMENT REPORT</Text>
-            <Text style={styles.headerSub}>Date: {todayFmt()} | Ref: {refFromAssessment(assessment)}</Text>
+            <Text style={styles.headerSub}>{headerLine}</Text>
           </View>
         </View>
         <Text style={styles.fspLine}>FSP1007414 | NZBN: 9429052055232</Text>
@@ -543,7 +552,7 @@ const AffordabilityReportDocument = ({ assessment, application, creditAssessment
           <TerePayLogo />
           <View>
             <Text style={styles.headerTitle}>AFFORDABILITY ASSESSMENT REPORT</Text>
-            <Text style={styles.headerSub}>Date: {todayFmt()} | Ref: {refFromAssessment(assessment)}</Text>
+            <Text style={styles.headerSub}>{headerLine}</Text>
           </View>
         </View>
         <Text style={styles.fspLine}>FSP1007414 | NZBN: 9429052055232</Text>
@@ -620,7 +629,7 @@ const AffordabilityReportDocument = ({ assessment, application, creditAssessment
           <TerePayLogo />
           <View>
             <Text style={styles.headerTitle}>AFFORDABILITY ASSESSMENT REPORT</Text>
-            <Text style={styles.headerSub}>Date: {todayFmt()} | Ref: {refFromAssessment(assessment)}</Text>
+            <Text style={styles.headerSub}>{headerLine}</Text>
           </View>
         </View>
         <Text style={styles.fspLine}>FSP1007414 | NZBN: 9429052055232</Text>
@@ -657,7 +666,7 @@ const AffordabilityReportDocument = ({ assessment, application, creditAssessment
           <TerePayLogo />
           <View>
             <Text style={styles.headerTitle}>AFFORDABILITY ASSESSMENT REPORT</Text>
-            <Text style={styles.headerSub}>Date: {todayFmt()} | Ref: {refFromAssessment(assessment)}</Text>
+            <Text style={styles.headerSub}>{headerLine}</Text>
           </View>
         </View>
         <Text style={styles.fspLine}>FSP1007414 | NZBN: 9429052055232</Text>
@@ -683,6 +692,8 @@ const AffordabilityReportDocument = ({ assessment, application, creditAssessment
           <OverviewRow label="Assessment Date" value={assessedAtStr} />
           <OverviewRow label="Centrix Enquiry Ref" value={assessment.checklist.centrixReportNumber ?? '-'} />
           <OverviewRow label="TerePay Subscriber Ref" value={refFromAssessment(assessment)} />
+          <OverviewRow label="Customer ID" value={customerIdLabel} />
+          <OverviewRow label="Loan Reference / Application ID" value={`${applicationRef} / ${application.applicationId}`} />
           <OverviewRow label="Loan Amount Approved" value={fmt(approvedAmount)} />
           <OverviewRow label="Decision" value={decisionLabel} />
         </View>
@@ -706,6 +717,8 @@ const AffordabilityReportDocument = ({ assessment, application, creditAssessment
 export interface AffordabilityPdfOptions {
   /** Full AI credit assessment record to print in the advisory section. */
   creditAssessment?: CreditAssessmentRecord | null;
+  /** Friendly TerePay customer ID to print on the report (see `resolveCustomerId()`). */
+  customerId?: string | null;
 }
 
 export async function generateAffordabilityPdf(
@@ -718,6 +731,7 @@ export async function generateAffordabilityPdf(
       assessment={assessment}
       application={application}
       creditAssessment={options.creditAssessment ?? null}
+      customerId={options.customerId ?? null}
     />,
   );
   return Buffer.from(buffer);

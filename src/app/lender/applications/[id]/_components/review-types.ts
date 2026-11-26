@@ -127,6 +127,8 @@ export type ReviewData = {
     submittedLabel: string;
   };
   snapshot: {
+    /** Friendly TerePay customer ID (`TERE001`), or a "not yet assigned" label. */
+    customerId: string;
     name: string;
     email: string;
     phone: string;

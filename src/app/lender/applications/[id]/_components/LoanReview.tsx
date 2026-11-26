@@ -214,6 +214,7 @@ function Sidebar({ data, onOpenDocuments }: { data: ReviewData; onOpenDocuments:
         </div>
 
         <div className="grid grid-cols-2 gap-x-3 gap-y-4">
+          <SnapItem icon="creditCard" label="Customer ID" value={s.customerId} mono />
           <SnapItem icon="user" label="Full name" value={s.name} />
           <SnapItem icon="mail" label="Email" value={s.email} />
           <SnapItem icon="phoneCall" label="Phone" value={s.phone} />
@@ -312,7 +313,7 @@ function Sidebar({ data, onOpenDocuments }: { data: ReviewData; onOpenDocuments:
   );
 }
 
-function SnapItem({ icon, label, value }: { icon: ConsoleIconName; label: string; value: string }) {
+function SnapItem({ icon, label, value, mono = false }: { icon: ConsoleIconName; label: string; value: string; mono?: boolean }) {
   return (
     <div className="flex items-start gap-2">
       <span className="mt-0.5 text-[var(--text-muted)]">
@@ -320,7 +321,14 @@ function SnapItem({ icon, label, value }: { icon: ConsoleIconName; label: string
       </span>
       <div className="min-w-0">
         <p className={SECTION_LABEL}>{label}</p>
-        <p className="mt-0.5 break-words text-[13px] font-medium text-[var(--text-body)]">{value}</p>
+        <p
+          className={[
+            'mt-0.5 break-words text-[13px] font-medium',
+            mono ? 'font-mono font-semibold text-[var(--orange-700)]' : 'text-[var(--text-body)]',
+          ].join(' ')}
+        >
+          {value}
+        </p>
       </div>
     </div>
   );
