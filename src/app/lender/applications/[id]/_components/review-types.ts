@@ -227,6 +227,11 @@ export type ReviewData = {
     };
     consentStatus?: string;
     consentActivatedAt?: string;
+    /** Raw status string last returned by Qippay for the mandate. */
+    consentProviderStatus?: string;
+    consentLastCheckedAt?: string;
+    /** Set when the render-time check against Qippay failed. */
+    consentReconcileError?: string;
   };
   decisionInput: { requestedAmount: number; assessedAmount?: number };
   kyc: {

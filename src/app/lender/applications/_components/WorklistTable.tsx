@@ -12,9 +12,19 @@ export type WorklistRow = {
   amount: number;
   purpose: string;
   status: string;
+  /** True when the SetPay mandate is active — the loan is ready to disburse. */
+  consentActive?: boolean;
   submittedLabel: string;
   daysPending: number | null;
 };
+
+/** Status pill copy, aware of the consent gate: authorised ≠ awaiting. */
+function statusPill(r: Pick<WorklistRow, 'status' | 'consentActive'>): { label: string; tone: PillTone } {
+  if (r.status === 'awaiting_payment_consent' && r.consentActive) {
+    return { label: 'Bank Authorised — Ready to Disburse', tone: 'success' };
+  }
+  return { label: STATUS_LABEL[r.status] ?? r.status, tone: STATUS_TONE[r.status] ?? 'neutral' };
+}
 
 const STATUS_LABEL: Record<string, string> = {
   pending_review: 'Pending Review',
@@ -229,8 +239,8 @@ export default function WorklistTable({ rows }: { rows: WorklistRow[] }) {
                   </td>
                   <td className="whitespace-nowrap px-5 py-3 align-middle text-[var(--text-body)]">{r.purpose}</td>
                   <td className="px-5 py-3 align-middle">
-                    <ConsolePill tone={STATUS_TONE[r.status] ?? 'neutral'} dot>
-                      {STATUS_LABEL[r.status] ?? r.status}
+                    <ConsolePill tone={statusPill(r).tone} dot>
+                      {statusPill(r).label}
                     </ConsolePill>
                   </td>
                   <td className="whitespace-nowrap px-5 py-3 align-middle text-[var(--text-muted)]">{r.submittedLabel}</td>
