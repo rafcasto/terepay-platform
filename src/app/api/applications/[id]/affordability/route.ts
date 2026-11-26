@@ -15,6 +15,7 @@ import type { AffordabilityAssessment, LoanApplication } from '@/types/applicati
 import type { CreditAssessmentRecord, CreditAssessmentSummary } from '@/types/credit-assessment';
 import { getAssessmentRecord, summariseRecord } from '@/lib/assessment/persist';
 import { evaluateEvidenceGate, loadPreviousApplications } from '@/lib/loan/evidence-gate';
+import { resolveCustomerId } from '@/lib/loan/customer-ref';
 import {
   affordabilityLoanPayment,
   calcExpenseFinal,
@@ -293,6 +294,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             const appForPdf = { ...appData, applicationId: id } as LoanApplication;
             const pdfBuffer = await generateAffordabilityPdf(assessmentForPdf, appForPdf, {
               creditAssessment: creditAssessmentRecord,
+              customerId: await resolveCustomerId(appForPdf),
             });
             const dateStr = new Date().toISOString().split('T')[0];
             const pdfFileName = `affordability_assessment_v${nextVersion}_${dateStr}.pdf`;
