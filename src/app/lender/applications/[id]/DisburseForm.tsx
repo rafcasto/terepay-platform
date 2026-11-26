@@ -23,6 +23,11 @@ type Props = {
   /** Status of the Qippay SetPay mandate. Undefined for legacy `loan_accepted` applications that pre-date the consent gate. */
   consentStatus?: string;
   consentActivatedAt?: string;
+  /** Raw status string last returned by Qippay for the mandate. */
+  consentProviderStatus?: string;
+  consentLastCheckedAt?: string;
+  /** Set when the server-side check against Qippay failed while rendering. */
+  consentReconcileError?: string;
 };
 
 export default function DisburseForm({
@@ -32,6 +37,9 @@ export default function DisburseForm({
   bankDetails,
   consentStatus,
   consentActivatedAt,
+  consentProviderStatus,
+  consentLastCheckedAt,
+  consentReconcileError,
 }: Props) {
   const router = useRouter();
   const defaultAmount = Math.max(0, approvedAmount - applicationFee);
@@ -45,14 +53,23 @@ export default function DisburseForm({
   // `loan_accepted` applications have undefined consentStatus and skip the gate).
   const consentGated = consentStatus !== undefined && consentStatus !== 'active';
 
+  const [refreshNote, setRefreshNote] = useState<string | null>(null);
+
   const refreshConsent = async () => {
     setRefreshing(true);
     setError(null);
+    setRefreshNote(null);
     try {
       const res = await fetch(`/api/applications/${applicationId}/consent/status`);
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
         throw new Error(data.error?.message ?? 'Failed to refresh consent status');
+      }
+      const next = data.data?.status as string | undefined;
+      if (next && next === consentStatus) {
+        setRefreshNote(
+          `Qippay still reports this mandate as "${data.data?.providerStatus ?? next}". If the applicant says they approved it in their banking app, ask them to open their application page — or wait for the hourly check.`,
+        );
       }
       router.refresh();
     } catch (e) {
@@ -110,8 +127,26 @@ export default function DisburseForm({
             </p>
             <p className="mt-2 text-xs">
               Mandate status: <span className="font-mono">{consentStatus ?? 'not_started'}</span>
+              {consentProviderStatus && (
+                <>
+                  {' · '}Qippay says: <span className="font-mono">{consentProviderStatus}</span>
+                </>
+              )}
+              {consentLastCheckedAt && consentLastCheckedAt !== '—' && (
+                <>
+                  {' · '}last checked {consentLastCheckedAt}
+                </>
+              )}
             </p>
           </div>
+          {consentReconcileError && (
+            <div className="rounded-[var(--radius-md)] border border-[var(--danger-700)]/25 bg-[var(--danger-50)] px-3 py-2 text-xs text-[var(--danger-700)]">
+              {consentReconcileError}
+            </div>
+          )}
+          {refreshNote && (
+            <p className="text-xs text-[var(--text-muted)]">{refreshNote}</p>
+          )}
           <button
             onClick={refreshConsent}
             disabled={refreshing}

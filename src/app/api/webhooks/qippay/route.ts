@@ -9,6 +9,7 @@ import {
   WEBHOOK_TIMESTAMP_HEADER,
 } from '@/lib/qippay/verify-webhook';
 import { getDetailedConsentStatus } from '@/lib/qippay/setpay-client';
+import { reconcileConsent } from '@/lib/qippay/reconcile-consent';
 import { syncLoanRecord } from '@/lib/loan/loan-record';
 import { isQippayEnabled } from '@/lib/qippay/feature';
 import { sendConsentRevokedNotice } from '@/lib/loan/consent-revoked-notice';
@@ -97,16 +98,15 @@ export async function POST(request: NextRequest) {
         await handleConsentRevoked(epcId);
         break;
 
-      case 'enduring.status.cancelled':
       case 'enduring.status.success':
-        // These are handled by the redirect flow. Log only.
-        await auditLog({
-          userId: 'system:qippay_webhook',
-          action: `qippay_webhook_${event.replace(/\./g, '_')}`,
-          targetType: 'application',
-          outcome: 'success',
-          changes: { epcId, event },
-        });
+      case 'enduring.status.cancelled':
+        // Authoritative server-to-server signal that the consent reached a
+        // terminal state. We used to log these and rely on the applicant's
+        // browser (return page / poller) to flip the consent — which left
+        // lenders seeing "Awaiting Bank Authorisation" for mandates the
+        // customer had approved but never bounced back from. Now we reconcile
+        // against Qippay immediately (the payload is a hint, the GET is truth).
+        await handleConsentOutcome(epcId, event);
         break;
 
       default:
@@ -138,6 +138,39 @@ export async function POST(request: NextRequest) {
 // ---------------------------------------------------------------------------
 // Event handlers
 // ---------------------------------------------------------------------------
+
+async function handleConsentOutcome(epcId: string, event: string): Promise<void> {
+  const app = await findApplicationByMandateId(epcId);
+  if (!app) {
+    console.warn('[webhooks/qippay] consent event — no app found for epcId', { event, epcId });
+    await auditLog({
+      userId: 'system:qippay_webhook',
+      action: `qippay_webhook_${event.replace(/\./g, '_')}`,
+      targetType: 'application',
+      outcome: 'failure',
+      errorDetail: 'no application for epcId',
+      changes: { epcId, event },
+    });
+    return;
+  }
+
+  const result = await reconcileConsent({
+    applicationId: app.ref.id,
+    caller: 'webhook',
+    callerUid: 'system:qippay_webhook',
+    // Qippay just told us the state changed — never serve the 10 s cache.
+    force: true,
+  });
+
+  await auditLog({
+    userId: 'system:qippay_webhook',
+    action: `qippay_webhook_${event.replace(/\./g, '_')}`,
+    targetId: app.ref.id,
+    targetType: 'application',
+    outcome: 'success',
+    changes: { epcId, event, consentStatus: result.status, providerStatus: result.providerStatus },
+  });
+}
 
 async function handlePaymentSuccess(epcId: string): Promise<void> {
   const app = await findApplicationByMandateId(epcId);

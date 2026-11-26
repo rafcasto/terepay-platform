@@ -68,6 +68,9 @@ export default async function LenderApplicationsPage() {
       amount: ld?.requestedAmount ?? 0,
       purpose: loanPurposeLabel(ld?.loanPurpose),
       status: a.status as string,
+      consentActive:
+        a.status === 'awaiting_payment_consent' &&
+        (a.paymentConsent as { status?: string } | undefined)?.status === 'active',
       submittedLabel: fmtDate(submittedAt),
       daysPending: daysPending(submittedAt),
     };

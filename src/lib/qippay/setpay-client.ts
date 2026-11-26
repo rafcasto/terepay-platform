@@ -239,19 +239,83 @@ export async function getMandateStatus(
   return mapInitiationResponseToMandate(data);
 }
 
-// Normalises the upstream raw SetPay status string into our PaymentConsentStatus
-// vocabulary. SetPay statuses per the spec: awaiting_redirect, pending, expired*,
-// success, revoked (post-approval), cancelled (post-approval).
-export function normaliseStatus(
-  raw: string,
-): 'active' | 'failed' | 'expired' | 'cancelled' | 'initiated' {
-  const s = raw.toLowerCase();
-  if (s === 'success' || s === 'authorised' || s === 'authorized') return 'active';
-  if (s.startsWith('expired')) return 'expired';
-  if (s === 'cancelled' || s === 'canceled') return 'cancelled';
-  if (s === 'revoked') return 'cancelled';
-  if (s === 'failed' || s === 'declined') return 'failed';
+export type NormalisedConsentStatus = 'active' | 'failed' | 'expired' | 'cancelled' | 'initiated';
+
+// Normalises the upstream raw SetPay consent status string into our
+// PaymentConsentStatus vocabulary. SetPay statuses per the spec:
+// awaiting_redirect, pending, expired*, success, revoked (post-approval),
+// cancelled (post-approval). Casing, spacing and a few synonyms observed on
+// other Qippay surfaces are tolerated so a wording change upstream can never
+// leave a mandate the customer did authorise stuck in "pending" on our side.
+// Anything still unrecognised maps to `initiated` and is reported by
+// `isRecognisedConsentStatus()` so the reconciler can escalate it.
+export function normaliseStatus(raw: string | null | undefined): NormalisedConsentStatus {
+  const s = (raw ?? '').toLowerCase().replace(/[\s_-]+/g, '');
+  if (!s) return 'initiated';
+  if (
+    s === 'success' ||
+    s === 'succeeded' ||
+    s === 'successful' ||
+    s === 'authorised' ||
+    s === 'authorized' ||
+    s === 'approved' ||
+    s === 'active' ||
+    s === 'consented' ||
+    s === 'complete' ||
+    s === 'completed'
+  ) {
+    return 'active';
+  }
+  if (s.startsWith('expired') || s === 'timeout' || s === 'timedout') return 'expired';
+  if (s === 'cancelled' || s === 'canceled' || s === 'revoked') return 'cancelled';
+  if (s === 'failed' || s === 'failure' || s === 'declined' || s === 'rejected' || s === 'error') {
+    return 'failed';
+  }
   return 'initiated';
+}
+
+/**
+ * True when `raw` is a consent status we positively know how to interpret —
+ * including the genuinely in-flight ones. An unknown string normalises to
+ * `initiated` too, but callers should treat it as a vocabulary gap, not a
+ * confirmed "still waiting".
+ */
+export function isRecognisedConsentStatus(raw: string | null | undefined): boolean {
+  const s = (raw ?? '').toLowerCase().replace(/[\s_-]+/g, '');
+  if (!s) return false;
+  if (normaliseStatus(raw) !== 'initiated') return true;
+  return (
+    s === 'awaitingredirect' ||
+    s === 'awaitingauthorisation' ||
+    s === 'awaitingauthorization' ||
+    s === 'pending' ||
+    s === 'initiated' ||
+    s === 'redirected' ||
+    s === 'processing' ||
+    s === 'inprogress'
+  );
+}
+
+/**
+ * Normalises the bank-side consent status Qippay relays in
+ * `providerStatus.Status` on GET /v1/enduring_initiation/{id}/status. These
+ * follow the NZ open-banking enduring-consent vocabulary (AwaitingAuthorisation,
+ * Authorised, Rejected, Revoked, Expired). Used as the second opinion when the
+ * top-level consent status is unrecognised.
+ */
+export function normaliseProviderStatus(
+  raw: string | null | undefined,
+): NormalisedConsentStatus | null {
+  const s = (raw ?? '').toLowerCase().replace(/[\s_-]+/g, '');
+  if (!s) return null;
+  if (s === 'authorised' || s === 'authorized' || s === 'consumed') return 'active';
+  if (s === 'rejected' || s === 'declined' || s === 'failed') return 'failed';
+  if (s === 'revoked' || s === 'cancelled' || s === 'canceled') return 'cancelled';
+  if (s.startsWith('expired')) return 'expired';
+  if (s === 'awaitingauthorisation' || s === 'awaitingauthorization' || s === 'pending') {
+    return 'initiated';
+  }
+  return null;
 }
 
 // --- Embedded flow primitives ---------------------------------------------

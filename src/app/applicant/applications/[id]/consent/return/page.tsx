@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { getAdminDb, verifySessionOrIdToken } from '@/lib/firebase/admin';
 import { auditLog } from '@/lib/utils/audit';
 import { reconcileConsent } from '@/lib/qippay/reconcile-consent';
@@ -25,12 +25,21 @@ export default async function ConsentReturnPage({ params, searchParams }: PagePr
   const { id } = await params;
   const sp = await searchParams;
 
+  // The bank (or the Qippay hosted page) may bounce the applicant back in a
+  // browser context that does not carry our session cookie — a mobile bank
+  // app's in-app browser, or a different browser than the one they applied
+  // in. Previously that was a hard 404 and the authorisation never got
+  // reconciled from this page. Send them through login and straight back here.
   const cookieStore = await cookies();
   const session = cookieStore.get('__session')?.value;
-  if (!session) notFound();
-
-  const decoded = await verifySessionOrIdToken(session).catch(() => null);
-  if (!decoded) notFound();
+  const decoded = session ? await verifySessionOrIdToken(session).catch(() => null) : null;
+  if (!decoded) {
+    const qs = new URLSearchParams();
+    if (sp.outcome) qs.set('outcome', sp.outcome);
+    if (sp.stub) qs.set('stub', sp.stub);
+    const here = `/applicant/applications/${id}/consent/return${qs.size ? `?${qs}` : ''}`;
+    redirect(`/auth/login?redirect=${encodeURIComponent(here)}`);
+  }
 
   const db = getAdminDb();
   const snap = await db.collection('loanApplications').doc(id).get();
