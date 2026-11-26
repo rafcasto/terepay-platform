@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
 import { getAdminDb, verifySessionOrIdToken } from '@/lib/firebase/admin';
 import type {
+  AffordabilityAssessment,
   ApplicationDocument,
   CommunicationLogEntry,
   DocumentStatus,
@@ -185,6 +186,46 @@ function buildReuseItem(args: {
     windowMonths: args.windowMonths,
     expiresLabel: fmtDate(reuseExpiry(args.date, args.windowMonths)),
   };
+}
+
+const SURPLUS_RATING_LABELS: Record<string, string> = {
+  affordable: 'Likely affordable',
+  marginal: 'Marginal',
+  high_risk: 'High risk',
+  not_affordable: 'Not affordable',
+};
+
+/** Newest `affordabilityAssessments` record for the application, shaped for the review card. */
+async function loadLatestAssessmentView(
+  db: ReturnType<typeof getAdminDb>,
+  applicationId: string,
+): Promise<ReviewData['affordability']['latest']> {
+  try {
+    const snap = await db
+      .collection('affordabilityAssessments')
+      .where('applicationId', '==', applicationId)
+      .orderBy('version', 'desc')
+      .limit(1)
+      .get();
+    const doc = snap.docs[0];
+    if (!doc) return undefined;
+    const a = doc.data() as AffordabilityAssessment;
+    const rationale = typeof a.recommendationRationale === 'string' ? a.recommendationRationale.trim() : '';
+    return {
+      version: a.version,
+      recommendation: a.recommendation,
+      recommendationLabel: a.recommendation === 'proceed' ? 'Proceed to credit check' : 'Decline',
+      rationale: rationale || null,
+      surplus: fmt(a.finalAvailableSurplus ?? 0),
+      surplusRatingLabel: SURPLUS_RATING_LABELS[a.surplusRating] ?? a.surplusRating ?? '—',
+      hardDeclineTriggers: Array.isArray(a.hardDeclineTriggers) ? a.hardDeclineTriggers : [],
+      assessedBy: a.lenderName || '—',
+      assessedAt: a.assessedAt ? fmtDateTime(a.assessedAt) : '—',
+    };
+  } catch (err) {
+    console.error('[lender/application] failed to load latest affordability assessment', applicationId, err);
+    return undefined;
+  }
 }
 
 export default async function LenderApplicationDetailPage({
@@ -698,6 +739,10 @@ export default async function LenderApplicationDetailPage({
     borrowerDocuments: borrowerKycDocuments,
     reports: datazooReports,
   };
+  // Latest recorded affordability assessment — surfaces the assessor's
+  // recommendation and written rationale on the application page.
+  const latestAssessment = await loadLatestAssessmentView(db, id);
+
   // Lender-entered Centrix summary, stored encrypted on the customer profile.
   const storedSummary = app.applicantId
     ? await loadCreditSummary(app.applicantId).catch(() => null)
@@ -774,6 +819,7 @@ export default async function LenderApplicationDetailPage({
       pdfUrl: `/api/applications/${id}/affordability/pdf`,
       assessUrl: `/lender/applications/${id}/affordability`,
       gate: gateView,
+      latest: latestAssessment,
     },
     estimatedFee: ld?.applicationFee !== undefined ? fmt(ld.applicationFee) : fmt(computeApplicationFee(app.isExistingCustomer)),
     feeIsEstimated: ld?.applicationFee === undefined,

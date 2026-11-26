@@ -593,6 +593,15 @@ const AffordabilityReportDocument = ({ assessment, application, creditAssessment
           {application.decision?.rationale ?? 'Assessment completed. Refer to full application file for decision rationale.'}
         </Text>
 
+        <Text style={styles.subHeading}>Affordability Recommendation:</Text>
+        <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 9, marginBottom: 4 }}>
+          {`${assessment.recommendation === 'proceed' ? 'PROCEED TO CREDIT CHECK' : 'DECLINE'} - ${assessment.lenderName || 'Assessor'}, v${assessment.version}`}
+        </Text>
+        <Text style={{ fontSize: 8, marginBottom: 8 }}>
+          {assessment.recommendationRationale?.trim() ||
+            'No rationale was recorded with this assessment (recorded before the rationale field was introduced).'}
+        </Text>
+
         <Text style={styles.subHeading}>Loan Terms:</Text>
         <TableHeaderRow cols={['Component', 'Detail']} />
         <TableRow shade cells={['Approved Amount', fmt(approvedAmount)]} />

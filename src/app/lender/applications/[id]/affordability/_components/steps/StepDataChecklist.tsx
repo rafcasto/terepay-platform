@@ -12,6 +12,8 @@ interface Props {
   hardDeclines: string[];
   /** What will actually be recorded (hard declines force `decline`). */
   effectiveRecommendation: 'proceed' | 'decline';
+  /** The assessor's written reasons, entered on Results & Decision. */
+  recommendationRationale: string;
   onSubmit: () => Promise<void>;
   loading: boolean;
   error: string | null;
@@ -31,6 +33,7 @@ export default function StepDataChecklist({
   isCitizen,
   hardDeclines,
   effectiveRecommendation,
+  recommendationRationale,
   onSubmit,
   loading,
   error,
@@ -206,6 +209,20 @@ export default function StepDataChecklist({
           . Go back to Results &amp; Decision to change it.
         </div>
       )}
+
+      {/* Rationale as it will be recorded */}
+      <div className="rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-white p-4 shadow-[var(--shadow-xs)]">
+        <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">
+          Rationale to be recorded
+        </p>
+        {recommendationRationale.trim() ? (
+          <p className="whitespace-pre-wrap text-sm text-[var(--text-body)]">{recommendationRationale.trim()}</p>
+        ) : (
+          <p className="text-sm text-[var(--danger-700)]">
+            No rationale entered — go back to Results &amp; Decision and explain why the loan is affordable or why it is being declined.
+          </p>
+        )}
+      </div>
 
       {/* Submission error */}
       {error && (

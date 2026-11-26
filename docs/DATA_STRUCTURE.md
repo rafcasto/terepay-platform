@@ -177,7 +177,13 @@ interface LenderProfile {
 interface LoanApplication {
   // Identifiers
   applicationId: string;                 // UUID
+  referenceNumber: string;               // Loan reference shown to the borrower, e.g. TPN202600001
+                                         // (TPN20 + YY + 5-digit yearly sequence; src/lib/loan/reference.ts).
+                                         // Issued on applicant submit or lender on-behalf creation.
+                                         // Legacy TP-2026-00001 values are kept as-is.
   applicantId: string;                   // Reference to users/{userId}
+  offlineCustomerId?: string;            // TERE ID when raised for an offline customer. Repointed by
+                                         // POST /api/customers/[id]/change-id (src/lib/customers/customer-id.ts)
   // Single-lender model: no lenderId field needed. The lender sees all submitted applications.
   
   // Status Tracking
@@ -502,6 +508,48 @@ interface Notification {
 - Section definitions + defaults live in `src/types/content.ts`; the editor's page/menu structure (which sections appear on which `/content-editor/*` page) lives in [src/lib/content/pages.ts](../src/lib/content/pages.ts).
 - Client trees read content through `SiteContentProvider` / `useSiteContent()` ([src/lib/content/SiteContentContext.tsx](../src/lib/content/SiteContentContext.tsx)), fed by the nearest server layout.
 - No PII. Every save is audit-logged as `content_section_updated`.
+
+### 8. Offline Customers Collection
+
+**Path:** `offlineCustomers/{customerId}` — the document ID **is** the friendly TERE ID (`TERE001`).
+
+```typescript
+interface OfflineCustomer {
+  customerId: string;            // Same as the document ID
+  firstName: string;             // 🔒
+  lastName: string;              // 🔒
+  email: string;                 // 🔒 used for 3-way claim verification
+  dateOfBirth: string;           // 🔒 YYYY-MM-DD
+  phone?: string;                // 🔒
+  notes?: string;
+  status: "unlinked" | "linked";
+  linkedUid?: string;            // users/{uid} once claimed
+  createdByLenderId: string;
+  previousCustomerIds?: string[];// History when a lender changes the ID (see below)
+  createdAt: Timestamp;
+  updatedAt?: Timestamp;
+}
+```
+
+**Changing a customer ID.** Lenders can edit the ID from the Customers page. `renameCustomerId()`
+([src/lib/customers/customer-id.ts](../src/lib/customers/customer-id.ts)) moves the document to the
+new key, repoints `users.customerId` and `loanApplications.offlineCustomerId`, appends the old ID to
+`previousCustomerIds`, and bumps `settings/customerIdCounter` past the new number — all in one
+transaction. Historic Qippay `statement_reference` values, audit entries and PDFs keep the old ID.
+
+### 9. Affordability Assessments Collection
+
+**Path:** `affordabilityAssessments/{assessmentId}` — see `AffordabilityAssessment` in
+[src/types/application.ts](../src/types/application.ts) for the full shape. Key decision fields:
+
+```typescript
+  hardDeclineTriggers: string[];
+  surplusRating: "affordable" | "marginal" | "high_risk" | "not_affordable";
+  recommendation: "proceed" | "decline";
+  recommendationRationale?: string;   // Assessor's written reasons (why affordable / why declined).
+                                      // Required on new assessments (10–2000 chars); printed in the
+                                      // report (§7) and shown on the lender's application page.
+```
 
 ## Data Relationships & Constraints
 

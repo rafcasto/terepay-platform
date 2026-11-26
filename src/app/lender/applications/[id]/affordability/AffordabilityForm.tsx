@@ -52,6 +52,21 @@ function validateIncome(incomeRows: IncomeRow[], checklist: Checklist): string[]
   return errors;
 }
 
+/** Results & Decision: the recommendation must come with written reasons. */
+const MIN_RATIONALE_LENGTH = 10;
+const MAX_RATIONALE_LENGTH = 2000;
+
+function validateResults(recommendationRationale: string): string[] {
+  const trimmed = recommendationRationale.trim();
+  if (trimmed.length < MIN_RATIONALE_LENGTH) {
+    return [`Explain the recommendation — why the loan is affordable or why it is being declined (at least ${MIN_RATIONALE_LENGTH} characters)`];
+  }
+  if (trimmed.length > MAX_RATIONALE_LENGTH) {
+    return [`Recommendation rationale must be ${MAX_RATIONALE_LENGTH} characters or fewer`];
+  }
+  return [];
+}
+
 /** Final checklist: every item ticked and its supporting detail supplied. */
 function validateChecklist(checklist: Checklist, isCitizen: boolean): string[] {
   const errors: string[] = [];
@@ -189,6 +204,9 @@ export default function AffordabilityForm({
   const [recommendation, setRecommendation] = useState<'proceed' | 'decline'>(
     initialDraft?.recommendation ?? 'proceed',
   );
+  const [recommendationRationale, setRecommendationRationale] = useState<string>(
+    initialDraft?.recommendationRationale ?? '',
+  );
   const [assessedAmount, setAssessedAmount] = useState<number>(
     initialDraft?.assessedAmount ?? loanAmount,
   );
@@ -280,13 +298,16 @@ export default function AffordabilityForm({
         incomeRows,
         expenseRows,
         recommendation,
+        recommendationRationale,
         assessedAmount,
       }),
     }).catch(() => undefined);
   };
 
   const submit = async () => {
-    const errors = validateChecklist(checklist, isCitizen);
+    // The rationale is validated again here because a draft saved before the
+    // field existed can resume straight onto this step.
+    const errors = [...validateResults(recommendationRationale), ...validateChecklist(checklist, isCitizen)];
     if (errors.length > 0) {
       setStepErrors(errors);
       return;
@@ -306,6 +327,7 @@ export default function AffordabilityForm({
           catalogVersionId,
           redFlagsAcknowledged: {},
           recommendation: effectiveRecommendation,
+          recommendationRationale: recommendationRationale.trim(),
           assessedAmount,
           // Attach the AI assessment only when it finished (and for this amount).
           creditAssessmentId:
@@ -334,6 +356,7 @@ export default function AffordabilityForm({
     // Validate the current step before advancing
     let errors: string[] = [];
     if (currentStep === STEP.income) errors = validateIncome(incomeRows, checklist);
+    if (currentStep === STEP.results) errors = validateResults(recommendationRationale);
 
     if (errors.length > 0) {
       setStepErrors(errors);
@@ -455,6 +478,9 @@ export default function AffordabilityForm({
                 hardDeclines={hardDeclines}
                 recommendation={recommendation}
                 onRecommendationChange={setRecommendation}
+                rationale={recommendationRationale}
+                onRationaleChange={setRecommendationRationale}
+                validationErrors={stepErrors}
                 onNext={next}
                 onBack={back}
                 aiPanel={
@@ -479,6 +505,7 @@ export default function AffordabilityForm({
                 isCitizen={isCitizen}
                 hardDeclines={hardDeclines}
                 effectiveRecommendation={effectiveRecommendation}
+                recommendationRationale={recommendationRationale}
                 onSubmit={submit}
                 loading={loading}
                 error={error}

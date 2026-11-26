@@ -7,21 +7,9 @@ import { AppError, errorResponse, internalError } from '@/lib/utils/api-error';
 import { auditLog, getClientIp } from '@/lib/utils/audit';
 import { hasOutstandingLoan } from '@/lib/loan/outstanding-loan';
 import { FieldValue } from 'firebase-admin/firestore';
+import { generateLoanReference } from '@/lib/loan/reference';
 
 type RouteParams = { params: Promise<{ id: string }> };
-
-/** Generate a TP-YYYY-NNNNN reference number. */
-async function generateReference(): Promise<string> {
-  const year = new Date().getFullYear();
-  const counterRef = adminDb.collection('counters').doc(`applications_${year}`);
-  const result = await adminDb.runTransaction(async (tx) => {
-    const doc = await tx.get(counterRef);
-    const next = (doc.data()?.count ?? 0) + 1;
-    tx.set(counterRef, { count: next }, { merge: true });
-    return next;
-  });
-  return `TP-${year}-${String(result).padStart(5, '0')}`;
-}
 
 /**
  * POST /api/applications/[id]/submit
@@ -64,7 +52,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const referenceNumber = data.referenceNumber || await generateReference();
+    const referenceNumber = data.referenceNumber || (await generateLoanReference(adminDb));
     const now = FieldValue.serverTimestamp();
 
     await docRef.update({
